@@ -7,6 +7,8 @@ import std.process;
 import std.stdio;
 
 import buildapi;
+import parsers.automatic;
+import tree_generators.dub;
 
 
 
@@ -37,7 +39,6 @@ int main(string[] args)
     import building.cache;
     import package_searching.entry;
     import package_searching.dub;
-    static import parsers.json;
     static import parsers.environment;
     static import command_generators.dmd;
 
@@ -55,17 +56,11 @@ int main(string[] args)
         import std.datetime.stopwatch;
         import std.system;
         StopWatch st = StopWatch(AutoStart.yes);
-        
-        string projectFile = findEntryProjectFile(workingDir);
-
-        BuildRequirements req;
-        switch(extension(projectFile))
-        {
-            case ".json":  req = parsers.json.parse(projectFile); break;
-            default: throw new Error("Unsupported project type "~projectFile);
-        }
+        BuildRequirements req = parseProject(workingDir);
         req.cfg = req.cfg.merge(parsers.environment.parse());
         writeln = command_generators.dmd.parseBuildConfiguration(req.cfg, os);
+
+        printProjectTree(getProjectTree(req));
         writeln = req.dependencies;
 
         writeln("Built project in ", (st.peek.total!"msecs"), " ms.") ;

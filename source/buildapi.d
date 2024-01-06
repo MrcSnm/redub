@@ -21,6 +21,7 @@ struct BuildConfiguration
     string[] versions;
     string[] importDirectories;
     string[] libraryPaths;
+    string[] stringImportPaths;
     string[] libraries;
     string[] linkFlags;
     string[] dFlags;
@@ -46,6 +47,25 @@ struct BuildConfiguration
         }
         return ret;
     }
+    BuildConfiguration mergeImport(BuildConfiguration other) const
+    {
+        BuildConfiguration ret = clone;
+        ret.importDirectories~= other.importDirectories;
+        return ret;
+    }
+
+    BuildConfiguration mergeDFlags(BuildConfiguration other) const
+    {
+        BuildConfiguration ret = clone;
+        ret.dFlags~= other.dFlags;
+        return ret;
+    }
+    BuildConfiguration mergeVersions(BuildConfiguration other) const
+    {
+        BuildConfiguration ret = clone;
+        ret.versions~= other.versions;
+        return ret;
+    }
 }
 
 struct Dependency
@@ -59,4 +79,26 @@ struct BuildRequirements
 {
     BuildConfiguration cfg;
     Dependency[] dependencies;
+    string version_;
+}
+
+class ProjectNode
+{
+    BuildRequirements requirements;
+    ProjectNode parent;
+    ProjectNode[] dependencies;
+
+    string name() const { return requirements.cfg.name; }
+
+    this(BuildRequirements req)
+    {
+        this.requirements = req;
+    }
+
+    ProjectNode addDependency(ProjectNode dep)
+    {
+        dep.parent = this;
+        dependencies~= dep;
+        return this;
+    }
 }

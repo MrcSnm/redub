@@ -2,10 +2,11 @@ module package_searching.dub;
 import std.json;
 import dubv2.libs.semver;
 
-bool dubHook_PackageManagerDownloadPackage(string packageName, string packageVersion)
+bool dubHook_PackageManagerDownloadPackage(string packageName, string packageVersion, string requiredBy= "")
 {
     import std.stdio;
-    writeln("dubHook_PackageManagerDownloadPackage with arguments (", packageName, ", ", packageVersion,") is not implemented yet.");
+    writeln("dubHook_PackageManagerDownloadPackage with arguments (", packageName, ", ", packageVersion,") " ~
+    "required by '", requiredBy, "' is not implemented yet.");
     return false;
 }
 
@@ -19,7 +20,7 @@ bool dubHook_PackageManagerDownloadPackage(string packageName, string packageVer
  *   packageVersion = "version" inside dub.json. Only full matches are accepted at the moment
  * Returns: The package path when found. null when not.
  */
-string getPackagePath(string packageName, string packageVersion)
+string getPackagePath(string packageName, string packageVersion, string requiredBy="")
 {
     import std.file;
     import std.path;
@@ -35,7 +36,7 @@ string getPackagePath(string packageName, string packageVersion)
     string downloadedPackagePath = buildNormalizedPath(lookupPath, packageName);
     if(!std.file.exists(downloadedPackagePath))
     {
-        if(!dubHook_PackageManagerDownloadPackage(packageName, packagePath))
+        if(!dubHook_PackageManagerDownloadPackage(packageName, packagePath, requiredBy))
             return null;
     }
 

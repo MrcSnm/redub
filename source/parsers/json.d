@@ -6,35 +6,46 @@ import std.file;
 
 BuildRequirements parse(string filePath)
 {
-    return parse(parseJSON(std.file.readText(filePath)));
+    import std.path;
+    ParseConfig c = ParseConfig(true, dirName(filePath));
+    return parse(parseJSON(std.file.readText(filePath)), c);
 }
-
+struct ParseConfig
+{
+    bool firstRun;
+    string workingDir;
+}
 
 /** 
  * Params:
  *   json = A dub.json equivalent
  * Returns: 
  */
-BuildRequirements parse(JSONValue json, bool firstRun = true)
+BuildRequirements parse(JSONValue json, ParseConfig cfg)
 {
-    import std.string:split;
     BuildRequirements buildRequirements;
+    if(cfg.firstRun) buildRequirements.version_ = "~master";
     immutable static handler = [
-        "name": (ref BuildRequirements req, JSONValue v, bool firstRun){if(firstRun) req.cfg.name = v.str;},
-        "targetType": (ref BuildRequirements req, JSONValue v, bool firstRun){req.cfg.targetType = targetFrom(v.str);},
-        "targetPath": (ref BuildRequirements req, JSONValue v, bool firstRun){req.cfg.outputDirectory = v.str;},
-        "importPaths": (ref BuildRequirements req, JSONValue v, bool firstRun){req.cfg.importDirectories = v.strArr;},
-        "libPaths":  (ref BuildRequirements req, JSONValue v, bool firstRun){req.cfg.libraryPaths = v.strArr;},
-        "libs":  (ref BuildRequirements req, JSONValue v, bool firstRun){req.cfg.libraries = v.strArr;},
-        "versions":  (ref BuildRequirements req, JSONValue v, bool firstRun){req.cfg.versions = v.strArr;},
-        "lflags":  (ref BuildRequirements req, JSONValue v, bool firstRun){req.cfg.linkFlags = v.strArr;},
-        "dflags":  (ref BuildRequirements req, JSONValue v, bool firstRun){req.cfg.dFlags = v.strArr;},
-        "configurations": (ref BuildRequirements req, JSONValue v, bool firstRun)
+        "name": (ref BuildRequirements req, JSONValue v, ParseConfig c){if(c.firstRun) req.cfg.name = v.str;},
+        "targetType": (ref BuildRequirements req, JSONValue v, ParseConfig c){req.cfg.targetType = targetFrom(v.str);},
+        "targetPath": (ref BuildRequirements req, JSONValue v, ParseConfig c){req.cfg.outputDirectory = v.str;},
+        "importPaths": (ref BuildRequirements req, JSONValue v, ParseConfig c){req.cfg.importDirectories = v.strArr;},
+        "libPaths":  (ref BuildRequirements req, JSONValue v, ParseConfig c){req.cfg.libraryPaths = v.strArr;},
+        "libs":  (ref BuildRequirements req, JSONValue v, ParseConfig c){req.cfg.libraries = v.strArr;},
+        "versions":  (ref BuildRequirements req, JSONValue v, ParseConfig c){req.cfg.versions = v.strArr;},
+        "lflags":  (ref BuildRequirements req, JSONValue v, ParseConfig c){req.cfg.linkFlags = v.strArr;},
+        "dflags":  (ref BuildRequirements req, JSONValue v, ParseConfig c){req.cfg.dFlags = v.strArr;},
+        "configurations": (ref BuildRequirements req, JSONValue v, ParseConfig c)
         {
-            if(firstRun) req.cfg = req.cfg.merge(parse(v.array[0], false).cfg);
+            if(c.firstRun)
+            {
+                c.firstRun = false;
+                req.cfg = req.cfg.merge(parse(v.array[0], c).cfg);
+            }
         },
-        "dependencies": (ref BuildRequirements req, JSONValue v, bool firstRun)
+        "dependencies": (ref BuildRequirements req, JSONValue v, ParseConfig c)
         {
+            import std.path;
             import std.exception;
             import package_searching.dub;
             foreach(string depName, JSONValue value; v.object)
@@ -43,16 +54,22 @@ BuildRequirements parse(JSONValue json, bool firstRun = true)
                 if(value.type == JSONType.object) ///Uses path style
                 {
                     const(JSONValue)* depPath = "path" in value;
-                    enforce(depPath, "Dependency named "~depName~" must contain a \"path\" property.");
-                    newDep.path = depPath.str;
                     const(JSONValue)* depVer = "version" in value;
-                    if(depVer) newDep.version_ = depVer.str;
+                    enforce(depPath || depVer, "Dependency named "~ depName ~ " must contain at least a \"path\" or \"version\" property.");
+                    if(depPath)
+                        newDep.path = depPath.str;
+                    if(depVer)
+                    {
+                        if(!depPath) newDep.path = package_searching.dub.getPackagePath(depName, depVer.str, req.cfg.name);
+                        newDep.version_ = depVer.str;
+                    }
                 }
                 else if(value.type == JSONType.string) ///Version style
                 {
                     newDep.version_ = value.str;
-                    newDep.path = getPackagePath(depName, value.str);
+                    newDep.path = package_searching.dub.getPackagePath(depName, value.str);
                 }
+                if(!isAbsolute(newDep.path)) newDep.path = buildNormalizedPath(c.workingDir, newDep.path);
                 req.dependencies~= newDep;
             }
         }
@@ -63,7 +80,7 @@ BuildRequirements parse(JSONValue json, bool firstRun = true)
     {
         auto fn = key in handler;
         if(fn)
-            (*fn)(buildRequirements, v, firstRun);
+            (*fn)(buildRequirements, v, cfg);
         else
         {
             CommandWithFilter filtered = CommandWithFilter.fromKey(key);
@@ -72,14 +89,14 @@ BuildRequirements parse(JSONValue json, bool firstRun = true)
             {
                 //TODO: Add mathesCompiler
                 if(filtered.matchesOS(os))
-                    (*fn)(buildRequirements, v, firstRun);
+                    (*fn)(buildRequirements, v, cfg);
             }
             else
                 unusedKeys~= key;
         }
     }
     import std.stdio;
-    if(firstRun) writeln("WARNING: Unused Keys -> ", unusedKeys);
+    // if(cfg.firstRun) writeln("WARNING: Unused Keys -> ", unusedKeys);
 
     return buildRequirements;
 }
