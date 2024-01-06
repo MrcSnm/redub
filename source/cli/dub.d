@@ -1,5 +1,14 @@
 module cli.dub;
 
+/// The URL to the official package registry and it's default fallback registries.
+static immutable string[] defaultRegistryURLs = [
+	"https://code.dlang.org/",
+	"https://codemirror.dlang.org/",
+	"https://dub.bytecraft.nl/",
+	"https://code-mirror.dlang.io/",
+];
+
+
 
 enum SkipRegistry
 {
@@ -55,7 +64,10 @@ struct DubCommonArguments
     bool verbose;
     @("Print debug output")
     bool vverbose;
-    args.getopt("q|quiet", &quiet, ["Only print warnings and errors"]);
+
+    @("Only print warnings and errors")
+    @("q|quiet")
+    bool quiet;
     @("Only print errors")
     bool verror;
     @("Print no messages")

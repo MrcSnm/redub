@@ -9,6 +9,11 @@ BuildRequirements parse(string filePath)
     return parse(parseJSON(std.file.readText(filePath)));
 }
 
+/** 
+ * Params:
+ *   json = A dub.json equivalent
+ * Returns: 
+ */
 BuildRequirements parse(JSONValue json)
 {
     BuildRequirements buildRequirements;

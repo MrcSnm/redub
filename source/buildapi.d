@@ -20,6 +20,19 @@ struct BuildConfiguration
     string sourceEntryPoint = "source/app.d";
     string outputDirectory  = "build";
     OutputType outputType;
+
+
+    BuildConfiguration merge(BuildConfiguration other) const
+    {
+        import std.traits:isArray;
+        BuildConfiguration ret = cast()this;
+        foreach(i, ref val; ret.tupleof)
+        {
+            static if(isArray!(typeof(val)))
+                cast()val~= other.tupleof[i][];
+        }
+        return ret;
+    }
 }
 
 struct Dependency{}
