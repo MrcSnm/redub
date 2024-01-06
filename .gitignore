@@ -1,0 +1,5 @@
+build
+*.exe
+*.a
+*.lib
+.DS_Store

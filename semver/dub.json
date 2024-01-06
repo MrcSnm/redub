@@ -1,0 +1,10 @@
+{
+	"authors": [
+		"Marcelo Silva Nascimento Mancini"
+	],
+	"copyright": "Copyright © 2024, Marcelo Silva Nascimento Mancini",
+	"description": "A minimal SemVer implementation, almost completely @nogc and nothrow",
+	"targetType": "library",
+	"license": "proprietary",
+	"name": "semver"
+}

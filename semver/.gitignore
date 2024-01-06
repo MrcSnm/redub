@@ -1,0 +1,16 @@
+.dub
+docs.json
+__dummy.html
+docs/
+/semver
+semver.so
+semver.dylib
+semver.dll
+semver.a
+semver.lib
+semver-test-*
+*.exe
+*.pdb
+*.o
+*.obj
+*.lst

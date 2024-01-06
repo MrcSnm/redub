@@ -1,0 +1,13 @@
+{
+    "name": "dubv2",
+    "targetPath": "build",
+    "authors": ["Hipreme"],
+    "license": "MIT",
+    "subPackages": [
+        "semver"
+    ],
+    "dependencies": {
+        "dubv2:semver": {"path": "semver"}
+    }
+
+}
