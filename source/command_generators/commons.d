@@ -34,12 +34,12 @@ string getLibraryExtension(OS os)
     }
 }
 
-string getExtension(OutputType t, OS target)
+string getExtension(TargetType t, OS target)
 {
     final switch(t)
     {
-        case OutputType.executable: return target.getExecutableExtension;
-        case OutputType.library: return target.getLibraryExtension;
-        case OutputType.sharedLibrary: return target.getSharedLibraryExtension;
+        case TargetType.executable: return target.getExecutableExtension;
+        case TargetType.library: return target.getLibraryExtension;
+        case TargetType.sharedLibrary: return target.getSharedLibraryExtension;
     }
 }

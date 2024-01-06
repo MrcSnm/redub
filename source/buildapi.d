@@ -1,10 +1,17 @@
 import std.path;
 
-enum OutputType
+enum TargetType
 {
     executable,
     library,
     sharedLibrary,
+}
+TargetType targetFrom(string s)
+{
+    TargetType ret;
+    static foreach(mem; __traits(allMembers, TargetType))
+        if(s == mem) ret = __traits(getMember, TargetType, mem);
+    return ret;
 }
 
 struct BuildConfiguration
@@ -19,7 +26,7 @@ struct BuildConfiguration
     string[] dFlags;
     string sourceEntryPoint = "source/app.d";
     string outputDirectory  = "bin";
-    OutputType outputType;
+    TargetType targetType;
 
     BuildConfiguration clone() const{return cast()this;}
 
@@ -30,7 +37,12 @@ struct BuildConfiguration
         foreach(i, ref val; ret.tupleof)
         {
             static if(isArray!(typeof(val)) && !is(typeof(val) == string))
-                cast()val~= other.tupleof[i][];
+                val~= other.tupleof[i][];
+            else 
+            {
+                if(other.tupleof[i] != BuildConfiguration.init.tupleof[i])
+                    val = other.tupleof[i];
+            }
         }
         return ret;
     }
