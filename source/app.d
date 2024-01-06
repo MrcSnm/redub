@@ -10,12 +10,6 @@ import buildapi;
 
 
 
-
-void createHipmakeFolder(string workingDir)
-{
-    std.file.mkdirRecurse(buildPath(workingDir, ".hipmake"));
-}
-
 string formatError(string err)
 {
     import std.algorithm.searching:countUntil;
@@ -30,19 +24,13 @@ string formatError(string err)
     }
     return err~"\nDubv2 Failed!";
 }
-
-bool willGetCommand = false;
-string hipMakePath;
-
 /**
-*
-*   All this file does is:
-*   1. Search in the current directory for project.d
-*   2. Use that directory as an import place for the project generator
-*   3. Build the command generator together with the project.d (as it is being blindly imported )
-*   4. Run the command generator using the project gotten from getProject function
-*   5. Caches the command generated from the generator until project.d is modified.
-*   6. If it is cached, it will only run the command
+* DubV2 work with input -> output on each step. It must be almost stateless.
+* ** CLI will be optionally implemented later. 
+* ** Cache will be optionally implemented later
+* 
+* FindProject -> ParseProject -> MergeWithEnvironment -> ConvertToBuildFlags ->
+* Build
 */
 int main(string[] args)
 {
@@ -50,8 +38,13 @@ int main(string[] args)
     import package_searching.entry;
     static import parsers.json;
     static import parsers.environment;
+    static import command_generators.dmd;
 
+    //TEST -> Take from args[1] the workingDir.
     string workingDir = std.file.getcwd();
+    if(args.length > 1)
+        workingDir = args[1];
+
     if(isUpToDate(workingDir))
     {
 
@@ -59,7 +52,9 @@ int main(string[] args)
     else
     {
         import std.datetime.stopwatch;
+        import std.system;
         StopWatch st = StopWatch(AutoStart.yes);
+        
         string projectFile = findEntryProjectFile(workingDir);
 
         BuildConfiguration base;
@@ -68,7 +63,9 @@ int main(string[] args)
             case ".json":  base = parsers.json.parse(projectFile).cfg; break;
             default: throw new Error("Unsupported project type "~projectFile);
         }
-        base = parsers.environment.parse().merge(base);
+        base = base.merge(parsers.environment.parse());
+        writeln = command_generators.dmd.parseBuildConfiguration(base, os);
+
 
         writeln("Built project in ", (st.peek.total!"msecs"), " ms.") ;
     }

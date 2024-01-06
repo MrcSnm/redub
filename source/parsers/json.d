@@ -14,7 +14,7 @@ BuildRequirements parse(string filePath)
  *   json = A dub.json equivalent
  * Returns: 
  */
-BuildRequirements parse(JSONValue json)
+BuildRequirements parse(JSONValue json, bool firstRun = true)
 {
     BuildRequirements buildRequirements;
     BuildConfiguration* cfg = &buildRequirements.cfg;
@@ -24,17 +24,27 @@ BuildRequirements parse(JSONValue json)
     {
         switch(key)
         {
+            case "name":
+                cfg.name = v.str;
+                break;
             case "importPaths":
                 cfg.importDirectories = v.strArr;
                 break;
             case "libPaths": 
                 cfg.libraryPaths = v.strArr;
                 break;
-            case "libraries": 
+            case "libs": 
                 cfg.libraries = v.strArr;
                 break;
             case "versions": 
                 cfg.versions = v.strArr;
+                break;
+            case "configurations":
+                if(firstRun)
+                {
+                    ///Default configuration is always the first defined.
+                    buildRequirements.cfg = cfg.merge(parse(v.array[0], false).cfg);
+                }
                 break;
             default: break;
         }

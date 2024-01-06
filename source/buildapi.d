@@ -2,9 +2,9 @@ import std.path;
 
 enum OutputType
 {
+    executable,
     library,
     sharedLibrary,
-    executable
 }
 
 struct BuildConfiguration
@@ -18,17 +18,18 @@ struct BuildConfiguration
     string[] linkFlags;
     string[] dFlags;
     string sourceEntryPoint = "source/app.d";
-    string outputDirectory  = "build";
+    string outputDirectory  = "bin";
     OutputType outputType;
 
+    BuildConfiguration clone() const{return cast()this;}
 
     BuildConfiguration merge(BuildConfiguration other) const
     {
         import std.traits:isArray;
-        BuildConfiguration ret = cast()this;
+        BuildConfiguration ret = clone;
         foreach(i, ref val; ret.tupleof)
         {
-            static if(isArray!(typeof(val)))
+            static if(isArray!(typeof(val)) && !is(typeof(val) == string))
                 cast()val~= other.tupleof[i][];
         }
         return ret;
