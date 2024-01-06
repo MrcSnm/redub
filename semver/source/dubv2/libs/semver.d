@@ -49,6 +49,7 @@ struct SemVer
 
     RawVersion ver;
     ComparisonResult[3] comparison = ComparisonTypes.mustBeEqual;
+    private string versionStringRepresentation;
     private 
     {
         string buildMetadata;
@@ -71,6 +72,7 @@ struct SemVer
         import std.ascii:isDigit;
         import std.algorithm.searching;
         if(v == null) v = "*";
+        versionStringRepresentation = v;
         ///Take metadata out
         ptrdiff_t metadataSeparator = std.string.indexOf(v, "+");
         if(metadataSeparator != -1)
@@ -109,6 +111,7 @@ struct SemVer
         if(parts.length > 1) handlePart(parts[1], minor, comparison[1]);
         if(parts.length > 2) handlePart(parts[2], patch, comparison[2]);
 
+
         ver = RawVersion(major, minor, patch);
     }
     
@@ -120,6 +123,12 @@ struct SemVer
     }
     string getErrorMessage() const { return error; }
     string getBuildMetadata() const {return buildMetadata;}
+
+
+    int opCmp(const SemVer other) const
+    {
+        return ver.opCmp(other.ver);
+    }
 
     bool satisfies(const SemVer requirement) const 
     {
@@ -135,6 +144,11 @@ struct SemVer
             return res[0] && (requirement.comparison[2] & thisMinPatch.ver.compareAtOnce(reqMinPatch.ver)) != 0;
         }
         return cmp(requirement.comparison, ver.compare(requirement.ver)) == [true, true, true];
+    }
+
+    string toString() const @safe pure nothrow
+    {
+        return versionStringRepresentation;
     }
 }
 

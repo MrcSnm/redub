@@ -32,6 +32,29 @@ BuildRequirements parse(JSONValue json, bool firstRun = true)
         "configurations": (ref BuildRequirements req, JSONValue v, bool firstRun)
         {
             if(firstRun) req.cfg = req.cfg.merge(parse(v.array[0], false).cfg);
+        },
+        "dependencies": (ref BuildRequirements req, JSONValue v, bool firstRun)
+        {
+            import std.exception;
+            import package_searching.dub;
+            foreach(string depName, JSONValue value; v.object)
+            {
+                Dependency newDep = Dependency(depName);
+                if(value.type == JSONType.object) ///Uses path style
+                {
+                    const(JSONValue)* depPath = "path" in value;
+                    enforce(depPath, "Dependency named "~depName~" must contain a \"path\" property.");
+                    newDep.path = depPath.str;
+                    const(JSONValue)* depVer = "version" in value;
+                    if(depVer) newDep.version_ = depVer.str;
+                }
+                else if(value.type == JSONType.string) ///Version style
+                {
+                    newDep.version_ = value.str;
+                    newDep.path = getPackagePath(depName, value.str);
+                }
+                req.dependencies~= newDep;
+            }
         }
     ];
 
@@ -43,22 +66,12 @@ BuildRequirements parse(JSONValue json, bool firstRun = true)
             (*fn)(buildRequirements, v, firstRun);
         else
         {
-            string[] keys = key.split("-"); //e.g: dflags-osx | dflags-ldc-osx
-            string flagKey = keys[0];
-            if(keys.length == 1)
-            {
-                unusedKeys~= key;
-                continue;
-            }
-            string flagCompiler = keys[1];
-            string flagOs;
-            if(keys.length == 3) flagOs = keys[2];
-            if(isOS(flagCompiler)) swap(flagCompiler, flagOs);
-            fn = flagKey in handler;
-
+            CommandWithFilter filtered = CommandWithFilter.fromKey(key);
+            fn = filtered.command in handler;
             if(fn)
             {
-                if(flagOs && flagOs.matchesOS(os))
+                //TODO: Add mathesCompiler
+                if(filtered.matchesOS(os))
                     (*fn)(buildRequirements, v, firstRun);
             }
             else
@@ -110,6 +123,41 @@ private bool matchesOS(string osRep, OS os)
         case "linux": return os == linux || os == android;
         case "osx": return os == osx || os == iOS || os == tvOS || os == watchOS;
         case "windows": return os == win32 || os == win64;
+    }
+}
+
+struct CommandWithFilter
+{
+    string command;
+    string compiler;
+    string targetOS;
+
+    bool matchesOS(OS os){return targetOS && parsers.json.matchesOS(targetOS, os);}
+
+    /** 
+     * Splits command-compiler-os into a struct.
+     * Input examples:
+     * - dflags-osx
+     * - dflags-ldc-osx
+     * - dependencies-windows
+     * Params:
+     *   key = Any key matching input style
+     * Returns: 
+     */
+    static CommandWithFilter fromKey(string key)
+    {
+        import std.string;
+        CommandWithFilter ret;
+
+        string[] keys = key.split("-"); 
+        if(keys.length == 1)
+            return ret;
+        ret.command = keys[0];
+        ret.compiler = keys[1];
+
+        if(keys.length == 3) ret.targetOS = keys[2];
+        if(isOS(ret.compiler)) swap(ret.compiler, ret.targetOS);
+        return ret;
     }
 }
 

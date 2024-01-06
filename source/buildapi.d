@@ -48,7 +48,12 @@ struct BuildConfiguration
     }
 }
 
-struct Dependency{}
+struct Dependency
+{
+    string name;
+    string path;
+    string version_ = "*";
+}
 
 struct BuildRequirements
 {

@@ -1,5 +1,6 @@
 module package_searching.dub;
 import std.json;
+import dubv2.libs.semver;
 
 bool dubHook_PackageManagerDownloadPackage(string packageName, string packageVersion)
 {
@@ -22,7 +23,6 @@ string getPackagePath(string packageName, string packageVersion)
 {
     import std.file;
     import std.path;
-    import std.json;
     string lookupPath = getDefaultLookupPathForPackages();
     string locPackages = buildNormalizedPath(lookupPath, "local-packages.json");
     string packagePath;
@@ -38,7 +38,32 @@ string getPackagePath(string packageName, string packageVersion)
         if(!dubHook_PackageManagerDownloadPackage(packageName, packagePath))
             return null;
     }
-    
+
+    import std.algorithm.sorting;
+    import std.algorithm.iteration;
+    import std.stdio;
+    import std.array;
+
+    SemVer[] semVers = dirEntries(downloadedPackagePath, SpanMode.shallow).map!((DirEntry e ) => SemVer(e.name.baseName)).array;
+    SemVer requirement = SemVer(packageVersion);
+
+    if(requirement.isInvalid)
+    {
+        writeln("Invalid package version requirement ", requirement);
+        return null;
+    }
+
+    foreach_reverse(SemVer v; sort(semVers))
+    {
+        if(v.isInvalid)
+        {
+            writeln("Invalid semver '", v, "' found in folder '", downloadedPackagePath, "'");
+            return null;
+        }
+        if(v.satisfies(requirement))
+            return buildNormalizedPath(downloadedPackagePath, v.toString);
+    }
+    return null;
 }
 
 
