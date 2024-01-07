@@ -4,16 +4,17 @@ import buildapi;
 import std.json;
 import std.file;
 
-BuildRequirements parse(string filePath)
+BuildRequirements parse(string filePath, string subConfiguration = "")
 {
     import std.path;
-    ParseConfig c = ParseConfig(true, dirName(filePath));
+    ParseConfig c = ParseConfig(true, dirName(filePath), subConfiguration);
     return parse(parseJSON(std.file.readText(filePath)), c);
 }
 struct ParseConfig
 {
     bool firstRun;
     string workingDir;
+    string subConfiguration;
 }
 
 /** 

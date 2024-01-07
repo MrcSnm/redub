@@ -186,6 +186,7 @@ private bool parseOperator(ref SemVer sv, string op) @nogc nothrow
         case "=":  sv.comparison = [equal, equal, equal]; break;
         case "^":  sv.comparison = [equal, atOnce, gtEqual];  break;
         case "~":  sv.comparison = [equal, equal, gtEqual]; break;
+        case "~>": sv.comparison = [equal, equal, gtEqual]; break;
         case ">":  sv.comparison = [atOnce, greaterThan, greaterThan]; break;
         case ">=": sv.comparison = [atOnce, gtEqual, gtEqual]; break;
         case "<":  sv.comparison = [atOnce, lessThan, lessThan]; break;

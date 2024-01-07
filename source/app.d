@@ -61,8 +61,10 @@ int main(string[] args)
         writeln = command_generators.dmd.parseBuildConfiguration(req.cfg, os);
 
         ProjectNode tree = getProjectTree(req);
-        // printProjectTree(tree);
-        printMatrixTree = fromTree(tree);
+        ProjectNode[][] expandedDependencyMatrix = fromTree(tree);
+
+        printMatrixTree = expandedDependencyMatrix;
+
         writeln("Built project in ", (st.peek.total!"msecs"), " ms.") ;
     }
 

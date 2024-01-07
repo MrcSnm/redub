@@ -73,6 +73,12 @@ struct Dependency
     string name;
     string path;
     string version_ = "*";
+    string subConfiguration;
+
+    bool isSameAs(string name, string subConfiguration)
+    {
+        return this.name == name && this.subConfiguration == subConfiguration;
+    }
 }
 
 struct BuildRequirements
@@ -80,6 +86,9 @@ struct BuildRequirements
     BuildConfiguration cfg;
     Dependency[] dependencies;
     string version_;
+    string targetConfiguration;
+
+    string name(){return cfg.name;}
 }
 
 class ProjectNode
@@ -138,7 +147,6 @@ private void fromTreeImpl(ProjectNode root, ref ProjectNode[][] output, ref int[
     }
     else
     {
-        debug { import std.stdio : writeln; try { writeln("Pushing ", root.name); } catch (Exception) {} }
         visited[root.name] = depth;
         output[depth]~= root;
     }
