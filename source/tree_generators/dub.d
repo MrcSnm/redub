@@ -32,6 +32,7 @@ private ProjectNode getProjectTreeImpl(BuildRequirements req, ref ProjectNode[st
         ProjectNode depNode;
         if(visitedDep)
         {
+            ///When found 2 different packages requiring a different dependendcy subConfiguration
             if(visitedDep.requirements.targetConfiguration != dep.subConfiguration)
             {
                 visitedDep.requirements = mergeDifferentSubConfigurations(
@@ -39,14 +40,14 @@ private ProjectNode getProjectTreeImpl(BuildRequirements req, ref ProjectNode[st
                     parseProjectWithParent(dep.path, req, dep.subConfiguration)
                 );
             }
-            else
+            else //If it exists, simply merge with the parent project for adjusting its import flags
             {
                 depNode = *visitedDep;
                 depNode.requirements = mergedProjectWithParent(depNode.requirements, req);
             }
         }
         else
-            depNode = getProjectTreeImpl(parseProjectWithParent(dep.path, req), visited);
+            depNode = getProjectTreeImpl(parseProjectWithParent(dep.path, req, dep.subConfiguration), visited);
         visited[dep.name] = depNode;
         root.addDependency(depNode);
     }
@@ -61,7 +62,7 @@ private ProjectNode getProjectTreeImpl(BuildRequirements req, ref ProjectNode[st
  *   subConfiguration = 
  * Returns: 
  */
-private BuildRequirements parseProjectWithParent(string projectPath, BuildRequirements parent, string subConfiguration = "")
+private BuildRequirements parseProjectWithParent(string projectPath, BuildRequirements parent, string subConfiguration)
 {
     BuildRequirements depReq = parseProject(projectPath, subConfiguration);
     return mergedProjectWithParent(depReq, parent);

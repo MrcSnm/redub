@@ -10,12 +10,6 @@ BuildRequirements parse(string filePath, string subConfiguration = "")
     ParseConfig c = ParseConfig(true, dirName(filePath), subConfiguration);
     return parse(parseJSON(std.file.readText(filePath)), c);
 }
-struct ParseConfig
-{
-    bool firstRun;
-    string workingDir;
-    string subConfiguration;
-}
 
 /** 
  * Params:
@@ -24,8 +18,8 @@ struct ParseConfig
  */
 BuildRequirements parse(JSONValue json, ParseConfig cfg)
 {
-    BuildRequirements buildRequirements;
-    if(cfg.firstRun) buildRequirements.version_ = "~master";
+    ///Setup base of configuration before finding anything
+    BuildRequirements buildRequirements = getDefaultBuildRequirement(cfg);
     immutable static handler = [
         "name": (ref BuildRequirements req, JSONValue v, ParseConfig c){if(c.firstRun) req.cfg.name = v.str;},
         "targetType": (ref BuildRequirements req, JSONValue v, ParseConfig c){req.cfg.targetType = targetFrom(v.str);},
@@ -96,7 +90,6 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
                 unusedKeys~= key;
         }
     }
-    import std.stdio;
     // if(cfg.firstRun) writeln("WARNING: Unused Keys -> ", unusedKeys);
 
     return buildRequirements;
@@ -184,4 +177,23 @@ private void swap(T)(ref T a, ref T b)
     T temp = b;
     b = a;
     a = temp;
+}
+
+
+
+struct ParseConfig
+{
+    bool firstRun;
+    string workingDir;
+    string subConfiguration;
+}
+
+
+BuildRequirements getDefaultBuildRequirement(ParseConfig cfg)
+{
+    BuildRequirements req = BuildRequirements.init;
+    req.version_ = "~master";
+    req.targetConfiguration = cfg.subConfiguration;
+    req.cfg.workingDir = cfg.workingDir;
+    return req;
 }

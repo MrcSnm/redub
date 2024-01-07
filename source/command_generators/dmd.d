@@ -16,20 +16,28 @@ string[] parseBuildConfiguration(BuildConfiguration b, OS target)
         commands~= importDirectories.map!((i) => "-I"~i).array;
         commands~= libraries.map!((l) => "-l"~l~getLibraryExtension(target)).array;
         commands~= libraryPaths.map!((lp) => "-L-L"~lp).array;
+        commands~= stringImportPaths.map!((sip) => "-J"~sip).array;
 
         string outFlag = getTargetTypeFlag(targetType);
         if(outFlag) commands~= outFlag;
 
+        string outputName;
+        if(targetType == TargetType.library) outputName = "lib";
+        outputName~= name~targetType.getExtension(os);
+
         if(outputDirectory)
         {
             commands~= "-od"~outputDirectory;
-            commands~= "-of"~buildNormalizedPath(outputDirectory, name, targetType.getExtension(os));
+            commands~= "-of"~buildNormalizedPath(outputDirectory, outputName);
         }
         else
         {
-            commands~= "-of"~name~targetType.getExtension(os);
+            commands~= "-of"~outputName;
         }
+        foreach(path; sourcePaths)
+            commands~= getSourceFiles(buildNormalizedPath(workingDir, path));
     }
+
     return commands;
 }
 
@@ -37,6 +45,7 @@ private string getTargetTypeFlag(TargetType o)
 {
     final switch(o)
     {
+        case TargetType.autodetect: return null;
         case TargetType.executable: return null;
         case TargetType.library: return "-lib";
         case TargetType.sharedLibrary: return "-shared";

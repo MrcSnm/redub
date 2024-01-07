@@ -1,9 +1,10 @@
 module command_generators.ldc;
-import buildapi;
+public import buildapi;
+public import std.system;
 
 
 
-string[] parseBuildConfiguration(BuildConfiguration b)
+string[] parseBuildConfiguration(BuildConfiguration b, OS os)
 {
     import std.algorithm.iteration:map;
     import std.array:array;

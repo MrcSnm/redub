@@ -38,8 +38,21 @@ string getExtension(TargetType t, OS target)
 {
     final switch(t)
     {
+        case TargetType.autodetect: return null;
         case TargetType.executable: return target.getExecutableExtension;
         case TargetType.library: return target.getLibraryExtension;
         case TargetType.sharedLibrary: return target.getSharedLibraryExtension;
     }
+}
+
+
+string[] getSourceFiles(string path)
+{
+    import std.file;
+    import std.string:endsWith;
+    import std.array;
+    import std.algorithm.iteration;
+    return dirEntries(path, SpanMode.depth)
+        .filter!((entry) => entry.name.endsWith(".d"))
+        .map!((entry => entry.name)).array;
 }

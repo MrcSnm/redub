@@ -2,6 +2,7 @@ import std.path;
 
 enum TargetType
 {
+    autodetect,
     executable,
     library,
     sharedLibrary,
@@ -19,32 +20,38 @@ struct BuildConfiguration
     bool isDebug;
     string name;
     string[] versions;
-    string[] importDirectories;
+    string[] importDirectories = ["source"];
     string[] libraryPaths;
     string[] stringImportPaths;
     string[] libraries;
     string[] linkFlags;
     string[] dFlags;
+    string[] sourcePaths = ["source"];
     string sourceEntryPoint = "source/app.d";
     string outputDirectory  = "bin";
+    string workingDir;
     TargetType targetType;
+
+    static BuildConfiguration init()
+    {
+        BuildConfiguration ret;
+        ret.importDirectories = ret.importDirectories.dup;
+        ret.sourcePaths = ret.sourcePaths.dup;
+        return ret;
+    }
 
     BuildConfiguration clone() const{return cast()this;}
 
     BuildConfiguration merge(BuildConfiguration other) const
     {
-        import std.traits:isArray;
         BuildConfiguration ret = clone;
-        foreach(i, ref val; ret.tupleof)
-        {
-            static if(isArray!(typeof(val)) && !is(typeof(val) == string))
-                val~= other.tupleof[i][];
-            else 
-            {
-                if(other.tupleof[i] != BuildConfiguration.init.tupleof[i])
-                    val = other.tupleof[i];
-            }
-        }
+        ret.stringImportPaths~= other.stringImportPaths;
+        ret.importDirectories~= other.importDirectories;
+        ret.versions~= other.versions;
+        ret.dFlags~= other.dFlags;
+        ret.libraries~= other.libraries;
+        ret.libraryPaths~= other.libraryPaths;
+        ret.linkFlags~= other.linkFlags;
         return ret;
     }
     BuildConfiguration mergeImport(BuildConfiguration other) const
@@ -87,6 +94,13 @@ struct BuildRequirements
     Dependency[] dependencies;
     string version_;
     string targetConfiguration;
+
+    static BuildRequirements init()
+    {
+        BuildRequirements req;
+        req.cfg = BuildConfiguration.init;
+        return req;
+    }
 
     string name(){return cfg.name;}
 }
