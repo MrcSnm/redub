@@ -22,7 +22,7 @@ ProjectNode getProjectTree(BuildRequirements req)
 void printProjectTree(ProjectNode node, int depth = 0)
 {
     import std.stdio;
-    writeln("\t".repeat(depth), node.name);
+    writeln("-".repeat(depth*2), node.name);
     foreach(dep; node.dependencies)
     {
         printProjectTree(dep, depth+1);

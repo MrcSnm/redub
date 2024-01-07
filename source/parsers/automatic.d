@@ -11,6 +11,7 @@ BuildRequirements parseProject(string projectWorkingDir)
     switch(extension(projectFile))
     {
         case ".json":  req = parsers.json.parse(projectFile); break;
+        case null: break;
         default: throw new Error("Unsupported project type "~projectFile~" at dir "~projectWorkingDir);
     }
     return req;

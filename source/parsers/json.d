@@ -69,7 +69,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
                     newDep.version_ = value.str;
                     newDep.path = package_searching.dub.getPackagePath(depName, value.str);
                 }
-                if(!isAbsolute(newDep.path)) newDep.path = buildNormalizedPath(c.workingDir, newDep.path);
+                if(newDep.path.length && !isAbsolute(newDep.path)) newDep.path = buildNormalizedPath(c.workingDir, newDep.path);
                 req.dependencies~= newDep;
             }
         }
