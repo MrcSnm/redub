@@ -60,9 +60,9 @@ int main(string[] args)
         req.cfg = req.cfg.merge(parsers.environment.parse());
         writeln = command_generators.dmd.parseBuildConfiguration(req.cfg, os);
 
-        printProjectTree(getProjectTree(req));
-        writeln = req.dependencies;
-
+        ProjectNode tree = getProjectTree(req);
+        // printProjectTree(tree);
+        printMatrixTree = fromTree(tree);
         writeln("Built project in ", (st.peek.total!"msecs"), " ms.") ;
     }
 

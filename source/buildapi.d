@@ -102,3 +102,54 @@ class ProjectNode
         return this;
     }
 }
+ProjectNode[][] fromTree(ProjectNode root)
+{
+    ProjectNode[][] ret;
+    int[string] visited;
+    fromTreeImpl(root, ret, visited);
+    return ret;
+}
+
+private void fromTreeImpl(ProjectNode root, ref ProjectNode[][] output, ref int[string] visited, int depth = 0)
+{
+    if(depth >= output.length) output.length = depth+1;
+
+    foreach(c; root.dependencies)
+    {
+        fromTreeImpl(c, output, visited, depth+1);
+    }
+    if(root.name in visited)
+    {
+        int oldDepth = visited[root.name];
+        if(depth > oldDepth)
+        {
+            visited[root.name] = depth;
+            output[depth] ~= root;
+            ///Remove frol the oldDepth
+            for(int i = 0; i < output[oldDepth].length; i++)
+            {
+                if(output[oldDepth][i].name == root.name)
+                {
+                    output[oldDepth] = output[oldDepth][0..i] ~ output[oldDepth][i+1..$];
+                    i--;
+                }
+            }
+        }
+    }
+    else
+    {
+        debug { import std.stdio : writeln; try { writeln("Pushing ", root.name); } catch (Exception) {} }
+        visited[root.name] = depth;
+        output[depth]~= root;
+    }
+}
+
+import tree_generators.dub;
+
+void printMatrixTree(ProjectNode[][] mat)
+{
+    import std.stdio;
+    foreach_reverse(i, node; mat)
+        foreach(n; node)
+            writeln("-".repeat(cast(int)i), " ", n.name);
+}
