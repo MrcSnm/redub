@@ -124,6 +124,17 @@ struct BuildRequirements
         return req;
     }
 
+    /** 
+     * Configurations and dependencies are merged.
+     */
+    BuildRequirements merge(BuildRequirements other) const
+    {
+        BuildRequirements ret = cast()this;
+        ret.cfg = ret.cfg.merge(other.cfg);
+        ret.dependencies~= other.dependencies;
+        return ret;
+    }
+
     string name(){return cfg.name;}
 }
 

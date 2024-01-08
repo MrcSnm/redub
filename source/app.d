@@ -48,6 +48,7 @@ int main(string[] args)
     {
         if(!isAbsolute(args[1])) 
             workingDir = buildNormalizedPath(workingDir, args[1]);
+        else workingDir = args[1];
     }
 
     if(isUpToDate(workingDir))

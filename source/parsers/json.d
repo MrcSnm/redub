@@ -55,7 +55,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
                         break;
                     }
                 }
-                req.cfg = req.cfg.merge(parse(configurationToUse, c).cfg);
+                req = req.merge(parse(configurationToUse, c));
                 req.targetConfiguration = configurationToUse["name"].str;
             }
         },
@@ -97,11 +97,12 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
                     newDep.subConfiguration = req.dependencies[depIndex].subConfiguration;
                     req.dependencies[depIndex] = newDep;
                 }
+                
             }
         },
         "subConfigurations": (ref BuildRequirements req, JSONValue v, ParseConfig c)
         {
-            enforce(v.type == JSONType.object, "Subconfigurations must be an object conversible to string[string]");
+            enforce(v.type == JSONType.object, "subConfigurations must be an object conversible to string[string]");
 
             if(req.dependencies.length == 0)
             {
@@ -138,16 +139,17 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
             unusedKeys~= key;
     }
 
+    import std.algorithm.iteration:filter;
+    import std.array:array;
+    ///Remove dependencies without paths.
+    buildRequirements.dependencies = buildRequirements.dependencies.filter!((dep) => dep.path.length).array;
+
     ///Fix dependencies name to change from `:` to `_`
     foreach(ref Dependency dep; buildRequirements.dependencies)
     {
         import std.string:replace;
         dep.name = dep.name.replace(":", "_");
     }
-    import std.algorithm.iteration:filter;
-    import std.array:array;
-    ///Remove dependencies without paths.
-    buildRequirements.dependencies = buildRequirements.dependencies.filter!((dep) => dep.path.length).array;
     // if(cfg.firstRun) writeln("WARNING: Unused Keys -> ", unusedKeys);
 
     return buildRequirements;

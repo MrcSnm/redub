@@ -16,6 +16,7 @@ BuildRequirements parseProject(string projectWorkingDir, string subConfiguration
         default: throw new Error("Unsupported project type "~projectFile~" at dir "~projectWorkingDir);
     }
     partiallyFinishBuildRequirements(req);
+    
     return req;
 }
 
