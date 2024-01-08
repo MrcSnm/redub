@@ -5,10 +5,10 @@ import std.json;
 import std.file;
 import etc.c.zlib;
 
-BuildRequirements parse(string filePath, string subConfiguration = "")
+BuildRequirements parse(string filePath, string subConfiguration = "", string subPackage = "")
 {
     import std.path;
-    ParseConfig c = ParseConfig(true, dirName(filePath), subConfiguration);
+    ParseConfig c = ParseConfig(true, dirName(filePath), subConfiguration, subPackage);
     return parse(parseJSON(std.file.readText(filePath)), c);
 }
 
@@ -69,6 +69,14 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
             foreach(string depName, JSONValue value; v.object)
             {
                 Dependency newDep = Dependency(depName);
+                string out_MainPackage;
+                string subPackageName = getSubPackageInfo(depName, out_MainPackage);
+                newDep.subPackage = subPackageName;
+                ///Inside this same package
+                if(out_MainPackage == req.name && subPackageName)
+                    newDep.path = c.workingDir;
+
+                
                 if(value.type == JSONType.object) ///Uses path style
                 {
                     const(JSONValue)* depPath = "path" in value;
@@ -86,19 +94,18 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
                             continue;
                     }
 
-
-                    if(depPath)
+                    if(depPath && !newDep.path)
                         newDep.path = depPath.str;
                     if(depVer)
                     {
-                        if(!depPath) newDep.path = package_searching.dub.getPackagePath(depName, depVer.str, req.cfg.name);
+                        if(!depPath && !newDep.path) newDep.path = package_searching.dub.getPackagePath(depName, depVer.str, req.cfg.name);
                         newDep.version_ = depVer.str;
                     }
                 }
                 else if(value.type == JSONType.string) ///Version style
                 {
                     newDep.version_ = value.str;
-                    newDep.path = package_searching.dub.getPackagePath(depName, value.str, c.requiredBy);
+                    if(!newDep.path) newDep.path = package_searching.dub.getPackagePath(depName, value.str, c.requiredBy);
                 }
                 if(newDep.path.length && !isAbsolute(newDep.path)) newDep.path = buildNormalizedPath(c.workingDir, newDep.path);
                 import std.algorithm.searching:countUntil;
@@ -131,6 +138,23 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
                     JSONValue* subCfg = dep.name in v;
                     if(subCfg)
                         dep.subConfiguration = subCfg.str;
+                }
+            }
+        },
+        "subPackages": (ref BuildRequirements req, JSONValue v, ParseConfig c)
+        {
+            if(!c.subPackage) 
+                return;
+            enforce(v.type == JSONType.array, "subPackages must be an array.");
+            foreach(JSONValue p; v.array)
+            {
+                const(JSONValue)* name = "name" in p;
+                enforce(name, "All subPackages entries must contain a name.");
+                if(name.str == c.subPackage)
+                {
+                    c.subPackage = null;
+                    req = parse(p, c);
+                    break;
                 }
             }
         }
@@ -268,6 +292,7 @@ struct ParseConfig
     bool firstRun;
     string workingDir;
     string subConfiguration;
+    string subPackage;
     string requiredBy;
 }
 
@@ -279,4 +304,13 @@ BuildRequirements getDefaultBuildRequirement(ParseConfig cfg)
     req.targetConfiguration = cfg.subConfiguration;
     req.cfg.workingDir = cfg.workingDir;
     return req;
+}
+
+private string getSubPackageInfo(string packageName, out string mainPackageName)
+{
+    import std.string:indexOf;
+    ptrdiff_t ind = packageName.indexOf(":");
+    if(ind == -1) return null;
+    mainPackageName = packageName[0..ind];
+    return packageName[ind+1..$];
 }

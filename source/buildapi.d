@@ -103,6 +103,7 @@ struct Dependency
     string path;
     string version_ = "*";
     string subConfiguration;
+    string subPackage;
 
     bool isSameAs(string name, string subConfiguration)
     {
