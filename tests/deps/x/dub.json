@@ -1,0 +1,19 @@
+{
+	"authors": [
+		"Marcelo Silva Nascimento Mancini"
+	],
+
+	"configurations": [
+		{
+			"name": "special"
+		},
+		{
+			"name": "other"
+		}
+	],
+    "targetType": "library",
+	"copyright": "Copyright © 2024, Marcelo Silva Nascimento Mancini",
+	"description": "A minimal D application.",
+	"license": "proprietary",
+	"name": "x"
+}

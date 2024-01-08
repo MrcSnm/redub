@@ -1,0 +1,16 @@
+{
+	"authors": [
+		"Marcelo Silva Nascimento Mancini"
+	],
+	"targetType": "staticLibrary",
+	"versions": [
+		"BVer"
+	],
+	"dependencies": {
+		"x": {"path": "../x"}
+	},
+	"copyright": "Copyright © 2024, Marcelo Silva Nascimento Mancini",
+	"description": "A minimal D application.",
+	"license": "proprietary",
+	"name": "b"
+}

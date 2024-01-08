@@ -1,0 +1,16 @@
+.dub
+docs.json
+__dummy.html
+docs/
+/deps
+deps.so
+deps.dylib
+deps.dll
+deps.a
+deps.lib
+deps-test-*
+*.exe
+*.pdb
+*.o
+*.obj
+*.lst
