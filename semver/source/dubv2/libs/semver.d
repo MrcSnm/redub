@@ -192,10 +192,11 @@ private bool parseOperator(ref SemVer sv, string op, size_t partsLength) @nogc n
     switch(op) with(ComparisonResult)
     {
         case "*":  sv.comparison = [any, any, any]; break;
-        case "=":  sv.comparison = [equal, equal, equal]; break;
+        case "=", "==":  
+            sv.comparison = [equal, equal, equal]; break;
         case "^":  sv.comparison = [equal, atOnce, gtEqual];  break;
         case "~", "~>":  
-            if(partsLength <= 1)
+            if(partsLength <= 2)
                 sv.comparison = [equal, atOnce, gtEqual];
             else
                 sv.comparison = [equal, equal, gtEqual]; 
