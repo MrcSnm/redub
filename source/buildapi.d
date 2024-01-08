@@ -5,6 +5,7 @@ enum TargetType
     autodetect,
     executable,
     library,
+    staticLibrary,
     sharedLibrary,
 }
 TargetType targetFrom(string s)
@@ -135,8 +136,9 @@ class ProjectNode
     }
 
     /** 
-     * This function will iterate recursively, from bottom to top, populating import paths from child
-     * to parent.
+     * This function will iterate recursively, from bottom to top, and it:
+     * - Populating parent imports using child imports paths.
+     * - Infer target type if it is on autodetect
      */
     void finish()
     {
@@ -146,6 +148,15 @@ class ProjectNode
         }
         if(parent)
             parent.requirements.cfg = parent.requirements.cfg.mergeImport(requirements.cfg);
+        static TargetType inferTargetType(bool hasParent)
+        {
+            if(hasParent) return TargetType.library;
+            return TargetType.executable;
+        }
+        if(requirements.cfg.targetType == TargetType.autodetect) 
+            requirements.cfg.targetType = inferTargetType(parent !is null);
+        
+        
     }
 }
 ProjectNode[][] fromTree(ProjectNode root)

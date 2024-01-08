@@ -40,7 +40,7 @@ string getExtension(TargetType t, OS target)
     {
         case TargetType.autodetect: return null;
         case TargetType.executable: return target.getExecutableExtension;
-        case TargetType.library: return target.getLibraryExtension;
+        case TargetType.library, TargetType.staticLibrary: return target.getLibraryExtension;
         case TargetType.sharedLibrary: return target.getSharedLibraryExtension;
     }
 }

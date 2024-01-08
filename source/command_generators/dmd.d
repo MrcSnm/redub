@@ -43,7 +43,7 @@ private string getTargetTypeFlag(TargetType o)
     {
         case TargetType.autodetect: return null;
         case TargetType.executable: return null;
-        case TargetType.library: return "-lib";
+        case TargetType.library, TargetType.staticLibrary: return "-lib";
         case TargetType.sharedLibrary: return "-shared";
     }
 }

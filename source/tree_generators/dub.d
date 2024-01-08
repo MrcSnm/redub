@@ -34,13 +34,17 @@ private ProjectNode getProjectTreeImpl(BuildRequirements req, ref ProjectNode[st
         ProjectNode depNode;
         if(visitedDep)
         {
-            ///When found 2 different packages requiring a different dependendcy subConfiguration
+            ///When found 2 different packages requiring a different dependency subConfiguration
             if(visitedDep.requirements.targetConfiguration != dep.subConfiguration)
             {
-                visitedDep.requirements = mergeDifferentSubConfigurations(
-                    visitedDep.requirements, 
-                    parseProjectWithParent(dep.path, req, dep.subConfiguration)
-                );
+                BuildRequirements depConfig = parseProjectWithParent(dep.path, req, dep.subConfiguration);
+                if(visitedDep.requirements.targetConfiguration != depConfig.targetConfiguration)
+                {
+                    visitedDep.requirements = mergeDifferentSubConfigurations(
+                        visitedDep.requirements, 
+                        depConfig
+                    );
+                }
             }
             else //If it exists, simply merge with the parent project for adjusting its import flags
             {
@@ -80,7 +84,7 @@ private BuildRequirements mergedProjectWithParent(BuildRequirements base, BuildR
 
 private BuildRequirements mergeDifferentSubConfigurations(BuildRequirements a, BuildRequirements b)
 {
-    throw new Error("Can't merge different subConfigurations at this moment: "~a.targetConfiguration~ " vs " ~ b.targetConfiguration);
+    throw new Error("Error in project: '"~a.name~"' Can't merge different subConfigurations at this moment: "~a.targetConfiguration~ " vs " ~ b.targetConfiguration);
 }
 
 void printProjectTree(ProjectNode node, int depth = 0)
