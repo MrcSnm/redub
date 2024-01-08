@@ -57,6 +57,18 @@ struct BuildConfiguration
         ret.linkFlags.exclusiveMerge(other.linkFlags);
         return ret;
     }
+    BuildConfiguration mergeLibraries(BuildConfiguration other) const
+    {
+        BuildConfiguration ret = clone;
+        ret.libraries.exclusiveMerge(other.libraries);
+        return ret;
+    }
+    BuildConfiguration mergeLibPaths(BuildConfiguration other) const
+    {
+        BuildConfiguration ret = clone;
+        ret.libraryPaths.exclusiveMerge(other.libraryPaths);
+        return ret;
+    }
     BuildConfiguration mergeImport(BuildConfiguration other) const
     {
         BuildConfiguration ret = clone;
@@ -139,6 +151,8 @@ class ProjectNode
      * This function will iterate recursively, from bottom to top, and it:
      * - Populating parent imports using child imports paths.
      * - Infer target type if it is on autodetect
+     * - Add the dependency as a library if it is a library
+     * - Add the dependency's libraries 
      */
     void finish()
     {
@@ -153,10 +167,25 @@ class ProjectNode
             if(hasParent) return TargetType.library;
             return TargetType.executable;
         }
-        if(requirements.cfg.targetType == TargetType.autodetect) 
-            requirements.cfg.targetType = inferTargetType(parent !is null);
-        
-        
+        with(TargetType)
+        {
+            HandleTargetType: final switch(requirements.cfg.targetType)
+            {
+                case autodetect: requirements.cfg.targetType = inferTargetType(parent !is null); goto HandleTargetType;
+                case library, staticLibrary:
+                    if(parent)
+                    {
+                        BuildConfiguration other = requirements.cfg.clone;
+                        other.libraries~= other.name;
+                        other.libraryPaths~= other.outputDirectory;
+                        parent.requirements.cfg = parent.requirements.cfg.mergeLibraries(other);
+                        parent.requirements.cfg = parent.requirements.cfg.mergeLibPaths(other);
+                    }
+                    break;
+                case sharedLibrary: throw new Error("Uninplemented support for shared libraries");
+                case executable: break;
+            }
+        }
     }
 }
 ProjectNode[][] fromTree(ProjectNode root)

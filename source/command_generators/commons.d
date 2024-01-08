@@ -48,7 +48,7 @@ string getExtension(TargetType t, OS target)
 string getOutputName(TargetType t, string name, OS os)
 {
     string outputName;
-    if(t == TargetType.library) outputName = "lib";
+    if(t == TargetType.library || t == TargetType.staticLibrary) outputName = "lib";
     outputName~= name~t.getExtension(os);
     return outputName;
 }

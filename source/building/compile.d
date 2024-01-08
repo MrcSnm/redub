@@ -5,7 +5,9 @@ import std.system;
 static import command_generators.dmd;
 static import command_generators.ldc;
 
-void compile(BuildRequirements req, OS os, string compiler, out int status, out string sink)
+void compile(BuildRequirements req, OS os, string compiler, 
+    out int status, out string sink, out string compilationFlagsSink
+)
 {
     import std.process;
     string[] flags;
@@ -23,6 +25,7 @@ void compile(BuildRequirements req, OS os, string compiler, out int status, out 
     auto ret = executeShell(cmds);
     status = ret.status;
     sink = ret.output;
+    compilationFlagsSink = cmds;
 }
 
 bool link()
@@ -37,16 +40,18 @@ bool buildProject(ProjectNode[][] steps, string compiler)
     import std.parallelism;
     size_t maxSize;
     string[] outputSink;
+    string[] compilationFlagsSink;
     int[] statusSink;
     foreach(depth; steps) if(depth.length > maxSize) maxSize = depth.length;
     outputSink = new string[](maxSize);
+    compilationFlagsSink = new string[](maxSize);
     statusSink = new int[](maxSize);
 
     foreach_reverse(dep; steps)
     {
         foreach(i, ProjectNode proj; parallel(dep))
         {
-            compile(proj.requirements, os, compiler, statusSink[i], outputSink[i]);
+            compile(proj.requirements, os, compiler, statusSink[i], outputSink[i], compilationFlagsSink[i]);
         }
         
         foreach(i; 0..dep.length)
@@ -54,7 +59,8 @@ bool buildProject(ProjectNode[][] steps, string compiler)
             import std.stdio;
             if(statusSink[i])
             {
-                writeln("Compilation of project ", dep[i].name, " failed with: \n", outputSink[i]);
+                writeln("Compilation of project '", dep[i].name,"' using flags\n\t", compilationFlagsSink[i], "\nFailed with message\n\t",
+                outputSink[i]);
                 return false;
             }
             else

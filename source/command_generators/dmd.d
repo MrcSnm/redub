@@ -14,22 +14,16 @@ string[] parseBuildConfiguration(BuildConfiguration b, OS target)
         if(isDebug) commands~= "-debug";
         commands~= versions.map!((v) => "-version="~v).array;
         commands~= importDirectories.map!((i) => "-I"~i).array;
-        commands~= libraries.map!((l) => "-l"~l~getLibraryExtension(target)).array;
         commands~= libraryPaths.map!((lp) => "-L-L"~lp).array;
+        commands~= libraries.map!((l) => "-L-l"~l).array;
         commands~= stringImportPaths.map!((sip) => "-J"~sip).array;
 
         string outFlag = getTargetTypeFlag(targetType);
         if(outFlag) commands~= outFlag;
 
         if(outputDirectory)
-        {
             commands~= "-od"~outputDirectory;
-            commands~= "-of"~buildNormalizedPath(outputDirectory, getOutputName(targetType, name, os));
-        }
-        else
-        {
-            commands~= "-of"~getOutputName(targetType, name, os);
-        }
+        commands~= "-of"~getOutputName(targetType, name, os);
         foreach(path; sourcePaths)
             commands~= getSourceFiles(buildNormalizedPath(workingDir, path));
     }
