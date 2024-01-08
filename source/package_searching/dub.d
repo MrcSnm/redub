@@ -62,7 +62,7 @@ string getPackagePath(string packageName, string packageVersion, string required
             return null;
         }
         if(v.satisfies(requirement))
-            return buildNormalizedPath(downloadedPackagePath, v.toString);
+            return buildNormalizedPath(downloadedPackagePath, v.toString, packageName);
     }
     return null;
 }

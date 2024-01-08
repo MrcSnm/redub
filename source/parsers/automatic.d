@@ -4,6 +4,7 @@ static import parsers.json;
 
 BuildRequirements parseProject(string projectWorkingDir, string subConfiguration="")
 {
+    import std.stdio;
     import std.path;
     import package_searching.entry;
     string projectFile = findEntryProjectFile(projectWorkingDir);

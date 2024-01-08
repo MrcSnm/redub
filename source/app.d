@@ -45,7 +45,10 @@ int main(string[] args)
     //TEST -> Take from args[1] the workingDir.
     string workingDir = std.file.getcwd();
     if(args.length > 1)
-        workingDir = args[1];
+    {
+        if(!isAbsolute(args[1])) 
+            workingDir = buildNormalizedPath(workingDir, args[1]);
+    }
 
     if(isUpToDate(workingDir))
     {
