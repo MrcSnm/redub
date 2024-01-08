@@ -29,7 +29,7 @@ string getPackagePath(string packageName, string packageVersion, string required
     string packagePath;
     if(std.file.exists(locPackages))
     {
-        JSONValue localPackagesJSON = parseJSON(locPackages);
+        JSONValue localPackagesJSON = parseJSON(std.file.readText(locPackages));
         packagePath = getPackageInJSON(localPackagesJSON, packageName, packageVersion);
         if(packagePath) return packagePath;
     }
