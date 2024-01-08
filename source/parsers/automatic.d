@@ -46,11 +46,16 @@ private void partiallyFinishBuildRequirements(ref BuildRequirements req)
     if(!isAbsolute(req.cfg.outputDirectory))
         req.cfg.outputDirectory = buildNormalizedPath(req.cfg.workingDir, req.cfg.outputDirectory);
 
-    foreach(ref string importDir; req.cfg.importDirectories)
-        if(!isAbsolute(importDir)) importDir = buildNormalizedPath(req.cfg.workingDir, importDir);
-    
-    foreach(ref string libDir; req.cfg.libraryPaths)
-        if(!isAbsolute(libDir)) libDir = buildNormalizedPath(req.cfg.workingDir, libDir);
+    alias StringArrayRef = string[]*;
+    StringArrayRef[] toAbsolutize = [
+        &req.cfg.importDirectories,
+        &req.cfg.libraryPaths,
+        &req.cfg.stringImportPaths
+    ];
+
+    foreach(arr; toAbsolutize)
+        foreach(ref string dir; *arr)
+            if(!isAbsolute(dir)) dir = buildNormalizedPath(req.cfg.workingDir, dir);
         
     if(!isAbsolute(req.cfg.sourceEntryPoint)) 
         req.cfg.sourceEntryPoint = buildNormalizedPath(req.cfg.workingDir, req.cfg.sourceEntryPoint);

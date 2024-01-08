@@ -32,6 +32,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
         "targetType": (ref BuildRequirements req, JSONValue v, ParseConfig c){req.cfg.targetType = targetFrom(v.str);},
         "targetPath": (ref BuildRequirements req, JSONValue v, ParseConfig c){req.cfg.outputDirectory = v.str;},
         "importPaths": (ref BuildRequirements req, JSONValue v, ParseConfig c){req.cfg.importDirectories = v.strArr;},
+        "stringImportPaths": (ref BuildRequirements req, JSONValue v, ParseConfig c){req.cfg.stringImportPaths = v.strArr;},
         "sourcePaths": (ref BuildRequirements req, JSONValue v, ParseConfig c){req.cfg.sourcePaths = v.strArr;},
         "libPaths":  (ref BuildRequirements req, JSONValue v, ParseConfig c){req.cfg.libraryPaths = v.strArr;},
         "libs":  (ref BuildRequirements req, JSONValue v, ParseConfig c){req.cfg.libraries = v.strArr;},

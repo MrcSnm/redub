@@ -16,7 +16,7 @@ string[] parseBuildConfiguration(BuildConfiguration b, OS target)
         commands~= importDirectories.map!((i) => "-I"~i).array;
         commands~= libraryPaths.map!((lp) => "-L-L"~lp).array;
         commands~= libraries.map!((l) => "-L-l"~l).array;
-        commands~= stringImportPaths.map!((sip) => "-J"~sip).array;
+        commands~= stringImportPaths.map!((sip) => "-J="~sip).array;
 
         string outFlag = getTargetTypeFlag(targetType);
         if(outFlag) commands~= outFlag;
