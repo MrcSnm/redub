@@ -21,6 +21,11 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
 {
     import std.exception;
     ///Setup base of configuration before finding anything
+    if(cfg.firstRun)
+    {
+        enforce("name" in json, "Every package must contain a 'name'");
+        cfg.requiredBy = json["name"].str;
+    }
     BuildRequirements buildRequirements = getDefaultBuildRequirement(cfg);
     immutable static  handler = [
         "name": (ref BuildRequirements req, JSONValue v, ParseConfig c){if(c.firstRun) req.cfg.name = v.str;},
@@ -78,10 +83,12 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
                 else if(value.type == JSONType.string) ///Version style
                 {
                     newDep.version_ = value.str;
-                    newDep.path = package_searching.dub.getPackagePath(depName, value.str);
+                    newDep.path = package_searching.dub.getPackagePath(depName, value.str, c.requiredBy);
                 }
                 if(newDep.path.length && !isAbsolute(newDep.path)) newDep.path = buildNormalizedPath(c.workingDir, newDep.path);
                 import std.algorithm.searching:countUntil;
+
+                //If dependency already exists, use the existing one
                 ptrdiff_t depIndex = countUntil!((a) => a.name == newDep.name)(req.dependencies);
                 if(depIndex == -1)
                     req.dependencies~= newDep;
@@ -244,7 +251,7 @@ struct ParseConfig
     bool firstRun;
     string workingDir;
     string subConfiguration;
-    bool hasCheckedSubdependencies;
+    string requiredBy;
 }
 
 

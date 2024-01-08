@@ -20,7 +20,7 @@ bool dubHook_PackageManagerDownloadPackage(string packageName, string packageVer
  *   packageVersion = "version" inside dub.json. Only full matches are accepted at the moment
  * Returns: The package path when found. null when not.
  */
-string getPackagePath(string packageName, string packageVersion, string requiredBy="")
+string getPackagePath(string packageName, string packageVersion, string requiredBy)
 {
     import std.file;
     import std.path;
@@ -45,7 +45,10 @@ string getPackagePath(string packageName, string packageVersion, string required
     import std.stdio;
     import std.array;
 
-    SemVer[] semVers = dirEntries(downloadedPackagePath, SpanMode.shallow).map!((DirEntry e ) => SemVer(e.name.baseName)).array;
+    SemVer[] semVers = dirEntries(downloadedPackagePath, SpanMode.shallow)
+        .map!((DirEntry e) => e.name.baseName)
+        .filter!((string name) => name.length && name[0] != '.') //Remove invisible files
+        .map!((string name ) => SemVer(name)).array;
     SemVer requirement = SemVer(packageVersion);
 
     if(requirement.isInvalid)
@@ -53,7 +56,6 @@ string getPackagePath(string packageName, string packageVersion, string required
         writeln("Invalid package version requirement ", requirement);
         return null;
     }
-
     foreach_reverse(SemVer v; sort(semVers))
     {
         if(v.isInvalid)
@@ -64,7 +66,12 @@ string getPackagePath(string packageName, string packageVersion, string required
         if(v.satisfies(requirement))
             return buildNormalizedPath(downloadedPackagePath, v.toString, packageName);
     }
-    return null;
+    throw new Error(
+        "Could not find any package named "~ 
+        packageName ~ " with version " ~ requirement.toString ~ 
+        " required by "~requiredBy ~ "\nFound versions:\n\t" ~
+        semVers.map!((sv) => sv.toString).join("\n\t")
+        );
 }
 
 
