@@ -9,7 +9,7 @@ import buildapi;
 BuildConfiguration parse()
 {
     import std.process;
-    BuildConfiguration ret = BuildConfiguration.init;
+    BuildConfiguration ret;
 
     string[] parsedEnvironmentVars = ["DFLAGS"];
     foreach(v; parsedEnvironmentVars)

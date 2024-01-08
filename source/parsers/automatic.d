@@ -7,7 +7,7 @@ BuildRequirements parseProject(string projectWorkingDir, string subConfiguration
     import std.path;
     import package_searching.entry;
     string projectFile = findEntryProjectFile(projectWorkingDir);
-    BuildRequirements req = BuildRequirements.init;
+    BuildRequirements req = BuildRequirements.defaultInit;
     switch(extension(projectFile))
     {
         case ".json":  req = parsers.json.parse(projectFile, subConfiguration); break;
@@ -32,6 +32,4 @@ private void finishBuildRequirements(ref BuildRequirements req)
         
     if(!isAbsolute(req.cfg.sourceEntryPoint)) 
         req.cfg.sourceEntryPoint = buildNormalizedPath(req.cfg.workingDir, req.cfg.sourceEntryPoint);
-
-    
 }

@@ -20,7 +20,9 @@ import parsers.automatic;
 ProjectNode getProjectTree(BuildRequirements req)
 {
     ProjectNode[string] visited;
-    return getProjectTreeImpl(req, visited);
+    ProjectNode tree =  getProjectTreeImpl(req, visited);
+    tree.finish();
+    return tree;
 
 }
 private ProjectNode getProjectTreeImpl(BuildRequirements req, ref ProjectNode[string] visited)

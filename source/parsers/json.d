@@ -35,6 +35,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
             if(c.firstRun)
             {
                 c.firstRun = false;
+                ///TODO: Change to use subConfiguration if found.
                 req.cfg = req.cfg.merge(parse(v.array[0], c).cfg);
             }
         },
@@ -191,7 +192,7 @@ struct ParseConfig
 
 BuildRequirements getDefaultBuildRequirement(ParseConfig cfg)
 {
-    BuildRequirements req = BuildRequirements.init;
+    BuildRequirements req = BuildRequirements.defaultInit;
     req.version_ = "~master";
     req.targetConfiguration = cfg.subConfiguration;
     req.cfg.workingDir = cfg.workingDir;

@@ -5,7 +5,7 @@ import std.system;
 static import command_generators.dmd;
 static import command_generators.ldc;
 
-bool compile(BuildRequirements req, OS os, string compiler)
+void compile(BuildRequirements req, OS os, string compiler, out int status, out string sink)
 {
     import std.process;
     string[] flags;
@@ -20,7 +20,9 @@ bool compile(BuildRequirements req, OS os, string compiler)
         default: throw new Error("Unsupported compiler "~compiler);
     }
     string cmds = escapeShellCommand(compiler ~ flags);
-    return wait(spawnShell(cmds)) == 0;
+    auto ret = executeShell(cmds);
+    status = ret.status;
+    sink = ret.output;
 }
 
 bool link()
@@ -31,11 +33,34 @@ bool link()
 
 bool buildProject(ProjectNode[][] steps, string compiler)
 {
+    import std.algorithm.searching:maxCount;
+    import std.parallelism;
+    size_t maxSize;
+    string[] outputSink;
+    int[] statusSink;
+    foreach(depth; steps) if(depth.length > maxSize) maxSize = depth.length;
+    outputSink = new string[](maxSize);
+    statusSink = new int[](maxSize);
+
     foreach_reverse(dep; steps)
-        foreach(ProjectNode proj; dep)
+    {
+        foreach(i, ProjectNode proj; parallel(dep))
         {
-            if(!compile(proj.requirements, os, compiler))
-                return false;
+            compile(proj.requirements, os, compiler, statusSink[i], outputSink[i]);
         }
+        
+        foreach(i; 0..dep.length)
+        {
+            import std.stdio;
+            if(statusSink[i])
+            {
+                writeln("Compilation of project ", dep[i].name, " failed with: \n", outputSink[i]);
+                return false;
+            }
+            else
+                writeln("Compilation of project ", dep[i].name, " finished!");
+        }
+
+    }
     return true;
 }

@@ -21,18 +21,14 @@ string[] parseBuildConfiguration(BuildConfiguration b, OS target)
         string outFlag = getTargetTypeFlag(targetType);
         if(outFlag) commands~= outFlag;
 
-        string outputName;
-        if(targetType == TargetType.library) outputName = "lib";
-        outputName~= name~targetType.getExtension(os);
-
         if(outputDirectory)
         {
             commands~= "-od"~outputDirectory;
-            commands~= "-of"~buildNormalizedPath(outputDirectory, outputName);
+            commands~= "-of"~buildNormalizedPath(outputDirectory, getOutputName(targetType, name, os));
         }
         else
         {
-            commands~= "-of"~outputName;
+            commands~= "-of"~getOutputName(targetType, name, os);
         }
         foreach(path; sourcePaths)
             commands~= getSourceFiles(buildNormalizedPath(workingDir, path));
