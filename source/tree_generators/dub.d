@@ -45,6 +45,8 @@ private ProjectNode getProjectTreeImpl(BuildRequirements req, ref ProjectNode[st
                         depConfig
                     );
                 }
+                else //If it is using the same subConfiguration, simply continue 
+                    continue;
             }
             else //If it exists, simply merge with the parent project for adjusting its import flags
             {
@@ -53,7 +55,11 @@ private ProjectNode getProjectTreeImpl(BuildRequirements req, ref ProjectNode[st
             }
         }
         else
-            depNode = getProjectTreeImpl(parseProjectWithParent(dep.path, req, dep.subConfiguration), visited);
+        {
+            BuildRequirements buildReq = parseProjectWithParent(dep.path, req, dep.subConfiguration);
+            depNode = getProjectTreeImpl(buildReq, visited);
+
+        }
         visited[dep.name] = depNode;
         root.addDependency(depNode);
     }

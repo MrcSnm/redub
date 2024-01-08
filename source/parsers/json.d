@@ -137,6 +137,10 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
         import std.string:replace;
         dep.name = dep.name.replace(":", "_");
     }
+    import std.algorithm.iteration:filter;
+    import std.array:array;
+    ///Remove dependencies without paths.
+    buildRequirements.dependencies = buildRequirements.dependencies.filter!((dep) => dep.path.length).array;
     // if(cfg.firstRun) writeln("WARNING: Unused Keys -> ", unusedKeys);
 
     return buildRequirements;
