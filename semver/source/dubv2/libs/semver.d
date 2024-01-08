@@ -81,6 +81,7 @@ struct SemVer
             metadata = v[metadataSeparator+1..$];
             v = v[0..metadataSeparator];
         }
+        //Take out build part
         ptrdiff_t buildSeparator = std.string.indexOf(v, "-");
         if(buildSeparator != -1)
         {
@@ -89,21 +90,22 @@ struct SemVer
         }
         ///Take modifiers out
         ptrdiff_t modifierSeparator = v.indexOfFirstMatching(c => isDigit(c));
+        string op;
         if(modifierSeparator != 0)
         {
-            string op;
             if(modifierSeparator == -1)
                 op = v, v = null;
             else
                 op = v[0..modifierSeparator], v = v[modifierSeparator..$];
-            if(!parseOperator(this, op))
-            {
-                setInvalid("Error parsing operator"); 
-                return;
-            }
         }
         nint major, minor, patch;
         auto parts = v.split(".");
+        if(op.length && !parseOperator(this, op, parts.length))
+        {
+            setInvalid("Error parsing operator"); 
+            return;
+        }
+
         static void handlePart(string part, ref nint output, ref ComparisonResult compareTo)
         {
             if(part == "*" || part == "x")
@@ -185,15 +187,19 @@ private ptrdiff_t indexOfFirstMatching(string str, scope indexOfFirstMatchingDg 
  *   sv = Semver which will be populated
  *   op = Semver which will be populated
  */
-private bool parseOperator(ref SemVer sv, string op) @nogc nothrow
+private bool parseOperator(ref SemVer sv, string op, size_t partsLength) @nogc nothrow
 {
     switch(op) with(ComparisonResult)
     {
         case "*":  sv.comparison = [any, any, any]; break;
         case "=":  sv.comparison = [equal, equal, equal]; break;
         case "^":  sv.comparison = [equal, atOnce, gtEqual];  break;
-        case "~":  sv.comparison = [equal, equal, gtEqual]; break;
-        case "~>": sv.comparison = [equal, equal, gtEqual]; break;
+        case "~", "~>":  
+            if(partsLength <= 1)
+                sv.comparison = [equal, atOnce, gtEqual];
+            else
+                sv.comparison = [equal, equal, gtEqual]; 
+            break;
         case ">":  sv.comparison = [atOnce, greaterThan, greaterThan]; break;
         case ">=": sv.comparison = [atOnce, gtEqual, gtEqual]; break;
         case "<":  sv.comparison = [atOnce, lessThan, lessThan]; break;
@@ -263,6 +269,8 @@ unittest
     assert(!SemVer("1.2.2").satisfies(gtPatches));
     assert(SemVer("1.2.10").satisfies(gtPatches));
     assert(!SemVer("1.0.10").satisfies(gtPatches));
+
+    // assert(SemVer("~5").satisfies("5.0.0"));
 }
 
 @("Compare Using Metadata")
