@@ -32,6 +32,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
         "targetType": (ref BuildRequirements req, JSONValue v, ParseConfig c){req.cfg.targetType = targetFrom(v.str);},
         "targetPath": (ref BuildRequirements req, JSONValue v, ParseConfig c){req.cfg.outputDirectory = v.str;},
         "importPaths": (ref BuildRequirements req, JSONValue v, ParseConfig c){req.cfg.importDirectories = v.strArr;},
+        "sourcePaths": (ref BuildRequirements req, JSONValue v, ParseConfig c){req.cfg.sourcePaths = v.strArr;},
         "libPaths":  (ref BuildRequirements req, JSONValue v, ParseConfig c){req.cfg.libraryPaths = v.strArr;},
         "libs":  (ref BuildRequirements req, JSONValue v, ParseConfig c){req.cfg.libraries = v.strArr;},
         "versions":  (ref BuildRequirements req, JSONValue v, ParseConfig c){req.cfg.versions = v.strArr;},
@@ -71,7 +72,20 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
                 {
                     const(JSONValue)* depPath = "path" in value;
                     const(JSONValue)* depVer = "version" in value;
-                    enforce(depPath || depVer, "Dependency named "~ depName ~ " must contain at least a \"path\" or \"version\" property.");
+                    const(JSONValue)* depOpt = "optional" in value;
+                    const(JSONValue)* depDef = "default" in value;
+                    enforce(depPath || depVer, 
+                        "Dependency named "~ depName ~ 
+                        " must contain at least a \"path\" or \"version\" property."
+                    );
+
+                    if(depOpt && depOpt.boolean == true)
+                    {
+                        if(!depDef || depDef.boolean == false)
+                            continue;
+                    }
+
+
                     if(depPath)
                         newDep.path = depPath.str;
                     if(depVer)
