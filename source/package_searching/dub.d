@@ -83,10 +83,8 @@ private string getDefaultLookupPathForPackages()
 {
     import std.path;
     import std.process;
-    string base;
-    version(Windows) base = environment["LOCALAPPDATA"];
-    else base = environment["HOME"];
-    return buildNormalizedPath(base, ".dub", "packages");
+    version(Windows) return buildNormalizedPath(environment["LOCALAPPDATA"],  "dub", "packages");
+    else return buildNormalizedPath(environment["HOME"], ".dub", "packages");
 }
 
 
