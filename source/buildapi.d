@@ -162,16 +162,23 @@ class ProjectNode
         }
         if(parent)
             parent.requirements.cfg = parent.requirements.cfg.mergeImport(requirements.cfg);
-        static TargetType inferTargetType(bool hasParent)
+        static TargetType inferTargetType(BuildConfiguration cfg)
         {
-            if(hasParent) return TargetType.library;
-            return TargetType.executable;
+            static immutable string[] filesThatInfersExecutable = ["app.d", "main.d"];
+            foreach(p; cfg.sourcePaths)
+            {
+                static import std.file;
+                foreach(f; filesThatInfersExecutable)
+                if(std.file.exists(buildNormalizedPath(cfg.workingDir, p,f)))
+                    return TargetType.executable;
+            }
+            return TargetType.library;
         }
         with(TargetType)
         {
             HandleTargetType: final switch(requirements.cfg.targetType)
             {
-                case autodetect: requirements.cfg.targetType = inferTargetType(parent !is null); goto HandleTargetType;
+                case autodetect: requirements.cfg.targetType = inferTargetType(requirements.cfg); goto HandleTargetType;
                 case library, staticLibrary:
                     if(parent)
                     {
@@ -185,6 +192,7 @@ class ProjectNode
                 case sharedLibrary: throw new Error("Uninplemented support for shared libraries");
                 case executable: break;
             }
+
         }
     }
 }

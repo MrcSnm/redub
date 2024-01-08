@@ -9,10 +9,10 @@ BuildRequirements parseProject(string projectWorkingDir, string subConfiguration
     import package_searching.entry;
     string projectFile = findEntryProjectFile(projectWorkingDir);
     BuildRequirements req = BuildRequirements.defaultInit;
+
     switch(extension(projectFile))
     {
         case ".json":  req = parsers.json.parse(projectFile, subConfiguration); break;
-        case null: break;
         default: throw new Error("Unsupported project type "~projectFile~" at dir "~projectWorkingDir);
     }
     partiallyFinishBuildRequirements(req);
