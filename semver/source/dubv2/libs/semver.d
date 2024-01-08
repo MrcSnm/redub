@@ -52,7 +52,8 @@ struct SemVer
     private string versionStringRepresentation;
     private 
     {
-        string buildMetadata;
+        string buildPart;
+        string metadata;
         bool invalid;
         string error;
     }
@@ -77,8 +78,14 @@ struct SemVer
         ptrdiff_t metadataSeparator = std.string.indexOf(v, "+");
         if(metadataSeparator != -1)
         {
-            buildMetadata = v[metadataSeparator+1..$];
+            metadata = v[metadataSeparator+1..$];
             v = v[0..metadataSeparator];
+        }
+        ptrdiff_t buildSeparator = std.string.indexOf(v, "-");
+        if(buildSeparator != -1)
+        {
+            buildPart = v[buildSeparator+1..$];
+            v = v[0..buildSeparator];
         }
         ///Take modifiers out
         ptrdiff_t modifierSeparator = v.indexOfFirstMatching(c => isDigit(c));
@@ -122,7 +129,7 @@ struct SemVer
         invalid = true;
     }
     string getErrorMessage() const { return error; }
-    string getBuildMetadata() const {return buildMetadata;}
+    string getMetadata() const {return metadata;}
 
 
     int opCmp(const SemVer other) const
@@ -258,13 +265,20 @@ unittest
     assert(!SemVer("1.0.10").satisfies(gtPatches));
 }
 
-@("Compare Using Build Metadata")
+@("Compare Using Metadata")
 unittest
 {
     string meta = "anything.is.accepted.here!";
     SemVer a = SemVer("1.2.3+"~meta);
     assert(SemVer("1.2.3").satisfies(a));
-    assert(a.getBuildMetadata == meta);
+    assert(a.getMetadata == meta);
+}
+
+@("Compare using build part")
+unittest
+{
+    SemVer a = SemVer("1.2.3-beta1");
+    assert(SemVer("1.2.3").satisfies(a));
 }
 
 @("Compare Using ^")
@@ -287,4 +301,3 @@ unittest
     assert(SemVer("*.*.9").isInvalid);
     assert(SemVer("99.55.9").satisfies(SemVer("*")));
 }
-
