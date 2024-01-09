@@ -67,7 +67,7 @@ bool link()
 }
 
 
-bool buildProject(ProjectNode[][] steps, ProjectNode tree, string compiler)
+bool buildProject(ProjectNode[][] steps, string compiler)
 {
     import std.algorithm.searching:maxCount;
     import std.parallelism;
@@ -110,11 +110,17 @@ bool buildProject2(ProjectNode root, string compiler, OS os)
     import std.concurrency;
     import std.stdio;
     ProjectNode[] dependencyFreePackages = root.findLeavesNodes();
-    bool nextIsRoot;
+    bool[ProjectNode] spawned;
     while(true)
     {
         foreach(dep; dependencyFreePackages)
-            spawn(&compile2, dep.requirements.cfg.idup, cast(shared)dep, os, compiler.idup);
+        {
+            if(!(dep in spawned))
+            {
+                spawned[dep] = true;
+                spawn(&compile2, dep.requirements.cfg.idup, cast(shared)dep, os, compiler.idup);
+            }
+        }
         CompilationResult res = receiveOnly!CompilationResult;
         ProjectNode finishedPackage = cast()res.node;
         if(res.status)
@@ -131,11 +137,9 @@ bool buildProject2(ProjectNode root, string compiler, OS os)
         {
             writeln("Compilation of project ", finishedPackage.name, " finished!");
             finishedPackage.becomeIndependent();
-            if(nextIsRoot)
-                break;
             dependencyFreePackages = root.findLeavesNodes();
-            if(dependencyFreePackages.length >= 1 && dependencyFreePackages[0] is root)
-                nextIsRoot = true;
+            if(finishedPackage is root)
+                break;
         }
     }
     return true;
