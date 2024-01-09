@@ -67,6 +67,9 @@ struct SemVer
     this(int M, int m){ver = RawVersion(M, m);}
     this(int M, int m, int p){ver = RawVersion(M, m, p);}
 
+    private bool isUsingRange;
+    private string rangeMax;
+
     this(string v) 
     {
         import std.string;
@@ -97,6 +100,14 @@ struct SemVer
                 op = v, v = null;
             else
                 op = v[0..modifierSeparator], v = v[modifierSeparator..$];
+        }
+        ///Take ranges out
+        ptrdiff_t rangesSeparator = v.indexOfFirstMatching(c => c == ' ');
+        if(rangesSeparator != -1)
+        {
+            isUsingRange = true;
+            rangeMax = v[rangesSeparator+1..$];
+            v = v[0..rangesSeparator];
         }
         nint major, minor, patch;
         auto parts = v.split(".");
@@ -142,6 +153,12 @@ struct SemVer
     bool satisfies(const SemVer requirement) const 
     {
         if(invalid) return false;
+        if(isUsingRange)
+        {
+            SemVer copy = cast()this;
+            copy.isUsingRange = false;
+            return copy.satisfies(requirement) && copy.satisfies(SemVer(requirement.rangeMax));
+        }
         if(requirement.comparison[0] == ComparisonResult.atOnce)
             return (requirement.comparison[1] & ver.compareAtOnce(requirement.ver)) != 0;
         else if(requirement.comparison[1] == ComparisonResult.atOnce)
@@ -309,4 +326,10 @@ unittest
     assert(SemVer("1.55.9").satisfies(SemVer("1.*.9")));
     assert(SemVer("*.*.9").isInvalid);
     assert(SemVer("99.55.9").satisfies(SemVer("*")));
+}
+
+@("Compare using Ranges")
+unittest
+{
+    assert(SemVer("2.0.5").satisfies(SemVer(">=2.0.5 <3.0.0")));
 }
