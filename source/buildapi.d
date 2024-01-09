@@ -254,7 +254,7 @@ class ProjectNode
     private void findLeavesNodesImpl(ProjectNode[] leaves, ref bool[ProjectNode] visited)
     {
         foreach(dep; dependencies)
-            findLeavesNodesImpl(leaves, visited);
+            dep.findLeavesNodesImpl(leaves, visited);
         if(dependencies.length == 0)
         {
             if(!(this in visited))
