@@ -130,7 +130,7 @@ bool buildProject2(ProjectNode root, string compiler, OS os)
         else
         {
             writeln("Compilation of project ", finishedPackage.name, " finished!");
-            
+            finishedPackage.becomeIndependent();
             if(nextIsRoot)
                 break;
             dependencyFreePackages = root.findLeavesNodes();
