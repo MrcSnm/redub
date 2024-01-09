@@ -101,7 +101,7 @@ struct DubArguments
         "Arbitrary pre- and suffixes to the identifiers below are recognized (e.g. ldc2 or dmd-2.063) and matched to the proper compiler type:" ~
         "dmd, gdc, ldc, gdmd, ldmd"
     )
-    string compiler;
+    string compiler = "dmd";
 
     @("Force a different architecture (e.g. x86 or x86_64)")
     @("a|arch")
@@ -163,4 +163,28 @@ struct DubBuildArguments
     @("Build all dependencies, even when main target is a static library.")
     @("d|deep")
     bool deep;
+}
+
+
+import std.getopt;
+
+GetoptResult betterGetopt(T)(ref string[] args, out T opts) if(is(T == struct))
+{
+    alias _ = opts;
+    return mixin(genGetoptCall!T);
+}
+
+private string genGetoptCall(T)()
+{
+    string ret = "getopt(args, ";
+    static foreach(mem; __traits(allMembers, T))
+    {{
+        alias att = __traits(getAttributes, __traits(getMember, T, mem));
+        static if(att.length == 2) 
+            ret~= att[1].stringof ~ ", "~att[0].stringof;
+        else
+            ret~= mem.stringof~", "~att[0].stringof;
+        ret~=", &_."~mem~", ";
+    }}
+    return ret~")";
 }

@@ -9,6 +9,7 @@ import std.stdio;
 import buildapi;
 import parsers.automatic;
 import tree_generators.dub;
+import cli.dub;
 
 
 
@@ -37,11 +38,6 @@ string formatError(string err)
 int main(string[] args)
 {
     import building.cache;
-    import package_searching.entry;
-    import package_searching.dub;
-    static import parsers.environment;
-    static import command_generators.dmd;
-
     //TEST -> Take from args[1] the workingDir.
     string workingDir = std.file.getcwd();
     if(args.length > 1)
@@ -56,25 +52,43 @@ int main(string[] args)
 
     }
     else
+        return buildMain(args, workingDir);
+
+    return 0;
+}
+
+
+int buildMain(string[] args, string workingDir)
+{
+    import std.getopt;
+    import std.datetime.stopwatch;
+    import std.system;
+    import building.compile;
+    import package_searching.entry;
+    static import parsers.environment;
+    static import command_generators.dmd;
+
+    DubArguments bArgs;
+    GetoptResult res = betterGetopt(args, bArgs);
+    if(res.helpWanted)
     {
-        import std.datetime.stopwatch;
-        import std.system;
-        import building.compile;
-        StopWatch st = StopWatch(AutoStart.yes);
-        BuildRequirements req = parseProject(workingDir);
-        import std.stdio;
-        req.cfg = req.cfg.merge(parsers.environment.parse());
-
-
-
-        ProjectNode tree = getProjectTree(req);
-        ProjectNode[][] expandedDependencyMatrix = fromTree(tree);
-        printMatrixTree = expandedDependencyMatrix;
-        if(!buildProject(expandedDependencyMatrix, "dmd"))
-            throw new Error("Build failure");
-
-        writeln("Built project in ", (st.peek.total!"msecs"), " ms.") ;
+        defaultGetoptPrinter("dubv2 build information\n\t", res.options);
+        return 1;
     }
 
+    StopWatch st = StopWatch(AutoStart.yes);
+    BuildRequirements req = parseProject(workingDir, bArgs.config);
+    import std.stdio;
+    req.cfg = req.cfg.merge(parsers.environment.parse());
+
+    ProjectNode tree = getProjectTree(req);
+    ProjectNode[][] expandedDependencyMatrix = fromTree(tree);
+    printMatrixTree = expandedDependencyMatrix;
+    writeln("Dependencies resolved in ", (st.peek.total!"msecs"), " ms.") ;
+
+    if(!buildProject(expandedDependencyMatrix, bArgs.compiler))
+        throw new Error("Build failure");
+
+    writeln("Built project in ", (st.peek.total!"msecs"), " ms.") ;
     return 0;
 }
