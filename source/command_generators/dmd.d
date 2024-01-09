@@ -2,7 +2,7 @@ module command_generators.dmd;
 import buildapi;
 import command_generators.commons;
 
-string[] parseBuildConfiguration(BuildConfiguration b, OS target)
+string[] parseBuildConfiguration(immutable BuildConfiguration b, OS target)
 {
     import std.path:buildNormalizedPath;
     import std.array:array;

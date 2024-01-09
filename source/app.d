@@ -90,7 +90,7 @@ int buildMain(string[] args, string workingDir)
     printMatrixTree = expandedDependencyMatrix;
     writeln("Dependencies resolved in ", (st.peek.total!"msecs"), " ms.") ;
 
-    if(!buildProject(expandedDependencyMatrix, bArgs.compiler))
+    if(!buildProject2(tree, bArgs.compiler, os))
         throw new Error("Build failure");
 
     writeln("Built project in ", (st.peek.total!"msecs"), " ms.") ;
