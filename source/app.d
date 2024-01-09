@@ -98,6 +98,6 @@ int buildMain(string[] args, string workingDir)
     if(!buildProject2(tree, bArgs.compiler, os))
         throw new Error("Build failure");
 
-    writeln("Built project in ", (st.peek.total!"msecs" - first), " ms.") ;
+    writeln("Built project in ", (st.peek.total!"msecs"), " ms.") ;
     return 0;
 }
