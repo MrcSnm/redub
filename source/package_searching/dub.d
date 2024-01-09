@@ -26,6 +26,10 @@ string getPackagePath(string packageName, string packageVersion, string required
     import std.path;
     string lookupPath = getDefaultLookupPathForPackages();
     string locPackages = buildNormalizedPath(lookupPath, "local-packages.json");
+    string mainPackageName;
+    string subPackage = getSubPackageInfo(packageName, mainPackageName);
+    if(mainPackageName) packageName = mainPackageName;
+
     string packagePath;
     if(std.file.exists(locPackages))
     {
@@ -53,6 +57,18 @@ string getPackagePath(string packageName, string packageVersion, string required
 
     if(requirement.isInvalid)
     {
+        import std.ascii:isAlphaNum;
+        import std.algorithm.searching:canFind;
+        if(requirement.toString.length > 1 && requirement.toString[0] == '~' && 
+            !requirement.toString[1..$].canFind!((ch) => !ch.isAlphaNum)) //Can't find a non alpha numeric version
+        {
+            writeln("Warning: using git package version requirement ", requirement, " for ", packageName ~ (subPackage ? (":"~subPackage) : ""));
+            foreach(DirEntry e; dirEntries(downloadedPackagePath, SpanMode.shallow))
+            {
+                if(e.name.baseName == requirement.toString)
+                    return buildNormalizedPath(downloadedPackagePath, requirement.toString, packageName);
+            }
+        }
         writeln("Invalid package version requirement ", requirement);
         return null;
     }
@@ -72,6 +88,15 @@ string getPackagePath(string packageName, string packageVersion, string required
         " required by "~requiredBy ~ "\nFound versions:\n\t" ~
         semVers.map!((sv) => sv.toString).join("\n\t")
         );
+}
+
+string getSubPackageInfo(string packageName, out string mainPackageName)
+{
+    import std.string:indexOf;
+    ptrdiff_t ind = packageName.indexOf(":");
+    if(ind == -1) return null;
+    mainPackageName = packageName[0..ind];
+    return packageName[ind+1..$];
 }
 
 

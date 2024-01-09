@@ -346,12 +346,3 @@ BuildRequirements getDefaultBuildRequirement(ParseConfig cfg)
     req.cfg.workingDir = cfg.workingDir;
     return req;
 }
-
-private string getSubPackageInfo(string packageName, out string mainPackageName)
-{
-    import std.string:indexOf;
-    ptrdiff_t ind = packageName.indexOf(":");
-    if(ind == -1) return null;
-    mainPackageName = packageName[0..ind];
-    return packageName[ind+1..$];
-}
