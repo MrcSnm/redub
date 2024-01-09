@@ -2,7 +2,7 @@ module parsers.automatic;
 public import buildapi;
 static import parsers.json;
 
-BuildRequirements parseProject(string projectWorkingDir, string subConfiguration="")
+BuildRequirements parseProject(string projectWorkingDir, string subConfiguration="", string subPackage="")
 {
     import std.stdio;
     import std.path;
@@ -12,7 +12,7 @@ BuildRequirements parseProject(string projectWorkingDir, string subConfiguration
 
     switch(extension(projectFile))
     {
-        case ".json":  req = parsers.json.parse(projectFile, subConfiguration); break;
+        case ".json":  req = parsers.json.parse(projectFile, subConfiguration, subPackage); break;
         default: throw new Error("Unsupported project type "~projectFile~" at dir "~projectWorkingDir);
     }
     partiallyFinishBuildRequirements(req);
