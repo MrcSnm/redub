@@ -76,6 +76,9 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
                 if(out_MainPackage == req.name && subPackageName)
                     newDep.path = c.workingDir;
 
+                import std.stdio;
+                writeln(out_MainPackage, " : ", subPackageName, " ", c.workingDir);
+
                 
                 if(value.type == JSONType.object) ///Uses path style
                 {
@@ -165,7 +168,25 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
                     break;
                 }
             }
-            else continue; //Nothing to do currently with path-only subPackages
+            else
+            {
+                import std.path;
+                import std.array;
+                string subPackagePath = p.str;
+                if(!std.path.isAbsolute(subPackagePath))
+                    subPackagePath = buildNormalizedPath(cfg.workingDir, subPackagePath);
+                enforce(std.file.isDir(subPackagePath), 
+                    "subPackage path '"~subPackagePath~"' must be a directory "
+                );
+                string subPackageName = pathSplitter(subPackagePath).array[$-1];
+                if(subPackageName == cfg.subPackage)
+                {
+                    import parsers.automatic;
+                    return parseProject(subPackagePath, cfg.subConfiguration, null);
+                }
+
+                continue; //Nothing to do currently with path-only subPackages
+            } 
         }
     }
 
