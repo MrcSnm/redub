@@ -67,7 +67,8 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
                         break;
                     }
                 }
-                req = req.merge(parse(configurationToUse, c));
+                BuildRequirements subCfgReq =parse(configurationToUse, c);
+                req = req.merge(subCfgReq);
                 req.targetConfiguration = configurationToUse["name"].str;
             }
         },
@@ -91,8 +92,6 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
                 ///Inside this same package
                 if(out_MainPackage == req.name && subPackageName)
                     newDep.path = c.workingDir;
-                import std.stdio;
-                writeln("Found dependency ", depName, " inside ", req.name,":",c.subPackage);
 
                 
                 if(value.type == JSONType.object) ///Uses path style

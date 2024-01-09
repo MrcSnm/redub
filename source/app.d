@@ -62,16 +62,13 @@ int main(string[] args)
         import building.compile;
         StopWatch st = StopWatch(AutoStart.yes);
         BuildRequirements req = parseProject(workingDir);
-        req.cfg = req.cfg.merge(parsers.environment.parse());
         import std.stdio;
+        req.cfg = req.cfg.merge(parsers.environment.parse());
 
-        foreach(dep; req.dependencies)
-            writeln(dep);
 
 
         ProjectNode tree = getProjectTree(req);
         ProjectNode[][] expandedDependencyMatrix = fromTree(tree);
-        // writeln = command_generators.dmd.parseBuildConfiguration(req.cfg, os);
         printMatrixTree = expandedDependencyMatrix;
         if(!buildProject(expandedDependencyMatrix, "dmd"))
             throw new Error("Build failure");

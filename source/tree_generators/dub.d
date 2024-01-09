@@ -32,6 +32,7 @@ private ProjectNode getProjectTreeImpl(BuildRequirements req, ref ProjectNode[st
     {
         ProjectNode* visitedDep = dep.fullName in visited;
         ProjectNode depNode;
+        //If visited already, just add the new dflags and versions
         if(visitedDep)
         {
             ///When found 2 different packages requiring a different dependency subConfiguration
@@ -48,7 +49,7 @@ private ProjectNode getProjectTreeImpl(BuildRequirements req, ref ProjectNode[st
                 else //If it is using the same subConfiguration, simply continue 
                 {
                     depNode = *visitedDep;
-                    depNode.requirements = mergeProjectWithParent(depNode.requirements, req);
+                    // depNode.requirements = mergeProjectWithParent(depNode.requirements, req);
                 }
             }
             else //If it exists, simply merge with the parent project for adjusting its import flags
@@ -62,7 +63,8 @@ private ProjectNode getProjectTreeImpl(BuildRequirements req, ref ProjectNode[st
             BuildRequirements buildReq = parseProjectWithParent(dep, req);
             depNode = getProjectTreeImpl(buildReq, visited);
         }
-        visited[dep.name] = depNode;
+
+        visited[dep.fullName] = depNode;
         root.addDependency(depNode);
     }
     return root;

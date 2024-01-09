@@ -150,7 +150,7 @@ struct BuildRequirements
 class ProjectNode
 {
     BuildRequirements requirements;
-    ProjectNode parent;
+    ProjectNode[] parent;
     ProjectNode[] dependencies;
 
     string name() const { return requirements.name; }
@@ -162,7 +162,7 @@ class ProjectNode
 
     ProjectNode addDependency(ProjectNode dep)
     {
-        dep.parent = this;
+        dep.parent~= this;
         dependencies~= dep;
         return this;
     }
@@ -182,34 +182,23 @@ class ProjectNode
         import std.string:replace;
         requirements.cfg.name = requirements.cfg.name.replace(":", "_");
 
-        if(parent)
-            parent.requirements.cfg = parent.requirements.cfg.mergeImport(requirements.cfg);
-        static TargetType inferTargetType(BuildConfiguration cfg)
+        foreach(p; parent)
         {
-            static immutable string[] filesThatInfersExecutable = ["app.d", "main.d"];
-            foreach(p; cfg.sourcePaths)
-            {
-                static import std.file;
-                foreach(f; filesThatInfersExecutable)
-                if(std.file.exists(buildNormalizedPath(cfg.workingDir, p,f)))
-                    return TargetType.executable;
-            }
-            return TargetType.library;
+            p.requirements.cfg = p.requirements.cfg.mergeImport(requirements.cfg);
+            p.requirements.cfg = p.requirements.cfg.mergeVersions(requirements.cfg);
         }
-        with(TargetType)
+        
+        foreach(p; parent)
         {
-            HandleTargetType: final switch(requirements.cfg.targetType)
+            HandleTargetType: final switch(requirements.cfg.targetType) with(TargetType)
             {
                 case autodetect: requirements.cfg.targetType = inferTargetType(requirements.cfg); goto HandleTargetType;
                 case library, staticLibrary:
-                    if(parent)
-                    {
                         BuildConfiguration other = requirements.cfg.clone;
                         other.libraries~= other.name;
                         other.libraryPaths~= other.outputDirectory;
-                        parent.requirements.cfg = parent.requirements.cfg.mergeLibraries(other);
-                        parent.requirements.cfg = parent.requirements.cfg.mergeLibPaths(other);
-                    }
+                        p.requirements.cfg = p.requirements.cfg.mergeLibraries(other);
+                        p.requirements.cfg = p.requirements.cfg.mergeLibPaths(other);
                     break;
                 case sharedLibrary: throw new Error("Uninplemented support for shared libraries");
                 case executable: break;
@@ -256,6 +245,19 @@ private void fromTreeImpl(ProjectNode root, ref ProjectNode[][] output, ref int[
         visited[root.name] = depth;
         output[depth]~= root;
     }
+}
+
+private TargetType inferTargetType(BuildConfiguration cfg)
+{
+    static immutable string[] filesThatInfersExecutable = ["app.d", "main.d"];
+    foreach(p; cfg.sourcePaths)
+    {
+        static import std.file;
+        foreach(f; filesThatInfersExecutable)
+        if(std.file.exists(buildNormalizedPath(cfg.workingDir, p,f)))
+            return TargetType.executable;
+    }
+    return TargetType.library;
 }
 
 import tree_generators.dub;

@@ -1,6 +1,11 @@
 {
     "name": "dubv2",
     "targetPath": "build",
+    "buildOptions": [
+        "debugInfo",
+        "debugInfoC",
+        "debugMode"
+    ],
     "authors": ["Hipreme"],
     "license": "MIT",
     "subPackages": [
