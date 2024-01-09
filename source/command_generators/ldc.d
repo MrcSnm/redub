@@ -4,7 +4,7 @@ public import std.system;
 
 
 
-string[] parseBuildConfiguration(BuildConfiguration b, OS os)
+string[] parseBuildConfiguration(immutable BuildConfiguration b, OS os)
 {
     import std.algorithm.iteration:map;
     import std.array:array;

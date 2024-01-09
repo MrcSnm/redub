@@ -43,6 +43,27 @@ struct BuildConfiguration
         return ret;
     }
 
+    immutable(BuildConfiguration) idup()
+    {
+        return immutable BuildConfiguration(
+            isDebug,
+            name,
+            versions.idup,
+            importDirectories.idup,
+            libraryPaths.idup,
+            stringImportPaths.idup,
+            libraries.idup,
+            linkFlags.idup,
+            dFlags.idup,
+            sourcePaths.idup,
+            sourceEntryPoint,
+            outputDirectory,
+            workingDir,
+            targetType
+        );
+
+    }
+
     BuildConfiguration clone() const{return cast()this;}
 
     BuildConfiguration merge(BuildConfiguration other) const
@@ -205,6 +226,45 @@ class ProjectNode
             }
         }
     }
+
+    void becomeIndependent()
+    {
+        assert(dependencies.length == 0, "Can't be independent when having dependencies.");
+
+        foreach(p; parent)
+            for(int i = 0; i < p.dependencies.length; i++)
+            {
+                if(p.dependencies[i] is this)
+                {
+                    p.dependencies = p.dependencies[0..i] ~ p.dependencies[i+1..$];
+                    break;
+                }
+            }
+    }
+
+
+    ProjectNode[] findLeavesNodes()
+    {
+        ProjectNode[] leaves;
+        bool[ProjectNode] visited;
+        findLeavesNodesImpl(leaves, visited);
+        return leaves;
+    }
+
+    private void findLeavesNodesImpl(ref ProjectNode[] leaves, ref bool[ProjectNode] visited)
+    {
+        foreach(dep; dependencies)
+            dep.findLeavesNodesImpl(leaves, visited);
+        if(dependencies.length == 0)
+        {
+            if(!(this in visited))
+            {
+                leaves~= this;
+                visited[this] = true;
+            }
+        }
+    }
+
 }
 ProjectNode[][] fromTree(ProjectNode root)
 {
