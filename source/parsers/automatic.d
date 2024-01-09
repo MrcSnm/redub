@@ -37,7 +37,10 @@ private void partiallyFinishBuildRequirements(ref BuildRequirements req)
         foreach(dep; req.dependencies)
         {
             import std.string:replace;
-            toMerge.versions~= "Have_"~dep.name.replace("-", "_");
+            string ver = "Have_"~dep.name.replace("-", "_");
+            if(dep.subPackage) ver~= "_"~dep.subPackage;
+            toMerge.versions~= ver;
+
         }
         req.cfg = req.cfg.mergeVersions(toMerge);
     }

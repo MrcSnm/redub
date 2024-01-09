@@ -169,6 +169,7 @@ class ProjectNode
 
     /** 
      * This function will iterate recursively, from bottom to top, and it:
+     * - Fixes the name if it is using subPackage name type.
      * - Populating parent imports using child imports paths.
      * - Infer target type if it is on autodetect
      * - Add the dependency as a library if it is a library
@@ -177,9 +178,10 @@ class ProjectNode
     void finish()
     {
         foreach(dep; dependencies)
-        {
             dep.finish();
-        }
+        import std.string:replace;
+        requirements.cfg.name = requirements.cfg.name.replace(":", "_");
+
         if(parent)
             parent.requirements.cfg = parent.requirements.cfg.mergeImport(requirements.cfg);
         static TargetType inferTargetType(BuildConfiguration cfg)
@@ -212,7 +214,6 @@ class ProjectNode
                 case sharedLibrary: throw new Error("Uninplemented support for shared libraries");
                 case executable: break;
             }
-
         }
     }
 }

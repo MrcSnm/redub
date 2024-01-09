@@ -82,6 +82,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
                 string out_MainPackage;
                 string subPackageName = getSubPackageInfo(depName, out_MainPackage);
 
+                ///If subPackage was found, populate informations on it
                 if(out_MainPackage.length)
                 {
                     newDep.name = out_MainPackage;
@@ -90,9 +91,8 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
                 ///Inside this same package
                 if(out_MainPackage == req.name && subPackageName)
                     newDep.path = c.workingDir;
-
                 import std.stdio;
-                writeln(out_MainPackage,  " : ", req.name, " ", subPackageName, " ", c.workingDir);
+                writeln("Found dependency ", depName, " inside ", req.name,":",c.subPackage);
 
                 
                 if(value.type == JSONType.object) ///Uses path style

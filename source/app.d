@@ -70,14 +70,13 @@ int main(string[] args)
 
 
         ProjectNode tree = getProjectTree(req);
-        // ProjectNode[][] expandedDependencyMatrix = fromTree(tree);
+        ProjectNode[][] expandedDependencyMatrix = fromTree(tree);
+        // writeln = command_generators.dmd.parseBuildConfiguration(req.cfg, os);
+        printMatrixTree = expandedDependencyMatrix;
+        if(!buildProject(expandedDependencyMatrix, "dmd"))
+            throw new Error("Build failure");
 
-        // // writeln = command_generators.dmd.parseBuildConfiguration(req.cfg, os);
-        // printMatrixTree = expandedDependencyMatrix;
-        // if(!buildProject(expandedDependencyMatrix, "dmd"))
-        //     throw new Error("Build failure");
-
-        // writeln("Built project in ", (st.peek.total!"msecs"), " ms.") ;
+        writeln("Built project in ", (st.peek.total!"msecs"), " ms.") ;
     }
 
     return 0;
