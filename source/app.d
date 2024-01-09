@@ -63,6 +63,11 @@ int main(string[] args)
         StopWatch st = StopWatch(AutoStart.yes);
         BuildRequirements req = parseProject(workingDir);
         req.cfg = req.cfg.merge(parsers.environment.parse());
+        import std.stdio;
+
+        foreach(dep; req.dependencies)
+            writeln(dep);
+
 
         ProjectNode tree = getProjectTree(req);
         ProjectNode[][] expandedDependencyMatrix = fromTree(tree);

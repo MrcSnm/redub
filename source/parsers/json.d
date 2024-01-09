@@ -141,24 +141,33 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
                 }
             }
         },
-        "subPackages": (ref BuildRequirements req, JSONValue v, ParseConfig c)
+        "subPackages": (ref BuildRequirements req, JSONValue v, ParseConfig c){}
+    ];
+    if(cfg.subPackage.length)
+    {
+        enforce("subPackages" in json, 
+            "dub.json at "~cfg.workingDir~
+            " must contain a subPackages property since it has a subPackage named "~cfg.subPackage
+        );
+        enforce(json["subPackages"].type == JSONType.array,
+            "subPackages property must ben Array"
+        );
+        foreach(JSONValue p; json["subPackages"].array)
         {
-            if(!c.subPackage) 
-                return;
-            enforce(v.type == JSONType.array, "subPackages must be an array.");
-            foreach(JSONValue p; v.array)
+            enforce(p.type == JSONType.object || p.type == JSONType.string, "subPackages may only be either a string or an object");
+            if(p.type == JSONType.object)
             {
                 const(JSONValue)* name = "name" in p;
                 enforce(name, "All subPackages entries must contain a name.");
-                if(name.str == c.subPackage)
+                if(name.str == cfg.subPackage)
                 {
-                    c.subPackage = null;
-                    req = parse(p, c);
+                    json = p;
                     break;
                 }
             }
+            else continue; //Nothing to do currently with path-only subPackages
         }
-    ];
+    }
 
     string[] unusedKeys;
     foreach(string key, JSONValue v; json)
