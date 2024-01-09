@@ -30,7 +30,7 @@ private ProjectNode getProjectTreeImpl(BuildRequirements req, ref ProjectNode[st
     ProjectNode root = new ProjectNode(req);
     foreach(dep; req.dependencies)
     {
-        ProjectNode* visitedDep = dep.name in visited;
+        ProjectNode* visitedDep = dep.fullName in visited;
         ProjectNode depNode;
         if(visitedDep)
         {

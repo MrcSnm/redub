@@ -9,7 +9,17 @@ BuildRequirements parse(string filePath, string subConfiguration = "", string su
 {
     import std.path;
     ParseConfig c = ParseConfig(true, dirName(filePath), subConfiguration, subPackage);
-    return parse(parseJSON(std.file.readText(filePath)), c);
+    return parse(parseJSONCached(filePath), c);
+}
+
+private JSONValue[string] jsonCache;
+///Optimization to be used when dealing with subPackages
+private JSONValue parseJSONCached(string filePath)
+{
+    const(JSONValue)* cached = filePath in jsonCache;
+    if(cached) return *cached;
+    jsonCache[filePath] = parseJSON(std.file.readText(filePath));
+    return jsonCache[filePath];
 }
 
 /** 
@@ -71,13 +81,18 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
                 Dependency newDep = Dependency(depName);
                 string out_MainPackage;
                 string subPackageName = getSubPackageInfo(depName, out_MainPackage);
-                newDep.subPackage = subPackageName;
+
+                if(out_MainPackage.length)
+                {
+                    newDep.name = out_MainPackage;
+                    newDep.subPackage = subPackageName;
+                }
                 ///Inside this same package
                 if(out_MainPackage == req.name && subPackageName)
                     newDep.path = c.workingDir;
 
                 import std.stdio;
-                writeln(out_MainPackage, " : ", subPackageName, " ", c.workingDir);
+                writeln(out_MainPackage,  " : ", req.name, " ", subPackageName, " ", c.workingDir);
 
                 
                 if(value.type == JSONType.object) ///Uses path style
@@ -114,7 +129,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
                 import std.algorithm.searching:countUntil;
 
                 //If dependency already exists, use the existing one
-                ptrdiff_t depIndex = countUntil!((a) => a.name == newDep.name)(req.dependencies);
+                ptrdiff_t depIndex = countUntil!((a) => a.isSameAs(newDep))(req.dependencies);
                 if(depIndex == -1)
                     req.dependencies~= newDep;
                 else
@@ -148,6 +163,11 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
     ];
     if(cfg.subPackage.length)
     {
+        enforce("name" in json, 
+            "dub.json at "~cfg.workingDir~
+            " which contains subPackages, must contain a name"
+        );
+        buildRequirements.cfg.name = json["name"].str;
         enforce("subPackages" in json, 
             "dub.json at "~cfg.workingDir~
             " must contain a subPackages property since it has a subPackage named "~cfg.subPackage
@@ -184,8 +204,6 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
                     import parsers.automatic;
                     return parseProject(subPackagePath, cfg.subConfiguration, null);
                 }
-
-                continue; //Nothing to do currently with path-only subPackages
             } 
         }
     }
@@ -213,12 +231,6 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
     ///Remove dependencies without paths.
     buildRequirements.dependencies = buildRequirements.dependencies.filter!((dep) => dep.path.length).array;
 
-    ///Fix dependencies name to change from `:` to `_`
-    foreach(ref Dependency dep; buildRequirements.dependencies)
-    {
-        import std.string:replace;
-        dep.name = dep.name.replace(":", "_");
-    }
     // if(cfg.firstRun) writeln("WARNING: Unused Keys -> ", unusedKeys);
 
     return buildRequirements;

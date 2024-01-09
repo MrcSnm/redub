@@ -105,9 +105,17 @@ struct Dependency
     string subConfiguration;
     string subPackage;
 
-    bool isSameAs(string name, string subConfiguration)
+    bool isSameAs(string name, string subConfiguration, string subPackage) const
     {
-        return this.name == name && this.subConfiguration == subConfiguration;
+        return this.name == name && this.subConfiguration == subConfiguration && this.subPackage == subPackage;
+    }
+
+    bool isSameAs(Dependency other) const{return isSameAs(other.name, other.subConfiguration, other.subPackage);}
+
+    string fullName()
+    {
+        if(subPackage.length) return name~":"~subPackage;
+        return name;
     }
 }
 
@@ -136,7 +144,7 @@ struct BuildRequirements
         return ret;
     }
 
-    string name(){return cfg.name;}
+    string name() const {return cfg.name;}
 }
 
 class ProjectNode
@@ -145,7 +153,7 @@ class ProjectNode
     ProjectNode parent;
     ProjectNode[] dependencies;
 
-    string name() const { return requirements.cfg.name; }
+    string name() const { return requirements.name; }
 
     this(BuildRequirements req)
     {
