@@ -8,6 +8,11 @@ enum TargetType
     staticLibrary,
     sharedLibrary,
 }
+bool isStaticLibrary(TargetType t)
+{
+    return t == TargetType.staticLibrary || t == TargetType.library;
+}
+
 TargetType targetFrom(string s)
 {
     TargetType ret;

@@ -165,6 +165,7 @@ bool buildProjectFullyParallelized(ProjectNode root, string compiler, OS os)
 private bool doLink(immutable BuildConfiguration cfg, OS os, string compiler)
 {
     import std.stdio;
+    if(cfg.targetType.isStaticLibrary) return true;
     CompilationResult linkRes = link(cfg, os, compiler);
     if(linkRes.status)
     {
