@@ -5,10 +5,10 @@ import std.json;
 import std.file;
 import etc.c.zlib;
 
-BuildRequirements parse(string filePath, string subConfiguration = "", string subPackage = "")
+BuildRequirements parse(string filePath, string compiler, string subConfiguration = "", string subPackage = "")
 {
     import std.path;
-    ParseConfig c = ParseConfig(true, dirName(filePath), subConfiguration, subPackage);
+    ParseConfig c = ParseConfig(true, dirName(filePath), subConfiguration, subPackage, compiler);
     return parse(parseJSONCached(filePath), c);
 }
 
@@ -41,16 +41,22 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
         "name": (ref BuildRequirements req, JSONValue v, ParseConfig c){if(c.firstRun) req.cfg.name = v.str;},
         "targetType": (ref BuildRequirements req, JSONValue v, ParseConfig c){req.cfg.targetType = targetFrom(v.str);},
         "targetPath": (ref BuildRequirements req, JSONValue v, ParseConfig c){req.cfg.outputDirectory = v.str;},
-        "importPaths": (ref BuildRequirements req, JSONValue v, ParseConfig c){req.cfg.importDirectories = v.strArr;},
+        "importPaths": (ref BuildRequirements req, JSONValue v, ParseConfig c){req.cfg.importDirectories.exclusiveMerge(v.strArr);},
         "stringImportPaths": (ref BuildRequirements req, JSONValue v, ParseConfig c){req.cfg.stringImportPaths = v.strArr;},
         "preBuildCommands": (ref BuildRequirements req, JSONValue v, ParseConfig c){req.cfg.preBuildCommands = v.strArr;},
         "postBuildCommands": (ref BuildRequirements req, JSONValue v, ParseConfig c){req.cfg.postBuildCommands = v.strArr;},
-        "sourcePaths": (ref BuildRequirements req, JSONValue v, ParseConfig c){req.cfg.sourcePaths = v.strArr;},
-        "libPaths":  (ref BuildRequirements req, JSONValue v, ParseConfig c){req.cfg.libraryPaths = v.strArr;},
-        "libs":  (ref BuildRequirements req, JSONValue v, ParseConfig c){req.cfg.libraries = v.strArr;},
-        "versions":  (ref BuildRequirements req, JSONValue v, ParseConfig c){req.cfg.versions = v.strArr;},
-        "lflags":  (ref BuildRequirements req, JSONValue v, ParseConfig c){req.cfg.linkFlags = v.strArr;},
-        "dflags":  (ref BuildRequirements req, JSONValue v, ParseConfig c){req.cfg.dFlags = v.strArr;},
+        "sourcePaths": (ref BuildRequirements req, JSONValue v, ParseConfig c){req.cfg.sourcePaths.exclusiveMerge(v.strArr);},
+        "sourceFiles": (ref BuildRequirements req, JSONValue v, ParseConfig c){req.cfg.sourceFiles.exclusiveMerge(v.strArr);},
+        "libPaths":  (ref BuildRequirements req, JSONValue v, ParseConfig c){req.cfg.libraryPaths.exclusiveMerge(v.strArr);},
+        "libs":  (ref BuildRequirements req, JSONValue v, ParseConfig c){req.cfg.libraries.exclusiveMerge(v.strArr);},
+        "versions":  (ref BuildRequirements req, JSONValue v, ParseConfig c){req.cfg.versions.exclusiveMerge(v.strArr);},
+        "lflags":  (ref BuildRequirements req, JSONValue v, ParseConfig c){req.cfg.linkFlags.exclusiveMerge(v.strArr);},
+        "dflags":  (ref BuildRequirements req, JSONValue v, ParseConfig c)
+        {
+            import std.stdio;
+            req.cfg.dFlags.exclusiveMerge(v.strArr);
+            writeln("Merging dflags on project ", req.name, " the dflags ", req.cfg.dFlags);
+        },
         "configurations": (ref BuildRequirements req, JSONValue v, ParseConfig c)
         {
             if(c.firstRun)
@@ -176,6 +182,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
         enforce(json["subPackages"].type == JSONType.array,
             "subPackages property must ben Array"
         );
+        bool isSubpackageInPackage = false;
         foreach(JSONValue p; json["subPackages"].array)
         {
             enforce(p.type == JSONType.object || p.type == JSONType.string, "subPackages may only be either a string or an object");
@@ -185,6 +192,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
                 enforce(name, "All subPackages entries must contain a name.");
                 if(name.str == cfg.subPackage)
                 {
+                    isSubpackageInPackage = true;
                     json = p;
                     break;
                 }
@@ -203,10 +211,16 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
                 if(subPackageName == cfg.subPackage)
                 {
                     import parsers.automatic;
-                    return parseProject(subPackagePath, cfg.subConfiguration, null);
+                    isSubpackageInPackage = true;
+                    return parseProject(subPackagePath, cfg.compiler, cfg.subConfiguration, null);
                 }
             } 
         }
+        enforce(isSubpackageInPackage, 
+            "subPackage named '"~cfg.subPackage~"' could not be found " ~
+            "while looking inside the requested package '"~buildRequirements.name ~ "' "~
+            "in path "~cfg.workingDir
+        );
     }
 
     string[] unusedKeys;
@@ -218,10 +232,9 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
         {
             CommandWithFilter filtered = CommandWithFilter.fromKey(key);
             fn = filtered.command in handler;
-            //TODO: Add mathesCompiler
-            mustExecuteHandler = filtered.matchesOS(os);
+            mustExecuteHandler = filtered.matchesOS(os) && filtered.matchesCompiler(cfg.compiler) && fn;
         }
-        if(fn && mustExecuteHandler)
+        if(mustExecuteHandler)
             (*fn)(buildRequirements, v, cfg);
         else
             unusedKeys~= key;
@@ -285,7 +298,9 @@ struct CommandWithFilter
     string compiler;
     string targetOS;
 
-    bool matchesOS(OS os){return targetOS && parsers.json.matchesOS(targetOS, os);}
+    bool matchesOS(OS os){return this.targetOS is null || parsers.json.matchesOS(targetOS, os);}
+    bool matchesCompiler(string compiler)
+    {return this.compiler is null || compiler == this.compiler;}
 
     /** 
      * Splits command-compiler-os into a struct.
@@ -336,13 +351,14 @@ struct ParseConfig
     string workingDir;
     string subConfiguration;
     string subPackage;
+    string compiler;
     string requiredBy;
 }
 
 
 BuildRequirements getDefaultBuildRequirement(ParseConfig cfg)
 {
-    BuildRequirements req = BuildRequirements.defaultInit;
+    BuildRequirements req = BuildRequirements.defaultInit(cfg.workingDir);
     req.version_ = "~master";
     req.targetConfiguration = cfg.subConfiguration;
     req.cfg.workingDir = cfg.workingDir;

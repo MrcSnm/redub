@@ -30,14 +30,25 @@ void compile2(immutable BuildConfiguration cfg, shared ProjectNode pack, OS os, 
 {
     import std.process;
     CompilationResult res;
-    res.compilationCommand = getCompileCommands(cfg, os, compiler);
     res.node = pack;
-    auto ret = executeShell(res.compilationCommand);
-    res.status = ret.status;
-    res.message = ret.output;
+    try
+    {
+        res.compilationCommand = getCompileCommands(cfg, os, compiler);
+        auto ret = executeShell(res.compilationCommand);
+        res.status = ret.status;
+        res.message = ret.output;
+    }
+    catch(Throwable e)
+    {
+        res.status = 1;
+        res.message = e.toString;
+    }
+    finally {
+        ownerTid.send(res);
+    }
 
-    ownerTid.send(res);
 }
+
 
 CompilationResult link(immutable BuildConfiguration cfg, OS os, string compiler)
 {
@@ -99,6 +110,7 @@ bool buildProjectParallelSimple(ProjectNode root, string compiler, OS os)
     bool[ProjectNode] spawned;
     while(true)
     {
+        writeln("Building ", dependencyFreePackages[0].name, " with args ", getCompileCommands(dependencyFreePackages[0].requirements.cfg.idup, os, compiler));
         foreach(dep; dependencyFreePackages)
         {
             if(!(dep in spawned))
@@ -116,7 +128,6 @@ bool buildProjectParallelSimple(ProjectNode root, string compiler, OS os)
                 "' using flags\n\t", res.compilationCommand, 
                 "\nFailed with message\n\t", res.message
             );
-            thread_joinAll();
             return false;
         }
         else
@@ -157,7 +168,6 @@ bool buildProjectFullyParallelized(ProjectNode root, string compiler, OS os)
         }
         else
             writeln("Compilation of project ", finishedPackage.name, " finished!");
-
     }
     return doLink(root.requirements.cfg.idup, os, compiler);
 }

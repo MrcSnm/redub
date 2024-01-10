@@ -4,7 +4,7 @@ import command_generators.commons;
 
 string[] parseBuildConfiguration(immutable BuildConfiguration b, OS target)
 {
-    import std.path:buildNormalizedPath;
+    import std.path;
     import std.array:array;
     import std.algorithm.iteration:map;
     
@@ -22,6 +22,7 @@ string[] parseBuildConfiguration(immutable BuildConfiguration b, OS target)
             commands~= libraries.map!((l) => "-L-l"~l).array;
         }
         commands~= stringImportPaths.map!((sip) => "-J="~sip).array;
+        commands~= dFlags;
 
         string outFlag = getTargetTypeFlag(targetType);
         if(outFlag) commands~= outFlag;
@@ -35,6 +36,11 @@ string[] parseBuildConfiguration(immutable BuildConfiguration b, OS target)
 
         foreach(path; sourcePaths)
             commands~= getSourceFiles(buildNormalizedPath(workingDir, path));
+        foreach(f; sourceFiles)
+        {
+            if(!isAbsolute(f)) commands ~= buildNormalizedPath(workingDir, f);
+            else commands ~= f;
+        }
     }
 
     return commands;
@@ -50,6 +56,7 @@ string[] parseLinkConfiguration(immutable BuildConfiguration b, OS target)
     {
         commands~= libraryPaths.map!((lp) => "-L-L"~lp).array;
         commands~= libraries.map!((l) => "-L-l"~l).array;
+        commands~= linkFlags.map!((l) => "-L"~l).array;
         commands~= buildNormalizedPath(outputDirectory, name~getObjectExtension(target));
         commands~= "-of"~buildNormalizedPath(outputDirectory, getOutputName(targetType, name, os));
     }

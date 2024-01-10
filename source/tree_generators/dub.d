@@ -17,15 +17,15 @@ import parsers.automatic;
  * Returns: A tree out of the BuildRequirements, with all its compilation flags merged. It is the final step
  * before being able to correctly use the compilation flags
  */
-ProjectNode getProjectTree(BuildRequirements req)
+ProjectNode getProjectTree(BuildRequirements req, string compiler)
 {
     ProjectNode[string] visited;
-    ProjectNode tree =  getProjectTreeImpl(req, visited);
+    ProjectNode tree =  getProjectTreeImpl(req, compiler, visited);
     tree.finish();
     return tree;
 
 }
-private ProjectNode getProjectTreeImpl(BuildRequirements req, ref ProjectNode[string] visited)
+private ProjectNode getProjectTreeImpl(BuildRequirements req, string compiler, ref ProjectNode[string] visited)
 {
     ProjectNode root = new ProjectNode(req);
     foreach(dep; req.dependencies)
@@ -38,7 +38,7 @@ private ProjectNode getProjectTreeImpl(BuildRequirements req, ref ProjectNode[st
             ///When found 2 different packages requiring a different dependency subConfiguration
             if(visitedDep.requirements.targetConfiguration != dep.subConfiguration)
             {
-                BuildRequirements depConfig = parseProjectWithParent(dep, req);
+                BuildRequirements depConfig = parseProjectWithParent(dep, req, compiler);
                 if(visitedDep.requirements.targetConfiguration != depConfig.targetConfiguration)
                 {
                     visitedDep.requirements = mergeDifferentSubConfigurations(
@@ -60,8 +60,8 @@ private ProjectNode getProjectTreeImpl(BuildRequirements req, ref ProjectNode[st
         }
         else
         {
-            BuildRequirements buildReq = parseProjectWithParent(dep, req);
-            depNode = getProjectTreeImpl(buildReq, visited);
+            BuildRequirements buildReq = parseProjectWithParent(dep, req, compiler);
+            depNode = getProjectTreeImpl(buildReq, compiler, visited);
         }
 
         visited[dep.fullName] = depNode;
@@ -78,9 +78,9 @@ private ProjectNode getProjectTreeImpl(BuildRequirements req, ref ProjectNode[st
  *   subConfiguration = 
  * Returns: 
  */
-private BuildRequirements parseProjectWithParent(Dependency dep, BuildRequirements parent)
+private BuildRequirements parseProjectWithParent(Dependency dep, BuildRequirements parent, string compiler)
 {
-    BuildRequirements depReq = parseProject(dep.path, dep.subConfiguration, dep.subPackage);
+    BuildRequirements depReq = parseProject(dep.path, compiler, dep.subConfiguration, dep.subPackage);
     depReq.cfg.name = dep.fullName;
     return mergeProjectWithParent(depReq, parent);
 }

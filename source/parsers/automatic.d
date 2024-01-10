@@ -2,17 +2,17 @@ module parsers.automatic;
 public import buildapi;
 static import parsers.json;
 
-BuildRequirements parseProject(string projectWorkingDir, string subConfiguration="", string subPackage="")
+BuildRequirements parseProject(string projectWorkingDir, string compiler, string subConfiguration, string subPackage)
 {
     import std.stdio;
     import std.path;
     import package_searching.entry;
     string projectFile = findEntryProjectFile(projectWorkingDir);
-    BuildRequirements req = BuildRequirements.defaultInit;
+    BuildRequirements req;
 
     switch(extension(projectFile))
     {
-        case ".json":  req = parsers.json.parse(projectFile, subConfiguration, subPackage); break;
+        case ".json":  req = parsers.json.parse(projectFile, compiler, subConfiguration, subPackage); break;
         default: throw new Error("Unsupported project type "~projectFile~" at dir "~projectWorkingDir);
     }
     partiallyFinishBuildRequirements(req);
@@ -33,7 +33,7 @@ private void partiallyFinishBuildRequirements(ref BuildRequirements req)
 {
     import std.path;
     {
-        BuildConfiguration toMerge = BuildConfiguration.defaultInit;
+        BuildConfiguration toMerge;
         foreach(dep; req.dependencies)
         {
             import std.string:replace;

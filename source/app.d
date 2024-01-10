@@ -81,11 +81,11 @@ int buildMain(string[] args, string workingDir)
     }
 
     StopWatch st = StopWatch(AutoStart.yes);
-    BuildRequirements req = parseProject(workingDir, bArgs.config);
+    BuildRequirements req = parseProject(workingDir, bArgs.compiler, bArgs.config, null);
     import std.stdio;
     req.cfg = req.cfg.merge(parsers.environment.parse());
 
-    ProjectNode tree = getProjectTree(req);
+    ProjectNode tree = getProjectTree(req, bArgs.compiler);
     // ProjectNode[][] expandedDependencyMatrix = fromTree(tree);
     writeln("Dependencies resolved in ", (st.peek.total!"msecs"), " ms.") ;
 
@@ -100,9 +100,8 @@ int buildMain(string[] args, string workingDir)
     if(!buildSucceeded)
         throw new Error("Build failure");
 
-    /// This might be deprecated.
-    // if(!buildProject(expandedDependencyMatrix, bArgs.compiler))
-    //     throw new Error("Build failure");
+    /// This might get removed.
+    // buldSucceeded = buildProject(expandedDependencyMatrix, bArgs.compiler))
 
     
 

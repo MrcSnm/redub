@@ -33,6 +33,7 @@ struct BuildConfiguration
     string[] linkFlags;
     string[] dFlags;
     string[] sourcePaths;
+    string[] sourceFiles;
     string[] preBuildCommands;
     string[] postBuildCommands;
     string sourceEntryPoint;
@@ -40,11 +41,27 @@ struct BuildConfiguration
     string workingDir;
     TargetType targetType;
 
-    static BuildConfiguration defaultInit()
+    static BuildConfiguration defaultInit(string workingDir)
     {
+        import std.path;
+        import std.file;
+        static immutable inferredSourceFolder = ["source", "src"];
+        string initialSource;
+        foreach(i; inferredSourceFolder)
+        {
+            if(exists(buildNormalizedPath(workingDir, i)))
+            {
+                initialSource = i;
+                break;
+            }
+        }
+        
         BuildConfiguration ret;
-        ret.importDirectories = ["source"];
-        ret.sourcePaths = ["source"];
+        if(initialSource)
+        {
+            ret.importDirectories = [initialSource];
+            ret.sourcePaths = [initialSource];
+        }
         ret.sourceEntryPoint = "source/app.d";
         ret.outputDirectory = "bin";
         return ret;
@@ -63,6 +80,7 @@ struct BuildConfiguration
             linkFlags.idup,
             dFlags.idup,
             sourcePaths.idup,
+            sourceFiles.idup,
             preBuildCommands.idup,
             postBuildCommands.idup,
             sourceEntryPoint,
@@ -119,7 +137,7 @@ struct BuildConfiguration
         return ret;
     }
 }
-private ref string[] exclusiveMerge(return scope ref string[] a, string[] b)
+ref string[] exclusiveMerge(return scope ref string[] a, string[] b)
 {
     import std.algorithm.searching:countUntil;
     foreach(v; b)
@@ -156,10 +174,10 @@ struct BuildRequirements
     string version_;
     string targetConfiguration;
 
-    static BuildRequirements defaultInit()
+    static BuildRequirements defaultInit(string workingDir)
     {
         BuildRequirements req;
-        req.cfg = BuildConfiguration.defaultInit;
+        req.cfg = BuildConfiguration.defaultInit(workingDir);
         return req;
     }
 
