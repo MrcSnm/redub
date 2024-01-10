@@ -25,6 +25,16 @@ string getSharedLibraryExtension(OS os)
         default: return ".so";
     }
 }
+
+string getObjectExtension(OS os)
+{
+    switch(os)
+    {
+        case OS.win32, OS.win64: return ".obj";
+        default: return ".o";
+    }
+}
+
 string getLibraryExtension(OS os)
 {
     switch(os)

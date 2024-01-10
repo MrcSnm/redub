@@ -28,6 +28,8 @@ struct BuildConfiguration
     string[] linkFlags;
     string[] dFlags;
     string[] sourcePaths;
+    string[] preBuildCommands;
+    string[] postBuildCommands;
     string sourceEntryPoint;
     string outputDirectory;
     string workingDir;
@@ -56,6 +58,8 @@ struct BuildConfiguration
             linkFlags.idup,
             dFlags.idup,
             sourcePaths.idup,
+            preBuildCommands.idup,
+            postBuildCommands.idup,
             sourceEntryPoint,
             outputDirectory,
             workingDir,
@@ -188,6 +192,20 @@ class ProjectNode
         return this;
     }
 
+    bool isFullyParallelizable()
+    {
+        bool parallelizable = 
+            requirements.cfg.preBuildCommands.length == 0 &&
+            requirements.cfg.postBuildCommands.length == 0;
+        foreach(dep; dependencies)
+        {
+            parallelizable|= dep.isFullyParallelizable;
+            if(!parallelizable) return false;
+        }
+        return parallelizable;
+
+    }
+
     /** 
      * This function will iterate recursively, from bottom to top, and it:
      * - Fixes the name if it is using subPackage name type.
@@ -202,6 +220,8 @@ class ProjectNode
             dep.finish();
         import std.string:replace;
         requirements.cfg.name = requirements.cfg.name.replace(":", "_");
+        if(requirements.cfg.targetType == TargetType.autodetect)
+            requirements.cfg.targetType = inferTargetType(requirements.cfg);
 
         foreach(p; parent)
         {
@@ -242,6 +262,24 @@ class ProjectNode
             }
     }
 
+    ///Collapses the tree in a single list.
+    ProjectNode[] collapse()
+    {
+        bool[ProjectNode] visited;
+        return collapseImpl(visited);
+    }
+    private ProjectNode[] collapseImpl(ref bool[ProjectNode] visited)
+    {
+        ProjectNode[] ret;
+        if(!(this in visited))
+        {
+            ret~= this;
+            visited[this] = true;
+        }
+        foreach(dep; dependencies)
+            ret~= dep.collapseImpl(visited);
+        return ret;
+    }
 
     ProjectNode[] findLeavesNodes()
     {

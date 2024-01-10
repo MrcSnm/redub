@@ -14,8 +14,13 @@ string[] parseBuildConfiguration(immutable BuildConfiguration b, OS target)
         if(isDebug) commands~= "-debug";
         commands~= versions.map!((v) => "-version="~v).array;
         commands~= importDirectories.map!((i) => "-I"~i).array;
-        commands~= libraryPaths.map!((lp) => "-L-L"~lp).array;
-        commands~= libraries.map!((l) => "-L-l"~l).array;
+
+        if(targetType == TargetType.executable)
+        {
+            commands~= "-c"; //Compile only
+            commands~= libraryPaths.map!((lp) => "-L-L"~lp).array;
+            commands~= libraries.map!((l) => "-L-l"~l).array;
+        }
         commands~= stringImportPaths.map!((sip) => "-J="~sip).array;
 
         string outFlag = getTargetTypeFlag(targetType);
@@ -23,11 +28,31 @@ string[] parseBuildConfiguration(immutable BuildConfiguration b, OS target)
 
         if(outputDirectory)
             commands~= "-od"~outputDirectory;
-        commands~= "-of"~getOutputName(targetType, name, os);
+        if(targetType != TargetType.executable)
+            commands~= "-of"~buildNormalizedPath(outputDirectory, getOutputName(targetType, name, os));
+        else
+            commands~= "-of"~buildNormalizedPath(outputDirectory, name~getObjectExtension(os));
+
         foreach(path; sourcePaths)
             commands~= getSourceFiles(buildNormalizedPath(workingDir, path));
     }
 
+    return commands;
+}
+
+string[] parseLinkConfiguration(immutable BuildConfiguration b, OS target)
+{
+    import std.algorithm.iteration;
+    import std.path;
+    import std.array;
+    string[] commands;
+    with(b)
+    {
+        commands~= libraryPaths.map!((lp) => "-L-L"~lp).array;
+        commands~= libraries.map!((l) => "-L-l"~l).array;
+        commands~= buildNormalizedPath(outputDirectory, name~getObjectExtension(target));
+        commands~= "-of"~buildNormalizedPath(outputDirectory, getOutputName(targetType, name, os));
+    }
     return commands;
 }
 

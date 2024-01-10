@@ -19,3 +19,8 @@ string[] parseBuildConfiguration(immutable BuildConfiguration b, OS os)
 
     return commands;
 }
+
+string[] parseLinkConfiguration(immutable BuildConfiguration b, OS os)
+{
+    return null;
+}

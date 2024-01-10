@@ -86,17 +86,25 @@ int buildMain(string[] args, string workingDir)
     req.cfg = req.cfg.merge(parsers.environment.parse());
 
     ProjectNode tree = getProjectTree(req);
-    ProjectNode[][] expandedDependencyMatrix = fromTree(tree);
-    printMatrixTree = expandedDependencyMatrix;
+    // ProjectNode[][] expandedDependencyMatrix = fromTree(tree);
     writeln("Dependencies resolved in ", (st.peek.total!"msecs"), " ms.") ;
 
+    bool buildSucceeded;
+    if(tree.isFullyParallelizable)
+    {
+        writeln("Project ", req.name," is fully parallelizable! Will build everything at the same time");
+        buildSucceeded = buildProjectFullyParallelized(tree, bArgs.compiler, os); 
+    }
+    else
+        buildSucceeded = buildProjectParallelSimple(tree, bArgs.compiler, os); 
+    if(!buildSucceeded)
+        throw new Error("Build failure");
 
     /// This might be deprecated.
     // if(!buildProject(expandedDependencyMatrix, bArgs.compiler))
     //     throw new Error("Build failure");
 
-    if(!buildProject2(tree, bArgs.compiler, os))
-        throw new Error("Build failure");
+    
 
     writeln("Built project in ", (st.peek.total!"msecs"), " ms.") ;
     return 0;

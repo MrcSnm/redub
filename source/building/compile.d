@@ -3,26 +3,15 @@ module building.compile;
 import buildapi;
 import std.system;
 import std.concurrency;
-static import command_generators.dmd;
-static import command_generators.ldc;
+import command_generators.automatic;
+import command_generators.automatic;
 
 void compile(BuildRequirements req, OS os, string compiler, 
     out int status, out string sink, out string compilationFlagsSink
 )
 {
     import std.process;
-    string[] flags;
-    switch(compiler)
-    {
-        case "dmd":
-            flags = command_generators.dmd.parseBuildConfiguration(cast(immutable)req.cfg, os);
-            break;
-        case "ldc", "ldc2":
-            flags = command_generators.ldc.parseBuildConfiguration(cast(immutable)req.cfg, os);
-            break;
-        default: throw new Error("Unsupported compiler "~compiler);
-    }
-    string cmds = escapeShellCommand(compiler ~ flags);
+    string cmds = getCompileCommands(cast(immutable)req.cfg, os, compiler);
     auto ret = executeShell(cmds);
     status = ret.status;
     sink = ret.output;
@@ -40,19 +29,8 @@ struct CompilationResult
 void compile2(immutable BuildConfiguration cfg, shared ProjectNode pack, OS os, string compiler)
 {
     import std.process;
-    string[] flags;
-    CompilationResult res = CompilationResult((cast()pack).name);
-    switch(compiler)
-    {
-        case "dmd":
-            flags = command_generators.dmd.parseBuildConfiguration(cfg, os);
-            break;
-        case "ldc", "ldc2":
-            flags = command_generators.ldc.parseBuildConfiguration(cfg, os);
-            break;
-        default: throw new Error("Unsupported compiler "~compiler);
-    }
-    res.compilationCommand = escapeShellCommand(compiler ~ flags);
+    CompilationResult res;
+    res.compilationCommand = getCompileCommands(cfg, os, compiler);
     res.node = pack;
     auto ret = executeShell(res.compilationCommand);
     res.status = ret.status;
@@ -61,9 +39,17 @@ void compile2(immutable BuildConfiguration cfg, shared ProjectNode pack, OS os, 
     ownerTid.send(res);
 }
 
-bool link()
+CompilationResult link(immutable BuildConfiguration cfg, OS os, string compiler)
 {
-    return false;
+    import std.process;
+    CompilationResult ret;
+    ret.compilationCommand = getLinkCommands(cfg, os, compiler);
+
+    auto exec = executeShell(ret.compilationCommand);
+    ret.status = exec.status;
+    ret.message = exec.output;
+
+    return ret;
 }
 
 
@@ -105,7 +91,7 @@ bool buildProject(ProjectNode[][] steps, string compiler)
 }
 
 
-bool buildProject2(ProjectNode root, string compiler, OS os)
+bool buildProjectParallelSimple(ProjectNode root, string compiler, OS os)
 {
     import std.concurrency;
     import std.stdio;
@@ -142,5 +128,53 @@ bool buildProject2(ProjectNode root, string compiler, OS os)
                 break;
         }
     }
+    return doLink(root.requirements.cfg.idup, os, compiler);
+}
+
+
+bool buildProjectFullyParallelized(ProjectNode root, string compiler, OS os)
+{
+    import std.concurrency;
+    import std.stdio;
+    ProjectNode[] allPackages = root.collapse();
+    foreach(pack; allPackages)
+    {
+        spawn(&compile2, pack.requirements.cfg.idup, cast(shared)pack, os, compiler.idup);
+    }
+    foreach(pack; allPackages)
+    {
+        CompilationResult res = receiveOnly!CompilationResult;
+        ProjectNode finishedPackage = cast()res.node;
+        if(res.status)
+        {
+            import core.thread;
+            writeln("Compilation of project '", finishedPackage.name,
+                "' using flags\n\t", res.compilationCommand, 
+                "\nFailed with message\n\t", res.message
+            );
+            thread_joinAll();
+            return false;
+        }
+        else
+            writeln("Compilation of project ", finishedPackage.name, " finished!");
+
+    }
+    return doLink(root.requirements.cfg.idup, os, compiler);
+}
+
+private bool doLink(immutable BuildConfiguration cfg, OS os, string compiler)
+{
+    import std.stdio;
+    CompilationResult linkRes = link(cfg, os, compiler);
+    if(linkRes.status)
+    {
+        writeln("Linking of project ", cfg.name, " failed:\n\t",
+            linkRes.message
+        );
+        return false;
+    }
+    else
+        writeln("Linking of project ", cfg.name, " finished!");
+
     return true;
 }
