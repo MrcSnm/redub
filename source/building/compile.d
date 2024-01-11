@@ -114,7 +114,7 @@ bool buildProjectParallelSimple(ProjectNode root, string compiler, OS os)
     bool[ProjectNode] spawned;
     while(true)
     {
-        writeln("Building ", dependencyFreePackages[0].name, " with args ", getCompileCommands(dependencyFreePackages[0].requirements.cfg.idup, os, compiler));
+        // writeln("Building ", dependencyFreePackages[0].name, " with args ", getCompileCommands(dependencyFreePackages[0].requirements.cfg.idup, os, compiler));
         foreach(dep; dependencyFreePackages)
         {
             if(!(dep in spawned))
@@ -151,6 +151,7 @@ bool buildProjectFullyParallelized(ProjectNode root, string compiler, OS os)
     ProjectNode[] allPackages = root.collapse();
     foreach(pack; allPackages)
     {
+        // writeln("Building ", pack.name, " with args ", getCompileCommands(pack.requirements.cfg.idup, os, compiler));
         spawn(&compile2, pack.requirements.cfg.idup, cast(shared)pack, os, compiler.idup);
     }
     foreach(pack; allPackages)
@@ -191,7 +192,8 @@ private bool doLink(immutable BuildConfiguration cfg, OS os, string compiler)
     CompilationResult linkRes = link(cfg, os, compiler);
     if(linkRes.status)
     {
-        writeln("Linking of project ", cfg.name, " failed:\n\t",
+        writeln("Linking of project ", cfg.name, " failed with flags: \n\t",
+            linkRes.compilationCommand,"\n\t\t  :\n\t",
             linkRes.message
         );
         return false;

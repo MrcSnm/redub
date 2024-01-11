@@ -1,0 +1,6 @@
+{
+	"name": "s-lib",
+    "dependencies": {
+        "special": {"path": "special"}
+    }
+}

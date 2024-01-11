@@ -60,7 +60,9 @@ private void partiallyFinishBuildRequirements(ref BuildRequirements req)
     StringArrayRef[] toAbsolutize = [
         &req.cfg.importDirectories,
         &req.cfg.libraryPaths,
-        &req.cfg.stringImportPaths
+        &req.cfg.stringImportPaths,
+        &req.cfg.sourcePaths,
+        &req.cfg.sourceFiles,
     ];
 
     foreach(arr; toAbsolutize)

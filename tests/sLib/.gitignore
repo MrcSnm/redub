@@ -1,0 +1,16 @@
+.dub
+docs.json
+__dummy.html
+docs/
+/s-lib
+s-lib.so
+s-lib.dylib
+s-lib.dll
+s-lib.a
+s-lib.lib
+s-lib-test-*
+*.exe
+*.pdb
+*.o
+*.obj
+*.lst
