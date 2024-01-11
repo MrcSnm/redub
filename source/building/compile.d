@@ -22,6 +22,7 @@ struct CompilationResult
 {
     string compilationCommand;
     string message;
+    size_t msNeeded;
     int status;
     shared ProjectNode node;
 }
@@ -29,8 +30,10 @@ struct CompilationResult
 void compile2(immutable BuildConfiguration cfg, shared ProjectNode pack, OS os, string compiler)
 {
     import std.process;
+    import std.datetime.stopwatch;
     CompilationResult res;
     res.node = pack;
+    StopWatch sw = StopWatch(AutoStart.yes);
     try
     {
         res.compilationCommand = getCompileCommands(cfg, os, compiler);
@@ -44,6 +47,7 @@ void compile2(immutable BuildConfiguration cfg, shared ProjectNode pack, OS os, 
         res.message = e.toString;
     }
     finally {
+        res.msNeeded = sw.peek.total!"msecs";
         ownerTid.send(res);
     }
 
@@ -124,15 +128,12 @@ bool buildProjectParallelSimple(ProjectNode root, string compiler, OS os)
         if(res.status)
         {
             import core.thread;
-            writeln("Compilation of project '", finishedPackage.name,
-                "' using flags\n\t", res.compilationCommand, 
-                "\nFailed with message\n\t", res.message
-            );
+            printError(finishedPackage.name, res);
             return false;
         }
         else
         {
-            writeln("Compilation of project ", finishedPackage.name, " finished!");
+            printSucceed(finishedPackage.name, res.msNeeded);
             finishedPackage.becomeIndependent();
             dependencyFreePackages = root.findLeavesNodes();
             if(finishedPackage is root)
@@ -159,17 +160,28 @@ bool buildProjectFullyParallelized(ProjectNode root, string compiler, OS os)
         if(res.status)
         {
             import core.thread;
-            writeln("Compilation of project '", finishedPackage.name,
-                "' using flags\n\t", res.compilationCommand, 
-                "\nFailed with message\n\t", res.message
-            );
+            printError(finishedPackage.name, res);
             thread_joinAll();
             return false;
         }
         else
-            writeln("Compilation of project ", finishedPackage.name, " finished!");
+            printSucceed(finishedPackage.name, res.msNeeded);
     }
     return doLink(root.requirements.cfg.idup, os, compiler);
+}
+
+private void printSucceed(string name, size_t msecs)
+{
+    import std.stdio;
+    writeln("Compilation of project ", name, " finished in ", msecs, "ms");
+}
+private void printError(string name, CompilationResult res)
+{
+    import std.stdio;
+    writeln("Compilation of project '", name,
+        "' using flags\n\t", res.compilationCommand, 
+        "\nFailed after ", res.msNeeded,"msecs with message\n\t", res.message
+    );
 }
 
 private bool doLink(immutable BuildConfiguration cfg, OS os, string compiler)
