@@ -65,11 +65,10 @@ string[] parseLinkConfiguration(immutable BuildConfiguration b, OS target)
 
 private string getTargetTypeFlag(TargetType o)
 {
-    final switch(o)
+    final switch(o) with(TargetType)
     {
-        case TargetType.autodetect: return null;
-        case TargetType.executable: return null;
-        case TargetType.library, TargetType.staticLibrary: return "-lib";
-        case TargetType.sharedLibrary: return "-shared";
+        case autodetect, executable, sourceLibrary: return null;
+        case library, staticLibrary: return "-lib";
+        case sharedLibrary: return "-shared";
     }
 }

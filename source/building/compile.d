@@ -180,7 +180,7 @@ private void printError(string name, CompilationResult res)
     import std.stdio;
     writeln("Compilation of project '", name,
         "' using flags\n\t", res.compilationCommand, 
-        "\nFailed after ", res.msNeeded,"msecs with message\n\t", res.message
+        "\nFailed after ", res.msNeeded,"ms with message\n\t", res.message
     );
 }
 

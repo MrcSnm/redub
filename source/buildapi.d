@@ -7,6 +7,7 @@ enum TargetType
     library,
     staticLibrary,
     sharedLibrary,
+    sourceLibrary
 }
 bool isStaticLibrary(TargetType t)
 {
@@ -137,6 +138,18 @@ struct BuildConfiguration
         ret.versions.exclusiveMerge(other.versions);
         return ret;
     }
+    BuildConfiguration mergeSourceFiles(BuildConfiguration other) const
+    {
+        BuildConfiguration ret = clone;
+        ret.sourceFiles.exclusiveMerge(other.sourceFiles);
+        return ret;
+    }
+    BuildConfiguration mergeSourcePaths(BuildConfiguration other) const
+    {
+        BuildConfiguration ret = clone;
+        ret.sourcePaths.exclusiveMerge(other.sourcePaths);
+        return ret;
+    }
 
     BuildConfiguration mergeLibsFromSource(BuildConfiguration other) const
     {
@@ -234,6 +247,15 @@ class ProjectNode
 
     ProjectNode addDependency(ProjectNode dep)
     {
+        import std.exception;
+        if(this.requirements.cfg.targetType == TargetType.sourceLibrary)
+        {
+            import std.conv;
+            enforce(dep.requirements.cfg.targetType == TargetType.sourceLibrary, 
+                "Project named '"~name~" which is a sourceLibrary, can not depend on project "~
+                dep.name~" since it can only depend on sourceLibrary. Dependency is a "~dep.requirements.cfg.targetType.to!string
+            );
+        }
         dep.parent~= this;
         dependencies~= dep;
         return this;
@@ -264,6 +286,7 @@ class ProjectNode
      * - Infer target type if it is on autodetect
      * - Add the dependency as a library if it is a library
      * - Add the dependency's libraries 
+     * - Remove source libraries from projects to build
      */
     void finish()
     {
@@ -294,10 +317,18 @@ class ProjectNode
                         p.requirements.cfg = p.requirements.cfg.mergeLibraries(other);
                         p.requirements.cfg = p.requirements.cfg.mergeLibPaths(other);
                     break;
+                case sourceLibrary: 
+                    p.requirements.cfg = p.requirements.cfg.merge(requirements.cfg);
+                    p.requirements.cfg = p.requirements.cfg.mergeSourcePaths(requirements.cfg);
+                    p.requirements.cfg = p.requirements.cfg.mergeSourceFiles(requirements.cfg);
+                    break;
                 case sharedLibrary: throw new Error("Uninplemented support for shared libraries");
                 case executable: break;
             }
         }
+
+        if(requirements.cfg.targetType == TargetType.sourceLibrary)
+            becomeIndependent();
     }
 
     void becomeIndependent()
