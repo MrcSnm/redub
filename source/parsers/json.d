@@ -45,18 +45,13 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
         "stringImportPaths": (ref BuildRequirements req, JSONValue v, ParseConfig c){req.cfg.stringImportPaths = v.strArr;},
         "preBuildCommands": (ref BuildRequirements req, JSONValue v, ParseConfig c){req.cfg.preBuildCommands = v.strArr;},
         "postBuildCommands": (ref BuildRequirements req, JSONValue v, ParseConfig c){req.cfg.postBuildCommands = v.strArr;},
-        "sourcePaths": (ref BuildRequirements req, JSONValue v, ParseConfig c){req.cfg.sourcePaths.exclusiveMerge(v.strArr);},
+        "sourcePaths": (ref BuildRequirements req, JSONValue v, ParseConfig c){req.cfg.sourcePaths.exclusiveMergePaths(v.strArr);},
         "sourceFiles": (ref BuildRequirements req, JSONValue v, ParseConfig c){req.cfg.sourceFiles.exclusiveMerge(v.strArr);},
         "libPaths":  (ref BuildRequirements req, JSONValue v, ParseConfig c){req.cfg.libraryPaths.exclusiveMerge(v.strArr);},
         "libs":  (ref BuildRequirements req, JSONValue v, ParseConfig c){req.cfg.libraries.exclusiveMerge(v.strArr);},
         "versions":  (ref BuildRequirements req, JSONValue v, ParseConfig c){req.cfg.versions.exclusiveMerge(v.strArr);},
         "lflags":  (ref BuildRequirements req, JSONValue v, ParseConfig c){req.cfg.linkFlags.exclusiveMerge(v.strArr);},
-        "dflags":  (ref BuildRequirements req, JSONValue v, ParseConfig c)
-        {
-            import std.stdio;
-            req.cfg.dFlags.exclusiveMerge(v.strArr);
-            writeln("Merging dflags on project ", req.name, " the dflags ", req.cfg.dFlags);
-        },
+        "dflags":  (ref BuildRequirements req, JSONValue v, ParseConfig c){req.cfg.dFlags.exclusiveMerge(v.strArr);},
         "configurations": (ref BuildRequirements req, JSONValue v, ParseConfig c)
         {
             if(c.firstRun)

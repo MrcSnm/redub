@@ -144,6 +144,14 @@ ref string[] exclusiveMerge(return scope ref string[] a, string[] b)
         if(a.countUntil(v) == -1) a~= v;
     return a;
 }
+ref string[] exclusiveMergePaths(return scope ref string[] a, string[] b)
+{
+    import std.algorithm.searching:countUntil;
+    foreach(v; b)
+        if(buildNormalizedPath(a).countUntil(buildNormalizedPath(v)) == -1) 
+            a~= v;
+    return a;
+}
 
 struct Dependency
 {
@@ -250,6 +258,7 @@ class ProjectNode
         {
             p.requirements.cfg = p.requirements.cfg.mergeImport(requirements.cfg);
             p.requirements.cfg = p.requirements.cfg.mergeVersions(requirements.cfg);
+            p.requirements.cfg = p.requirements.cfg.mergeDFlags(requirements.cfg);
         }
         
         foreach(p; parent)

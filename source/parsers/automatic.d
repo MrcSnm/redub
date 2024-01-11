@@ -1,6 +1,7 @@
 module parsers.automatic;
 public import buildapi;
 static import parsers.json;
+static import parsers.environment;
 
 BuildRequirements parseProject(string projectWorkingDir, string compiler, string subConfiguration, string subPackage)
 {
@@ -15,6 +16,10 @@ BuildRequirements parseProject(string projectWorkingDir, string compiler, string
         case ".json":  req = parsers.json.parse(projectFile, compiler, subConfiguration, subPackage); break;
         default: throw new Error("Unsupported project type "~projectFile~" at dir "~projectWorkingDir);
     }
+
+    parsers.environment.setupEnvironmentVariablesForPackage(cast(immutable)req);
+    req.cfg = parsers.environment.parseEnvironment(req.cfg);
+
     partiallyFinishBuildRequirements(req);
     
     return req;

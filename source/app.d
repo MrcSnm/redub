@@ -79,13 +79,16 @@ int buildMain(string[] args, string workingDir)
         defaultGetoptPrinter("dubv2 build information\n\t", res.options);
         return 1;
     }
+    parsers.environment.setupBuildEnvironmentVariables(bArgs, DubBuildArguments.init, os, args);
 
     StopWatch st = StopWatch(AutoStart.yes);
     BuildRequirements req = parseProject(workingDir, bArgs.compiler, bArgs.config, null);
-    import std.stdio;
+    parsers.environment.setupEnvironmentVariablesForRootPackage(cast(immutable)req);
     req.cfg = req.cfg.merge(parsers.environment.parse());
 
     ProjectNode tree = getProjectTree(req, bArgs.compiler);
+    parsers.environment.setupEnvironmentVariablesForPackageTree(tree);
+
     // ProjectNode[][] expandedDependencyMatrix = fromTree(tree);
     writeln("Dependencies resolved in ", (st.peek.total!"msecs"), " ms.") ;
 
