@@ -52,6 +52,14 @@ bool isLibraryExtension(string ext)
         default: return false;
     }
 }
+bool isObjectExtension(string ext)
+{
+    switch(ext)
+    {
+        case ".o", ".obj": return true;
+        default: return false;
+    }
+}
 
 string getExtension(TargetType t, OS target)
 {
@@ -81,6 +89,6 @@ string[] getSourceFiles(string path)
     import std.array;
     import std.algorithm.iteration;
     return dirEntries(path, SpanMode.depth)
-        .filter!((entry) => entry.name.endsWith(".d"))
+        .filter!((entry) => entry.name.endsWith(".d") || entry.name.extension.isObjectExtension)
         .map!((entry => entry.name)).array;
 }

@@ -162,12 +162,12 @@ bool buildProjectParallelSimple(ProjectNode root, string compiler, OS os)
         if(res.status)
         {
             import core.thread;
-            printError(finishedPackage.name, res);
+            printError(finishedPackage, res);
             return false;
         }
         else
         {
-            printSucceed(finishedPackage.name, res.msNeeded);
+            printSucceed(finishedPackage, res.msNeeded);
             finishedPackage.becomeIndependent();
             dependencyFreePackages = root.findLeavesNodes();
             if(finishedPackage is root)
@@ -195,25 +195,25 @@ bool buildProjectFullyParallelized(ProjectNode root, string compiler, OS os)
         if(res.status)
         {
             import core.thread;
-            printError(finishedPackage.name, res);
+            printError(finishedPackage, res);
             thread_joinAll();
             return false;
         }
         else
-            printSucceed(finishedPackage.name, res.msNeeded);
+            printSucceed(finishedPackage, res.msNeeded);
     }
     return doLink(root.requirements.cfg.idup, os, compiler);
 }
 
-private void printSucceed(string name, size_t msecs)
+private void printSucceed(ProjectNode node, size_t msecs)
 {
     import std.stdio;
-    writeln("Compilation of project ", name, " finished in ", msecs, "ms");
+    writeln("Compilation of project ", node.name, " ",node.requirements.version_," [", node.requirements.targetConfiguration,"] finished in ", msecs, "ms");
 }
-private void printError(string name, CompilationResult res)
+private void printError(ProjectNode node, CompilationResult res)
 {
     import std.stdio;
-    writeln("Compilation of project '", name,
+    writeln("Compilation of project '", node.name, " ",node.requirements.version_," [", node.requirements.targetConfiguration,"] ",
         "' using flags\n\t", res.compilationCommand, 
         "\nFailed after ", res.msNeeded,"ms with message\n\t", res.message
     );
