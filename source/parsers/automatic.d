@@ -1,6 +1,7 @@
 module parsers.automatic;
 public import buildapi;
 static import parsers.json;
+static import parsers.sdl;
 static import parsers.environment;
 
 BuildRequirements parseProject(string projectWorkingDir, string compiler, string subConfiguration, string subPackage)
@@ -14,6 +15,7 @@ BuildRequirements parseProject(string projectWorkingDir, string compiler, string
     switch(extension(projectFile))
     {
         case ".json":  req = parsers.json.parse(projectFile, compiler, subConfiguration, subPackage); break;
+        case ".sdl":   req = parsers.sdl.parse(projectFile, compiler, subConfiguration, subPackage); break;
         default: throw new Error("Unsupported project type "~projectFile~" at dir "~projectWorkingDir);
     }
 

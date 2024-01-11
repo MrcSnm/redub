@@ -1,6 +1,11 @@
 # Dub v2 - Build System
 
 ## Making it faster
+Have you ever wondered why dub was slow? I tried solving it, but its codebase was fairly unreadable. After building this project, I've implemented features that dub don't use
+
+- Lazy build project configuration evaluation
+- Parallelization on build sorted by dependency
+- Fully parallelized build when only link is waiting for dependencies
 
 ### Philosophy
 
@@ -17,16 +22,18 @@
 - api -> Can be freely be imported from any module
 - module -> Needs to be isolated as muhc as possible from each module. If one needs to communicate with other, a bridge/api may be created after the initial idea
 
-### Build system base
-- api: build configuration
-- module: Parse dub.json into a build configuration
-- module: Parse CLI to get the build root and an initial build configuration
-- module: Merge environment variables into build configuration
-- module: Output build dependency tree
-- module: Merge a tree node build configurations and output them
-- module: Convert build configuration into compilation flags
-- module: Transform build tree into dependency order tree
-- module: Spawn build processes for each tree level
+### How it works
+Here are described the modules which do most of the work if someone wants to contribute.
+
+- buildapi: Defines the contents of build configurations, tree of projects and commons for them
+- parsers.json: Parse dub.json into a build configuration
+- parsers.automatic: Parse using an automatic parser identification
+- cli.dub + app: Parse CLI to get the build root and an initial build configuration
+- parsers.environment: Merge environment variables into build configuration
+- tree_generators.dub: Output build dependency tree while merging their configurations
+- command_generator.automatic: Convert build configuration into compilation flags
+- buildapi + building.compile: Transform build tree into dependency order tree
+- building.compile: Spawn build processes for the dependencies until it links
 
 
 ### Contributor Attracting
@@ -36,7 +43,17 @@
 - No need to handle edge cases in the beginning. They may become even separate modules.
 
 ### A week project
-- This project is very small. It is intended to be finished at most a week of work.
+- This project had a small start. I gave one week for doing it, but since it was very succesful on its
+achievements, I decided to extend a little the deadline for achieving support.
+Right now, it has been tested with
+
+### Working examples
+Those projects were fairly tested while building this one
+- dub 
+- glui
+- dplug
+- arsd-official
+- Hipreme Engine
 
 ## Package manager
-- Will be implemented as a hook in the build system 
+- Will be implemented as a hook in the build system. I'm accepting PRs, but I'm not implementing myself.
