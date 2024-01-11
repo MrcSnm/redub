@@ -130,10 +130,26 @@ struct BuildConfiguration
         ret.dFlags.exclusiveMerge(other.dFlags);
         return ret;
     }
+    
     BuildConfiguration mergeVersions(BuildConfiguration other) const
     {
         BuildConfiguration ret = clone;
         ret.versions.exclusiveMerge(other.versions);
+        return ret;
+    }
+
+    BuildConfiguration mergeLibsFromSource(BuildConfiguration other) const
+    {
+        import std.path;
+        import command_generators.commons;
+        BuildConfiguration ret = clone;
+        string[] l;
+        foreach(src; other.sourceFiles)
+        {
+            if(isLibraryExtension(extension(src)))
+                l~= src;
+        }
+        ret.libraries.exclusiveMerge(l);
         return ret;
     }
 }
@@ -240,7 +256,11 @@ class ProjectNode
     /** 
      * This function will iterate recursively, from bottom to top, and it:
      * - Fixes the name if it is using subPackage name type.
-     * - Populating parent imports using child imports paths.
+     * - Populating parent imports using children:
+     * >-  Imports paths.
+     * >-  Versions.
+     * >-  dflags.
+     * >-  sourceFiles if they are libraries.
      * - Infer target type if it is on autodetect
      * - Add the dependency as a library if it is a library
      * - Add the dependency's libraries 
@@ -259,6 +279,7 @@ class ProjectNode
             p.requirements.cfg = p.requirements.cfg.mergeImport(requirements.cfg);
             p.requirements.cfg = p.requirements.cfg.mergeVersions(requirements.cfg);
             p.requirements.cfg = p.requirements.cfg.mergeDFlags(requirements.cfg);
+            p.requirements.cfg = p.requirements.cfg.mergeLibsFromSource(requirements.cfg);
         }
         
         foreach(p; parent)

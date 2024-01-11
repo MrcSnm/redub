@@ -44,6 +44,15 @@ string getLibraryExtension(OS os)
     }
 }
 
+bool isLibraryExtension(string ext)
+{
+    switch(ext)
+    {
+        case ".a", ".lib": return true;
+        default: return false;
+    }
+}
+
 string getExtension(TargetType t, OS target)
 {
     final switch(t)
