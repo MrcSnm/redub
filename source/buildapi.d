@@ -35,6 +35,8 @@ struct BuildConfiguration
     string[] dFlags;
     string[] sourcePaths;
     string[] sourceFiles;
+    string[] preGenerateCommands;
+    string[] postGenerateCommands;
     string[] preBuildCommands;
     string[] postBuildCommands;
     string sourceEntryPoint;
@@ -82,6 +84,8 @@ struct BuildConfiguration
             dFlags.idup,
             sourcePaths.idup,
             sourceFiles.idup,
+            preGenerateCommands.idup,
+            postGenerateCommands.idup,
             preBuildCommands.idup,
             postBuildCommands.idup,
             sourceEntryPoint,

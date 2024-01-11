@@ -27,6 +27,27 @@ struct CompilationResult
     shared ProjectNode node;
 }
 
+import std.typecons;
+alias ExecutionResult = Tuple!(int, "status", string, "output");
+/**
+*   If any command has status, it will stop executing them and return
+*/
+private ExecutionResult executeCommands(const string[] commandsList, string listName, ref CompilationResult res)
+{
+    import std.process;
+    foreach(cmd; commandsList)
+    {
+        auto execRes  = executeShell(cmd);
+        if(execRes.status)
+        {
+            res.status = execRes.status;
+            res.message = "Result of "~listName~" command '"~cmd~"' "~execRes.output;
+            return execRes;
+        }
+    }
+    return ExecutionResult(0, "Success");
+}
+
 void compile2(immutable BuildConfiguration cfg, shared ProjectNode pack, OS os, string compiler)
 {
     import std.process;
@@ -34,23 +55,34 @@ void compile2(immutable BuildConfiguration cfg, shared ProjectNode pack, OS os, 
     CompilationResult res;
     res.node = pack;
     StopWatch sw = StopWatch(AutoStart.yes);
+    scope(exit)
+    {
+        terminate: res.msNeeded = sw.peek.total!"msecs";
+        ownerTid.send(res);
+    }
     try
     {
+        {
+            if(executeCommands(cfg.preBuildCommands, "preBuildCommand", res).status)
+                return;
+        }
         res.compilationCommand = getCompileCommands(cfg, os, compiler);
         auto ret = executeShell(res.compilationCommand);
         res.status = ret.status;
         res.message = ret.output;
+        if(res.status == 0)
+        {
+            if(executeCommands(cfg.postBuildCommands, "postBuildCommand", res).status)
+                return;
+            if(cfg.targetType != TargetType.executable && executeCommands(cfg.postGenerateCommands, "postGenerateCommand", res).status)
+                return;
+        }
     }
     catch(Throwable e)
     {
         res.status = 1;
         res.message = e.toString;
     }
-    finally {
-        res.msNeeded = sw.peek.total!"msecs";
-        ownerTid.send(res);
-    }
-
 }
 
 
@@ -63,6 +95,8 @@ CompilationResult link(immutable BuildConfiguration cfg, OS os, string compiler)
     auto exec = executeShell(ret.compilationCommand);
     ret.status = exec.status;
     ret.message = exec.output;
+    if(cfg.targetType == TargetType.executable)
+        executeCommands(cfg.postGenerateCommands, "postGenerateCommand", ret);
 
     return ret;
 }

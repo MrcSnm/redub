@@ -230,6 +230,12 @@ string parseStringWithEnvironment(string str)
     return cast(string)ret;
 }
 
+/** 
+ * 
+ * Params:
+ *   cfg = Base build configuration which will have its variables merged with environment
+ * Returns: Merged configuration
+ */
 BuildConfiguration parseEnvironment(BuildConfiguration cfg)
 {
     with(cfg)
@@ -238,8 +244,10 @@ BuildConfiguration parseEnvironment(BuildConfiguration cfg)
         sourcePaths = arrParseEnv(sourcePaths);
         sourceFiles = arrParseEnv(sourceFiles);
         dFlags = arrParseEnv(dFlags);
-        postBuildCommands = arrParseEnv(dFlags);
-        preBuildCommands = arrParseEnv(dFlags);
+        preGenerateCommands = arrParseEnv(preGenerateCommands);
+        postGenerateCommands = arrParseEnv(postGenerateCommands);
+        preBuildCommands = arrParseEnv(preBuildCommands);
+        postBuildCommands = arrParseEnv(postBuildCommands);
         stringImportPaths = arrParseEnv(stringImportPaths);
     }
     return cfg;
