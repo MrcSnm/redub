@@ -1,0 +1,16 @@
+.dub
+docs.json
+__dummy.html
+docs/
+/preb
+preb.so
+preb.dylib
+preb.dll
+preb.a
+preb.lib
+preb-test-*
+*.exe
+*.pdb
+*.o
+*.obj
+*.lst

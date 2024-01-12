@@ -89,6 +89,14 @@ string[] getSourceFiles(string path)
     import std.array;
     import std.algorithm.iteration;
     return dirEntries(path, SpanMode.depth)
-        .filter!((entry) => entry.name.endsWith(".d") || entry.name.extension.isObjectExtension)
+        .filter!((entry) => entry.name.endsWith(".d"))
         .map!((entry => entry.name)).array;
+}
+
+string[] getLinkFiles(const string[] filesToLink)
+{
+    import std.path;
+    import std.array;
+    import std.algorithm.iteration;
+    return filesToLink.filter!((name) => name.extension.isObjectExtension).array.dup;
 }

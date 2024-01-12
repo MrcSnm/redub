@@ -1,0 +1,18 @@
+{
+	"authors": [
+		"Marcelo Silva Nascimento Mancini"
+	],
+	"preBuildCommands": [
+		"cd other; dmd -c test.d"
+	],
+	"importPaths": [
+		"other/"
+	],
+	"sourceFiles": [
+		"other/test.o"
+	],
+	"copyright": "Copyright © 2024, Marcelo Silva Nascimento Mancini",
+	"description": "A minimal D application.",
+	"license": "proprietary",
+	"name": "preb"
+}
