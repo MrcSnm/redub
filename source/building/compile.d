@@ -1,9 +1,8 @@
 module building.compile;
-
+import building.cache;
 import buildapi;
 import std.system;
 import std.concurrency;
-import command_generators.automatic;
 import command_generators.automatic;
 
 void compile(BuildRequirements req, OS os, string compiler, 
@@ -25,6 +24,7 @@ struct CompilationResult
     size_t msNeeded;
     int status;
     shared ProjectNode node;
+    string dateCache;
 }
 
 import std.typecons;
@@ -184,10 +184,15 @@ bool buildProjectFullyParallelized(ProjectNode root, string compiler, OS os)
     import std.concurrency;
     import std.stdio;
     ProjectNode[] allPackages = root.collapse();
+    string mainPackHash = hashFrom(root.requirements);
     foreach(pack; allPackages)
     {
         // writeln("Building ", pack.name, " with args ", getCompileCommands(pack.requirements.cfg.idup, os, compiler));
-        spawn(&compile2, pack.requirements.cfg.idup, cast(shared)pack, os, compiler.idup);
+        spawn(&compile2, 
+            pack.requirements.cfg.idup, 
+            cast(shared)pack, os, compiler.idup, 
+            CompilationCache(hashFrom(pack.requirements), )
+        );
     }
     foreach(pack; allPackages)
     {

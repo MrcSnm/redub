@@ -103,6 +103,15 @@ string getSubPackageInfo(string packageName, out string mainPackageName)
     return packageName[ind+1..$];
 }
 
+string getDubWorkspacePath()
+{
+    import std.path;
+    import std.process;
+    version(Windows) return buildNormalizedPath(environment["LOCALAPPDATA"],  "dub");
+    else return buildNormalizedPath(environment["HOME"], ".dub");
+}
+
+
 
 private string getPackageInJSON(JSONValue json, string packageName, string packageVersion)
 {
@@ -118,9 +127,7 @@ private string getPackageInJSON(JSONValue json, string packageName, string packa
 private string getDefaultLookupPathForPackages()
 {
     import std.path;
-    import std.process;
-    version(Windows) return buildNormalizedPath(environment["LOCALAPPDATA"],  "dub", "packages");
-    else return buildNormalizedPath(environment["HOME"], ".dub", "packages");
+    return buildNormalizedPath(getDubWorkspacePath, "packages");
 }
 
 

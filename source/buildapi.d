@@ -347,14 +347,15 @@ class ProjectNode
     }
 
     ///Collapses the tree in a single list.
-    ProjectNode[] collapse()
+    inout(ProjectNode)[] collapse() inout
     {
         bool[ProjectNode] visited;
-        return collapseImpl(visited);
+        return cast(inout(ProjectNode)[])collapseImpl(visited);
     }
-    private ProjectNode[] collapseImpl(ref bool[ProjectNode] visited)
+    ///Since it does not modify them, there's no problem in being const.
+    private const(ProjectNode)[] collapseImpl(ref bool[const ProjectNode] visited) const
     {
-        ProjectNode[] ret;
+        const(ProjectNode)[] ret;
         if(!(this in visited))
         {
             ret~= this;
