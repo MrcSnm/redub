@@ -95,7 +95,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
                             "'platforms' on configuration "~name.str~" at project "~req.name
                         );
                         if(!platformMatches(platforms.array, os))
-                            break;
+                            continue;
                     }
                     if(preferredConfiguration == -1)
                         preferredConfiguration = i.to!int;
@@ -105,10 +105,13 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
                         break;
                     }
                 }
-                configurationToUse = v.array[preferredConfiguration];
-                BuildRequirements subCfgReq =parse(configurationToUse, c);
-                req = req.merge(subCfgReq);
-                req.targetConfiguration = configurationToUse["name"].str;
+                if(preferredConfiguration != -1)
+                {
+                    configurationToUse = v.array[preferredConfiguration];
+                    BuildRequirements subCfgReq = parse(configurationToUse, c);
+                    req = req.merge(subCfgReq);
+                    req.targetConfiguration = configurationToUse["name"].str;
+                }
             }
         },
         "dependencies": (ref BuildRequirements req, JSONValue v, ParseConfig c)

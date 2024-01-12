@@ -102,6 +102,8 @@ struct BuildConfiguration
     {
         BuildConfiguration ret = clone;
         ret.stringImportPaths.exclusiveMerge(other.stringImportPaths);
+        ret.sourceFiles.exclusiveMerge(other.sourceFiles);
+        ret.sourcePaths.exclusiveMerge(other.sourcePaths);
         ret.importDirectories.exclusiveMerge(other.importDirectories);
         ret.versions.exclusiveMerge(other.versions);
         ret.dFlags.exclusiveMerge(other.dFlags);

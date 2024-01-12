@@ -1,0 +1,24 @@
+{
+	"authors": [
+		"Marcelo Silva Nascimento Mancini"
+	],
+	"sourcePaths": ["source"],
+	"configurations": [
+		{
+			"name": "Linux",
+			"platforms": ["linux"],
+			"sourcePaths": ["extra/linux/"],
+			"importPaths": ["extra/linux/"]
+		},
+		{
+			"name": "MacOS",
+			"platforms": ["osx"],
+			"sourcePaths": ["extra/osx/"],
+			"importPaths": ["extra/osx/"]
+		}
+	],
+	"copyright": "Copyright © 2024, Marcelo Silva Nascimento Mancini",
+	"description": "A minimal D application.",
+	"license": "proprietary",
+	"name": "platforms"
+}
