@@ -4,6 +4,7 @@ import buildapi;
 import std.json;
 import std.file;
 import etc.c.zlib;
+import core.cpuid;
 
 BuildRequirements parse(string filePath, string compiler, string subConfiguration = "", string subPackage = "")
 {
@@ -75,20 +76,36 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
         {
             if(c.firstRun)
             {
+                import std.conv:to;
                 enforce(v.type == JSONType.array, "'configurations' must be an array.");
                 enforce(v.array.length, "'configurations' must have at least one member.");
                 c.firstRun = false;
-                JSONValue configurationToUse = v.array[0];
-                foreach(JSONValue projectConfiguration; v.array)
+                ///Start looking for a configuration that matches the user preference if exists
+                ///If "platform" didn't match, then it will skip it.
+                int preferredConfiguration = -1;
+                JSONValue configurationToUse;
+                foreach(i, JSONValue projectConfiguration; v.array)
                 {
                     JSONValue* name = "name" in projectConfiguration;
                     enforce(name, "'configurations' must have a 'name' on each");
+                    JSONValue* platforms = "platforms" in projectConfiguration;
+                    if(platforms)
+                    {
+                        enforce(platforms.type == JSONType.array, 
+                            "'platforms' on configuration "~name.str~" at project "~req.name
+                        );
+                        if(!platformMatches(platforms.array, os))
+                            break;
+                    }
+                    if(preferredConfiguration == -1)
+                        preferredConfiguration = i.to!int;
                     if(name.str == c.subConfiguration)
                     {
-                        configurationToUse = projectConfiguration;
+                        preferredConfiguration = i.to!int;
                         break;
                     }
                 }
+                configurationToUse = v.array[preferredConfiguration];
                 BuildRequirements subCfgReq =parse(configurationToUse, c);
                 req = req.merge(subCfgReq);
                 req.targetConfiguration = configurationToUse["name"].str;
@@ -361,6 +378,14 @@ private void swap(T)(ref T a, ref T b)
     T temp = b;
     b = a;
     a = temp;
+}
+
+private bool platformMatches(JSONValue[] platforms, OS os)
+{
+    foreach(p; platforms)
+        if(matchesOS(p.str, os))
+            return true;
+    return false;
 }
 
 /** 
