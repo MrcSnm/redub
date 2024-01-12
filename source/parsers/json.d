@@ -323,7 +323,7 @@ private bool isOS(string osRep)
 }
 private bool matchesOS(string osRep, OS os)
 {
-    final switch(osRep) with(OS)
+    switch(osRep) with(OS)
     {
         case "posix": return os == solaris || 
                              os == dragonFlyBSD || 
@@ -335,7 +335,8 @@ private bool matchesOS(string osRep, OS os)
                              "osx".matchesOS(os);
         case "linux": return os == linux || os == android;
         case "osx": return os == osx || os == iOS || os == tvOS || os == watchOS;
-        case "windows": return os == win32 || os == win64;
+        case "windows", "windows-x86_64", "windows-x86_mscoff": return os == win32 || os == win64;
+        default: throw new Error("No appropriate switch clause found for "~osRep);
     }
 }
 
