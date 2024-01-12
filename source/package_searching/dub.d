@@ -5,9 +5,13 @@ import dubv2.libs.semver;
 bool dubHook_PackageManagerDownloadPackage(string packageName, string packageVersion, string requiredBy= "")
 {
     import std.stdio;
-    writeln("dubHook_PackageManagerDownloadPackage with arguments (", packageName, ", ", packageVersion,") " ~
-    "required by '", requiredBy, "' is not implemented yet.");
-    return false;
+    import std.process;
+    string cmd = "dub fetch "~packageName;
+    if(packageVersion) cmd~= "@"~packageVersion;
+    // writeln("dubHook_PackageManagerDownloadPackage with arguments (", packageName, ", ", packageVersion,") " ~
+    // "required by '", requiredBy, "' is not implemented yet.");
+    return wait(spawnShell(cmd)) == 0;
+    // return false;
 }
 
 /** 
