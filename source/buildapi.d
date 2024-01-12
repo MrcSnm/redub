@@ -157,22 +157,8 @@ struct BuildConfiguration
         return ret;
     }
 
-    BuildConfiguration mergeLibsFromSource(BuildConfiguration other) const
-    {
-        import std.path;
-        import command_generators.commons;
-        BuildConfiguration ret = clone;
-        string[] l;
-        foreach(src; other.sourceFiles)
-        {
-            if(isLibraryExtension(extension(src)))
-                l~= src;
-        }
-        ret.libraries.exclusiveMerge(l);
-        return ret;
-    }
 
-    BuildConfiguration mergeObjectsFromSource(BuildConfiguration other) const
+    BuildConfiguration mergeLinkFilesFromSource(BuildConfiguration other) const
     {
         import command_generators.commons;
         BuildConfiguration ret = clone;
@@ -316,8 +302,7 @@ class ProjectNode
             p.requirements.cfg = p.requirements.cfg.mergeImport(requirements.cfg);
             p.requirements.cfg = p.requirements.cfg.mergeVersions(requirements.cfg);
             p.requirements.cfg = p.requirements.cfg.mergeDFlags(requirements.cfg);
-            p.requirements.cfg = p.requirements.cfg.mergeLibsFromSource(requirements.cfg);
-            p.requirements.cfg = p.requirements.cfg.mergeObjectsFromSource(requirements.cfg);
+            p.requirements.cfg = p.requirements.cfg.mergeLinkFilesFromSource(requirements.cfg);
         }
         
         foreach(p; parent)

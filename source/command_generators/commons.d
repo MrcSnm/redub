@@ -61,6 +61,11 @@ bool isObjectExtension(string ext)
     }
 }
 
+bool isLinkerValidExtension(string ext)
+{
+    return isObjectExtension(ext) || isLibraryExtension(ext);
+}
+
 string getExtension(TargetType t, OS target)
 {
     final switch(t)
@@ -98,5 +103,5 @@ string[] getLinkFiles(const string[] filesToLink)
     import std.path;
     import std.array;
     import std.algorithm.iteration;
-    return filesToLink.filter!((name) => name.extension.isObjectExtension).array.dup;
+    return filesToLink.filter!((name) => name.extension.isLinkerValidExtension).array.dup;
 }
