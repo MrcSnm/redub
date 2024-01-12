@@ -169,6 +169,14 @@ struct BuildConfiguration
         ret.libraries.exclusiveMerge(l);
         return ret;
     }
+
+    BuildConfiguration mergeObjectsFromSource(BuildConfiguration other) const
+    {
+        import command_generators.commons;
+        BuildConfiguration ret = clone;
+        ret.sourceFiles.exclusiveMerge(getLinkFiles(other.sourceFiles));
+        return ret;
+    }
 }
 ref string[] exclusiveMerge(return scope ref string[] a, string[] b)
 {
@@ -307,6 +315,7 @@ class ProjectNode
             p.requirements.cfg = p.requirements.cfg.mergeVersions(requirements.cfg);
             p.requirements.cfg = p.requirements.cfg.mergeDFlags(requirements.cfg);
             p.requirements.cfg = p.requirements.cfg.mergeLibsFromSource(requirements.cfg);
+            p.requirements.cfg = p.requirements.cfg.mergeObjectsFromSource(requirements.cfg);
         }
         
         foreach(p; parent)
