@@ -8,7 +8,7 @@ import etc.c.zlib;
 BuildRequirements parse(string filePath, string compiler, string subConfiguration = "", string subPackage = "")
 {
     import std.path;
-    ParseConfig c = ParseConfig(true, dirName(filePath), subConfiguration, subPackage, compiler);
+    ParseConfig c = ParseConfig(dirName(filePath), subConfiguration, subPackage, compiler);
     return parse(parseJSONCached(filePath), c);
 }
 
@@ -21,6 +21,8 @@ private JSONValue parseJSONCached(string filePath)
     jsonCache[filePath] = parseJSON(std.file.readText(filePath));
     return jsonCache[filePath];
 }
+
+
 
 /** 
  * Params:
@@ -37,7 +39,22 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
         cfg.requiredBy = json["name"].str;
     }
     BuildRequirements buildRequirements = getDefaultBuildRequirement(cfg);
-    immutable static  handler = [
+
+    immutable static preGenerateRun = [
+        "preGenerateCommands": (ref BuildRequirements req, JSONValue v, ParseConfig c)
+        {
+            foreach(JSONValue cmd; v.array)
+            {
+                import std.process;
+                import std.conv:to;
+                auto res = executeShell(cmd.str, null, Config.none, size_t.max, c.workingDir);
+                if(res.status)
+                    throw new Error("preGenerateCommand '"~cmd.str~"; exited with code "~res.status.to!string);
+            }
+        }
+    ];
+
+    immutable static requirementsRun = [
         "name": (ref BuildRequirements req, JSONValue v, ParseConfig c){if(c.firstRun) req.cfg.name = v.str;},
         "targetType": (ref BuildRequirements req, JSONValue v, ParseConfig c){req.cfg.targetType = targetFrom(v.str);},
         "targetPath": (ref BuildRequirements req, JSONValue v, ParseConfig c){req.cfg.outputDirectory = v.str;},
@@ -219,9 +236,31 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
             "in path "~cfg.workingDir
         );
     }
-
     string[] unusedKeys;
-    foreach(string key, JSONValue v; json)
+    if(cfg.preGenerateRun)
+    {
+        runHandlers(preGenerateRun, buildRequirements, cfg, json, false, unusedKeys);
+        cfg.preGenerateRun = false;
+    }
+    runHandlers(requirementsRun, buildRequirements, cfg, json, false, unusedKeys);
+
+
+    import std.algorithm.iteration:filter;
+    import std.array:array;
+    ///Remove dependencies without paths.
+    buildRequirements.dependencies = buildRequirements.dependencies.filter!((dep) => dep.path.length).array;
+
+    // if(cfg.firstRun) writeln("WARNING: Unused Keys -> ", unusedKeys);
+
+    return buildRequirements;
+}
+
+private void runHandlers(
+    immutable void function(ref BuildRequirements req, JSONValue v, ParseConfig c)[string] handler,
+    ref BuildRequirements buildRequirements, ParseConfig cfg,
+    JSONValue target, bool bGetUnusedKeys, out string[] unusedKeys)
+{
+    foreach(string key, JSONValue v; target)
     {
         bool mustExecuteHandler = true;
         auto fn = key in handler;
@@ -233,18 +272,9 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
         }
         if(mustExecuteHandler)
             (*fn)(buildRequirements, v, cfg);
-        else
+        else if(bGetUnusedKeys)
             unusedKeys~= key;
     }
-
-    import std.algorithm.iteration:filter;
-    import std.array:array;
-    ///Remove dependencies without paths.
-    buildRequirements.dependencies = buildRequirements.dependencies.filter!((dep) => dep.path.length).array;
-
-    // if(cfg.firstRun) writeln("WARNING: Unused Keys -> ", unusedKeys);
-
-    return buildRequirements;
 }
 
 private string[] strArr(JSONValue target)
@@ -344,12 +374,13 @@ private alias ParseDependency = string;
 
 struct ParseConfig
 {
-    bool firstRun;
     string workingDir;
     string subConfiguration;
     string subPackage;
     string compiler;
     string requiredBy;
+    bool firstRun = true;
+    bool preGenerateRun = true;
 }
 
 
