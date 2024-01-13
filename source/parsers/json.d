@@ -6,10 +6,10 @@ import std.file;
 import etc.c.zlib;
 import core.cpuid;
 
-BuildRequirements parse(string filePath, string compiler, string version_, string subConfiguration = "", string subPackage = "")
+BuildRequirements parse(string filePath, string projectWorkingDir, string compiler, string version_, string subConfiguration = "", string subPackage = "")
 {
     import std.path;
-    ParseConfig c = ParseConfig(dirName(filePath), subConfiguration, subPackage, version_, compiler);
+    ParseConfig c = ParseConfig(projectWorkingDir, subConfiguration, subPackage, version_, compiler);
     return parse(parseJSONCached(filePath), c);
 }
 

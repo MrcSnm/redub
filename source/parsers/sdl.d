@@ -1,7 +1,7 @@
 module parsers.sdl;
 public import buildapi;
 
-BuildRequirements parse(string filePath, string compiler, string subConfiguration = "", string subPackage = "")
+BuildRequirements parse(string filePath, string workingDir,  string compiler, string subConfiguration = "", string subPackage = "")
 {
     static import parsers.json;
     import std.process;
@@ -9,7 +9,7 @@ BuildRequirements parse(string filePath, string compiler, string subConfiguratio
     import std.path;
 
     string currDir = getcwd();
-    chdir(dirName(filePath));
+    chdir(workingDir);
     auto exec = executeShell("dub convert -f json -s");
 
     if(exec.status)
@@ -17,7 +17,7 @@ BuildRequirements parse(string filePath, string compiler, string subConfiguratio
     
     string tempFile = filePath~".json"; //.sdl.json
     std.file.write(tempFile, exec.output);
-    BuildRequirements ret = parsers.json.parse(tempFile, compiler, subConfiguration, subPackage);
+    BuildRequirements ret = parsers.json.parse(tempFile, workingDir, compiler, subConfiguration, subPackage);
     chdir(currDir);
     std.file.remove(tempFile);
     return ret;

@@ -16,8 +16,8 @@ BuildRequirements parseProject(string projectWorkingDir, string compiler, string
 
     switch(extension(projectFile))
     {
-        case ".json":  req = parsers.json.parse(projectFile, compiler, subConfiguration, subPackage); break;
-        case ".sdl":   req = parsers.sdl.parse(projectFile, compiler, subConfiguration, subPackage); break;
+        case ".json":  req = parsers.json.parse(projectFile, projectWorkingDir, compiler, subConfiguration, subPackage); break;
+        case ".sdl":   req = parsers.sdl.parse(projectFile, projectWorkingDir, compiler, subConfiguration, subPackage); break;
         default: throw new Error("Unsupported project type "~projectFile~" at dir "~projectWorkingDir);
     }
 
