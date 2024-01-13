@@ -248,7 +248,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
                 {
                     import parsers.automatic;
                     isSubpackageInPackage = true;
-                    return parseProject(subPackagePath, cfg.compiler, cfg.subConfiguration, null);
+                    return parseProject(subPackagePath, cfg.compiler, cfg.subConfiguration, null, null);
                 }
             } 
         }

@@ -172,12 +172,12 @@ bool buildProjectParallelSimple(ProjectNode root, string compiler, OS os)
         if(res.status)
         {
             import core.thread;
-            printError(finishedPackage, res);
+            buildFailed(finishedPackage, res);
             return false;
         }
         else
         {
-            printSucceed(finishedPackage, res.msNeeded);
+            buildSucceeded(finishedPackage, res.msNeeded);
             finishedPackage.becomeIndependent();
             dependencyFreePackages = root.findLeavesNodes();
             if(finishedPackage is root)
@@ -211,31 +211,31 @@ bool buildProjectFullyParallelized(ProjectNode root, string compiler, OS os)
         if(res.status)
         {
             import core.thread;
-            printError(finishedPackage, res);
+            buildFailed(finishedPackage, res);
             thread_joinAll();
             return false;
         }
         else
         {
             updateCache(mainPackHash, res.cache);
-            printSucceed(finishedPackage, res.msNeeded);
+            buildSucceeded(finishedPackage, res.msNeeded);
         }
     }
     return doLink(root.requirements.idup, os, compiler, mainPackHash, root.isUpToDate);
 }
 
-private void printSucceed(ProjectNode node, size_t msecs)
+private void buildSucceeded(ProjectNode node, size_t msecs)
 {
     import std.stdio;
     if(node.isUpToDate)
-        writeln("Project ", node.name, " ",node.requirements.version_," [", node.requirements.targetConfiguration,"] up to date check in ", msecs, "ms");
+        writeln("Up-to-Date: ", node.name, " ",node.requirements.version_," [", node.requirements.targetConfiguration,"]. Took ", msecs, "ms");
     else 
-        writeln("Compilation of project ", node.name, " ",node.requirements.version_," [", node.requirements.targetConfiguration,"] finished in ", msecs, "ms");
+        writeln("Built: ", node.name, " ",node.requirements.version_," [", node.requirements.targetConfiguration,"]. Took ", msecs, "ms");
 }
-private void printError(ProjectNode node, CompilationResult res)
+private void buildFailed(ProjectNode node, CompilationResult res)
 {
     import std.stdio;
-    writeln("Compilation of project '", node.name, " ",node.requirements.version_," [", node.requirements.targetConfiguration,"] ",
+    writeln("Build Failure: '", node.name, " ",node.requirements.version_," [", node.requirements.targetConfiguration,"] ",
         "' using flags\n\t", res.compilationCommand, 
         "\nFailed after ", res.msNeeded,"ms with message\n\t", res.message
     );
@@ -247,14 +247,14 @@ private bool doLink(immutable BuildRequirements req, OS os, string compiler, str
     if(req.cfg.targetType.isStaticLibrary || isUpToDate)
     {
         if(isUpToDate)
-            writeln("Project ", req.name, " is up to date, skipping linking");
+            writeln("Up-to-Date: ", req.name, ", skipping linking");
         updateCache(mainPackHash, CompilationCache.get(mainPackHash, req), true);
         return true;
     }
     CompilationResult linkRes = link(req.cfg, os, compiler);
     if(linkRes.status)
     {
-        writeln("Linking of project ", req.name, " failed with flags: \n\t",
+        writeln("Linking Error: ", req.name, ". Failed with flags: \n\t",
             linkRes.compilationCommand,"\n\t\t  :\n\t",
             linkRes.message
         );
@@ -262,7 +262,7 @@ private bool doLink(immutable BuildRequirements req, OS os, string compiler, str
     }
     else
     {
-        writeln("Linking of project ", req.name, " finished!");
+        writeln("Linked: ", req.name, " finished!");
         updateCache(mainPackHash, CompilationCache.get(mainPackHash, req), true);
 
     }

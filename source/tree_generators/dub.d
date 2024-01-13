@@ -102,7 +102,7 @@ private ProjectNode getProjectTreeImpl(
  */
 private BuildRequirements parseProjectWithParent(Dependency dep, BuildRequirements parent, string compiler)
 {
-    BuildRequirements depReq = parseProject(dep.path, compiler, dep.subConfiguration, dep.subPackage);
+    BuildRequirements depReq = parseProject(dep.path, compiler, dep.subConfiguration, dep.subPackage, null);
     depReq.cfg.name = dep.fullName;
     return mergeProjectWithParent(depReq, parent);
 }

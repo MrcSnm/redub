@@ -4,12 +4,14 @@ static import parsers.json;
 static import parsers.sdl;
 static import parsers.environment;
 
-BuildRequirements parseProject(string projectWorkingDir, string compiler, string subConfiguration, string subPackage)
+BuildRequirements parseProject(string projectWorkingDir, string compiler, string subConfiguration, string subPackage, string recipe)
 {
-    import std.stdio;
     import std.path;
+    import std.file;
     import package_searching.entry;
-    string projectFile = findEntryProjectFile(projectWorkingDir);
+    if(!std.file.exists(projectWorkingDir))
+        throw new Error("Directory "~projectWorkingDir~"' does not exists.");
+    string projectFile = findEntryProjectFile(projectWorkingDir, recipe);
     BuildRequirements req;
 
     switch(extension(projectFile))

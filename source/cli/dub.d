@@ -27,10 +27,6 @@ enum Color
 
 struct DubCommonArguments
 {
-    @("Display general or command specific help")
-    @("h|help")
-    bool help;
-
     @("Path to operate in instead of the current working dir")
     string root;
 
@@ -83,10 +79,25 @@ struct DubCommonArguments
 
     @("Puts any fetched packages in the specified location [local|system|user].")
     string cache;
+
+    string getRoot(string workingDir) const
+    {
+        import std.path;
+        if(isAbsolute(root)) return root;
+        return buildNormalizedPath(workingDir, root);
+    }
+
+    string getRecipe(string workingDir) const
+    {
+        import std.path;
+        if(isAbsolute(recipe))  return recipe;
+        return buildNormalizedPath(getRoot(workingDir), recipe);
+    }
 }
 
 struct DubArguments
 {
+    DubCommonArguments cArgs;
     @("Specifies the type of build to perform. Note that setting the DFLAGS environment variable will override the build type with custom flags.",
     "Possible names:")
     @("b|build")
@@ -171,20 +182,32 @@ import std.getopt;
 GetoptResult betterGetopt(T)(ref string[] args, out T opts) if(is(T == struct))
 {
     alias _ = opts;
-    return mixin(genGetoptCall!T);
+    return mixin("getopt(args, " ~ genGetoptCall!(T)("_") ~ ")");
 }
 
-private string genGetoptCall(T)()
+private string genGetoptCall(T)(string memberName  )
 {
-    string ret = "getopt(args, ";
+    import std.traits:isFunction;
+    string ret;
     static foreach(mem; __traits(allMembers, T))
     {{
-        alias att = __traits(getAttributes, __traits(getMember, T, mem));
-        static if(att.length == 2) 
-            ret~= att[1].stringof ~ ", "~att[0].stringof;
-        else
-            ret~= mem.stringof~", "~att[0].stringof;
-        ret~=", &_."~mem~", ";
+        alias member = __traits(getMember, T, mem);
+        static if(!isFunction!(typeof(member)))
+        {
+            static if(is(typeof(member) == struct))
+            {
+                ret~= genGetoptCall!(typeof(member))(memberName~"."~mem);
+            }
+            else
+            {
+                alias att = __traits(getAttributes, member);
+                static if(att.length == 2) 
+                    ret~= att[1].stringof ~ ", "~att[0].stringof;
+                else
+                    ret~= mem.stringof~", "~att[0].stringof;
+                ret~=", &"~memberName~"."~mem~", ";
+            }
+        }
     }}
-    return ret~")";
+    return ret;
 }

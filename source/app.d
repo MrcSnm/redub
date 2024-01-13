@@ -37,24 +37,11 @@ string formatError(string err)
 */
 int main(string[] args)
 {
-    //TEST -> Take from args[1] the workingDir.
-    string workingDir = std.file.getcwd();
-    if(args.length > 1)
-    {
-        if(!isAbsolute(args[1])) 
-            workingDir = buildNormalizedPath(workingDir, args[1]);
-        else workingDir = args[1];
-        if(args.length > 2)
-            args = args[0..1] ~ args[2..$];
-        else
-            args = args[0..1];
-    }
-
-    return buildMain(args, workingDir);
+    return buildMain(args);
 }
 
 
-int buildMain(string[] args, string workingDir)
+int buildMain(string[] args)
 {
     import std.getopt;
     import std.datetime.stopwatch;
@@ -65,6 +52,8 @@ int buildMain(string[] args, string workingDir)
     static import parsers.environment;
     static import command_generators.dmd;
 
+    string workingDir = std.file.getcwd();
+    string recipe;
     DubArguments bArgs;
     GetoptResult res = betterGetopt(args, bArgs);
     if(res.helpWanted)
@@ -72,10 +61,15 @@ int buildMain(string[] args, string workingDir)
         defaultGetoptPrinter("dubv2 build information\n\t", res.options);
         return 1;
     }
+    DubCommonArguments cArgs = bArgs.cArgs;
+    if(cArgs.root)
+        workingDir = cArgs.getRoot(workingDir);
+    if(cArgs.recipe)
+        recipe = cArgs.getRecipe(workingDir);
     parsers.environment.setupBuildEnvironmentVariables(bArgs, DubBuildArguments.init, os, args);
 
     StopWatch st = StopWatch(AutoStart.yes);
-    BuildRequirements req = parseProject(workingDir, bArgs.compiler, bArgs.config, null);
+    BuildRequirements req = parseProject(workingDir, bArgs.compiler, bArgs.config, null, recipe);
     parsers.environment.setupEnvironmentVariablesForRootPackage(cast(immutable)req);
     req.cfg = req.cfg.merge(parsers.environment.parse());
 
