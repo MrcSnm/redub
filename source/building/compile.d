@@ -24,7 +24,7 @@ struct CompilationResult
     size_t msNeeded;
     int status;
     shared ProjectNode node;
-    string dateCache;
+    CompilationCache cache;
 }
 
 import std.typecons;
@@ -48,13 +48,14 @@ private ExecutionResult executeCommands(const string[] commandsList, string list
     return ExecutionResult(0, "Success");
 }
 
-void compile2(immutable BuildConfiguration cfg, shared ProjectNode pack, OS os, string compiler)
+void compile2(immutable BuildConfiguration cfg, shared ProjectNode pack, OS os, string compiler, CompilationCache cache)
 {
     import std.file;
     import std.process;
     import std.datetime.stopwatch;
     CompilationResult res;
     res.node = pack;
+    res.cache.requirementCache = cache.requirementCache;
     StopWatch sw = StopWatch(AutoStart.yes);
     scope(exit)
     {
@@ -63,10 +64,11 @@ void compile2(immutable BuildConfiguration cfg, shared ProjectNode pack, OS os, 
     }
     try
     {
-        {
-            if(executeCommands(cfg.preBuildCommands, "preBuildCommand", res, cfg.workingDir).status)
-                return;
-        }
+        res.cache.dateCache = hashFromDates(cfg);
+        if(res.cache.dateCache == cache.dateCache)
+            return;
+        if(executeCommands(cfg.preBuildCommands, "preBuildCommand", res, cfg.workingDir).status)
+            return;
         res.compilationCommand = getCompileCommands(cfg, os, compiler);
         auto ret = executeShell(res.compilationCommand);
         res.status = ret.status;
@@ -146,6 +148,7 @@ bool buildProjectParallelSimple(ProjectNode root, string compiler, OS os)
     import std.concurrency;
     import std.stdio;
     ProjectNode[] dependencyFreePackages = root.findLeavesNodes();
+    string mainPackHash = hashFrom(root.requirements);
     bool[ProjectNode] spawned;
     while(true)
     {
@@ -155,7 +158,10 @@ bool buildProjectParallelSimple(ProjectNode root, string compiler, OS os)
             if(!(dep in spawned))
             {
                 spawned[dep] = true;
-                spawn(&compile2, dep.requirements.cfg.idup, cast(shared)dep, os, compiler.idup);
+                spawn(&compile2, 
+                    dep.requirements.cfg.idup, cast(shared)dep, os, 
+                    compiler.idup, CompilationCache.get(mainPackHash, dep.requirements)
+                );
             }
         }
         CompilationResult res = receiveOnly!CompilationResult;
@@ -175,7 +181,7 @@ bool buildProjectParallelSimple(ProjectNode root, string compiler, OS os)
                 break;
         }
     }
-    return doLink(root.requirements.cfg.idup, os, compiler);
+    return doLink(root.requirements.idup, os, compiler, mainPackHash);
 }
 
 
@@ -185,13 +191,14 @@ bool buildProjectFullyParallelized(ProjectNode root, string compiler, OS os)
     import std.stdio;
     ProjectNode[] allPackages = root.collapse();
     string mainPackHash = hashFrom(root.requirements);
+    
     foreach(pack; allPackages)
     {
         // writeln("Building ", pack.name, " with args ", getCompileCommands(pack.requirements.cfg.idup, os, compiler));
         spawn(&compile2, 
             pack.requirements.cfg.idup, 
             cast(shared)pack, os, compiler.idup, 
-            CompilationCache(hashFrom(pack.requirements), )
+            CompilationCache.get(mainPackHash, pack.requirements)
         );
     }
     foreach(pack; allPackages)
@@ -206,9 +213,12 @@ bool buildProjectFullyParallelized(ProjectNode root, string compiler, OS os)
             return false;
         }
         else
+        {
+            updateCache(mainPackHash, res.cache);
             printSucceed(finishedPackage, res.msNeeded);
+        }
     }
-    return doLink(root.requirements.cfg.idup, os, compiler);
+    return doLink(root.requirements.idup, os, compiler, mainPackHash);
 }
 
 private void printSucceed(ProjectNode node, size_t msecs)
@@ -225,21 +235,25 @@ private void printError(ProjectNode node, CompilationResult res)
     );
 }
 
-private bool doLink(immutable BuildConfiguration cfg, OS os, string compiler)
+private bool doLink(immutable BuildRequirements req, OS os, string compiler, string mainPackHash)
 {
     import std.stdio;
-    if(cfg.targetType.isStaticLibrary) return true;
-    CompilationResult linkRes = link(cfg, os, compiler);
+    if(req.cfg.targetType.isStaticLibrary) return true;
+    CompilationResult linkRes = link(req.cfg, os, compiler);
     if(linkRes.status)
     {
-        writeln("Linking of project ", cfg.name, " failed with flags: \n\t",
+        writeln("Linking of project ", req.name, " failed with flags: \n\t",
             linkRes.compilationCommand,"\n\t\t  :\n\t",
             linkRes.message
         );
         return false;
     }
     else
-        writeln("Linking of project ", cfg.name, " finished!");
+    {
+        writeln("Linking of project ", req.name, " finished!");
+        updateCache(mainPackHash, CompilationCache.get(mainPackHash, req), true);
+
+    }
 
     return true;
 }

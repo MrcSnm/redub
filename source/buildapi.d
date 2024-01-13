@@ -70,7 +70,7 @@ struct BuildConfiguration
         return ret;
     }
 
-    immutable(BuildConfiguration) idup()
+    immutable(BuildConfiguration) idup() inout
     {
         return immutable BuildConfiguration(
             isDebug,
@@ -210,6 +210,16 @@ struct BuildRequirements
     Dependency[] dependencies;
     string version_;
     string targetConfiguration;
+
+    immutable(BuildRequirements) idup() inout
+    {
+        return immutable BuildRequirements(
+            cfg.idup,
+            dependencies.idup,
+            version_,
+            targetConfiguration
+        );
+    }
 
     static BuildRequirements defaultInit(string workingDir)
     {
