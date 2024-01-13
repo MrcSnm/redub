@@ -64,9 +64,11 @@ void compile2(immutable BuildConfiguration cfg, shared ProjectNode pack, OS os, 
     }
     try
     {
-        // res.cache.dateCache = hashFromDates(cfg);
         if(pack.isUpToDate)
+        {
+            res.cache = cache;
             return;
+        }
         if(executeCommands(cfg.preBuildCommands, "preBuildCommand", res, cfg.workingDir).status)
             return;
         res.compilationCommand = getCompileCommands(cfg, os, compiler);
@@ -80,6 +82,7 @@ void compile2(immutable BuildConfiguration cfg, shared ProjectNode pack, OS os, 
             if(cfg.targetType != TargetType.executable && executeCommands(cfg.postGenerateCommands, "postGenerateCommand", res, cfg.workingDir).status)
                 return;
         }
+        res.cache.dateCache = hashFromDates(cfg);
     }
     catch(Throwable e)
     {
@@ -201,7 +204,6 @@ bool buildProjectFullyParallelized(ProjectNode root, string compiler, OS os)
             cache[i++]
         );
     }
-    i = 0;
     foreach(pack; root.collapse)
     {
         CompilationResult res = receiveOnly!CompilationResult;
@@ -215,7 +217,9 @@ bool buildProjectFullyParallelized(ProjectNode root, string compiler, OS os)
         }
         else
         {
-            updateCache(mainPackHash, cache[i++]);
+            import std.stdio;
+            writeln(res.cache);
+            updateCache(mainPackHash, res.cache);
             printSucceed(finishedPackage, res.msNeeded);
         }
     }
@@ -239,7 +243,11 @@ private void printError(ProjectNode node, CompilationResult res)
 private bool doLink(immutable BuildRequirements req, OS os, string compiler, string mainPackHash)
 {
     import std.stdio;
-    if(req.cfg.targetType.isStaticLibrary) return true;
+    if(req.cfg.targetType.isStaticLibrary)
+    {
+        updateCache(mainPackHash, CompilationCache.get(mainPackHash, req), true);
+        return true;
+    }
     CompilationResult linkRes = link(req.cfg, os, compiler);
     if(linkRes.status)
     {
