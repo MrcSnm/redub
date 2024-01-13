@@ -5,6 +5,7 @@ static import std.file;
 import std.stdio;
 import std.path;
 import std.json;
+import std.encoding;
 
 
 enum cacheFolder = ".dubv2";
@@ -36,27 +37,38 @@ struct CompilationCache
         JSONValue[] caches = targetCache.array;
         return CompilationCache(reqCache, caches[0].str, caches[1].str);
     }
+
+    bool isUpToDate(const BuildRequirements req) const
+    {
+        return requirementCache == hashFrom(req) &&
+            dateCache == hashFromDates(req.cfg);
+    }
 }
 
-
-nothrow bool isUpToDate(string workspace)
+/** 
+ * Params:
+ *   root = 
+ * Returns: Current cache status from root, without modifying it
+ */
+CompilationCache[] cacheStatusForProject(ProjectNode root)
 {
-
-    string cache = buildPath(workspace, cacheFolder, cacheFile);
-    if(!std.file.exists(cache))
-        return false;
-
-    return false;
+    CompilationCache[] cache = new CompilationCache[](root.collapse.length);
+    string rootCache = hashFrom(root.requirements);
+    int i = 0;
+    foreach(const ProjectNode node; root.collapse)
+        cache[i++] = CompilationCache.get(rootCache, node.requirements);
+    return cache;
 }
-
-
 
 /**
-*  Returns if operation was succesful
+*   Invalidate caches that aren't up to date
 */
-nothrow bool createCache(string workspace)
+void invalidateCaches(ProjectNode root, const CompilationCache[] cacheStatus)
 {
-    return false;
+    int i = 0;
+    foreach(ProjectNode n; root.collapse)
+        if(!cacheStatus[i++].isUpToDate(n.requirements))
+            n.invalidateCache();
 }
 
 string hashFunction(const char[] input)
@@ -90,12 +102,13 @@ string hashFromPathDates(scope const(string[]) entryPaths...)
     BigInt bInt;
     foreach(path; entryPaths)
     {
+        if(!std.file.exists(path)) return null;
         if(std.file.isDir(path))
         {
             foreach(DirEntry e; dirEntries(path, SpanMode.depth))
                 bInt+= e.timeLastModified.stdTime;
         }
-        else 
+        else
             bInt+= std.file.timeLastModified(path).stdTime;
     }
     
@@ -109,15 +122,15 @@ string hashFromPathDates(scope const(string[]) entryPaths...)
     return hashFunction(output[0..length]);
 }
 
-string hashFromDates(immutable BuildConfiguration cfg)
+string hashFromDates(const BuildConfiguration cfg)
 {
-    string[] sourceFiles;
-    string[] libs;
+    string[] sourceFiles = new string[](cfg.sourceFiles.length);
+    string[] libs = new string[](cfg.libraries.length);
 
-    foreach(s; cfg.sourceFiles)
-        sourceFiles~= buildNormalizedPath(cfg.workingDir, s);
-    foreach(s; cfg.libraries)
-        libs~= buildNormalizedPath(cfg.workingDir, s);
+    foreach(i, s; cfg.sourceFiles)
+        sourceFiles[i] = buildNormalizedPath(cfg.workingDir, s);
+    foreach(i, s; cfg.libraries)
+        libs[i] = buildNormalizedPath(cfg.workingDir, s);
 
     return hashFromPathDates(
         cfg.importDirectories~

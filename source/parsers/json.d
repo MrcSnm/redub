@@ -6,10 +6,10 @@ import std.file;
 import etc.c.zlib;
 import core.cpuid;
 
-BuildRequirements parse(string filePath, string compiler, string subConfiguration = "", string subPackage = "")
+BuildRequirements parse(string filePath, string compiler, string version_, string subConfiguration = "", string subPackage = "")
 {
     import std.path;
-    ParseConfig c = ParseConfig(dirName(filePath), subConfiguration, subPackage, compiler);
+    ParseConfig c = ParseConfig(dirName(filePath), subConfiguration, subPackage, version_, compiler);
     return parse(parseJSONCached(filePath), c);
 }
 
@@ -38,6 +38,8 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
     {
         enforce("name" in json, "Every package must contain a 'name'");
         cfg.requiredBy = json["name"].str;
+        if("version" in json)
+            cfg.version_ = json["version"].str;
     }
     BuildRequirements buildRequirements = getDefaultBuildRequirement(cfg);
 
@@ -406,6 +408,7 @@ struct ParseConfig
     string workingDir;
     string subConfiguration;
     string subPackage;
+    string version_ = "~master";
     string compiler;
     string requiredBy;
     bool firstRun = true;
@@ -416,7 +419,7 @@ struct ParseConfig
 BuildRequirements getDefaultBuildRequirement(ParseConfig cfg)
 {
     BuildRequirements req = BuildRequirements.defaultInit(cfg.workingDir);
-    req.version_ = "~master";
+    req.version_ = cfg.version_;
     req.targetConfiguration = cfg.subConfiguration;
     req.cfg.workingDir = cfg.workingDir;
     return req;

@@ -247,6 +247,8 @@ class ProjectNode
     BuildRequirements requirements;
     ProjectNode[] parent;
     ProjectNode[] dependencies;
+    private bool shouldRebuild = false;
+    private ProjectNode[] collapsedRef;
 
     string name() const { return requirements.name; }
 
@@ -297,11 +299,14 @@ class ProjectNode
      * - Add the dependency as a library if it is a library
      * - Add the dependency's libraries 
      * - Remove source libraries from projects to build
+     *
+     * Also receives an argument containing the collapsed reference of its unique nodes.
      */
-    void finish()
+    void finish(ProjectNode[] collapsedRef)
     {
+        this.collapsedRef = collapsedRef;
         foreach(dep; dependencies)
-            dep.finish();
+            dep.finish(collapsedRef);
         import std.string:replace;
         requirements.cfg.name = requirements.cfg.name.replace(":", "_");
         if(requirements.cfg.targetType == TargetType.autodetect)
@@ -338,7 +343,19 @@ class ProjectNode
         }
 
         if(requirements.cfg.targetType == TargetType.sourceLibrary)
+        {
+            import std.stdio;
+            writeln("Project ", name, " is a sourceLibrary. Becoming independent.");
             becomeIndependent();
+        }
+    }
+    
+    bool isUpToDate() const shared { return !shouldRebuild; }
+
+    void invalidateCache()
+    {
+        shouldRebuild = true;
+        foreach(p; parent) p.invalidateCache();
     }
 
     void becomeIndependent()
@@ -357,23 +374,19 @@ class ProjectNode
     }
 
     ///Collapses the tree in a single list.
-    inout(ProjectNode)[] collapse() inout
+    final auto collapse()
     {
-        bool[ProjectNode] visited;
-        return cast(inout(ProjectNode)[])collapseImpl(visited);
-    }
-    ///Since it does not modify them, there's no problem in being const.
-    private const(ProjectNode)[] collapseImpl(ref bool[const ProjectNode] visited) const
-    {
-        const(ProjectNode)[] ret;
-        if(!(this in visited))
+        static struct CollapsedRange
         {
-            ret~= this;
-            visited[this] = true;
+            private ProjectNode[] nodes;
+            int index = 0;
+            bool empty(){return index >= nodes.length; }
+            void popFront(){index++;}
+            size_t length(){return nodes.length;}
+            inout(ProjectNode) front() inout {return nodes[index];}
         }
-        foreach(dep; dependencies)
-            ret~= dep.collapseImpl(visited);
-        return ret;
+
+        return CollapsedRange(collapsedRef);
     }
 
     ProjectNode[] findLeavesNodes()

@@ -64,8 +64,8 @@ void compile2(immutable BuildConfiguration cfg, shared ProjectNode pack, OS os, 
     }
     try
     {
-        res.cache.dateCache = hashFromDates(cfg);
-        if(res.cache.dateCache == cache.dateCache)
+        // res.cache.dateCache = hashFromDates(cfg);
+        if(pack.isUpToDate)
             return;
         if(executeCommands(cfg.preBuildCommands, "preBuildCommand", res, cfg.workingDir).status)
             return;
@@ -189,19 +189,20 @@ bool buildProjectFullyParallelized(ProjectNode root, string compiler, OS os)
 {
     import std.concurrency;
     import std.stdio;
-    ProjectNode[] allPackages = root.collapse();
     string mainPackHash = hashFrom(root.requirements);
-    
-    foreach(pack; allPackages)
+    CompilationCache[] cache = cacheStatusForProject(root);
+    size_t i = 0;
+    foreach(pack; root.collapse)
     {
         // writeln("Building ", pack.name, " with args ", getCompileCommands(pack.requirements.cfg.idup, os, compiler));
         spawn(&compile2, 
             pack.requirements.cfg.idup, 
             cast(shared)pack, os, compiler.idup, 
-            CompilationCache.get(mainPackHash, pack.requirements)
+            cache[i++]
         );
     }
-    foreach(pack; allPackages)
+    i = 0;
+    foreach(pack; root.collapse)
     {
         CompilationResult res = receiveOnly!CompilationResult;
         ProjectNode finishedPackage = cast()res.node;
@@ -214,7 +215,7 @@ bool buildProjectFullyParallelized(ProjectNode root, string compiler, OS os)
         }
         else
         {
-            updateCache(mainPackHash, res.cache);
+            updateCache(mainPackHash, cache[i++]);
             printSucceed(finishedPackage, res.msNeeded);
         }
     }

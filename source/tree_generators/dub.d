@@ -20,14 +20,36 @@ import parsers.automatic;
 ProjectNode getProjectTree(BuildRequirements req, string compiler)
 {
     ProjectNode[string] visited;
-    ProjectNode tree =  getProjectTreeImpl(req, compiler, visited);
-    tree.finish();
+    ProjectNode[] collapsed;
+    ProjectNode tree =  getProjectTreeImpl(req, compiler, visited, collapsed);
+    tree.finish(collapsed);
     return tree;
 
 }
-private ProjectNode getProjectTreeImpl(BuildRequirements req, string compiler, ref ProjectNode[string] visited)
+
+/** 
+ * 
+ * Params:
+ *   req = Requirement to generate node
+ *   compiler = Compiler for parsing configs
+ *   visited = Cache for unique matching
+ *   collapsed = A collapsed representation of the tree. This is useful 
+ *  for saving CPU and memory instead if needing to recursively iterate all the time.
+ *  this was moved here because it already implements the `visited` pattern inside the tree,
+ *  so, it is an assumption that can be made to make it slightly faster. Might be removed
+ *  if it makes code comprehension significantly worse.
+ * 
+ * Returns: 
+ */
+private ProjectNode getProjectTreeImpl(
+    BuildRequirements req, 
+    string compiler, 
+    ref ProjectNode[string] visited, 
+    ref ProjectNode[] collapsed)
 {
     ProjectNode root = new ProjectNode(req);
+    if(req.cfg.targetType != TargetType.sourceLibrary) //Source libraries are not considered.
+        collapsed~= root;
     foreach(dep; req.dependencies)
     {
         ProjectNode* visitedDep = dep.fullName in visited;
@@ -61,7 +83,7 @@ private ProjectNode getProjectTreeImpl(BuildRequirements req, string compiler, r
         else
         {
             BuildRequirements buildReq = parseProjectWithParent(dep, req, compiler);
-            depNode = getProjectTreeImpl(buildReq, compiler, visited);
+            depNode = getProjectTreeImpl(buildReq, compiler, visited, collapsed);
         }
 
         visited[dep.fullName] = depNode;

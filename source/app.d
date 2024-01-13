@@ -37,7 +37,6 @@ string formatError(string err)
 */
 int main(string[] args)
 {
-    import building.cache;
     //TEST -> Take from args[1] the workingDir.
     string workingDir = std.file.getcwd();
     if(args.length > 1)
@@ -51,14 +50,7 @@ int main(string[] args)
             args = args[0..1];
     }
 
-    if(isUpToDate(workingDir))
-    {
-
-    }
-    else
-        return buildMain(args, workingDir);
-
-    return 0;
+    return buildMain(args, workingDir);
 }
 
 
@@ -68,6 +60,7 @@ int buildMain(string[] args, string workingDir)
     import std.datetime.stopwatch;
     import std.system;
     import building.compile;
+    import building.cache;
     import package_searching.entry;
     static import parsers.environment;
     static import command_generators.dmd;
@@ -88,6 +81,8 @@ int buildMain(string[] args, string workingDir)
 
     ProjectNode tree = getProjectTree(req, bArgs.compiler);
     parsers.environment.setupEnvironmentVariablesForPackageTree(tree);
+    invalidateCaches(tree, cacheStatusForProject(tree));
+    
 
     // ProjectNode[][] expandedDependencyMatrix = fromTree(tree);
     writeln("Dependencies resolved in ", (st.peek.total!"msecs"), " ms.") ;
