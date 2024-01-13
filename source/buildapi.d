@@ -350,6 +350,7 @@ class ProjectNode
         }
     }
     
+    bool isUpToDate() const { return !shouldRebuild; }
     bool isUpToDate() const shared { return !shouldRebuild; }
 
     void invalidateCache()

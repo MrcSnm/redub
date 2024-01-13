@@ -184,7 +184,7 @@ bool buildProjectParallelSimple(ProjectNode root, string compiler, OS os)
                 break;
         }
     }
-    return doLink(root.requirements.idup, os, compiler, mainPackHash);
+    return doLink(root.requirements.idup, os, compiler, mainPackHash, root.isUpToDate);
 }
 
 
@@ -217,19 +217,20 @@ bool buildProjectFullyParallelized(ProjectNode root, string compiler, OS os)
         }
         else
         {
-            import std.stdio;
-            writeln(res.cache);
             updateCache(mainPackHash, res.cache);
             printSucceed(finishedPackage, res.msNeeded);
         }
     }
-    return doLink(root.requirements.idup, os, compiler, mainPackHash);
+    return doLink(root.requirements.idup, os, compiler, mainPackHash, root.isUpToDate);
 }
 
 private void printSucceed(ProjectNode node, size_t msecs)
 {
     import std.stdio;
-    writeln("Compilation of project ", node.name, " ",node.requirements.version_," [", node.requirements.targetConfiguration,"] finished in ", msecs, "ms");
+    if(node.isUpToDate)
+        writeln("Project ", node.name, " ",node.requirements.version_," [", node.requirements.targetConfiguration,"] up to date check in ", msecs, "ms");
+    else 
+        writeln("Compilation of project ", node.name, " ",node.requirements.version_," [", node.requirements.targetConfiguration,"] finished in ", msecs, "ms");
 }
 private void printError(ProjectNode node, CompilationResult res)
 {
@@ -240,11 +241,13 @@ private void printError(ProjectNode node, CompilationResult res)
     );
 }
 
-private bool doLink(immutable BuildRequirements req, OS os, string compiler, string mainPackHash)
+private bool doLink(immutable BuildRequirements req, OS os, string compiler, string mainPackHash, bool isUpToDate)
 {
     import std.stdio;
-    if(req.cfg.targetType.isStaticLibrary)
+    if(req.cfg.targetType.isStaticLibrary || isUpToDate)
     {
+        if(isUpToDate)
+            writeln("Project ", req.name, " is up to date, skipping linking");
         updateCache(mainPackHash, CompilationCache.get(mainPackHash, req), true);
         return true;
     }

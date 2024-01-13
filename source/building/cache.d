@@ -96,7 +96,6 @@ string hashFrom(const BuildRequirements req)
 string hashFromPathDates(scope const(string[]) entryPaths...)
 {
     import std.conv:to;
-    import std.digest.md;
     import std.file;
     import std.bigint;
     BigInt bInt;
