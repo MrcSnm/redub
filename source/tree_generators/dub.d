@@ -59,7 +59,7 @@ private ProjectNode getProjectTreeImpl(
         {
             depNode = *visitedDep;
             ///When found 2 different packages requiring a different dependency subConfiguration
-            if(visitedDep.requirements.configuration != dep.subConfiguration)
+            if(visitedDep.requirements.configuration != dep.subConfiguration && !dep.subConfiguration.isDefault)
             {
                 BuildRequirements depConfig = parseProjectWithParent(dep, req, compiler);
                 if(visitedDep.requirements.targetConfiguration != depConfig.targetConfiguration)
@@ -107,9 +107,12 @@ private BuildRequirements mergeProjectWithParent(BuildRequirements base, BuildRe
     return base;
 }
 
-private BuildRequirements mergeDifferentSubConfigurations(BuildRequirements a, BuildRequirements b)
+private BuildRequirements mergeDifferentSubConfigurations(BuildRequirements existingReq, BuildRequirements newReq)
 {
-    throw new Error("Error in project: '"~a.name~"' Can't merge different subConfigurations at this moment: "~a.targetConfiguration~ " vs " ~ b.targetConfiguration);
+    throw new Error(
+        "Error in project: '"~existingReq.name~"' Can't merge different subConfigurations at this " ~
+        "moment: "~existingReq.targetConfiguration~ " vs " ~ newReq.targetConfiguration
+    );
 }
 
 void printProjectTree(ProjectNode node, int depth = 0)
