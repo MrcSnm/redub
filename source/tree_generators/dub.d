@@ -57,27 +57,19 @@ private ProjectNode getProjectTreeImpl(
         //If visited already, just add the new dflags and versions
         if(visitedDep)
         {
+            depNode = *visitedDep;
             ///When found 2 different packages requiring a different dependency subConfiguration
-            if(visitedDep.requirements.targetConfiguration != dep.subConfiguration)
+            if(visitedDep.requirements.configuration != dep.subConfiguration)
             {
                 BuildRequirements depConfig = parseProjectWithParent(dep, req, compiler);
                 if(visitedDep.requirements.targetConfiguration != depConfig.targetConfiguration)
                 {
+                    //Print merging different subConfigs?
                     visitedDep.requirements = mergeDifferentSubConfigurations(
                         visitedDep.requirements, 
                         depConfig
                     );
                 }
-                else //If it is using the same subConfiguration, simply continue 
-                {
-                    depNode = *visitedDep;
-                    // depNode.requirements = mergeProjectWithParent(depNode.requirements, req);
-                }
-            }
-            else //If it exists, simply merge with the parent project for adjusting its import flags
-            {
-                depNode = *visitedDep;
-                depNode.requirements = mergeProjectWithParent(depNode.requirements, req);
             }
         }
         else

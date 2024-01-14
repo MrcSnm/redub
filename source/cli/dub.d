@@ -98,6 +98,8 @@ struct DubCommonArguments
 struct DubArguments
 {
     DubCommonArguments cArgs;
+    DubBuildArguments build;
+    
     @("Specifies the type of build to perform. Note that setting the DFLAGS environment variable will override the build type with custom flags.",
     "Possible names:")
     @("b|build")
@@ -172,7 +174,6 @@ struct DubBuildArguments
     bool nonInteractive;
 
     @("Build all dependencies, even when main target is a static library.")
-    @("d|deep")
     bool deep;
 }
 

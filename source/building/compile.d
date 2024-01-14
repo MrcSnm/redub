@@ -177,7 +177,7 @@ bool buildProjectParallelSimple(ProjectNode root, string compiler, OS os)
         }
         else
         {
-            buildSucceeded(finishedPackage, res.msNeeded);
+            buildSucceeded(finishedPackage, res);
             finishedPackage.becomeIndependent();
             dependencyFreePackages = root.findLeavesNodes();
             if(finishedPackage is root)
@@ -218,19 +218,23 @@ bool buildProjectFullyParallelized(ProjectNode root, string compiler, OS os)
         else
         {
             updateCache(mainPackHash, res.cache);
-            buildSucceeded(finishedPackage, res.msNeeded);
+            buildSucceeded(finishedPackage, res);
         }
     }
     return doLink(root.requirements.idup, os, compiler, mainPackHash, root.isUpToDate);
 }
 
-private void buildSucceeded(ProjectNode node, size_t msecs)
+private void buildSucceeded(ProjectNode node, CompilationResult res)
 {
     import std.stdio;
     if(node.isUpToDate)
-        writeln("Up-to-Date: ", node.name, " ",node.requirements.version_," [", node.requirements.targetConfiguration,"]. Took ", msecs, "ms");
-    else 
-        writeln("Built: ", node.name, " ",node.requirements.version_," [", node.requirements.targetConfiguration,"]. Took ", msecs, "ms");
+        writeln("Up-to-Date: ", node.name, " ",node.requirements.version_," [", node.requirements.targetConfiguration,"]. Took ", res.msNeeded, "ms");
+    else
+    {
+        // writeln("Succesfully built with cmd:", res.compilationCommand);
+        writeln("Built: ", node.name, " ",node.requirements.version_," [", node.requirements.targetConfiguration,"]. Took ", res.msNeeded, "ms");
+
+    } 
 }
 private void buildFailed(ProjectNode node, CompilationResult res)
 {

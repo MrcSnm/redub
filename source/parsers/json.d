@@ -6,7 +6,13 @@ import std.file;
 import etc.c.zlib;
 import core.cpuid;
 
-BuildRequirements parse(string filePath, string projectWorkingDir, string compiler, string version_, string subConfiguration = "", string subPackage = "")
+BuildRequirements parse(string filePath, 
+    string projectWorkingDir, 
+    string compiler, 
+    string version_, 
+    BuildRequirements.Configuration subConfiguration,
+    string subPackage
+)
 {
     import std.path;
     ParseConfig c = ParseConfig(projectWorkingDir, subConfiguration, subPackage, version_, compiler);
@@ -73,7 +79,10 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
         "libs":  (ref BuildRequirements req, JSONValue v, ParseConfig c){req.cfg.libraries.exclusiveMerge(v.strArr);},
         "versions":  (ref BuildRequirements req, JSONValue v, ParseConfig c){req.cfg.versions.exclusiveMerge(v.strArr);},
         "lflags":  (ref BuildRequirements req, JSONValue v, ParseConfig c){req.cfg.linkFlags.exclusiveMerge(v.strArr);},
-        "dflags":  (ref BuildRequirements req, JSONValue v, ParseConfig c){req.cfg.dFlags.exclusiveMerge(v.strArr);},
+        "dflags":  (ref BuildRequirements req, JSONValue v, ParseConfig c)
+        {
+            req.cfg.dFlags.exclusiveMerge(v.strArr);
+        },
         "configurations": (ref BuildRequirements req, JSONValue v, ParseConfig c)
         {
             if(c.firstRun)
@@ -101,7 +110,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
                     }
                     if(preferredConfiguration == -1)
                         preferredConfiguration = i.to!int;
-                    if(name.str == c.subConfiguration)
+                    if(name.str == c.subConfiguration.name)
                     {
                         preferredConfiguration = i.to!int;
                         break;
@@ -110,9 +119,11 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
                 if(preferredConfiguration != -1)
                 {
                     configurationToUse = v.array[preferredConfiguration];
+                    string cfgName = configurationToUse["name"].str;
+                    c.subConfiguration = BuildRequirements.Configuration(cfgName, preferredConfiguration == 0);
                     BuildRequirements subCfgReq = parse(configurationToUse, c);
                     req = req.merge(subCfgReq);
-                    req.targetConfiguration = configurationToUse["name"].str;
+                    req.configuration = c.subConfiguration;
                 }
             }
         },
@@ -186,11 +197,15 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
         "subConfigurations": (ref BuildRequirements req, JSONValue v, ParseConfig c)
         {
             enforce(v.type == JSONType.object, "subConfigurations must be an object conversible to string[string]");
-
+            if(c.verbose) foreach(string key, JSONValue value; v)
+            {
+                import std.stdio;
+                writeln("Using ", value.str, " subconfiguration for ", key, " in project ", c.requiredBy);
+            }
             if(req.dependencies.length == 0)
             {
                 foreach(string key, JSONValue value; v)
-                    req.dependencies~= Dependency(key, null, null, value.str);
+                    req.dependencies~= Dependency(key, null, null, BuildRequirements.Configuration(value.str, false));
             }
             else
             {
@@ -198,7 +213,9 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
                 {
                     JSONValue* subCfg = dep.name in v;
                     if(subCfg)
-                        dep.subConfiguration = subCfg.str;
+                    {
+                        dep.subConfiguration = BuildRequirements.Configuration(subCfg.str, false);
+                    }
                 }
             }
         },
@@ -290,6 +307,7 @@ private void runHandlers(
         {
             CommandWithFilter filtered = CommandWithFilter.fromKey(key);
             fn = filtered.command in handler;
+
             mustExecuteHandler = filtered.matchesOS(os) && filtered.matchesCompiler(cfg.compiler) && fn;
         }
         if(mustExecuteHandler)
@@ -406,13 +424,14 @@ private alias ParseDependency = string;
 struct ParseConfig
 {
     string workingDir;
-    string subConfiguration;
+    BuildRequirements.Configuration subConfiguration;
     string subPackage;
     string version_ = "~master";
     string compiler;
     string requiredBy;
     bool firstRun = true;
     bool preGenerateRun = true;
+    bool verbose;
 }
 
 
@@ -420,7 +439,7 @@ BuildRequirements getDefaultBuildRequirement(ParseConfig cfg)
 {
     BuildRequirements req = BuildRequirements.defaultInit(cfg.workingDir);
     req.version_ = cfg.version_;
-    req.targetConfiguration = cfg.subConfiguration;
+    req.configuration = cfg.subConfiguration;
     req.cfg.workingDir = cfg.workingDir;
     return req;
 }

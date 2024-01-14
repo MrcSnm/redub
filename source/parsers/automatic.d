@@ -4,7 +4,13 @@ static import parsers.json;
 static import parsers.sdl;
 static import parsers.environment;
 
-BuildRequirements parseProject(string projectWorkingDir, string compiler, string subConfiguration, string subPackage, string recipe)
+BuildRequirements parseProject(
+    string projectWorkingDir, 
+    string compiler, 
+    BuildRequirements.Configuration subConfiguration, 
+    string subPackage, 
+    string recipe
+)
 {
     import std.path;
     import std.file;
@@ -16,8 +22,8 @@ BuildRequirements parseProject(string projectWorkingDir, string compiler, string
 
     switch(extension(projectFile))
     {
-        case ".json":  req = parsers.json.parse(projectFile, projectWorkingDir, compiler, subConfiguration, subPackage); break;
-        case ".sdl":   req = parsers.sdl.parse(projectFile, projectWorkingDir, compiler, subConfiguration, subPackage); break;
+        case ".json":  req = parsers.json.parse(projectFile, projectWorkingDir, compiler, null, subConfiguration, subPackage); break;
+        case ".sdl":   req = parsers.sdl.parse(projectFile, projectWorkingDir, compiler, null, subConfiguration, subPackage); break;
         default: throw new Error("Unsupported project type "~projectFile~" at dir "~projectWorkingDir);
     }
 
@@ -31,7 +37,6 @@ BuildRequirements parseProject(string projectWorkingDir, string compiler, string
 
 /** 
  * This function finishes some parts of the build requirement:
- * - Adds Have_ versions
  * - Transforms relative paths into absolute paths
  * After that, it makes possible to merge with other build requirements. But, it is not completely
  * finished. It still has to become a tree.
@@ -41,20 +46,7 @@ BuildRequirements parseProject(string projectWorkingDir, string compiler, string
 private void partiallyFinishBuildRequirements(ref BuildRequirements req)
 {
     import std.path;
-    {
-        BuildConfiguration toMerge;
-        foreach(dep; req.dependencies)
-        {
-            import std.string:replace;
-            string ver = "Have_"~dep.name.replace("-", "_");
-            if(dep.subPackage) ver~= "_"~dep.subPackage;
-            toMerge.versions~= ver;
-
-        }
-        req.cfg = req.cfg.mergeVersions(toMerge);
-    }
-        
-
+   
     if(!isAbsolute(req.cfg.outputDirectory))
         req.cfg.outputDirectory = buildNormalizedPath(req.cfg.workingDir, req.cfg.outputDirectory);
 

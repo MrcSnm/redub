@@ -67,15 +67,21 @@ int buildMain(string[] args)
     if(cArgs.recipe)
         recipe = cArgs.getRecipe(workingDir);
     parsers.environment.setupBuildEnvironmentVariables(bArgs, DubBuildArguments.init, os, args);
-
     StopWatch st = StopWatch(AutoStart.yes);
-    BuildRequirements req = parseProject(workingDir, bArgs.compiler, bArgs.config, null, recipe);
+
+
+    BuildRequirements req = parseProject(workingDir, bArgs.compiler, BuildRequirements.Configuration(bArgs.config, false), null, recipe);
     parsers.environment.setupEnvironmentVariablesForRootPackage(cast(immutable)req);
     req.cfg = req.cfg.merge(parsers.environment.parse());
 
     ProjectNode tree = getProjectTree(req, bArgs.compiler);
     parsers.environment.setupEnvironmentVariablesForPackageTree(tree);
+    import std.string:startsWith;
+
+    writeln(tree.debugFindDep("renderer").requirements.targetConfiguration);
+    
     invalidateCaches(tree, cacheStatusForProject(tree));
+    if(bArgs.build.force) tree.invalidateCacheOnTree();
     
 
     // ProjectNode[][] expandedDependencyMatrix = fromTree(tree);
@@ -92,8 +98,8 @@ int buildMain(string[] args)
     if(!buildSucceeded)
         throw new Error("Build failure");
 
-    /// This might get removed.
-    // buldSucceeded = buildProject(expandedDependencyMatrix, bArgs.compiler))
+    // This might get removed.
+    // buldSucceeded = buildProject(expandedDependencyMatrix, bArgs.compiler);
 
     
 

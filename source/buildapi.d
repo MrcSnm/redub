@@ -187,15 +187,16 @@ struct Dependency
     string name;
     string path;
     string version_ = "*";
-    string subConfiguration;
+
+    BuildRequirements.Configuration subConfiguration;
     string subPackage;
 
-    bool isSameAs(string name, string subConfiguration, string subPackage) const
+    bool isSameAs(string name, string subPackage) const
     {
-        return this.name == name && this.subConfiguration == subConfiguration && this.subPackage == subPackage;
+        return this.name == name && this.subPackage == subPackage;
     }
 
-    bool isSameAs(Dependency other) const{return isSameAs(other.name, other.subConfiguration, other.subPackage);}
+    bool isSameAs(Dependency other) const{return isSameAs(other.name, other.subPackage);}
 
     string fullName()
     {
@@ -209,7 +210,28 @@ struct BuildRequirements
     BuildConfiguration cfg;
     Dependency[] dependencies;
     string version_;
-    string targetConfiguration;
+
+    struct Configuration
+    {
+        string name;
+        bool isDefault = true;
+
+        this(string name, bool isDefault)
+        {
+            this.name = name;
+            this.isDefault = isDefault;
+            if(name == null)
+                isDefault = true;
+        }
+
+        bool opEquals(const Configuration other) const
+        {
+            if(isDefault && other.isDefault) return true;
+            return name == other.name;    
+        }
+    }
+    Configuration configuration;
+    string targetConfiguration() const { return configuration.name; }
 
     immutable(BuildRequirements) idup() inout
     {
@@ -217,7 +239,7 @@ struct BuildRequirements
             cfg.idup,
             dependencies.idup,
             version_,
-            targetConfiguration
+            configuration
         );
     }
 
@@ -257,6 +279,14 @@ class ProjectNode
         this.requirements = req;
     }
 
+    ProjectNode debugFindDep(string depName)
+    {
+        foreach(pack; collapse)
+            if(pack.name == depName)
+                return pack;
+        return null;
+    }
+
     ProjectNode addDependency(ProjectNode dep)
     {
         import std.exception;
@@ -284,7 +314,6 @@ class ProjectNode
             if(!parallelizable) return false;
         }
         return parallelizable;
-
     }
 
     /** 
@@ -311,7 +340,14 @@ class ProjectNode
         requirements.cfg.name = requirements.cfg.name.replace(":", "_");
         if(requirements.cfg.targetType == TargetType.autodetect)
             requirements.cfg.targetType = inferTargetType(requirements.cfg);
-
+        
+        BuildConfiguration toMerge;
+        foreach(dep; dependencies)
+        {
+            import std.string:replace;
+            toMerge.versions~= "Have_"~dep.name.replace("-", "_");
+        }
+        requirements.cfg = requirements.cfg.mergeVersions(toMerge);
         foreach(p; parent)
         {
             p.requirements.cfg = p.requirements.cfg.mergeImport(requirements.cfg);
@@ -353,10 +389,16 @@ class ProjectNode
     bool isUpToDate() const { return !shouldRebuild; }
     bool isUpToDate() const shared { return !shouldRebuild; }
 
+    ///Invalidates self and parent caches
     void invalidateCache()
     {
         shouldRebuild = true;
         foreach(p; parent) p.invalidateCache();
+    }
+    ///Helper function for --force
+    void invalidateCacheOnTree()
+    {
+        foreach(node; collapse) node.shouldRebuild = true;
     }
 
     void becomeIndependent()
