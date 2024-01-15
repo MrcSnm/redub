@@ -25,7 +25,7 @@ ProjectNode getProjectTree(BuildRequirements req, string compiler)
     tree.finish(collapsed);
     return tree;
 
-}
+}   
 
 /** 
  * 
@@ -59,6 +59,7 @@ private ProjectNode getProjectTreeImpl(
         {
             depNode = *visitedDep;
             ///When found 2 different packages requiring a different dependency subConfiguration
+            /// and the new is a default one.
             if(visitedDep.requirements.configuration != dep.subConfiguration && !dep.subConfiguration.isDefault)
             {
                 BuildRequirements depConfig = parseProjectWithParent(dep, req, compiler);
@@ -74,12 +75,23 @@ private ProjectNode getProjectTreeImpl(
         }
         else
         {
+            import std.stdio;
+            
             BuildRequirements buildReq = parseProjectWithParent(dep, req, compiler);
             depNode = getProjectTreeImpl(buildReq, compiler, visited, collapsed);
+            if(req.name == "match3")
+            {
+                // writeln("Parsing project ", req.name, " with subConfig ", req.configuration);
+                // writeln(req.dependencies);
+            }
         }
-
         visited[dep.fullName] = depNode;
         root.addDependency(depNode);
+        if(root.name == "game2d" && depNode.name == "hipengine_api")
+        {
+            import std.stdio;
+            writeln(dep.fullName, " ", root.requirements.configuration);
+        }
     }
     return root;
 }

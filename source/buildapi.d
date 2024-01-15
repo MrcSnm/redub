@@ -187,7 +187,6 @@ struct Dependency
     string name;
     string path;
     string version_ = "*";
-
     BuildRequirements.Configuration subConfiguration;
     string subPackage;
 
@@ -257,7 +256,28 @@ struct BuildRequirements
     {
         BuildRequirements ret = cast()this;
         ret.cfg = ret.cfg.merge(other.cfg);
-        ret.dependencies~= other.dependencies;
+        return ret.mergeDependencies(other);
+    }
+
+    BuildRequirements mergeDependencies(BuildRequirements other) const
+    {
+        import std.algorithm.searching;
+        import std.exception;
+        BuildRequirements ret = cast()this;
+
+        // import std.stdio;
+        // writeln("Merging dependencies: ", ret.name, " with ", other.name, " ", other.dependencies);
+        foreach(dep; other.dependencies)
+        {
+            ptrdiff_t index = countUntil!((d) => d.isSameAs(dep))(ret.dependencies);
+            if(index == -1) ret.dependencies~= dep;
+            else 
+            {
+                if(dep.subConfiguration != ret.dependencies[index].subConfiguration)
+                    enforce(ret.dependencies[index].subConfiguration.isDefault, "Can't merge 2 non default subConfigurations.");
+                ret.dependencies[index].subConfiguration = dep.subConfiguration;
+            }
+        }
         return ret;
     }
 
@@ -354,10 +374,6 @@ class ProjectNode
             p.requirements.cfg = p.requirements.cfg.mergeVersions(requirements.cfg);
             p.requirements.cfg = p.requirements.cfg.mergeDFlags(requirements.cfg);
             p.requirements.cfg = p.requirements.cfg.mergeLinkFilesFromSource(requirements.cfg);
-        }
-        
-        foreach(p; parent)
-        {
             HandleTargetType: final switch(requirements.cfg.targetType) with(TargetType)
             {
                 case autodetect: requirements.cfg.targetType = inferTargetType(requirements.cfg); goto HandleTargetType;
@@ -369,6 +385,8 @@ class ProjectNode
                         p.requirements.cfg = p.requirements.cfg.mergeLibPaths(other);
                     break;
                 case sourceLibrary: 
+                    import std.stdio;
+                    writeln("Merged ", requirements.name, " at ", p.name, " parents: ", parent);
                     p.requirements.cfg = p.requirements.cfg.merge(requirements.cfg);
                     p.requirements.cfg = p.requirements.cfg.mergeSourcePaths(requirements.cfg);
                     p.requirements.cfg = p.requirements.cfg.mergeSourceFiles(requirements.cfg);
@@ -377,7 +395,7 @@ class ProjectNode
                 case executable: break;
             }
         }
-
+        
         if(requirements.cfg.targetType == TargetType.sourceLibrary)
         {
             import std.stdio;
