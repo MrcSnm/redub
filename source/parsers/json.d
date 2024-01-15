@@ -130,9 +130,6 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
             import std.path;
             import std.exception;
             import package_searching.dub;
-            import std.stdio;
-            if(c.requiredBy == "match3")
-                writeln("Match3 dependencies!!: ", req.dependencies);
             
             foreach(string depName, JSONValue value; v.object)
             {

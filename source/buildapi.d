@@ -385,8 +385,6 @@ class ProjectNode
                         p.requirements.cfg = p.requirements.cfg.mergeLibPaths(other);
                     break;
                 case sourceLibrary: 
-                    import std.stdio;
-                    writeln("Merged ", requirements.name, " at ", p.name, " parents: ", parent);
                     p.requirements.cfg = p.requirements.cfg.merge(requirements.cfg);
                     p.requirements.cfg = p.requirements.cfg.mergeSourcePaths(requirements.cfg);
                     p.requirements.cfg = p.requirements.cfg.mergeSourceFiles(requirements.cfg);
