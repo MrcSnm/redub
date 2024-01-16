@@ -93,11 +93,16 @@ int buildMain(string[] args)
     if(!buildSucceeded)
         throw new Error("Build failure");
 
-    // This might get removed.
-    // buldSucceeded = buildProject(expandedDependencyMatrix, bArgs.compiler);
-
-    
-
     writeln("Built project in ", (st.peek.total!"msecs"), " ms.") ;
+
+    if(tree.requirements.cfg.targetType == TargetType.executable)
+    {
+        import command_generators.commons;
+        
+        return wait(spawnShell(
+            buildNormalizedPath(tree.requirements.cfg.outputDirectory, 
+            tree.requirements.cfg.name~getExecutableExtension(os)) ~ ` G:\HipremeEngine\projects\match3`
+        ));
+    }
     return 0;
 }

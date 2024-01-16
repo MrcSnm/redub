@@ -67,8 +67,10 @@ void invalidateCaches(ProjectNode root, const CompilationCache[] cacheStatus)
 {
     int i = 0;
     foreach(ProjectNode n; root.collapse)
+    {
         if(!cacheStatus[i++].isUpToDate(n.requirements))
             n.invalidateCache();
+    }
 }
 
 string hashFunction(const char[] input)

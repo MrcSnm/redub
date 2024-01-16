@@ -21,7 +21,7 @@ string getSharedLibraryExtension(OS os)
     switch(os)
     {
         case OS.win32, OS.win64: return ".dll";
-        case OS.iOS, OS.osx, OS.tvOS, OS.watchOS: return ".dynlib";
+        case OS.iOS, OS.osx, OS.tvOS, OS.watchOS: return ".dylib";
         default: return ".so";
     }
 }

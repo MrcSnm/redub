@@ -13,6 +13,7 @@ string getCompileCommands(immutable BuildConfiguration cfg, OS os, string compil
             flags = command_generators.dmd.parseBuildConfiguration(cfg, os);
             break;
         case "ldc", "ldc2":
+            compiler = "ldc2";
             flags = command_generators.ldc.parseBuildConfiguration(cfg, os);
             break;
         default: throw new Error("Unsupported compiler "~compiler);
@@ -31,7 +32,9 @@ string getLinkCommands(immutable BuildConfiguration cfg, OS os, string compiler)
             else flags = command_generators.dmd.parseLinkConfiguration(cfg, os);
             break;
         case "ldc", "ldc2":
-            flags = command_generators.ldc.parseLinkConfiguration(cfg, os);
+            compiler = "ldc2";
+            version(Windows) flags = command_generators.ldc.parseLinkConfiguration(cfg, os);
+            else flags = command_generators.ldc.parseLinkConfiguration(cfg, os);
             break;
         default: throw new Error("Unsupported compiler "~compiler);
     }
