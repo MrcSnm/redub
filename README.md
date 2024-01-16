@@ -1,7 +1,7 @@
-# Dub v2 - Build System
+# Redub - Dub Based Build System
 
 ## Making it faster
-Have you ever wondered why dub was slow? I tried solving it, but its codebase was fairly unreadable. After building this project, I've implemented features that dub don't use
+Have you ever wondered why [dub](https://github.com/dlang/dub) was slow? I tried solving it, but its codebase was fairly unreadable. After building this project, I've implemented features that dub don't use
 
 - Lazy build project configuration evaluation
 - Parallelization on build sorted by dependency

@@ -8,8 +8,8 @@ import std.json;
 import std.encoding;
 
 
-enum cacheFolder = ".dubv2";
-enum cacheFile = "dubv2_cache.json";
+enum cacheFolder = ".redub";
+enum cacheFile = "redub_cache.json";
 
 struct CompilationCache
 {

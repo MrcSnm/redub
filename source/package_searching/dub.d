@@ -1,6 +1,6 @@
 module package_searching.dub;
 import std.json;
-import dubv2.libs.semver;
+import redub.libs.semver;
 
 bool dubHook_PackageManagerDownloadPackage(string packageName, string packageVersion, string requiredBy= "")
 {

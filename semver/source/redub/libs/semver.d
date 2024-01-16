@@ -1,4 +1,4 @@
-module dubv2.libs.semver;
+module redub.libs.semver;
 
 import std.typecons;
 import std.conv:to;

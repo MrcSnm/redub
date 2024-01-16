@@ -1,5 +1,5 @@
 {
-    "name": "dubv2",
+    "name": "redub",
     "targetPath": "build",
     "buildOptions": [
         "debugInfo",

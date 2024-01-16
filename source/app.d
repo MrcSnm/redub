@@ -23,12 +23,12 @@ string formatError(string err)
         string moduleName = err[moduleNameStart..moduleNameEnd];
 
         return err~"\nMaybe you forgot to add the module '"~moduleName~"' source root to import paths?
-        Dubv2 Failed!";
+        Redub Failed!";
     }
-    return err~"\nDubv2 Failed!";
+    return err~"\nRedub Failed!";
 }
 /**
-* DubV2 work with input -> output on each step. It must be almost stateless.
+* Redub work with input -> output on each step. It must be almost stateless.
 * ** CLI will be optionally implemented later. 
 * ** Cache will be optionally implemented later
 * 
@@ -58,7 +58,7 @@ int buildMain(string[] args)
     GetoptResult res = betterGetopt(args, bArgs);
     if(res.helpWanted)
     {
-        defaultGetoptPrinter("dubv2 build information\n\t", res.options);
+        defaultGetoptPrinter("redub build information\n\t", res.options);
         return 1;
     }
     DubCommonArguments cArgs = bArgs.cArgs;
