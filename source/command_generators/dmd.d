@@ -16,11 +16,7 @@ string[] parseBuildConfiguration(immutable BuildConfiguration b, OS target)
         commands~= importDirectories.map!((i) => "-I"~i).array;
 
         if(targetType == TargetType.executable)
-        {
             commands~= "-c"; //Compile only
-            commands~= libraryPaths.map!((lp) => "-L-L"~lp).array;
-            commands~= libraries.map!((l) => "-L-l"~l).array;
-        }
         commands~= stringImportPaths.map!((sip) => "-J="~sip).array;
         commands~= dFlags;
 
@@ -57,6 +53,25 @@ string[] parseLinkConfiguration(immutable BuildConfiguration b, OS target)
         commands~= libraryPaths.map!((lp) => "-L-L"~lp).array;
         commands~= getLinkFiles(b.sourceFiles);
         commands~= libraries.map!((l) => "-L-l"~l).array;
+        commands~= linkFlags.map!((l) => "-L"~l).array;
+        
+        commands~= buildNormalizedPath(outputDirectory, name~getObjectExtension(target));
+        commands~= "-of"~buildNormalizedPath(outputDirectory, getOutputName(targetType, name, os));
+    }
+    return commands;
+}
+
+string[] parseLinkConfigurationMSVC(immutable BuildConfiguration b, OS target)
+{
+    import std.algorithm.iteration;
+    import std.path;
+    import std.array;
+    string[] commands;
+    with(b)
+    {
+        commands~= libraryPaths.map!((lp) => "-L/LIBPATH:"~lp).array;
+        commands~= getLinkFiles(b.sourceFiles);
+        commands~= libraries.map!((l) => "-L"~l~".lib").array;
         commands~= linkFlags.map!((l) => "-L"~l).array;
         
         commands~= buildNormalizedPath(outputDirectory, name~getObjectExtension(target));

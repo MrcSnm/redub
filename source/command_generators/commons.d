@@ -66,6 +66,11 @@ bool isLinkerValidExtension(string ext)
     return isObjectExtension(ext) || isLibraryExtension(ext);
 }
 
+bool isPosix(OS os)
+{
+    return !(os == OS.win32 || os == OS.win64);
+}
+
 string getExtension(TargetType t, OS target)
 {
     final switch(t)
@@ -80,7 +85,8 @@ string getExtension(TargetType t, OS target)
 string getOutputName(TargetType t, string name, OS os)
 {
     string outputName;
-    if(t == TargetType.library || t == TargetType.staticLibrary) outputName = "lib";
+    if(os.isPosix && t.isStaticLibrary)
+        outputName = "lib";
     outputName~= name~t.getExtension(os);
     return outputName;
 }

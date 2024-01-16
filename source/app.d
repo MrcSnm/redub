@@ -74,9 +74,6 @@ int buildMain(string[] args)
     parsers.environment.setupEnvironmentVariablesForRootPackage(cast(immutable)req);
     req.cfg = req.cfg.merge(parsers.environment.parse());
 
-    foreach(dep; req.dependencies)
-        writeln(dep,"\n");
-
     ProjectNode tree = getProjectTree(req, bArgs.compiler);
     parsers.environment.setupEnvironmentVariablesForPackageTree(tree);
 

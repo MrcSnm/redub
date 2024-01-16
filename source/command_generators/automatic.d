@@ -27,13 +27,13 @@ string getLinkCommands(immutable BuildConfiguration cfg, OS os, string compiler)
     switch(compiler)
     {
         case "dmd":
-            flags = command_generators.dmd.parseLinkConfiguration(cfg, os);
+            version(Windows)flags = command_generators.dmd.parseLinkConfigurationMSVC(cfg, os);
+            else flags = command_generators.dmd.parseLinkConfiguration(cfg, os);
             break;
         case "ldc", "ldc2":
             flags = command_generators.ldc.parseLinkConfiguration(cfg, os);
             break;
         default: throw new Error("Unsupported compiler "~compiler);
     }
-
     return escapeShellCommand(compiler ~ flags);
 }
