@@ -73,9 +73,8 @@ void invalidateCaches(ProjectNode root, const CompilationCache[] cacheStatus)
 
 string hashFunction(const char[] input)
 {
-    import std.conv:to;
-    import std.digest.md:md5Of;
-    return input.hashOf.to!string;
+    import std.digest.md:md5Of, toHexString;
+    return md5Of(input).toHexString.idup;
 }
 
 string hashFrom(const BuildRequirements req)
@@ -101,7 +100,7 @@ string hashFromPathDates(scope const(string[]) entryPaths...)
     BigInt bInt;
     foreach(path; entryPaths)
     {
-        if(!std.file.exists(path)) return null;
+        if(!std.file.exists(path)) continue;
         if(std.file.isDir(path))
         {
             foreach(DirEntry e; dirEntries(path, SpanMode.depth))
@@ -111,13 +110,13 @@ string hashFromPathDates(scope const(string[]) entryPaths...)
             bInt+= std.file.timeLastModified(path).stdTime;
     }
     
-    char[2048] output;
+    char[4096] output;
     size_t length;
     bInt.toString((scope const(char)[] str)
     {
         length = str.length;
         output[0..length] = str[];
-    }, "%x"); //Hexadecimal to save space?
+    }, "%o"); //Hexadecimal to save space?
     return hashFunction(output[0..length]);
 }
 
