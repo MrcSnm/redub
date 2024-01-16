@@ -107,7 +107,7 @@ struct BuildConfiguration
         ret.importDirectories.exclusiveMerge(other.importDirectories);
         ret.versions.exclusiveMerge(other.versions);
         ret.dFlags.exclusiveMerge(other.dFlags);
-        ret.libraries.exclusiveMerge(other.libraries);
+        ret.libraries.exclusiveMergeFront(other.libraries);
         ret.libraryPaths.exclusiveMerge(other.libraryPaths);
         ret.linkFlags.exclusiveMerge(other.linkFlags);
         return ret;
@@ -115,7 +115,7 @@ struct BuildConfiguration
     BuildConfiguration mergeLibraries(BuildConfiguration other) const
     {
         BuildConfiguration ret = clone;
-        ret.libraries.exclusiveMerge(other.libraries);
+        ret.libraries.exclusiveMergeFront(other.libraries);
         return ret;
     }
     BuildConfiguration mergeLibPaths(BuildConfiguration other) const
@@ -171,6 +171,18 @@ ref string[] exclusiveMerge (return scope ref string[] a, string[] b)
     import std.algorithm.searching:countUntil;
     foreach(v; b)
         if(a.countUntil(v) == -1) a~= v;
+    return a;
+}
+
+ref string[] exclusiveMergeFront (return scope ref string[] a, string[] b)
+{
+    import std.algorithm.searching:countUntil;
+    int pushFrontCount;
+    foreach(v; b) if(a.countUntil(v) == -1) pushFrontCount++;
+    string[] toPush = new string[](pushFrontCount);
+    int i = 0;
+    foreach(v; b) if(a.countUntil(v) == -1) toPush[i++] = v;
+    a = toPush~a;
     return a;
 }
 ref string[] exclusiveMergePaths(return scope ref string[] a, string[] b)

@@ -37,16 +37,89 @@ string formatError(string err)
 */
 int main(string[] args)
 {
-    return buildMain(args);
+    if(args.length == 1)
+        return runMain(args);
+
+    string action = args[1];
+    args = args[0] ~ args[2..$];
+    switch(action)
+    {
+        case "build":
+            return buildMain(args);
+        case "run":
+        default:
+            return runMain(args);
+    }
 }
 
 
+auto timed(T)(scope T delegate() action)
+{
+    import std.datetime.stopwatch;
+    StopWatch sw = StopWatch(AutoStart.yes);
+    static struct Value
+    {
+        T value;
+        long msecs;
+    }
+    Value ret = Value(action());
+    ret.msecs = sw.peek.total!"msecs";
+    return ret;
+}
+
+int runMain(string[] args)
+{
+    ProjectDetails d = buildBase(args);
+    if(d == ProjectDetails.init) return 1;
+    if(d.tree.requirements.cfg.targetType != TargetType.executable)
+        return 1;
+
+    import command_generators.commons;
+    
+    return wait(spawnShell(
+        buildNormalizedPath(d.tree.requirements.cfg.outputDirectory, 
+        d.tree.requirements.cfg.name~getExecutableExtension(os)) ~ ` G:\HipremeEngine\projects\match3`
+    ));
+}
+
 int buildMain(string[] args)
+{
+    if(buildBase(args) == ProjectDetails.init)
+        return 1;
+    return 0;
+}
+
+private ProjectDetails buildBase(string[] args)
+{
+    import building.compile;
+    import std.system;
+    ProjectDetails d = resolveDependencies(args);
+    if(d == ProjectDetails.init)
+        return d;
+    ProjectNode tree = d.tree;
+    auto result = timed(()
+    {
+        if(tree.isFullyParallelizable)
+        {
+            writeln("Project ", tree.name," is fully parallelizable! Will build everything at the same time");
+            return buildProjectFullyParallelized(tree, d.compiler, os); 
+        }
+        else
+            return buildProjectParallelSimple(tree, d.compiler, os); 
+    });
+    bool buildSucceeded = result.value;
+    if(!buildSucceeded)
+        throw new Error("Build failure");
+    writeln("Built project in ", result.msecs, " ms.");
+
+    return d;
+}
+
+private ProjectDetails resolveDependencies(string[] args)
 {
     import std.getopt;
     import std.datetime.stopwatch;
     import std.system;
-    import building.compile;
     import building.cache;
     import package_searching.entry;
     static import parsers.environment;
@@ -59,7 +132,7 @@ int buildMain(string[] args)
     if(res.helpWanted)
     {
         defaultGetoptPrinter("redub build information\n\t", res.options);
-        return 1;
+        return ProjectDetails.init;
     }
     DubCommonArguments cArgs = bArgs.cArgs;
     if(cArgs.root)
@@ -81,28 +154,11 @@ int buildMain(string[] args)
     if(bArgs.build.force) tree.invalidateCacheOnTree();
     
     writeln("Dependencies resolved in ", (st.peek.total!"msecs"), " ms.") ;
+    return ProjectDetails(tree, bArgs.compiler);
+}
 
-    bool buildSucceeded;
-    if(tree.isFullyParallelizable)
-    {
-        writeln("Project ", req.name," is fully parallelizable! Will build everything at the same time");
-        buildSucceeded = buildProjectFullyParallelized(tree, bArgs.compiler, os); 
-    }
-    else
-        buildSucceeded = buildProjectParallelSimple(tree, bArgs.compiler, os); 
-    if(!buildSucceeded)
-        throw new Error("Build failure");
-
-    writeln("Built project in ", (st.peek.total!"msecs"), " ms.") ;
-
-    if(tree.requirements.cfg.targetType == TargetType.executable)
-    {
-        import command_generators.commons;
-        
-        return wait(spawnShell(
-            buildNormalizedPath(tree.requirements.cfg.outputDirectory, 
-            tree.requirements.cfg.name~getExecutableExtension(os)) ~ ` G:\HipremeEngine\projects\match3`
-        ));
-    }
-    return 0;
+private struct ProjectDetails
+{
+    ProjectNode tree;
+    string compiler;
 }
