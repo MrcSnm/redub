@@ -2,21 +2,11 @@
 	"authors": [
 		"Marcelo Silva Nascimento Mancini"
 	],
-
-	"configurations": [
-		{
-			"name": "special",
-			"versions": [
-				"DoesDubSendsThisVersionToDeps"
-			]
-		},
-		{
-			"name": "other"
-		}
-	],
-    "targetType": "library",
 	"copyright": "Copyright © 2024, Marcelo Silva Nascimento Mancini",
+	"dependencies": {
+		"vibe-d": "~>0.9.7"
+	},
 	"description": "A minimal D application.",
 	"license": "proprietary",
-	"name": "x"
+	"name": "vibehello"
 }

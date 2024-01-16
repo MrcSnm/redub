@@ -166,7 +166,7 @@ struct BuildConfiguration
         return ret;
     }
 }
-ref string[] exclusiveMerge(return scope ref string[] a, string[] b)
+ref string[] exclusiveMerge (return scope ref string[] a, string[] b)
 {
     import std.algorithm.searching:countUntil;
     foreach(v; b)
@@ -182,6 +182,19 @@ ref string[] exclusiveMergePaths(return scope ref string[] a, string[] b)
     return a;
 }
 
+enum Visibility
+{
+    public_,  
+    private_,
+}
+Visibility VisibilityFrom(string vis)
+{
+    final switch(vis)
+    {
+        case "private": return Visibility.private_;
+        case "public":  return Visibility.public_;
+    }
+}
 struct Dependency
 {
     string name;
@@ -189,6 +202,7 @@ struct Dependency
     string version_ = "*";
     BuildRequirements.Configuration subConfiguration;
     string subPackage;
+    Visibility visibility = Visibility.public_;
 
     bool isSameAs(string name, string subPackage) const
     {
@@ -229,8 +243,19 @@ struct BuildRequirements
             return name == other.name;    
         }
     }
+
     Configuration configuration;
     string targetConfiguration() const { return configuration.name; }
+    string[string] getSubConfigurations() const
+    {
+        string[string] ret;
+        foreach(dep; dependencies)
+        {
+            if(dep.subConfiguration.name)
+                ret[dep.name] = dep.subConfiguration.name;
+        }
+        return ret;
+    }
 
     immutable(BuildRequirements) idup() inout
     {
@@ -339,6 +364,7 @@ class ProjectNode
     /** 
      * This function will iterate recursively, from bottom to top, and it:
      * - Fixes the name if it is using subPackage name type.
+     * - Adds Have_ version for the current project name.
      * - Populating parent imports using children:
      * >-  Imports paths.
      * >-  Versions.
@@ -358,6 +384,7 @@ class ProjectNode
             dep.finish(collapsedRef);
         import std.string:replace;
         requirements.cfg.name = requirements.cfg.name.replace(":", "_");
+        requirements.cfg.versions.exclusiveMerge(["Have_"~requirements.cfg.name.replace("-", "_")]);
         if(requirements.cfg.targetType == TargetType.autodetect)
             requirements.cfg.targetType = inferTargetType(requirements.cfg);
         
@@ -385,7 +412,8 @@ class ProjectNode
                         p.requirements.cfg = p.requirements.cfg.mergeLibPaths(other);
                     break;
                 case sourceLibrary: 
-                    p.requirements.cfg = p.requirements.cfg.merge(requirements.cfg);
+                    p.requirements.cfg = p.requirements.cfg.mergeLibraries(requirements.cfg);
+                    p.requirements.cfg = p.requirements.cfg.mergeLibPaths(requirements.cfg);
                     p.requirements.cfg = p.requirements.cfg.mergeSourcePaths(requirements.cfg);
                     p.requirements.cfg = p.requirements.cfg.mergeSourceFiles(requirements.cfg);
                     break;
@@ -471,46 +499,7 @@ class ProjectNode
     }
 
 }
-ProjectNode[][] fromTree(ProjectNode root)
-{
-    ProjectNode[][] ret;
-    int[string] visited;
-    fromTreeImpl(root, ret, visited);
-    return ret;
-}
 
-private void fromTreeImpl(ProjectNode root, ref ProjectNode[][] output, ref int[string] visited, int depth = 0)
-{
-    if(depth >= output.length) output.length = depth+1;
-
-    foreach(c; root.dependencies)
-    {
-        fromTreeImpl(c, output, visited, depth+1);
-    }
-    if(root.name in visited)
-    {
-        int oldDepth = visited[root.name];
-        if(depth > oldDepth)
-        {
-            visited[root.name] = depth;
-            output[depth] ~= root;
-            ///Remove frol the oldDepth
-            for(int i = 0; i < output[oldDepth].length; i++)
-            {
-                if(output[oldDepth][i].name == root.name)
-                {
-                    output[oldDepth] = output[oldDepth][0..i] ~ output[oldDepth][i+1..$];
-                    i--;
-                }
-            }
-        }
-    }
-    else
-    {
-        visited[root.name] = depth;
-        output[depth]~= root;
-    }
-}
 
 private TargetType inferTargetType(BuildConfiguration cfg)
 {
@@ -523,14 +512,4 @@ private TargetType inferTargetType(BuildConfiguration cfg)
             return TargetType.executable;
     }
     return TargetType.library;
-}
-
-import tree_generators.dub;
-
-void printMatrixTree(ProjectNode[][] mat)
-{
-    import std.stdio;
-    foreach_reverse(i, node; mat)
-        foreach(n; node)
-            writeln("-".repeat(cast(int)i), " ", n.name);
 }

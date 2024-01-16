@@ -1,0 +1,16 @@
+.dub
+docs.json
+__dummy.html
+docs/
+/dmd
+dmd.so
+dmd.dylib
+dmd.dll
+dmd.a
+dmd.lib
+dmd-test-*
+*.exe
+*.pdb
+*.o
+*.obj
+*.lst

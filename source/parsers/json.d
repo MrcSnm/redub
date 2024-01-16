@@ -3,8 +3,6 @@ import std.system;
 import buildapi;
 import std.json;
 import std.file;
-import etc.c.zlib;
-import core.cpuid;
 import parsers.base;
 
 BuildRequirements parse(string filePath, 
@@ -40,6 +38,7 @@ private JSONValue parseJSONCached(string filePath)
 BuildRequirements parse(JSONValue json, ParseConfig cfg)
 {
     import std.exception;
+    import std.stdio;
     ///Setup base of configuration before finding anything
     if(cfg.firstRun)
     {
@@ -129,16 +128,18 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
         {
             import std.path;
             import std.exception;
+            import std.algorithm.comparison;
             import package_searching.dub;
             
             foreach(string depName, JSONValue value; v.object)
             {
-                string name, version_, path;
+                string name, version_, path, visibility;
                 name = depName;
                 if(value.type == JSONType.object) ///Uses path style
                 {
                     const(JSONValue)* depPath = "path" in value;
                     const(JSONValue)* depVer = "version" in value;
+                    visibility = value.tryStr("visibility");
                     enforce(depPath || depVer, 
                         "Dependency named "~ name ~ 
                         " must contain at least a \"path\" or \"version\" property."
@@ -154,21 +155,15 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
                         }
                     }
 
-                    if(depPath && !path)
-                        path = depPath.str;
-                    if(depVer)
-                    {
-                        if(!depPath && !path) 
-                            path = package_searching.dub.getPackagePath(name, depVer.str, req.cfg.name);
-                        version_ = depVer.str;
-                    }
+                    path = either(path, depPath ? depPath.str : null, depVer ? package_searching.dub.getPackagePath(name, depVer.str, req.cfg.name) : null);
+                    version_ = either(version_, depVer ? depVer.str : null);
                 }
                 else if(value.type == JSONType.string) ///Version style
                 {
                     version_ = value.str;
                     if(!path) path = package_searching.dub.getPackagePath(name, value.str, c.requiredBy);
                 }
-                addDependency(req, c, name, version_, BuildRequirements.Configuration.init, path);
+                addDependency(req, c, name, version_, BuildRequirements.Configuration.init, path, visibility);
             }
         },
         "subConfigurations": (ref BuildRequirements req, JSONValue v, ParseConfig c)
@@ -349,6 +344,13 @@ struct CommandWithFilter
         if(isOS(ret.compiler)) swap(ret.compiler, ret.targetOS);
         return ret;
     }
+}
+
+private string tryStr(JSONValue input, string prop)
+{
+    const(JSONValue)* v = prop in input;
+    if(v) return v.str;
+    return null;
 }
 
 private void swap(T)(ref T a, ref T b)

@@ -1,0 +1,7 @@
+{
+	"copyright": "Copyright © 2024, Marcelo Silva Nascimento Mancini",
+	"dependencies": {
+		"dplug:core": "~>14.0"
+	},
+	"name": "vec-bench"
+}

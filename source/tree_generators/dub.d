@@ -21,7 +21,8 @@ ProjectNode getProjectTree(BuildRequirements req, string compiler)
 {
     ProjectNode[string] visited;
     ProjectNode[] collapsed;
-    ProjectNode tree =  getProjectTreeImpl(req, compiler, visited, collapsed);
+    string[string] subConfigs = req.getSubConfigurations;
+    ProjectNode tree =  getProjectTreeImpl(req, compiler, subConfigs, visited, collapsed);
     tree.finish(collapsed);
     return tree;
 
@@ -44,6 +45,7 @@ ProjectNode getProjectTree(BuildRequirements req, string compiler)
 private ProjectNode getProjectTreeImpl(
     BuildRequirements req, 
     string compiler, 
+    const string[string] subConfigurations,
     ref ProjectNode[string] visited, 
     ref ProjectNode[] collapsed)
 {
@@ -54,6 +56,8 @@ private ProjectNode getProjectTreeImpl(
     {
         ProjectNode* visitedDep = dep.fullName in visited;
         ProjectNode depNode;
+        if(dep.subConfiguration.isDefault && dep.name in subConfigurations)
+            dep.subConfiguration = BuildRequirements.Configuration(subConfigurations[dep.name], false);
         //If visited already, just add the new dflags and versions
         if(visitedDep)
         {
@@ -75,15 +79,8 @@ private ProjectNode getProjectTreeImpl(
         }
         else
         {
-            import std.stdio;
-            
             BuildRequirements buildReq = parseProjectWithParent(dep, req, compiler);
-            depNode = getProjectTreeImpl(buildReq, compiler, visited, collapsed);
-            if(req.name == "match3")
-            {
-                // writeln("Parsing project ", req.name, " with subConfig ", req.configuration);
-                // writeln(req.dependencies);
-            }
+            depNode = getProjectTreeImpl(buildReq, compiler, subConfigurations, visited, collapsed);
         }
         visited[dep.fullName] = depNode;
         root.addDependency(depNode);

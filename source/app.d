@@ -74,17 +74,15 @@ int buildMain(string[] args)
     parsers.environment.setupEnvironmentVariablesForRootPackage(cast(immutable)req);
     req.cfg = req.cfg.merge(parsers.environment.parse());
 
+    foreach(dep; req.dependencies)
+        writeln(dep,"\n");
+
     ProjectNode tree = getProjectTree(req, bArgs.compiler);
     parsers.environment.setupEnvironmentVariablesForPackageTree(tree);
-    import std.string:startsWith;
 
-    writeln(tree.debugFindDep("renderer").requirements.targetConfiguration);
-    
     invalidateCaches(tree, cacheStatusForProject(tree));
     if(bArgs.build.force) tree.invalidateCacheOnTree();
     
-
-    // ProjectNode[][] expandedDependencyMatrix = fromTree(tree);
     writeln("Dependencies resolved in ", (st.peek.total!"msecs"), " ms.") ;
 
     bool buildSucceeded;

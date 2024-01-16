@@ -46,7 +46,6 @@ BuildRequirements parseProject(
 private void partiallyFinishBuildRequirements(ref BuildRequirements req)
 {
     import std.path;
-   
     if(!isAbsolute(req.cfg.outputDirectory))
         req.cfg.outputDirectory = buildNormalizedPath(req.cfg.workingDir, req.cfg.outputDirectory);
 
@@ -65,5 +64,8 @@ private void partiallyFinishBuildRequirements(ref BuildRequirements req)
         
     if(!isAbsolute(req.cfg.sourceEntryPoint)) 
         req.cfg.sourceEntryPoint = buildNormalizedPath(req.cfg.workingDir, req.cfg.sourceEntryPoint);
+
+    import std.algorithm.sorting;
+    sort!((Dependency a, Dependency b) => a.name < b.name)(req.dependencies);
 
 }

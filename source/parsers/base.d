@@ -40,19 +40,15 @@ void addDependency(
     ParseConfig c,
     string name, string version_, 
     BuildRequirements.Configuration subConfiguration, 
-    string path
+    string path,
+    string visibility
 )
 {
     import std.path;
     import std.algorithm.searching:countUntil;
     if(path.length && !isAbsolute(path)) 
         path = buildNormalizedPath(c.workingDir, path);
-    Dependency dep = dependency(name, path, version_, req.name, c.workingDir, subConfiguration);
-    // if(req.name == "match3")
-    // {
-    //     import std.stdio;
-    //     writeln("Adding dep to match3: ", dep, " Existing: ", req.dependencies);
-    // }
+    Dependency dep = dependency(name, path, version_, req.name, c.workingDir, subConfiguration, visibility);
     //If dependency already exists, use the existing one
     ptrdiff_t depIndex = countUntil!((a) => a.isSameAs(dep))(req.dependencies);
     if(depIndex == -1)
@@ -74,7 +70,8 @@ private Dependency dependency(
     string version_,
     string requirementName,
     string workingDir,
-    BuildRequirements.Configuration subConfiguration
+    BuildRequirements.Configuration subConfiguration,
+    string visibilityStr
 )
 {
     string out_mainPackageName;
@@ -85,8 +82,11 @@ private Dependency dependency(
     ///Inside this same package
     if(out_mainPackageName == requirementName && subPackage)
         path = workingDir;
+
+    Visibility visibility = Visibility.public_;
+    if(visibilityStr) visibility = VisibilityFrom(visibilityStr);
     
-    return Dependency(name, path, version_, subConfiguration, subPackage);
+    return Dependency(name, path, version_, subConfiguration, subPackage, visibility);
 }
 
 void addSubConfiguration(
