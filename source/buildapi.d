@@ -107,7 +107,7 @@ struct BuildConfiguration
         ret.importDirectories.exclusiveMerge(other.importDirectories);
         ret.versions.exclusiveMerge(other.versions);
         ret.dFlags.exclusiveMerge(other.dFlags);
-        ret.libraries.exclusiveMergeFront(other.libraries);
+        ret.libraries.exclusiveMerge(other.libraries);
         ret.libraryPaths.exclusiveMerge(other.libraryPaths);
         ret.linkFlags.exclusiveMerge(other.linkFlags);
         return ret;
@@ -115,7 +115,7 @@ struct BuildConfiguration
     BuildConfiguration mergeLibraries(BuildConfiguration other) const
     {
         BuildConfiguration ret = clone;
-        ret.libraries.exclusiveMergeFront(other.libraries);
+        ret.libraries.exclusiveMerge(other.libraries);
         return ret;
     }
     BuildConfiguration mergeLibPaths(BuildConfiguration other) const

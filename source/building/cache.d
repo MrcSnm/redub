@@ -153,6 +153,8 @@ string hashFromPathDates(scope const(string[]) entryPaths...)
 
 string hashFromDates(const BuildConfiguration cfg)
 {
+    import std.system;
+    import command_generators.commons;
     string[] sourceFiles = new string[](cfg.sourceFiles.length);
     string[] libs = new string[](cfg.libraries.length);
 
@@ -163,11 +165,12 @@ string hashFromDates(const BuildConfiguration cfg)
 
     return hashFromPathDates(
         cfg.importDirectories~
-        cfg.sourcePaths~
-        cfg.libraryPaths~
+        cfg.sourcePaths ~
         cfg.stringImportPaths~
         sourceFiles~
-        libs
+        libs ~ 
+        buildNormalizedPath(cfg.outputDirectory, getOutputName(cfg.targetType, cfg.name, os))
+        // cfg.libraryPaths~ ///This is causing problems when using subPackages.
     );
     
 }

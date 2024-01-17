@@ -5,18 +5,6 @@ import std.system;
 import std.concurrency;
 import command_generators.automatic;
 
-void compile(BuildRequirements req, OS os, string compiler, 
-    out int status, out string sink, out string compilationFlagsSink
-)
-{
-    import std.process;
-    string cmds = getCompileCommands(cast(immutable)req.cfg, os, compiler);
-    auto ret = executeShell(cmds);
-    status = ret.status;
-    sink = ret.output;
-    compilationFlagsSink = cmds;
-}
-
 struct CompilationResult
 {
     string compilationCommand;
@@ -105,44 +93,6 @@ CompilationResult link(immutable BuildConfiguration cfg, OS os, string compiler)
         executeCommands(cfg.postGenerateCommands, "postGenerateCommand", ret, cfg.workingDir);
 
     return ret;
-}
-
-
-bool buildProject(ProjectNode[][] steps, string compiler)
-{
-    import std.algorithm.searching:maxCount;
-    import std.parallelism;
-    size_t maxSize;
-    string[] outputSink;
-    string[] compilationFlagsSink;
-    int[] statusSink;
-    foreach(depth; steps) if(depth.length > maxSize) maxSize = depth.length;
-    outputSink = new string[](maxSize);
-    compilationFlagsSink = new string[](maxSize);
-    statusSink = new int[](maxSize);
-
-    foreach_reverse(dep; steps)
-    {
-        foreach(i, ProjectNode proj; parallel(dep))
-        {
-            compile(proj.requirements, os, compiler, statusSink[i], outputSink[i], compilationFlagsSink[i]);
-        }
-        
-        foreach(i; 0..dep.length)
-        {
-            import std.stdio;
-            if(statusSink[i])
-            {
-                writeln("Compilation of project '", dep[i].name,"' using flags\n\t", compilationFlagsSink[i], "\nFailed with message\n\t",
-                outputSink[i]);
-                return false;
-            }
-            else
-                writeln("Compilation of project ", dep[i].name, " finished!");
-        }
-
-    }
-    return true;
 }
 
 
