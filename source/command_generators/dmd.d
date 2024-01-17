@@ -8,7 +8,7 @@ string[] parseBuildConfiguration(immutable BuildConfiguration b, OS target)
     import std.array:array;
     import std.algorithm.iteration:map;
     
-    string[] commands = ["-color=on", "-o-"];
+    string[] commands = ["-color=on"];
     with(b)
     {
         if(isDebug) commands~= "-debug";
@@ -25,6 +25,7 @@ string[] parseBuildConfiguration(immutable BuildConfiguration b, OS target)
 
         if(outputDirectory)
             commands~= "-od"~outputDirectory;
+
         if(targetType != TargetType.executable)
             commands~= "-of"~buildNormalizedPath(outputDirectory, getOutputName(targetType, name, os));
         else
@@ -51,8 +52,8 @@ string[] parseLinkConfiguration(immutable BuildConfiguration b, OS target)
     with(b)
     {
         commands~= libraryPaths.map!((lp) => "-L-L"~lp).array;
+        commands~= libraries.map!((l) => "-L-l"~l).reverseArray;
         commands~= getLinkFiles(b.sourceFiles);
-        commands~= libraries.map!((l) => "-L-l"~l).array;
         commands~= linkFlags.map!((l) => "-L"~l).array;
         
         commands~= buildNormalizedPath(outputDirectory, name~getObjectExtension(target));

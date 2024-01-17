@@ -20,6 +20,8 @@ string[] parseBuildConfiguration(immutable BuildConfiguration b, OS os)
 
         if(targetType == TargetType.executable)
             commands~= "-c"; //Compile only
+        // else
+        //     commands~= "--o-";
         commands~= stringImportPaths.map!((sip) => "-J="~sip).array;
         commands~= dFlags;
 
@@ -73,8 +75,8 @@ string[] parseLinkConfigurationMSVC(immutable BuildConfiguration b, OS target)
     with(b)
     {
         commands~= libraryPaths.map!((lp) => "-L/LIBPATH:"~lp).array;
+        commands~= libraries.map!((l) => "-L"~l~".lib").reverseArray;
         commands~= getLinkFiles(b.sourceFiles);
-        commands~= libraries.map!((l) => "-L"~l~".lib").array;
         commands~= linkFlags.map!((l) => "-L"~l).array;
         
         commands~= buildNormalizedPath(outputDirectory, name~getObjectExtension(target));

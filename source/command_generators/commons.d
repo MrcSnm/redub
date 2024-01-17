@@ -111,3 +111,17 @@ string[] getLinkFiles(const string[] filesToLink)
     import std.algorithm.iteration;
     return filesToLink.filter!((name) => name.extension.isLinkerValidExtension).array.dup;
 }
+
+T[] reverseArray(Q, T = typeof(Q.front))(Q range)
+{
+    T[] ret;
+    static if(__traits(hasMember, Q, "length"))
+    {
+        ret = new T[](range.length);
+        int i = 0;
+        foreach_reverse(v; range)
+            ret[i++] = v;
+    }
+    else foreach_reverse(v; range) ret~= v;
+    return ret;
+}

@@ -89,11 +89,7 @@ void invalidateCaches(ProjectNode root, string compiler)
     foreach(ProjectNode n; root.collapse)
     {
         if(!cacheStatus[i++].isUpToDate(n.requirements, compiler))
-        {
-            import std.stdio;
-            writeln(n.name, " failed cache check. ");
             n.invalidateCache();
-        }
     }
 }
 
@@ -131,8 +127,8 @@ string hashFromPathDates(scope const(string[]) entryPaths...)
         {
             foreach(DirEntry e; dirEntries(path, SpanMode.depth))
             {
-                import std.string;
-                if(e.name.endsWith(".o")) throw new Error("Found .o at "~e.name);
+                // import std.string;
+                // if(e.name.endsWith(".o")) throw new Error("Found .o at "~e.name);
                 bInt+= e.timeLastModified.stdTime;
             }
         }
