@@ -317,7 +317,12 @@ struct CommandWithFilter
 
     bool matchesOS(OS os){return this.targetOS is null || parsers.json.matchesOS(targetOS, os);}
     bool matchesCompiler(string compiler)
-    {return this.compiler is null || compiler == this.compiler;}
+    {
+        import std.string:startsWith;
+        if(this.compiler is null) return true;
+        if(this.compiler.startsWith("ldc")) return compiler.startsWith("ldc");
+        return this.compiler == compiler;
+    }
 
     /** 
      * Splits command-compiler-os into a struct.
