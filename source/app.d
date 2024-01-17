@@ -43,14 +43,17 @@ int main(string[] args)
         return runMain(args);
 
     string action = args[1];
-    args = args[0] ~ args[2..$];
     switch(action)
     {
         case "build":
+            args = args[0] ~ args[2..$];
             return buildMain(args);
         case "clean":
+            args = args[0] ~ args[2..$];
             return cleanMain(args);
         case "run":
+            args = args[0] ~ args[2..$];
+            goto default;
         default:
             return runMain(args);
     }
@@ -78,11 +81,16 @@ int runMain(string[] args)
     if(d.tree.requirements.cfg.targetType != TargetType.executable)
         return 1;
 
+    ptrdiff_t execArgsInit = countUntil(args, "--");
+    string execArgs;
+    if(execArgsInit != -1) execArgs = " " ~ escapeShellCommand(args[execArgsInit+1..$]);
+
+
     import command_generators.commons;
     
     return wait(spawnShell(
         buildNormalizedPath(d.tree.requirements.cfg.outputDirectory, 
-        d.tree.requirements.cfg.name~getExecutableExtension(os)) ~ ` G:\HipremeEngine\projects\match3`
+        d.tree.requirements.cfg.name~getExecutableExtension(os)) ~  execArgs
     ));
 }
 

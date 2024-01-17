@@ -290,6 +290,14 @@ private bool isOS(string osRep)
         default: return false;
     }
 }
+private bool isArch(string archRep)
+{
+    switch(archRep)
+    {
+        case "x86", "x84_64", "amd64", "x86_mscoff": return true;
+        default: return false;
+    }
+}
 private bool matchesOS(string osRep, OS os)
 {
     switch(osRep) with(OS)

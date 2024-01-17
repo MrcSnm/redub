@@ -170,7 +170,8 @@ string hashFromDates(const BuildConfiguration cfg)
         sourceFiles~
         libs ~ 
         buildNormalizedPath(cfg.outputDirectory, getOutputName(cfg.targetType, cfg.name, os))
-        // cfg.libraryPaths~ ///This is causing problems when using subPackages.
+        // cfg.libraryPaths~ ///This is causing problems when using subPackages without output path, they may clash after
+        // the compilation is finished. Solving this would require hash calculation after linking
     );
     
 }
