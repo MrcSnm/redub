@@ -89,7 +89,11 @@ void invalidateCaches(ProjectNode root, string compiler)
     foreach(ProjectNode n; root.collapse)
     {
         if(!cacheStatus[i++].isUpToDate(n.requirements, compiler))
+        {
+            import std.stdio;
+            writeln(n.name, " failed cache check. ");
             n.invalidateCache();
+        }
     }
 }
 
@@ -126,20 +130,25 @@ string hashFromPathDates(scope const(string[]) entryPaths...)
         if(std.file.isDir(path))
         {
             foreach(DirEntry e; dirEntries(path, SpanMode.depth))
+            {
+                import std.string;
+                if(e.name.endsWith(".o")) throw new Error("Found .o at "~e.name);
                 bInt+= e.timeLastModified.stdTime;
+            }
         }
         else
             bInt+= std.file.timeLastModified(path).stdTime;
     }
     
-    char[4096] output;
+    char[2048] output;
     size_t length;
     bInt.toString((scope const(char)[] str)
     {
         length = str.length;
         output[0..length] = str[];
-    }, "%o"); //Hexadecimal to save space?
-    return hashFunction(output[0..length]);
+    }, "%x"); //Hexadecimal to save space?
+    // return hashFunction(output[0..length]); No need to use hash, use just the number.
+    return (output[0..length]).dup;
 }
 
 string hashFromDates(const BuildConfiguration cfg)

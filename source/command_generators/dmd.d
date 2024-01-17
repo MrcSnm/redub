@@ -8,7 +8,7 @@ string[] parseBuildConfiguration(immutable BuildConfiguration b, OS target)
     import std.array:array;
     import std.algorithm.iteration:map;
     
-    string[] commands = ["-color=on"];
+    string[] commands = ["-color=on", "-o-"];
     with(b)
     {
         if(isDebug) commands~= "-debug";

@@ -10,6 +10,7 @@ import buildapi;
 import parsers.automatic;
 import tree_generators.dub;
 import cli.dub;
+import command_generators.commons;
 
 enum RedubVersion = "Redub - A reimagined DUB: v1.0.0";
 
@@ -47,6 +48,8 @@ int main(string[] args)
     {
         case "build":
             return buildMain(args);
+        case "clean":
+            return cleanMain(args);
         case "run":
         default:
             return runMain(args);
@@ -81,6 +84,36 @@ int runMain(string[] args)
         buildNormalizedPath(d.tree.requirements.cfg.outputDirectory, 
         d.tree.requirements.cfg.name~getExecutableExtension(os)) ~ ` G:\HipremeEngine\projects\match3`
     ));
+}
+
+int cleanMain(string[] args)
+{
+    ProjectDetails d = resolveDependencies(args);
+    if(d == ProjectDetails.init)
+        return 1;
+    
+    auto res = timed(()
+    {
+        writeln("Cleaning project ", d.tree.name);
+        import std.file;
+        foreach(ProjectNode node; d.tree.collapse)
+        {
+            string output = buildNormalizedPath(
+                node.requirements.cfg.outputDirectory, 
+                getOutputName(node.requirements.cfg.targetType, node.name, os)
+            );
+            if(std.file.exists(output))
+            {
+                writeln("Removing ", output);
+                remove(output);
+            }
+        }
+        return true;
+    });
+
+    writeln("Finished cleaning project in ", res.msecs, "ms");
+
+    return res.value ? 0 : 1;
 }
 
 int buildMain(string[] args)
