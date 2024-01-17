@@ -6,8 +6,12 @@ bool dubHook_PackageManagerDownloadPackage(string packageName, string packageVer
 {
     import std.stdio;
     import std.process;
+    SemVer sv = SemVer(packageVersion);
+    writeln("Fetching ", packageName,"@",sv.toString, ", required by ", requiredBy);
+    string dubFetchVersion = sv.toString;
+    if(!sv.ver.major.isNull) dubFetchVersion = sv.ver.toString;
     string cmd = "dub fetch "~packageName;
-    if(packageVersion) cmd~= "@"~packageVersion;
+    if(packageVersion) cmd~= "@"~dubFetchVersion;
     // writeln("dubHook_PackageManagerDownloadPackage with arguments (", packageName, ", ", packageVersion,") " ~
     // "required by '", requiredBy, "' is not implemented yet.");
     return wait(spawnShell(cmd)) == 0;
@@ -28,11 +32,15 @@ string getPackagePath(string packageName, string packageVersion, string required
 {
     import std.file;
     import std.path;
+    import std.stdio;
     string lookupPath = getDefaultLookupPathForPackages();
     string locPackages = buildNormalizedPath(lookupPath, "local-packages.json");
     string mainPackageName;
     string subPackage = getSubPackageInfo(packageName, mainPackageName);
     if(mainPackageName) packageName = mainPackageName;
+
+    //if(verbose)
+    //writeln("Getting package ", packageName, ":", subPackage, "@",packageVersion);
 
     string packagePath;
     if(std.file.exists(locPackages))
@@ -44,13 +52,12 @@ string getPackagePath(string packageName, string packageVersion, string required
     string downloadedPackagePath = buildNormalizedPath(lookupPath, packageName);
     if(!std.file.exists(downloadedPackagePath))
     {
-        if(!dubHook_PackageManagerDownloadPackage(packageName, packagePath, requiredBy))
+        if(!dubHook_PackageManagerDownloadPackage(packageName, packageVersion, requiredBy))
             return null;
     }
 
     import std.algorithm.sorting;
     import std.algorithm.iteration;
-    import std.stdio;
     import std.array;
 
     SemVer[] semVers = dirEntries(downloadedPackagePath, SpanMode.shallow)
@@ -58,13 +65,11 @@ string getPackagePath(string packageName, string packageVersion, string required
         .filter!((string name) => name.length && name[0] != '.') //Remove invisible files
         .map!((string name ) => SemVer(name)).array;
     SemVer requirement = SemVer(packageVersion);
+    if(packageVersion == ">=0.0.0") requirement = SemVer.matchAll(packageVersion);
 
     if(requirement.isInvalid)
     {
-        import std.ascii:isAlphaNum;
-        import std.algorithm.searching:canFind;
-        if(requirement.toString.length > 1 && requirement.toString[0] == '~' && 
-            !requirement.toString[1..$].canFind!((ch) => !ch.isAlphaNum)) //Can't find a non alpha numeric version
+        if(isGitStyle(requirement.toString))
         {
             writeln("Warning: using git package version requirement ", requirement, " for ", packageName ~ (subPackage ? (":"~subPackage) : ""));
             foreach(DirEntry e; dirEntries(downloadedPackagePath, SpanMode.shallow))
@@ -78,14 +83,11 @@ string getPackagePath(string packageName, string packageVersion, string required
     }
     foreach_reverse(SemVer v; sort(semVers))
     {
-        if(v.isInvalid)
-        {
-            writeln("Invalid semver '", v, "' found in folder '", downloadedPackagePath, "'");
-            return null;
-        }
         if(v.satisfies(requirement))
             return buildNormalizedPath(downloadedPackagePath, v.toString, packageName);
     }
+    if(dubHook_PackageManagerDownloadPackage(packageName, packageVersion, requiredBy))
+        return getPackagePath(packageName, packageVersion, requiredBy);
     throw new Error(
         "Could not find any package named "~ 
         packageName ~ " with version " ~ requirement.toString ~ 
@@ -128,6 +130,21 @@ private string getDefaultLookupPathForPackages()
 {
     import std.path;
     return buildNormalizedPath(getDubWorkspacePath, "packages");
+}
+
+/** 
+ * Git style (~master)
+ * Params:
+ *   str = ~branchName
+ * Returns: 
+ */
+private bool isGitStyle(string str)
+{
+    import std.ascii:isAlphaNum;
+    import std.algorithm.searching:canFind;
+    // Must start with ~ and Can't find a non alpha numeric version 
+    return str.length > 1 && str[0] == '~' && 
+            !str[1..$].canFind!((ch) => !ch.isAlphaNum);
 }
 
 

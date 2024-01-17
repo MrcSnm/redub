@@ -9,7 +9,6 @@ struct SemVer
 {
     private struct RawVersion
     {
-        @nogc nothrow:
         nint major;
         nint minor;
         nint patch;
@@ -22,19 +21,19 @@ struct SemVer
         this(nint M, nint m, nint p){major = M; minor = m; patch = p;}
        
 
-        ComparisonResult[3] compare(const RawVersion other) const
+        ComparisonResult[3] compare(const RawVersion other) const @nogc nothrow
         {
             return [cmp(major, other.major), cmp(minor, other.minor), cmp(patch, other.patch)];
         }
 
-        ComparisonResult compareAtOnce(const RawVersion other) const
+        ComparisonResult compareAtOnce(const RawVersion other) const @nogc nothrow
         {
             if(major != other.major) return cmp(major, other.major);
             if(minor != other.minor) return cmp(minor, other.minor);
             return cmp(major, other.major);
         }
 
-        int opCmp(const RawVersion other) const
+        int opCmp(const RawVersion other) const @nogc nothrow
         {
             switch(compareAtOnce(other))
             {
@@ -43,6 +42,37 @@ struct SemVer
                 case ComparisonResult.equal: return 0;
                 default: assert(false, "Invalid value received");
             }
+        }
+
+        string toString() const
+        {
+            import std.conv;
+            import std.array:join;
+            if(major.isNull) return null;
+            if(minor.isNull) return major.get.to!string;
+            
+            auto majChars = major.get.toChars;
+            auto minChars = minor.get.toChars;
+            char[] ret;
+            size_t length = majChars.length+minChars.length+1;
+            typeof(toChars(patch.get)) patChars;
+            
+            if(!patch.isNull)
+            {
+                patChars = patch.get.toChars;
+            	length+= 1+patChars.length;
+            }
+            ret = new char[](length);
+            int i = 0;
+            foreach(v; majChars) ret[i++] = v;
+            ret[i++] = '.';
+            foreach(v; minChars) ret[i++] = v;
+            if(!patch.isNull)
+            {
+                ret[i++] = '.';
+                foreach(v; patChars) ret[i++] = v;
+            }
+            return cast(string)ret;
         }
 
     }
@@ -134,6 +164,19 @@ struct SemVer
 
         ver = RawVersion(major, minor, patch);
     }
+
+    /** 
+     * 
+     * Params:
+     *   ver = Just a string representation
+     * Returns: A SemVer that can match anything.
+     */
+    static SemVer matchAll(string ver)
+    {
+        SemVer ret = SemVer(ver);
+        ret.comparison = ComparisonTypes.any;
+        return ret;
+    }
     
     bool isInvalid(){return invalid;}
     private void setInvalid(string errMessage)
@@ -152,6 +195,7 @@ struct SemVer
 
     bool satisfies(const SemVer requirement) const 
     {
+        if(comparison == ComparisonTypes.any) return true;
         if(invalid) return false;
         if(isUsingRange)
         {
