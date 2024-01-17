@@ -56,8 +56,8 @@ string[] parseLinkConfiguration(immutable BuildConfiguration b, OS target)
     with(b)
     {
         commands~= libraryPaths.map!((lp) => "-L-L"~lp).array;
+        commands~= libraries.map!((l) => "-L-l"~l).reverseArray;
         commands~= getLinkFiles(b.sourceFiles);
-        commands~= libraries.map!((l) => "-L-l"~l).array;
         commands~= linkFlags.map!((l) => "-L"~l).array;
         
         commands~= buildNormalizedPath(outputDirectory, name~getObjectExtension(target));
