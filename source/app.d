@@ -11,6 +11,7 @@ import parsers.automatic;
 import tree_generators.dub;
 import cli.dub;
 
+enum RedubVersion = "Redub - A reimagined DUB: v1.0.0";
 
 
 string formatError(string err)
@@ -150,8 +151,10 @@ private ProjectDetails resolveDependencies(string[] args)
     ProjectNode tree = getProjectTree(req, bArgs.compiler);
     parsers.environment.setupEnvironmentVariablesForPackageTree(tree);
 
-    invalidateCaches(tree, cacheStatusForProject(tree));
-    if(bArgs.build.force) tree.invalidateCacheOnTree();
+    if(bArgs.build.force)
+        tree.invalidateCacheOnTree();
+    else 
+        invalidateCaches(tree, bArgs.compiler);
     
     writeln("Dependencies resolved in ", (st.peek.total!"msecs"), " ms.") ;
     return ProjectDetails(tree, bArgs.compiler);

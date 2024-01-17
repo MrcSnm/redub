@@ -151,7 +151,7 @@ bool buildProjectParallelSimple(ProjectNode root, string compiler, OS os)
     import std.concurrency;
     import std.stdio;
     ProjectNode[] dependencyFreePackages = root.findLeavesNodes();
-    string mainPackHash = hashFrom(root.requirements);
+    string mainPackHash = hashFrom(root.requirements, compiler);
     bool[ProjectNode] spawned;
     while(true)
     {
@@ -163,7 +163,7 @@ bool buildProjectParallelSimple(ProjectNode root, string compiler, OS os)
                 spawned[dep] = true;
                 spawn(&compile2, 
                     dep.requirements.cfg.idup, cast(shared)dep, os, 
-                    compiler.idup, CompilationCache.get(mainPackHash, dep.requirements)
+                    compiler.idup, CompilationCache.get(mainPackHash, dep.requirements, compiler)
                 );
             }
         }
@@ -192,8 +192,8 @@ bool buildProjectFullyParallelized(ProjectNode root, string compiler, OS os)
 {
     import std.concurrency;
     import std.stdio;
-    string mainPackHash = hashFrom(root.requirements);
-    CompilationCache[] cache = cacheStatusForProject(root);
+    string mainPackHash = hashFrom(root.requirements, compiler);
+    CompilationCache[] cache = cacheStatusForProject(root, compiler);
     size_t i = 0;
     foreach(pack; root.collapse)
     {
@@ -252,7 +252,7 @@ private bool doLink(immutable BuildRequirements req, OS os, string compiler, str
     {
         if(isUpToDate)
             writeln("Up-to-Date: ", req.name, ", skipping linking");
-        updateCache(mainPackHash, CompilationCache.get(mainPackHash, req), true);
+        updateCache(mainPackHash, CompilationCache.get(mainPackHash, req, compiler), true);
         return true;
     }
     CompilationResult linkRes = link(req.cfg, os, compiler);
@@ -267,7 +267,7 @@ private bool doLink(immutable BuildRequirements req, OS os, string compiler, str
     else
     {
         writeln("Linked: ", req.name, " finished!");
-        updateCache(mainPackHash, CompilationCache.get(mainPackHash, req), true);
+        updateCache(mainPackHash, CompilationCache.get(mainPackHash, req, compiler), true);
 
     }
 
