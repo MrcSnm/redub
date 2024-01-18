@@ -9,9 +9,11 @@ bool dubHook_PackageManagerDownloadPackage(string packageName, string packageVer
     SemVer sv = SemVer(packageVersion);
     writeln("Fetching ", packageName,"@",sv.toString, ", required by ", requiredBy);
     string dubFetchVersion = sv.toString;
-    if(!sv.ver.major.isNull) dubFetchVersion = sv.ver.toString;
+    if(SemVer(0,0,0).satisfies(sv)) packageVersion = null;
+    else if(!sv.ver.major.isNull) dubFetchVersion = sv.ver.toString;
     string cmd = "dub fetch "~packageName;
     if(packageVersion) cmd~= "@"~dubFetchVersion;
+
     // writeln("dubHook_PackageManagerDownloadPackage with arguments (", packageName, ", ", packageVersion,") " ~
     // "required by '", requiredBy, "' is not implemented yet.");
     return wait(spawnShell(cmd)) == 0;
@@ -52,6 +54,7 @@ string getPackagePath(string packageName, string packageVersion, string required
     string downloadedPackagePath = buildNormalizedPath(lookupPath, packageName);
     if(!std.file.exists(downloadedPackagePath))
     {
+        writeln(downloadedPackagePath);
         if(!dubHook_PackageManagerDownloadPackage(packageName, packageVersion, requiredBy))
             return null;
     }
@@ -65,7 +68,6 @@ string getPackagePath(string packageName, string packageVersion, string required
         .filter!((string name) => name.length && name[0] != '.') //Remove invisible files
         .map!((string name ) => SemVer(name)).array;
     SemVer requirement = SemVer(packageVersion);
-    if(packageVersion == ">=0.0.0") requirement = SemVer.matchAll(packageVersion);
 
     if(requirement.isInvalid)
     {

@@ -20,6 +20,9 @@ BuildRequirements parseProject(
     string projectFile = findEntryProjectFile(projectWorkingDir, recipe);
     BuildRequirements req;
 
+    // import std.stdio; verbose
+    // writeln("Parsing ", projectFile, " at ", projectWorkingDir, " with :",  subPackage, " -c ", subConfiguration.name);
+
     switch(extension(projectFile))
     {
         case ".json":  req = parsers.json.parse(projectFile, projectWorkingDir, compiler, null, subConfiguration, subPackage); break;
