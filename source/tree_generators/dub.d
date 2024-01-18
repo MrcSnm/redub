@@ -1,4 +1,5 @@
 module tree_generators.dub;
+import logging;
 import buildapi;
 import package_searching.dub;
 import package_searching.entry;
@@ -84,11 +85,6 @@ private ProjectNode getProjectTreeImpl(
         }
         visited[dep.fullName] = depNode;
         root.addDependency(depNode);
-        if(root.name == "game2d" && depNode.name == "hipengine_api")
-        {
-            import std.stdio;
-            writeln(dep.fullName, " ", root.requirements.configuration);
-        }
     }
     return root;
 }
@@ -126,8 +122,7 @@ private BuildRequirements mergeDifferentSubConfigurations(BuildRequirements exis
 
 void printProjectTree(ProjectNode node, int depth = 0)
 {
-    import std.stdio;
-    writeln("-".repeat(depth*2), node.name);
+    vlog("-".repeat(depth*2), node.name);
     foreach(dep; node.dependencies)
     {
         printProjectTree(dep, depth+1);

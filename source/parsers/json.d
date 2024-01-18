@@ -1,4 +1,5 @@
 module parsers.json;
+import logging;
 import std.system;
 import buildapi;
 import std.json;
@@ -38,7 +39,6 @@ private JSONValue parseJSONCached(string filePath)
 BuildRequirements parse(JSONValue json, ParseConfig cfg)
 {
     import std.exception;
-    import std.stdio;
     ///Setup base of configuration before finding anything
     if(cfg.firstRun)
     {
@@ -149,8 +149,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
                     {
                         if(!("default" in value) || value["default"].boolean == false)
                         {
-                            import std.stdio;
-                            writeln("Warning: redub does not handle optional dependencies.");
+                            warn("redub does not handle optional dependencies.");
                             continue;
                         }
                     }
@@ -238,7 +237,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
     runHandlers(requirementsRun, buildRequirements, cfg, json, false, unusedKeys);
 
 
-    // if(cfg.firstRun) writeln("WARNING: Unused Keys -> ", unusedKeys);
+    if(cfg.firstRun) warn("Unused Keys -> ", unusedKeys);
 
     return buildRequirements;
 }

@@ -1,4 +1,5 @@
 module parsers.automatic;
+import logging;
 public import buildapi;
 static import parsers.json;
 static import parsers.sdl;
@@ -20,8 +21,7 @@ BuildRequirements parseProject(
     string projectFile = findEntryProjectFile(projectWorkingDir, recipe);
     BuildRequirements req;
 
-    // import std.stdio; verbose
-    // writeln("Parsing ", projectFile, " at ", projectWorkingDir, " with :",  subPackage, " -c ", subConfiguration.name);
+    vlog("Parsing ", projectFile, " at ", projectWorkingDir, " with :",  subPackage, " -c ", subConfiguration.name);
 
     switch(extension(projectFile))
     {

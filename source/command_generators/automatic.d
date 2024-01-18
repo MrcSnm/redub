@@ -26,8 +26,8 @@ string getLinkCommands(immutable BuildConfiguration cfg, OS os, string compiler)
 {
     import command_generators.linkers;
     string[] flags;
-    version(Windows) flags = parseLinkConfigurationMSVC(cfg, os);
-    else flags = parseLinkConfiguration(cfg, os);
+    version(Windows) flags = parseLinkConfigurationMSVC(cfg, os, compiler);
+    else flags = parseLinkConfiguration(cfg, os, compiler);
 
     switch(compiler)
     {

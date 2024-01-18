@@ -1,4 +1,5 @@
 import std.path;
+import logging;
 
 enum TargetType
 {
@@ -6,7 +7,7 @@ enum TargetType
     executable,
     library,
     staticLibrary,
-    sharedLibrary,
+    dynamicLibrary,
     sourceLibrary
 }
 bool isStaticLibrary(TargetType t)
@@ -303,8 +304,7 @@ struct BuildRequirements
         import std.exception;
         BuildRequirements ret = cast()this;
 
-        // import std.stdio;
-        // writeln("Merging dependencies: ", ret.name, " with ", other.name, " ", other.dependencies);
+        vlog("Merging dependencies: ", ret.name, " with ", other.name, " ", other.dependencies);
         foreach(dep; other.dependencies)
         {
             ptrdiff_t index = countUntil!((d) => d.isSameAs(dep))(ret.dependencies);
@@ -430,15 +430,14 @@ class ProjectNode
                     p.requirements.cfg = p.requirements.cfg.mergeSourcePaths(requirements.cfg);
                     p.requirements.cfg = p.requirements.cfg.mergeSourceFiles(requirements.cfg);
                     break;
-                case sharedLibrary: throw new Error("Uninplemented support for shared libraries");
+                case dynamicLibrary: throw new Error("Uninplemented support for shared libraries");
                 case executable: break;
             }
         }
         
         if(requirements.cfg.targetType == TargetType.sourceLibrary)
         {
-            import std.stdio;
-            writeln("Project ", name, " is a sourceLibrary. Becoming independent.");
+            vlog("Project ", name, " is a sourceLibrary. Becoming independent.");
             becomeIndependent();
         }
     }

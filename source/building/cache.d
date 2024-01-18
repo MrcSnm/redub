@@ -3,7 +3,6 @@ public import std.bigint;
 import package_searching.dub;
 import buildapi;
 static import std.file;
-import std.stdio;
 import std.path;
 import std.json;
 import std.encoding;

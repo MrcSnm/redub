@@ -1,4 +1,5 @@
 module parsers.base;
+import logging;
 import buildapi;
 import package_searching.dub;
 struct ParseConfig
@@ -11,7 +12,6 @@ struct ParseConfig
     string requiredBy;
     bool firstRun = true;
     bool preGenerateRun = true;
-    bool verbose;
 }
 
 
@@ -104,9 +104,7 @@ void addSubConfiguration(
     string subConfigurationName
 )
 {
-    import std.stdio;
-    if(c.verbose)
-        writeln("Using ", subConfigurationName, " subconfiguration for ", dependencyName, " in project ", c.requiredBy);
+    vlog("Using ", subConfigurationName, " subconfiguration for ", dependencyName, " in project ", c.requiredBy);
     import std.algorithm.searching:countUntil;
     ptrdiff_t depIndex = countUntil!((dep) => dep.name == dependencyName)(req.dependencies);
     if(depIndex == -1)

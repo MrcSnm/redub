@@ -4,7 +4,7 @@ import std.array;
 import std.path;
 import std.file;
 import std.process;
-import std.stdio;
+import logging;
 
 import buildapi;
 import parsers.automatic;
@@ -102,7 +102,7 @@ int cleanMain(string[] args)
     
     auto res = timed(()
     {
-        writeln("Cleaning project ", d.tree.name);
+        info("Cleaning project ", d.tree.name);
         import std.file;
         foreach(ProjectNode node; d.tree.collapse)
         {
@@ -112,14 +112,14 @@ int cleanMain(string[] args)
             );
             if(std.file.exists(output))
             {
-                writeln("Removing ", output);
+                vlog("Removing ", output);
                 remove(output);
             }
         }
         return true;
     });
 
-    writeln("Finished cleaning project in ", res.msecs, "ms");
+    info("Finished cleaning project in ", res.msecs, "ms");
 
     return res.value ? 0 : 1;
 }
@@ -143,7 +143,7 @@ private ProjectDetails buildBase(string[] args)
     {
         if(tree.isFullyParallelizable)
         {
-            writeln("Project ", tree.name," is fully parallelizable! Will build everything at the same time");
+            info("Project ", tree.name," is fully parallelizable! Will build everything at the same time");
             return buildProjectFullyParallelized(tree, d.compiler, os); 
         }
         else
@@ -152,7 +152,7 @@ private ProjectDetails buildBase(string[] args)
     bool buildSucceeded = result.value;
     if(!buildSucceeded)
         throw new Error("Build failure");
-    writeln("Built project in ", result.msecs, " ms.");
+    info("Built project in ", result.msecs, " ms.");
 
     return d;
 }
@@ -177,6 +177,7 @@ private ProjectDetails resolveDependencies(string[] args)
         defaultGetoptPrinter("redub build information\n\t", res.options);
         return ProjectDetails.init;
     }
+    updateVerbosity(bArgs.cArgs);
     if(bArgs.arch) bArgs.compiler = "ldc2";
     DubCommonArguments cArgs = bArgs.cArgs;
     if(cArgs.root)
@@ -199,7 +200,7 @@ private ProjectDetails resolveDependencies(string[] args)
     else 
         invalidateCaches(tree, bArgs.compiler);
     
-    writeln("Dependencies resolved in ", (st.peek.total!"msecs"), " ms.") ;
+    info("Dependencies resolved in ", (st.peek.total!"msecs"), " ms.") ;
     return ProjectDetails(tree, bArgs.compiler);
 }
 
@@ -220,4 +221,15 @@ private string parseSubpackageFromCli(ref string[] args)
     ret = args[subPackIndex][1..$];
     args = args[0..subPackIndex] ~ args[subPackIndex+1..$];
     return ret;
+}
+
+private void updateVerbosity(DubCommonArguments a)
+{
+    import logging;
+    if(a.vquiet) return setLogLevel(LogLevel.none);
+    if(a.verror) return setLogLevel(LogLevel.error);
+    if(a.quiet) return setLogLevel(LogLevel.warn);
+    if(a.verbose) return setLogLevel(LogLevel.verbose);
+    if(a.vverbose) return setLogLevel(LogLevel.verbose);
+    return setLogLevel(LogLevel.info);
 }

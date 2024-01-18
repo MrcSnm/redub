@@ -42,12 +42,12 @@ string[] parseBuildConfiguration(immutable BuildConfiguration b, OS target)
     return commands;
 }
 
-private string getTargetTypeFlag(TargetType o)
+string getTargetTypeFlag(TargetType o)
 {
     final switch(o) with(TargetType)
     {
         case autodetect, executable, sourceLibrary: return null;
         case library, staticLibrary: return "-lib";
-        case sharedLibrary: return "-shared";
+        case dynamicLibrary: return "-shared";
     }
 }

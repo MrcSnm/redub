@@ -1,5 +1,6 @@
 module building.compile;
 import building.cache;
+import logging;
 import buildapi;
 import std.system;
 import std.concurrency;
@@ -101,17 +102,16 @@ CompilationResult link(immutable BuildConfiguration cfg, OS os, string compiler)
 bool buildProjectParallelSimple(ProjectNode root, string compiler, OS os)
 {
     import std.concurrency;
-    import std.stdio;
     ProjectNode[] dependencyFreePackages = root.findLeavesNodes();
     string mainPackHash = hashFrom(root.requirements, compiler);
     bool[ProjectNode] spawned;
     while(true)
     {
-        // writeln("Building ", dependencyFreePackages[0].name, " with args ", getCompileCommands(dependencyFreePackages[0].requirements.cfg.idup, os, compiler));
         foreach(dep; dependencyFreePackages)
         {
             if(!(dep in spawned))
             {
+                vlog("Building ", dep.name, " with args ", getCompileCommands(dep.requirements.cfg.idup, os, compiler));
                 spawned[dep] = true;
                 spawn(&compile2, 
                     dep.requirements.cfg.idup, cast(shared)dep, os, 
@@ -143,13 +143,12 @@ bool buildProjectParallelSimple(ProjectNode root, string compiler, OS os)
 bool buildProjectFullyParallelized(ProjectNode root, string compiler, OS os)
 {
     import std.concurrency;
-    import std.stdio;
     string mainPackHash = hashFrom(root.requirements, compiler);
     CompilationCache[] cache = cacheStatusForProject(root, compiler);
     size_t i = 0;
     foreach(pack; root.collapse)
     {
-        // writeln("Building ", pack.name, " with args ", getCompileCommands(pack.requirements.cfg.idup, os, compiler));
+        vlog("Building ", pack.name, " with args ", getCompileCommands(pack.requirements.cfg.idup, os, compiler));
         spawn(&compile2, 
             pack.requirements.cfg.idup, 
             cast(shared)pack, os, compiler.idup, 
@@ -178,20 +177,18 @@ bool buildProjectFullyParallelized(ProjectNode root, string compiler, OS os)
 
 private void buildSucceeded(ProjectNode node, CompilationResult res)
 {
-    import std.stdio;
     if(node.isUpToDate)
-        writeln("Up-to-Date: ", node.name, " ",node.requirements.version_," [", node.requirements.targetConfiguration,"]. Took ", res.msNeeded, "ms");
+        info("Up-to-Date: ", node.name, " ",node.requirements.version_," [", node.requirements.targetConfiguration,"]. Took ", res.msNeeded, "ms");
     else
     {
         // writeln("Succesfully built with cmd:", res.compilationCommand);
-        writeln("Built: ", node.name, " ",node.requirements.version_," [", node.requirements.targetConfiguration,"]. Took ", res.msNeeded, "ms");
+        info("Built: ", node.name, " ",node.requirements.version_," [", node.requirements.targetConfiguration,"]. Took ", res.msNeeded, "ms");
 
     } 
 }
 private void buildFailed(ProjectNode node, CompilationResult res)
 {
-    import std.stdio;
-    writeln("Build Failure: '", node.name, " ",node.requirements.version_," [", node.requirements.targetConfiguration,"] ",
+    error("Build Failure: '", node.name, " ",node.requirements.version_," [", node.requirements.targetConfiguration,"] ",
         "' using flags\n\t", res.compilationCommand, 
         "\nFailed after ", res.msNeeded,"ms with message\n\t", res.message
     );
@@ -199,18 +196,17 @@ private void buildFailed(ProjectNode node, CompilationResult res)
 
 private bool doLink(immutable BuildRequirements req, OS os, string compiler, string mainPackHash, bool isUpToDate)
 {
-    import std.stdio;
     if(req.cfg.targetType.isStaticLibrary || isUpToDate)
     {
         if(isUpToDate)
-            writeln("Up-to-Date: ", req.name, ", skipping linking");
+            info("Up-to-Date: ", req.name, ", skipping linking");
         updateCache(mainPackHash, CompilationCache.get(mainPackHash, req, compiler), true);
         return true;
     }
     CompilationResult linkRes = link(req.cfg, os, compiler);
     if(linkRes.status)
     {
-        writeln("Linking Error: ", req.name, ". Failed with flags: \n\t",
+        error("Linking Error: ", req.name, ". Failed with flags: \n\t",
             linkRes.compilationCommand,"\n\t\t  :\n\t",
             linkRes.message
         );
@@ -218,7 +214,7 @@ private bool doLink(immutable BuildRequirements req, OS os, string compiler, str
     }
     else
     {
-        writeln("Linked: ", req.name, " finished!");
+        info("Linked: ", req.name, " finished!");
         updateCache(mainPackHash, CompilationCache.get(mainPackHash, req, compiler), true);
 
     }

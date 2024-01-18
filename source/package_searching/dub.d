@@ -1,13 +1,13 @@
 module package_searching.dub;
+import logging;
 import std.json;
 import redub.libs.semver;
 
 bool dubHook_PackageManagerDownloadPackage(string packageName, string packageVersion, string requiredBy= "")
 {
-    import std.stdio;
     import std.process;
     SemVer sv = SemVer(packageVersion);
-    writeln("Fetching ", packageName,"@",sv.toString, ", required by ", requiredBy);
+    info("Fetching ", packageName,"@",sv.toString, ", required by ", requiredBy);
     string dubFetchVersion = sv.toString;
     if(SemVer(0,0,0).satisfies(sv)) packageVersion = null;
     else if(!sv.ver.major.isNull) dubFetchVersion = sv.ver.toString;
@@ -34,15 +34,13 @@ string getPackagePath(string packageName, string packageVersion, string required
 {
     import std.file;
     import std.path;
-    import std.stdio;
     string lookupPath = getDefaultLookupPathForPackages();
     string locPackages = buildNormalizedPath(lookupPath, "local-packages.json");
     string mainPackageName;
     string subPackage = getSubPackageInfo(packageName, mainPackageName);
     if(mainPackageName) packageName = mainPackageName;
 
-    //if(verbose)
-    //writeln("Getting package ", packageName, ":", subPackage, "@",packageVersion);
+    vlog("Getting package ", packageName, ":", subPackage, "@",packageVersion);
 
     string packagePath;
     if(std.file.exists(locPackages))
@@ -54,7 +52,6 @@ string getPackagePath(string packageName, string packageVersion, string required
     string downloadedPackagePath = buildNormalizedPath(lookupPath, packageName);
     if(!std.file.exists(downloadedPackagePath))
     {
-        writeln(downloadedPackagePath);
         if(!dubHook_PackageManagerDownloadPackage(packageName, packageVersion, requiredBy))
             return null;
     }
@@ -73,14 +70,14 @@ string getPackagePath(string packageName, string packageVersion, string required
     {
         if(isGitStyle(requirement.toString))
         {
-            writeln("Warning: using git package version requirement ", requirement, " for ", packageName ~ (subPackage ? (":"~subPackage) : ""));
+            warn("Using git package version requirement ", requirement, " for ", packageName ~ (subPackage ? (":"~subPackage) : ""));
             foreach(DirEntry e; dirEntries(downloadedPackagePath, SpanMode.shallow))
             {
                 if(e.name.baseName == requirement.toString)
                     return buildNormalizedPath(downloadedPackagePath, requirement.toString, packageName);
             }
         }
-        writeln("Invalid package version requirement ", requirement);
+        error("Invalid package version requirement ", requirement);
         return null;
     }
     foreach_reverse(SemVer v; sort(semVers))
