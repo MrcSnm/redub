@@ -8,6 +8,21 @@ import std.process;
 import std.stdio;
 import std.datetime.stopwatch;
 
+
+string getObjectDir(string projWorkingDir)
+{
+    import std.path;
+    import std.file;
+
+    static string objDir;
+    if(objDir is null)
+    {
+        objDir = buildNormalizedPath(tempDir, ".redub");
+        if(!exists(objDir)) mkdirRecurse(objDir);
+    }
+    return objDir;
+}
+
 string getExecutableExtension(OS os)
 {
     if(os == OS.win32 || os == OS.win64)

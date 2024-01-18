@@ -23,8 +23,7 @@ string[] parseBuildConfiguration(immutable BuildConfiguration b, OS target)
         string outFlag = getTargetTypeFlag(targetType);
         if(outFlag) commands~= outFlag;
 
-        if(outputDirectory)
-            commands~= "-od"~outputDirectory;
+        commands~= "-od"~getObjectDir(b.workingDir);
 
         if(targetType != TargetType.executable)
             commands~= "-of"~buildNormalizedPath(outputDirectory, getOutputName(targetType, name, os));
