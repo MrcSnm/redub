@@ -15,17 +15,18 @@ string[] parseBuildConfiguration(immutable BuildConfiguration b, OS target)
         commands~= versions.map!((v) => "-version="~v).array;
         commands~= importDirectories.map!((i) => "-I"~i).array;
 
-        if(targetType == TargetType.executable)
+        if(targetType == TargetType.executable || targetType == TargetType.dynamicLibrary)
             commands~= "-c"; //Compile only
         commands~= stringImportPaths.map!((sip) => "-J="~sip).array;
         commands~= dFlags;
+
 
         string outFlag = getTargetTypeFlag(targetType);
         if(outFlag) commands~= outFlag;
 
         commands~= "-od"~getObjectDir(b.workingDir);
 
-        if(targetType != TargetType.executable)
+        if(targetType.isStaticLibrary)
             commands~= "-of"~buildNormalizedPath(outputDirectory, getOutputName(targetType, name, os));
         else
             commands~= "-of"~buildNormalizedPath(outputDirectory, name~getObjectExtension(os));
