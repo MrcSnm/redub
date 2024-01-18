@@ -25,11 +25,10 @@ BuildRequirements parseProject(
 
     switch(extension(projectFile))
     {
-        case ".json":  req = parsers.json.parse(projectFile, projectWorkingDir, compiler, null, subConfiguration, subPackage); break;
         case ".sdl":   req = parsers.sdl.parse(projectFile, projectWorkingDir, compiler, null, subConfiguration, subPackage); break;
+        case ".json":  req = parsers.json.parse(projectFile, projectWorkingDir, compiler, null, subConfiguration, subPackage); break;
         default: throw new Error("Unsupported project type "~projectFile~" at dir "~projectWorkingDir);
     }
-
     parsers.environment.setupEnvironmentVariablesForPackage(cast(immutable)req);
     req.cfg = parsers.environment.parseEnvironment(req.cfg);
 
@@ -69,6 +68,7 @@ private void partiallyFinishBuildRequirements(ref BuildRequirements req)
         req.cfg.sourceEntryPoint = buildNormalizedPath(req.cfg.workingDir, req.cfg.sourceEntryPoint);
 
     import std.algorithm.sorting;
+    ///Sort dependencies for predictability
     sort!((Dependency a, Dependency b) => a.name < b.name)(req.dependencies);
 
 }

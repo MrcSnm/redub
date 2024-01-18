@@ -3,6 +3,7 @@ import logging;
 
 enum TargetType
 {
+    none = 0, //Bug
     autodetect,
     executable,
     library,
@@ -17,9 +18,18 @@ bool isStaticLibrary(TargetType t)
 
 TargetType targetFrom(string s)
 {
+    import std.exception;
     TargetType ret;
+    bool found = false;
     static foreach(mem; __traits(allMembers, TargetType))
-        if(s == mem) ret = __traits(getMember, TargetType, mem);
+    {
+        if(s == mem)
+        {
+            found = true;
+            ret = __traits(getMember, TargetType, mem);
+        } 
+    }
+    enforce(found, "Could not find targetType with value "~s);
     return ret;
 }
 
@@ -66,6 +76,7 @@ struct BuildConfiguration
             ret.importDirectories = [initialSource];
             ret.sourcePaths = [initialSource];
         }
+        ret.targetType = TargetType.autodetect;
         ret.sourceEntryPoint = "source/app.d";
         ret.outputDirectory = "bin";
         return ret;
@@ -101,7 +112,9 @@ struct BuildConfiguration
 
     BuildConfiguration merge(BuildConfiguration other) const
     {
+        import std.algorithm.comparison:either;
         BuildConfiguration ret = clone;
+        ret.targetType = either(other.targetType, ret.targetType);
         ret.stringImportPaths.exclusiveMergePaths(other.stringImportPaths);
         ret.sourceFiles.exclusiveMerge(other.sourceFiles);
         ret.sourcePaths.exclusiveMergePaths(other.sourcePaths);
@@ -432,6 +445,7 @@ class ProjectNode
                     break;
                 case dynamicLibrary: throw new Error("Uninplemented support for shared libraries");
                 case executable: break;
+                case none: throw new Error("Invalid targetType: none");
             }
         }
         

@@ -236,8 +236,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
     }
     runHandlers(requirementsRun, buildRequirements, cfg, json, false, unusedKeys);
 
-
-    if(cfg.firstRun) warn("Unused Keys -> ", unusedKeys);
+    if(cfg.firstRun && unusedKeys.length) warn("Unused Keys -> ", unusedKeys);
 
     return buildRequirements;
 }
@@ -394,7 +393,8 @@ private bool platformMatches(JSONValue[] platforms, OS os)
 
 BuildRequirements getDefaultBuildRequirement(ParseConfig cfg)
 {
-    BuildRequirements req = BuildRequirements.defaultInit(cfg.workingDir);
+    BuildRequirements req;
+    if(cfg.firstRun) req = BuildRequirements.defaultInit(cfg.workingDir);
     req.version_ = cfg.version_;
     req.configuration = cfg.subConfiguration;
     req.cfg.workingDir = cfg.workingDir;

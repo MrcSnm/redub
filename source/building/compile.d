@@ -111,7 +111,6 @@ bool buildProjectParallelSimple(ProjectNode root, string compiler, OS os)
         {
             if(!(dep in spawned))
             {
-                vlog("Building ", dep.name, " with args ", getCompileCommands(dep.requirements.cfg.idup, os, compiler));
                 spawned[dep] = true;
                 spawn(&compile2, 
                     dep.requirements.cfg.idup, cast(shared)dep, os, 
@@ -123,7 +122,6 @@ bool buildProjectParallelSimple(ProjectNode root, string compiler, OS os)
         ProjectNode finishedPackage = cast()res.node;
         if(res.status)
         {
-            import core.thread;
             buildFailed(finishedPackage, res);
             return false;
         }
@@ -148,7 +146,6 @@ bool buildProjectFullyParallelized(ProjectNode root, string compiler, OS os)
     size_t i = 0;
     foreach(pack; root.collapse)
     {
-        vlog("Building ", pack.name, " with args ", getCompileCommands(pack.requirements.cfg.idup, os, compiler));
         spawn(&compile2, 
             pack.requirements.cfg.idup, 
             cast(shared)pack, os, compiler.idup, 
@@ -183,6 +180,7 @@ private void buildSucceeded(ProjectNode node, CompilationResult res)
     {
         // writeln("Succesfully built with cmd:", res.compilationCommand);
         info("Built: ", node.name, " ",node.requirements.version_," [", node.requirements.targetConfiguration,"]. Took ", res.msNeeded, "ms");
+        vlog("\n\t", res.compilationCommand, " \n");
 
     } 
 }
