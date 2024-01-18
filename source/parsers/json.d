@@ -87,7 +87,6 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
                 import std.conv:to;
                 enforce(v.type == JSONType.array, "'configurations' must be an array.");
                 enforce(v.array.length, "'configurations' must have at least one member.");
-                c.firstRun = false;
                 ///Start looking for a configuration that matches the user preference if exists
                 ///If "platform" didn't match, then it will skip it.
                 int preferredConfiguration = -1;
@@ -118,6 +117,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
                     configurationToUse = v.array[preferredConfiguration];
                     string cfgName = configurationToUse["name"].str;
                     c.subConfiguration = BuildRequirements.Configuration(cfgName, preferredConfiguration == 0);
+                    c.firstRun = false;
                     BuildRequirements subCfgReq = parse(configurationToUse, c);
                     req.configuration = c.subConfiguration;
                     req = req.merge(subCfgReq);

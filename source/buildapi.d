@@ -101,14 +101,14 @@ struct BuildConfiguration
     BuildConfiguration merge(BuildConfiguration other) const
     {
         BuildConfiguration ret = clone;
-        ret.stringImportPaths.exclusiveMerge(other.stringImportPaths);
+        ret.stringImportPaths.exclusiveMergePaths(other.stringImportPaths);
         ret.sourceFiles.exclusiveMerge(other.sourceFiles);
-        ret.sourcePaths.exclusiveMerge(other.sourcePaths);
-        ret.importDirectories.exclusiveMerge(other.importDirectories);
+        ret.sourcePaths.exclusiveMergePaths(other.sourcePaths);
+        ret.importDirectories.exclusiveMergePaths(other.importDirectories);
         ret.versions.exclusiveMerge(other.versions);
         ret.dFlags.exclusiveMerge(other.dFlags);
         ret.libraries.exclusiveMerge(other.libraries);
-        ret.libraryPaths.exclusiveMerge(other.libraryPaths);
+        ret.libraryPaths.exclusiveMergePaths(other.libraryPaths);
         ret.linkFlags.exclusiveMerge(other.linkFlags);
         return ret;
     }
@@ -121,13 +121,13 @@ struct BuildConfiguration
     BuildConfiguration mergeLibPaths(BuildConfiguration other) const
     {
         BuildConfiguration ret = clone;
-        ret.libraryPaths.exclusiveMerge(other.libraryPaths);
+        ret.libraryPaths.exclusiveMergePaths(other.libraryPaths);
         return ret;
     }
     BuildConfiguration mergeImport(BuildConfiguration other) const
     {
         BuildConfiguration ret = clone;
-        ret.importDirectories.exclusiveMerge(other.importDirectories);
+        ret.importDirectories.exclusiveMergePaths(other.importDirectories);
         return ret;
     }
 
@@ -153,7 +153,7 @@ struct BuildConfiguration
     BuildConfiguration mergeSourcePaths(BuildConfiguration other) const
     {
         BuildConfiguration ret = clone;
-        ret.sourcePaths.exclusiveMerge(other.sourcePaths);
+        ret.sourcePaths.exclusiveMergePaths(other.sourcePaths);
         return ret;
     }
 
@@ -188,8 +188,9 @@ ref string[] exclusiveMergeFront (return scope ref string[] a, string[] b)
 ref string[] exclusiveMergePaths(return scope ref string[] a, string[] b)
 {
     import std.algorithm.searching:countUntil;
+    import std.path:asNormalizedPath;
     foreach(v; b)
-        if(buildNormalizedPath(a).countUntil(buildNormalizedPath(v)) == -1) 
+        if(buildNormalizedPath(a).countUntil(asNormalizedPath(v)) == -1) 
             a~= v;
     return a;
 }
