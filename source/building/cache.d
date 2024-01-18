@@ -86,14 +86,14 @@ CompilationCache[] cacheStatusForProject(ProjectNode root, string compiler)
 void invalidateCaches(ProjectNode root, string compiler)
 {
     import std.array;
-    int i = 0;
     const CompilationCache[] cacheStatus = cacheStatusForProject(root, compiler);
+    ptrdiff_t i = cacheStatus.length;
     BigInt[string] cachedDirTime;
 
     foreach_reverse(ProjectNode n; root.collapse.array)
     {
         if(!n.isUpToDate) continue;
-        if(!cacheStatus[i++].isUpToDate(n.requirements, compiler, cachedDirTime))
+        if(!cacheStatus[--i].isUpToDate(n.requirements, compiler, cachedDirTime))
             n.invalidateCache();
     }
 }

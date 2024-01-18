@@ -77,7 +77,7 @@ auto timed(T)(scope T delegate() action)
 int runMain(string[] args)
 {
     ProjectDetails d = buildBase(args);
-    if(d == ProjectDetails.init) return 1;
+    if(!d.tree) return 1;
     if(d.tree.requirements.cfg.targetType != TargetType.executable)
         return 1;
 
@@ -97,7 +97,7 @@ int runMain(string[] args)
 int cleanMain(string[] args)
 {
     ProjectDetails d = resolveDependencies(args);
-    if(d == ProjectDetails.init)
+    if(!d.tree)
         return 1;
     
     auto res = timed(()
@@ -126,7 +126,7 @@ int cleanMain(string[] args)
 
 int buildMain(string[] args)
 {
-    if(buildBase(args) == ProjectDetails.init)
+    if(!buildBase(args).tree)
         return 1;
     return 0;
 }
@@ -136,7 +136,7 @@ private ProjectDetails buildBase(string[] args)
     import building.compile;
     import std.system;
     ProjectDetails d = resolveDependencies(args);
-    if(d == ProjectDetails.init)
+    if(!d.tree)
         return d;
     ProjectNode tree = d.tree;
     auto result = timed(()
@@ -176,6 +176,7 @@ private ProjectDetails resolveDependencies(string[] args)
         defaultGetoptPrinter("redub build information\n\t", res.options);
         return ProjectDetails.init;
     }
+    if(bArgs.arch) bArgs.compiler = "ldc2";
     DubCommonArguments cArgs = bArgs.cArgs;
     if(cArgs.root)
         workingDir = cArgs.getRoot(workingDir);

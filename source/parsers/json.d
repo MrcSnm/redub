@@ -298,6 +298,18 @@ private bool isArch(string archRep)
         default: return false;
     }
 }
+private bool matchesArch(string archRep, ISA isa)
+{
+    switch(archRep) with(ISA)
+    {
+        case "x86":     return isa == x86;
+        case "x86_64":  return isa == x86_64;
+        case "arm":     return isa == arm;
+        case "aarch64": return isa == aarch64;
+        default:
+            throw new Error("No appropriate switch clause found for architecture "~archRep);
+    }
+}
 private bool matchesOS(string osRep, OS os)
 {
     switch(osRep) with(OS)
