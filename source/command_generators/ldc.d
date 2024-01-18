@@ -47,45 +47,6 @@ string[] parseBuildConfiguration(immutable BuildConfiguration b, OS os)
     return commands;
 }
 
-string[] parseLinkConfiguration(immutable BuildConfiguration b, OS target)
-{
-    import std.algorithm.iteration;
-    import std.path;
-    import std.array;
-    string[] commands;
-    with(b)
-    {
-        commands~= libraryPaths.map!((lp) => "-L-L"~lp).array;
-        commands~= libraries.map!((l) => "-L-l"~l).reverseArray;
-        commands~= getLinkFiles(b.sourceFiles);
-        commands~= linkFlags.map!((l) => "-L"~l).array;
-        
-        commands~= buildNormalizedPath(outputDirectory, name~getObjectExtension(target));
-        commands~= "-of"~buildNormalizedPath(outputDirectory, getOutputName(targetType, name, os));
-    }
-    return commands;
-}
-
-string[] parseLinkConfigurationMSVC(immutable BuildConfiguration b, OS target)
-{
-    import std.algorithm.iteration;
-    import std.path;
-    import std.array;
-    string[] commands;
-    with(b)
-    {
-        commands~= libraryPaths.map!((lp) => "-L/LIBPATH:"~lp).array;
-        commands~= libraries.map!((l) => "-L"~l~".lib").reverseArray;
-        commands~= getLinkFiles(b.sourceFiles);
-        commands~= linkFlags.map!((l) => "-L"~l).array;
-        
-        commands~= buildNormalizedPath(outputDirectory, name~getObjectExtension(target));
-        commands~= "-of"~buildNormalizedPath(outputDirectory, getOutputName(targetType, name, os));
-    }
-    return commands;
-}
-
-
 private string getTargetTypeFlag(TargetType o)
 {
     final switch(o) with(TargetType)
