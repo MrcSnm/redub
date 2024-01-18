@@ -167,6 +167,7 @@ private ProjectDetails resolveDependencies(string[] args)
     static import parsers.environment;
     static import command_generators.dmd;
 
+    string subPackage = parseSubpackageFromCli(args);
     string workingDir = std.file.getcwd();
     string recipe;
     DubArguments bArgs;
@@ -186,7 +187,7 @@ private ProjectDetails resolveDependencies(string[] args)
     StopWatch st = StopWatch(AutoStart.yes);
 
 
-    BuildRequirements req = parseProject(workingDir, bArgs.compiler, BuildRequirements.Configuration(bArgs.config, false), null, recipe);
+    BuildRequirements req = parseProject(workingDir, bArgs.compiler, BuildRequirements.Configuration(bArgs.config, false), subPackage, recipe);
     parsers.environment.setupEnvironmentVariablesForRootPackage(cast(immutable)req);
     req.cfg = req.cfg.merge(parsers.environment.parse());
 
@@ -206,4 +207,17 @@ private struct ProjectDetails
 {
     ProjectNode tree;
     string compiler;
+}
+
+private string parseSubpackageFromCli(ref string[] args)
+{
+    import std.string:startsWith;
+    import std.algorithm.searching;
+    ptrdiff_t subPackIndex = countUntil!((a => a.startsWith(':')))(args);
+    if(subPackIndex == -1) return null;
+
+    string ret;
+    ret = args[subPackIndex][1..$];
+    args = args[0..subPackIndex] ~ args[subPackIndex+1..$];
+    return ret;
 }
