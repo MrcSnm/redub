@@ -70,7 +70,9 @@ void compile2(immutable BuildConfiguration cfg, shared ProjectNode pack, OS os, 
             if(cfg.targetType != TargetType.executable && executeCommands(cfg.postGenerateCommands, "postGenerateCommand", res, cfg.workingDir).status)
                 return;
         }
-        res.cache.dateCache = hashFromDates(cfg);
+        
+        BigInt[string] _;
+        res.cache.dateCache = hashFromDates(cfg,_);
     }
     catch(Throwable e)
     {

@@ -1,4 +1,5 @@
 module building.cache;
+public import std.bigint;
 import package_searching.dub;
 import buildapi;
 static import std.file;
@@ -57,10 +58,10 @@ struct CompilationCache
         return CompilationCache(reqCache, caches[0].str, caches[1].str);
     }
 
-    bool isUpToDate(const BuildRequirements req, string compiler) const
+    bool isUpToDate(const BuildRequirements req, string compiler, ref BigInt[string] cachedDirTime) const
     {
         return requirementCache == hashFrom(req, compiler) &&
-            dateCache == hashFromDates(req.cfg);
+            dateCache == hashFromDates(req.cfg, cachedDirTime);
     }
 }
 
@@ -87,10 +88,12 @@ void invalidateCaches(ProjectNode root, string compiler)
     import std.array;
     int i = 0;
     const CompilationCache[] cacheStatus = cacheStatusForProject(root, compiler);
+    BigInt[string] cachedDirTime;
+
     foreach_reverse(ProjectNode n; root.collapse.array)
     {
         if(!n.isUpToDate) continue;
-        if(!cacheStatus[i++].isUpToDate(n.requirements, compiler))
+        if(!cacheStatus[i++].isUpToDate(n.requirements, compiler, cachedDirTime))
             n.invalidateCache();
     }
 }
@@ -116,23 +119,26 @@ string hashFrom(const BuildRequirements req, string compiler)
     return hashFunction(inputHash.join);
 }
 
-string hashFromPathDates(scope const(string[]) entryPaths...)
+string hashFromPathDates(ref BigInt[string] cachedDirTime, scope const(string[]) entryPaths...)
 {
     import std.conv:to;
     import std.file;
-    import std.bigint;
     BigInt bInt;
     foreach(path; entryPaths)
     {
         if(!std.file.exists(path)) continue;
-        if(std.file.isDir(path))
+        if(path in cachedDirTime) bInt+= cachedDirTime[path];
+        else if(std.file.isDir(path))
         {
+            BigInt dirTime;
             foreach(DirEntry e; dirEntries(path, SpanMode.depth))
             {
                 // import std.string;
                 // if(e.name.endsWith(".o")) throw new Error("Found .o at "~e.name);
-                bInt+= e.timeLastModified.stdTime;
+                dirTime+= e.timeLastModified.stdTime;
             }
+            bInt+= dirTime;
+            cachedDirTime[path] = dirTime;
         }
         else
             bInt+= std.file.timeLastModified(path).stdTime;
@@ -149,7 +155,7 @@ string hashFromPathDates(scope const(string[]) entryPaths...)
     return (output[0..length]).dup;
 }
 
-string hashFromDates(const BuildConfiguration cfg)
+string hashFromDates(const BuildConfiguration cfg, ref BigInt[string] cachedDirTime)
 {
     import std.system;
     import command_generators.commons;
@@ -162,6 +168,7 @@ string hashFromDates(const BuildConfiguration cfg)
         libs[i] = buildNormalizedPath(cfg.workingDir, s);
 
     return hashFromPathDates(
+        cachedDirTime,
         cfg.importDirectories~
         cfg.sourcePaths ~
         cfg.stringImportPaths~
