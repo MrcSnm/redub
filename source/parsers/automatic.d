@@ -40,6 +40,7 @@ BuildRequirements parseProject(
 /** 
  * This function finishes some parts of the build requirement:
  * - Transforms relative paths into absolute paths
+ * - If no import directory exists, it will be reflected by source paths.
  * After that, it makes possible to merge with other build requirements. But, it is not completely
  * finished. It still has to become a tree.
  * Params:
@@ -63,6 +64,9 @@ private void partiallyFinishBuildRequirements(ref BuildRequirements req)
     foreach(arr; toAbsolutize)
         foreach(ref string dir; *arr)
             if(!isAbsolute(dir)) dir = buildNormalizedPath(req.cfg.workingDir, dir);
+
+    if(req.cfg.importDirectories.length == 0)
+        req.cfg.importDirectories = req.cfg.sourcePaths;
         
     if(!isAbsolute(req.cfg.sourceEntryPoint)) 
         req.cfg.sourceEntryPoint = buildNormalizedPath(req.cfg.workingDir, req.cfg.sourceEntryPoint);

@@ -24,10 +24,44 @@ ProjectNode getProjectTree(BuildRequirements req, string compiler)
     ProjectNode[] collapsed;
     string[string] subConfigs = req.getSubConfigurations;
     ProjectNode tree =  getProjectTreeImpl(req, compiler, subConfigs, visited, collapsed);
-    tree.finish(collapsed);
-    return tree;
+    detectCycle(tree);
 
+    ProjectNode a = new ProjectNode(BuildRequirements.init);
+    ProjectNode b = new ProjectNode(BuildRequirements.init);
+    ProjectNode c = new ProjectNode(BuildRequirements.init);
+
+    a.addDependency(b);
+    b.addDependency(c);
+    c.addDependency(a);
+
+    // detectCycle(a);
+    tree.finish(collapsed);
+
+
+
+    return tree;
 }   
+
+
+void detectCycle(ProjectNode t)
+{
+    bool[ProjectNode] visited;
+    bool[ProjectNode] inStack;
+
+    void impl(ProjectNode node)
+    {
+        if(node in inStack) throw new Error("Found a cycle at "~node.name);
+        inStack[node] = true;
+        visited[node] = true;
+        
+        foreach(n; node.dependencies)
+        {
+            if(!(node in visited)) impl(n);
+        }
+        inStack.remove(node);
+    }
+    impl(t);
+}
 
 /** 
  * 
@@ -122,7 +156,7 @@ private BuildRequirements mergeDifferentSubConfigurations(BuildRequirements exis
 
 void printProjectTree(ProjectNode node, int depth = 0)
 {
-    vlog("-".repeat(depth*2), node.name);
+    info("-".repeat(depth*2), node.name);
     foreach(dep; node.dependencies)
     {
         printProjectTree(dep, depth+1);
