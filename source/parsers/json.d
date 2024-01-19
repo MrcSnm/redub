@@ -197,11 +197,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
                 const(JSONValue)* name = "name" in p;
                 enforce(name, "All subPackages entries must contain a name.");
                 if(name.str == cfg.subPackage)
-                {
-                    isSubpackageInPackage = true;
-                    json = p;
-                    break;
-                }
+                    return parse(p, ParseConfig(cfg.workingDir, cfg.subConfiguration, null, null, cfg.compiler, cfg.requiredBy, true, true));
             }
             else ///Subpackage is on other file
             {
