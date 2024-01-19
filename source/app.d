@@ -187,9 +187,6 @@ private ProjectDetails resolveDependencies(string[] args)
     parsers.environment.setupBuildEnvironmentVariables(bArgs, DubBuildArguments.init, os, args);
     StopWatch st = StopWatch(AutoStart.yes);
 
-    import core.memory;
-    GC.disable;
-
     BuildRequirements req = parseProject(workingDir, bArgs.compiler, BuildRequirements.Configuration(bArgs.config, false), subPackage, recipe);
     parsers.environment.setupEnvironmentVariablesForRootPackage(cast(immutable)req);
     req.cfg = req.cfg.merge(parsers.environment.parse());
