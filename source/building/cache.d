@@ -20,7 +20,7 @@ string getCompilerVersion(string compiler)
         switch(compiler)
         {
             case "ldc", "ldc2": compiler = "ldc2"; break;
-            case "dmd": break;
+            case "dmd", "gcc", "g++": break;
             default: throw new Error("Unsupported compiler: "~compiler);
         }
         auto result = executeShell(compiler~" --version");

@@ -135,10 +135,14 @@ private ProjectDetails buildBase(string[] args)
 {
     import building.compile;
     import std.system;
+    
     ProjectDetails d = resolveDependencies(args);
+
     if(!d.tree)
         return d;
+
     ProjectNode tree = d.tree;
+
     auto result = timed(()
     {
         if(tree.isFullyParallelizable)
@@ -179,6 +183,7 @@ private ProjectDetails resolveDependencies(string[] args)
     }
     updateVerbosity(bArgs.cArgs);
     if(bArgs.arch) bArgs.compiler = "ldc2";
+
     DubCommonArguments cArgs = bArgs.cArgs;
     if(cArgs.root)
         workingDir = cArgs.getRoot(workingDir);

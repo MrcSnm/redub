@@ -115,7 +115,9 @@ string[] getSourceFiles(string path)
     import std.array;
     import std.algorithm.iteration;
     return dirEntries(path, SpanMode.depth)
-        .filter!((entry) => entry.name.endsWith(".d"))
+        .filter!((entry) => { entry.name.endsWith(".d") || entry.name.endsWith(".c") || entry.name.endsWith(".cpp") ||
+                              entry.name.endsWith(".cc") || entry.name.endsWith(".mm") || entry.name.endsWith(".cxx") ||
+                            entry.name.endsWith(".c++"); })
         .map!((entry => entry.name)).array;
 }
 

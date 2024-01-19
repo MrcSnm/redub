@@ -1,0 +1,20 @@
+{
+	"authors": [
+		"Amlal El Mahrouss"
+	],
+	"sourcePaths": ["source"],
+	"configurations": [
+		{
+			"name": "Linux",
+			"platforms": ["linux"]
+		},
+		{
+			"name": "MacOS",
+			"platforms": ["osx"]
+		}
+	],
+	"copyright": "Copyright © 2024, Amlal El Mahrouss",
+	"description": "A minimal C++ application.",
+	"license": "MIT",
+	"name": "platforms"
+}

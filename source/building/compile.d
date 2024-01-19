@@ -60,8 +60,10 @@ void compile2(immutable BuildConfiguration cfg, shared ProjectNode pack, OS os, 
         }
         if(executeCommands(cfg.preBuildCommands, "preBuildCommand", res, cfg.workingDir).status)
             return;
+        
         res.compilationCommand = getCompileCommands(cfg, os, compiler);
         auto ret = executeShell(res.compilationCommand, null, Config.none, size_t.max, cfg.workingDir);
+
         res.status = ret.status;
         res.message = ret.output;
         if(res.status == 0)
