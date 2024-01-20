@@ -1,4 +1,5 @@
 module command_generators.commons;
+public import redub.libs.semver;
 public import std.system;
 
 
@@ -142,3 +143,4 @@ T[] reverseArray(Q, T = typeof(Q.front))(Q range)
     else foreach_reverse(v; range) ret~= v;
     return ret;
 }
+

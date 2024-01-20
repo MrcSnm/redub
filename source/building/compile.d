@@ -177,18 +177,18 @@ bool buildProjectFullyParallelized(ProjectNode root, string compiler, OS os)
 private void buildSucceeded(ProjectNode node, CompilationResult res)
 {
     if(node.isUpToDate)
-        info("Up-to-Date: ", node.name, " ",node.requirements.version_," [", node.requirements.targetConfiguration,"]. Took ", res.msNeeded, "ms");
+        infos("Up-to-Date: ", node.name, " ",node.requirements.version_," [", node.requirements.targetConfiguration,"]. Took ", res.msNeeded, "ms");
     else
     {
         // writeln("Succesfully built with cmd:", res.compilationCommand);
-        info("Built: ", node.name, " ",node.requirements.version_," [", node.requirements.targetConfiguration,"]. Took ", res.msNeeded, "ms");
+        infos("Built: ", node.name, " ",node.requirements.version_," [", node.requirements.targetConfiguration,"]. Took ", res.msNeeded, "ms");
         vlog("\n\t", res.compilationCommand, " \n");
 
     } 
 }
 private void buildFailed(ProjectNode node, CompilationResult res)
 {
-    error("Build Failure: '", node.name, " ",node.requirements.version_," [", node.requirements.targetConfiguration,"] ",
+    errorTitle("Build Failure: '", node.name, " ",node.requirements.version_," [", node.requirements.targetConfiguration,"] ",
         "' using flags\n\t", res.compilationCommand, 
         "\nFailed after ", res.msNeeded,"ms with message\n\t", res.message
     );
@@ -199,14 +199,14 @@ private bool doLink(immutable BuildRequirements req, OS os, string compiler, str
     if(req.cfg.targetType.isStaticLibrary || isUpToDate)
     {
         if(isUpToDate)
-            info("Up-to-Date: ", req.name, ", skipping linking");
+            infos("Up-to-Date: ", req.name, ", skipping linking");
         updateCache(mainPackHash, CompilationCache.get(mainPackHash, req, compiler), true);
         return true;
     }
     CompilationResult linkRes = link(req.cfg, os, compiler);
     if(linkRes.status)
     {
-        error("Linking Error: ", req.name, ". Failed with flags: \n\t",
+        errorTitle("Linking Error: ", req.name, ". Failed with flags: \n\t",
             linkRes.compilationCommand,"\n\t\t  :\n\t",
             linkRes.message
         );
@@ -214,7 +214,7 @@ private bool doLink(immutable BuildRequirements req, OS os, string compiler, str
     }
     else
     {
-        info("Linked: ", req.name, " finished!");
+        infos("Linked: ", req.name, " finished!");
         updateCache(mainPackHash, CompilationCache.get(mainPackHash, req, compiler), true);
 
     }

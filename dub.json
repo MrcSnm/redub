@@ -9,7 +9,8 @@
     "authors": ["Hipreme"],
     "license": "MIT",
     "dependencies": {
-        "semver": {"path": "semver"}
+        "semver": {"path": "semver"},
+        "colorize": {"path": "colorize"}
     }
 
 }

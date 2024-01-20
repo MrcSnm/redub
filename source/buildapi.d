@@ -61,21 +61,17 @@ struct BuildConfiguration
         import std.file;
         static immutable inferredSourceFolder = ["source", "src"];
         string initialSource;
-        foreach(i; inferredSourceFolder)
+        foreach(sourceFolder; inferredSourceFolder)
         {
-            if(exists(buildNormalizedPath(workingDir, i)))
+            if(exists(buildNormalizedPath(workingDir, sourceFolder)))
             {
-                initialSource = i;
+                initialSource = sourceFolder;
                 break;
             }
         }
         
         BuildConfiguration ret;
-        if(initialSource)
-        {
-            ret.importDirectories = [initialSource];
-            ret.sourcePaths = [initialSource];
-        }
+        if(initialSource) ret.sourcePaths = [initialSource];
         ret.targetType = TargetType.autodetect;
         ret.sourceEntryPoint = "source/app.d";
         ret.outputDirectory = "bin";
@@ -202,10 +198,20 @@ ref string[] exclusiveMergeFront (return scope ref string[] a, string[] b)
 ref string[] exclusiveMergePaths(return scope ref string[] a, string[] b)
 {
     import std.algorithm.searching:countUntil;
-    import std.path:asNormalizedPath;
     foreach(v; b)
-        if(buildNormalizedPath(a).countUntil(asNormalizedPath(v)) == -1) 
-            a~= v;
+    {
+        string normB = buildNormalizedPath(v);
+        ptrdiff_t index = -1;
+        foreach(i, path; a)
+        {
+            if(buildNormalizedPath(path) == normB)
+            {
+                index = i;
+                break;
+            }
+        }
+        if(index == -1) a~= v;
+    }
     return a;
 }
 
@@ -448,6 +454,7 @@ class ProjectNode
                 case none: throw new Error("Invalid targetType: none");
             }
         }
+        
         
         if(requirements.cfg.targetType == TargetType.sourceLibrary)
         {
