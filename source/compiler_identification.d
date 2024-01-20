@@ -37,7 +37,14 @@ Compiler getCompiler(string compilerOrPath)
 {
     import std.process;
     import std.exception;
+    import std.path;
     if(compilerOrPath == null) compilerOrPath = "dmd";
+    if(!isAbsolute(compilerOrPath))
+    {
+        import std.file;
+        if(compilerOrPath.length > 0 && compilerOrPath[0] == '.')
+            compilerOrPath = buildNormalizedPath(getcwd(), compilerOrPath);
+    }
 
     immutable inference = [
         &tryInferDmd,
@@ -102,7 +109,7 @@ private bool tryInferGcc(string compilerOrPath, string _vString, out Compiler co
     string type = compilerOrPath.baseName.stripExtension;
     switch(type)
     {
-        case "gcc", "tcc": comp = Compiler(AcceptedCompiler.gcc, SemVer.init, SemVer.init, _vString); return true;
+        case "gcc", "tcc": comp = Compiler(AcceptedCompiler.gcc, SemVer.init, SemVer.init, _vString, compilerOrPath); return true;
         default: return false;
     }
 }

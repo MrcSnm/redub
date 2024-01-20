@@ -11,7 +11,7 @@ string[] parseBuildConfiguration(immutable BuildConfiguration b, OS os)
     import std.array:array;
     import std.path;
     
-    string[] commands = [""];
+    string[] commands;
     with(b)
     {
         if(isDebug) commands~= "-g";
