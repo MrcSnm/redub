@@ -13,7 +13,7 @@ import tree_generators.dub;
 import cli.dub;
 import command_generators.commons;
 
-enum RedubVersion = "Redub - A reimagined DUB: v1.0.0";
+enum RedubVersion = "Redub - A reimagined DUB: v1.0.2";
 
 
 string formatError(string err)
