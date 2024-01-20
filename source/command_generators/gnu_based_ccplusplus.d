@@ -19,6 +19,8 @@ string[] parseBuildConfiguration(immutable BuildConfiguration b, OS os)
         import std.algorithm: canFind;
 
         if(isDebug) commands~= "-g ";
+
+        commands~= versions.map!((v) => "-D"~v~"=1").array;
      
         string[2][] standards = [ [ "C++17", "--std=c++17" ], [ "C++20", "--std=c++20" ], 
                                     [ "C++14", "--std=c++14" ], [ "C++11", "--std=c++11" ] ]; 
