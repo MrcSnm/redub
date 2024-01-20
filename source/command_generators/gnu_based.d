@@ -15,7 +15,7 @@ string[] parseBuildConfiguration(immutable BuildConfiguration b, OS os)
     with(b)
     {
         if(isDebug) commands~= "-g";
-        commands~= versions.map!((v) => "-D"~v~"=1").array;
+        
         commands~= importDirectories.map!((i) => "-I"~i).array;
 
         if(targetType == TargetType.executable)
