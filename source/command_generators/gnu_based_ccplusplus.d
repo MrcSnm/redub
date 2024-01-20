@@ -23,14 +23,16 @@ string[] parseBuildConfiguration(immutable BuildConfiguration b, OS os)
         commands~= versions.map!((v) => "-D"~v~"=1").array;
      
         string[2][] standards = [ [ "C++17", "--std=c++17" ], [ "C++20", "--std=c++20" ], 
-                                    [ "C++14", "--std=c++14" ], [ "C++11", "--std=c++11" ] ]; 
+                                    [ "C++14", "--std=c++14" ], [ "C++11", "--std=c++11" ], 
+                                    [ "C++98", "--std=c++98" ], [ "C++2B", "--std=c++2b" ] ]; 
 
         foreach (string[2] key; standards)
         {
             /* check for a c++ standard */
-            if (b.dFlags.canFind(key[0]))
+            if (b.dFlags.canFind(key[1]) ||
+                b.dFlags.canFind(key[0]))
             {
-                commands ~= key[1]; // FIXME
+                commands ~= key[1];
             }
         }
 
