@@ -16,6 +16,11 @@ bool isStaticLibrary(TargetType t)
     return t == TargetType.staticLibrary || t == TargetType.library;
 }
 
+bool isLinkedSeparately(TargetType t)
+{
+    return t == TargetType.executable || t == TargetType.dynamicLibrary;
+}
+
 TargetType targetFrom(string s)
 {
     import std.exception;

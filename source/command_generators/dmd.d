@@ -15,7 +15,7 @@ string[] parseBuildConfiguration(immutable BuildConfiguration b, OS target)
         commands~= versions.map!((v) => "-version="~v).array;
         commands~= importDirectories.map!((i) => "-I"~i).array;
 
-        if(targetType == TargetType.executable || targetType == TargetType.dynamicLibrary)
+        if(targetType.isLinkedSeparately)
             commands~= "-c"; //Compile only
         commands~= stringImportPaths.map!((sip) => "-J="~sip).array;
         commands~= dFlags;

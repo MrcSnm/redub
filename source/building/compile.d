@@ -113,7 +113,7 @@ CompilationResult link(immutable BuildConfiguration cfg, OS os, Compiler compile
     auto exec = executeShell(ret.compilationCommand);
     ret.status = exec.status;
     ret.message = exec.output;
-    if(cfg.targetType == TargetType.executable)
+    if(cfg.targetType.isLinkedSeparately)
         executeCommands(cfg.postGenerateCommands, "postGenerateCommand", ret, cfg.workingDir);
 
     return ret;
@@ -234,6 +234,7 @@ private bool doLink(immutable BuildRequirements req, OS os, Compiler compiler, s
     else
     {
         infos("Linked: ", req.name, " finished!");
+        vlog("\n\t", linkRes.compilationCommand, " \n");
         updateCache(mainPackHash, CompilationCache.get(mainPackHash, req, compiler), true);
 
     }

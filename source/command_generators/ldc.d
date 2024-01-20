@@ -18,16 +18,25 @@ string[] parseBuildConfiguration(immutable BuildConfiguration b, OS os)
         commands~= versions.map!((v) => "--d-version="~v).array;
         commands~= importDirectories.map!((i) => "-I"~i).array;
 
-        if(targetType == TargetType.executable)
+        if(targetType.isLinkedSeparately)
             commands~= "-c"; //Compile only
         commands~= stringImportPaths.map!((sip) => "-J="~sip).array;
         commands~= dFlags;
 
-        string outFlag = getTargetTypeFlag(targetType);
-        if(outFlag) commands~= outFlag;
+        if(targetType.isStaticLibrary)
+        {
+            string outFlag = getTargetTypeFlag(targetType);
+            if(outFlag) commands~= outFlag;
+        }
 
         commands~= "--od="~getObjectDir(b.workingDir);
-        if(targetType != TargetType.executable)
+
+        if(targetType == TargetType.dynamicLibrary)
+        {
+            // commands~= "--dllimport=all";
+            // commands~= "--fvisibility=public";
+        }
+        if(targetType.isStaticLibrary)
             commands~= "--of="~buildNormalizedPath(outputDirectory, getOutputName(targetType, name, os));
         else
             commands~= "--of="~buildNormalizedPath(outputDirectory, name~getObjectExtension(os));
