@@ -4,8 +4,9 @@ import std.array;
 import std.path;
 import std.file;
 import std.process;
-import logging;
 
+import compiler_identification;
+import logging;
 import buildapi;
 import parsers.automatic;
 import tree_generators.dub;
@@ -135,10 +136,14 @@ private ProjectDetails buildBase(string[] args)
 {
     import building.compile;
     import std.system;
+    
     ProjectDetails d = resolveDependencies(args);
+
     if(!d.tree)
         return d;
+
     ProjectNode tree = d.tree;
+
     auto result = timed(()
     {
         if(tree.isFullyParallelizable)
@@ -179,6 +184,7 @@ private ProjectDetails resolveDependencies(string[] args)
     }
     updateVerbosity(bArgs.cArgs);
     if(bArgs.arch) bArgs.compiler = "ldc2";
+
     DubCommonArguments cArgs = bArgs.cArgs;
     if(cArgs.root)
         workingDir = cArgs.getRoot(workingDir);
@@ -186,6 +192,8 @@ private ProjectDetails resolveDependencies(string[] args)
         recipe = cArgs.getRecipe(workingDir);
     parsers.environment.setupBuildEnvironmentVariables(bArgs, DubBuildArguments.init, os, args);
     StopWatch st = StopWatch(AutoStart.yes);
+
+    Compiler compiler = getCompiler(bArgs.compiler);
 
     BuildRequirements req = parseProject(workingDir, bArgs.compiler, BuildRequirements.Configuration(bArgs.config, false), subPackage, recipe);
     parsers.environment.setupEnvironmentVariablesForRootPackage(cast(immutable)req);
@@ -197,16 +205,16 @@ private ProjectDetails resolveDependencies(string[] args)
     if(bArgs.build.force)
         tree.invalidateCacheOnTree();
     else 
-        invalidateCaches(tree, bArgs.compiler);
+        invalidateCaches(tree, compiler);
     
     info("Dependencies resolved in ", (st.peek.total!"msecs"), " ms.") ;
-    return ProjectDetails(tree, bArgs.compiler);
+    return ProjectDetails(tree, compiler);
 }
 
 private struct ProjectDetails
 {
     ProjectNode tree;
-    string compiler;
+    Compiler compiler;
 }
 
 private string parseSubpackageFromCli(ref string[] args)

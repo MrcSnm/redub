@@ -112,7 +112,7 @@ struct DubArguments
     @(
         "Specifies the compiler binary to use (can be a path)" ~
         "Arbitrary pre- and suffixes to the identifiers below are recognized (e.g. ldc2 or dmd-2.063) and matched to the proper compiler type:" ~
-        "dmd, gdc, ldc, gdmd, ldmd"
+        "dmd, gdc, ldc, gdmd, ldmd, gcc, g++"
     )
     string compiler = "dmd";
 
@@ -186,10 +186,11 @@ GetoptResult betterGetopt(T)(ref string[] args, out T opts) if(is(T == struct))
     return mixin("getopt(args, " ~ genGetoptCall!(T)("_") ~ ")");
 }
 
-private string genGetoptCall(T)(string memberName  )
+private string genGetoptCall(T)(string memberName)
 {
     import std.traits:isFunction;
     string ret;
+
     static foreach(mem; __traits(allMembers, T))
     {{
         alias member = __traits(getMember, T, mem);

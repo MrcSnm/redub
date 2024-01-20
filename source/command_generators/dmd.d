@@ -32,7 +32,7 @@ string[] parseBuildConfiguration(immutable BuildConfiguration b, OS target)
             commands~= "-of"~buildNormalizedPath(outputDirectory, name~getObjectExtension(os));
 
         foreach(path; sourcePaths)
-            commands~= getSourceFiles(buildNormalizedPath(workingDir, path));
+            commands~= getDSourceFiles(buildNormalizedPath(workingDir, path));
         foreach(f; sourceFiles)
         {
             if(!isAbsolute(f)) commands ~= buildNormalizedPath(workingDir, f);
