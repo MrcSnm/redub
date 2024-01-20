@@ -3,7 +3,7 @@
 		"Amlal El Mahrouss"
 	],
 	"sourcePaths": ["source"],
-	"targetType": "staticLibrary",
+	"targetType": "dynamicLibrary",
 	"configurations": [
 		{
 			"name": "Linux",

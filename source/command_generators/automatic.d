@@ -51,8 +51,6 @@ string getLinkCommands(immutable BuildConfiguration cfg, OS os, Compiler compile
     if (TargetType.library == cfg.targetType ||
         TargetType.staticLibrary == cfg.targetType)
         return escapeShellCommand(compiler.archiver ~ flags);
-    else if (TargetType.executable == cfg.targetType)
-        return escapeShellCommand(compiler.binOrPath ~ flags);
 
     return null;
 }
