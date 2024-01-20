@@ -44,7 +44,7 @@ void execCompilation(immutable BuildConfiguration cfg, shared ProjectNode pack, 
     import std.process;
     import std.datetime.stopwatch;
     import command_generators.commons;
-    
+
     CompilationResult res;
     res.node = pack;
     res.cache.requirementCache = cache.requirementCache;
@@ -75,6 +75,9 @@ void execCompilation(immutable BuildConfiguration cfg, shared ProjectNode pack, 
         }
         else
         {
+            ///Creates a folder to C output since it doesn't do automatically.
+            if(!isDCompiler(compiler))
+                createOutputDirFolder(cfg);
             res.compilationCommand = getCompileCommands(cfg, os, compiler);
             ret = executeShell(res.compilationCommand, null, Config.none, size_t.max, cfg.workingDir);
         }
