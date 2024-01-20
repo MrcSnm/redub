@@ -20,7 +20,7 @@ Have you ever wondered why [dub](https://github.com/dlang/dub) was slow? I tried
 
 ### Legend
 - api -> Can be freely be imported from any module
-- module -> Needs to be isolated as muhc as possible from each module. If one needs to communicate with other, a bridge/api may be created after the initial idea
+- module -> Needs to be isolated as much as possible from each module. If one needs to communicate with other, a bridge/api may be created after the initial idea
 
 ### How it works
 Here are described the modules which do most of the work if someone wants to contribute.
