@@ -1,7 +1,6 @@
 module building.cache;
-public import std.bigint;
 public import compiler_identification;
-public import core.int128;
+public import std.int128;
 import package_searching.dub;
 import buildapi;
 static import std.file;
@@ -40,7 +39,7 @@ struct CompilationCache
         return CompilationCache(reqCache, caches[0].str, caches[1].str);
     }
 
-    bool isUpToDate(const BuildRequirements req, Compiler compiler, ref BigInt[string] cachedDirTime) const
+    bool isUpToDate(const BuildRequirements req, Compiler compiler, ref Int128[string] cachedDirTime) const
     {
         return requirementCache == hashFrom(req, compiler) &&
             dateCache == hashFromDates(req.cfg, cachedDirTime);
@@ -70,7 +69,7 @@ void invalidateCaches(ProjectNode root, Compiler compiler)
     import std.array;
     const CompilationCache[] cacheStatus = cacheStatusForProject(root, compiler);
     ptrdiff_t i = cacheStatus.length;
-    BigInt[string] cachedDirTime;
+    Int128[string] cachedDirTime;
 
     foreach_reverse(ProjectNode n; root.collapse.array)
     {
@@ -101,18 +100,18 @@ string hashFrom(const BuildRequirements req, Compiler compiler)
     return hashFunction(inputHash.join);
 }
 
-string hashFromPathDates(ref BigInt[string] cachedDirTime, scope const(string[]) entryPaths...)
+string hashFromPathDates(ref Int128[string] cachedDirTime, scope const(string[]) entryPaths...)
 {
     import std.conv:to;
     import std.file;
-    BigInt bInt;
+    Int128 bInt;
     foreach(path; entryPaths)
     {
         if(!std.file.exists(path)) continue;
         if(path in cachedDirTime) bInt+= cachedDirTime[path];
         else if(std.file.isDir(path))
         {
-            BigInt dirTime;
+            Int128 dirTime;
             foreach(DirEntry e; dirEntries(path, SpanMode.depth))
             {
                 // import std.string;
@@ -127,17 +126,17 @@ string hashFromPathDates(ref BigInt[string] cachedDirTime, scope const(string[])
     }
     
     char[2048] output;
-    size_t length;
-    bInt.toString((scope const(char)[] str)
-    {
-        length = str.length;
-        output[0..length] = str[];
-    }, "%x"); //Hexadecimal to save space?
+    import std.conv;
+    int i = 0;
+    foreach(c; toChars(bInt.data.hi))
+        output[i++] = c;
+    foreach(c; toChars(bInt.data.lo))
+        output[i++] = c;
     // return hashFunction(output[0..length]); No need to use hash, use just the number.
-    return (output[0..length]).dup;
+    return (output[0..i]).dup;
 }
 
-string hashFromDates(const BuildConfiguration cfg, ref BigInt[string] cachedDirTime)
+string hashFromDates(const BuildConfiguration cfg, ref Int128[string] cachedDirTime)
 {
     import std.system;
     import command_generators.commons;
