@@ -38,11 +38,13 @@ private ExecutionResult executeCommands(const string[] commandsList, string list
     return ExecutionResult(0, "Success");
 }
 
-void compile2(immutable BuildConfiguration cfg, shared ProjectNode pack, OS os, Compiler compiler, CompilationCache cache)
+void execCompilation(immutable BuildConfiguration cfg, shared ProjectNode pack, OS os, Compiler compiler, CompilationCache cache)
 {
     import std.file;
     import std.process;
     import std.datetime.stopwatch;
+    import command_generators.commons;
+    
     CompilationResult res;
     res.node = pack;
     res.cache.requirementCache = cache.requirementCache;
@@ -61,9 +63,22 @@ void compile2(immutable BuildConfiguration cfg, shared ProjectNode pack, OS os, 
         }
         if(executeCommands(cfg.preBuildCommands, "preBuildCommand", res, cfg.workingDir).status)
             return;
+
+        ExecutionResult ret;
+        if(isDCompiler(compiler) && os.isWindows)
+        {
+            string[] flags = getCompilationFlags(cfg, os, compiler);
+            string commandFile = createCommandFile(cfg, os, compiler, flags, res.compilationCommand);
+            res.compilationCommand = compiler.binOrPath ~ " "~res.compilationCommand;
+            ret = executeShell(compiler.binOrPath ~ " @"~commandFile);
+            std.file.remove(commandFile);
+        }
+        else
+        {
+            res.compilationCommand = getCompileCommands(cfg, os, compiler);
+            ret = executeShell(res.compilationCommand, null, Config.none, size_t.max, cfg.workingDir);
+        }
         
-        res.compilationCommand = getCompileCommands(cfg, os, compiler);
-        auto ret = executeShell(res.compilationCommand, null, Config.none, size_t.max, cfg.workingDir);
 
         res.status = ret.status;
         res.message = ret.output;
@@ -115,7 +130,7 @@ bool buildProjectParallelSimple(ProjectNode root, Compiler compiler, OS os)
             if(!(dep in spawned))
             {
                 spawned[dep] = true;
-                spawn(&compile2, 
+                spawn(&execCompilation, 
                     dep.requirements.cfg.idup, cast(shared)dep, os, 
                     compiler, CompilationCache.get(mainPackHash, dep.requirements, compiler)
                 );
@@ -149,7 +164,7 @@ bool buildProjectFullyParallelized(ProjectNode root, Compiler compiler, OS os)
     size_t i = 0;
     foreach(pack; root.collapse)
     {
-        spawn(&compile2, 
+        spawn(&execCompilation, 
             pack.requirements.cfg.idup, 
             cast(shared)pack, os, compiler, 
             cache[i++]

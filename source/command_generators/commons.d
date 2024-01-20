@@ -1,7 +1,7 @@
 module command_generators.commons;
 public import redub.libs.semver;
 public import std.system;
-
+public import compiler_identification;
 
 //Import the commonly shared buildapi
 import buildapi;
@@ -164,3 +164,27 @@ T[] reverseArray(Q, T = typeof(Q.front))(Q range)
     return ret;
 }
 
+
+bool isWindows(OS os){return os == OS.win32 || os == OS.win64;}
+
+void createOutputDirFolder(immutable BuildConfiguration cfg, OS os, Compiler compiler)
+{
+    import std.file;
+    if(cfg.outputDirectory)
+        mkdirRecurse(cfg.outputDirectory);
+}
+
+string createCommandFile(immutable BuildConfiguration cfg, OS os, Compiler compiler, string[] flags, out string joinedFlags)
+{
+    import std.random;
+    import std.string;
+    import std.file;
+    import std.conv;
+    import std.path;
+    Random seed = Random(unpredictableSeed);
+    uint num = uniform(0, int.max, seed);
+    joinedFlags = join(flags, " ");
+    string fileName = buildNormalizedPath(tempDir, cfg.name~num.to!string);
+    std.file.write(fileName, joinedFlags);
+    return fileName;
+}
