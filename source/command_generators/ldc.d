@@ -20,8 +20,6 @@ string[] parseBuildConfiguration(immutable BuildConfiguration b, OS os)
 
         if(targetType == TargetType.executable)
             commands~= "-c"; //Compile only
-        // else
-        //     commands~= "--o-";
         commands~= stringImportPaths.map!((sip) => "-J="~sip).array;
         commands~= dFlags;
 
@@ -35,7 +33,7 @@ string[] parseBuildConfiguration(immutable BuildConfiguration b, OS os)
             commands~= "--of="~buildNormalizedPath(outputDirectory, name~getObjectExtension(os));
 
         foreach(path; sourcePaths)
-            commands~= getSourceFiles(buildNormalizedPath(workingDir, path));
+            commands~= getDSourceFiles(buildNormalizedPath(workingDir, path));
         foreach(f; sourceFiles)
         {
             if(!isAbsolute(f)) commands ~= buildNormalizedPath(workingDir, f);

@@ -15,6 +15,7 @@ string[] parseBuildConfiguration(immutable BuildConfiguration b, OS os)
     with(b)
     {
         if(isDebug) commands~= "-g ";
+        commands~= versions.map!((v) => "-D"~v~"=1").array;
         commands~= "--std=c++17"; // FIXME
         commands~="-v";
 
@@ -28,14 +29,12 @@ string[] parseBuildConfiguration(immutable BuildConfiguration b, OS os)
 
         if(targetType == TargetType.executable)
             commands~= "-c"; //Compile only
-        // else
-        //     commands~= "--o-";
         
         string outFlag = getTargetTypeFlag(targetType);
         if(outFlag) commands~= outFlag;
 
         foreach(path; sourcePaths)
-            commands~= getSourceFiles(buildNormalizedPath(workingDir, path));
+            commands~= getCppSourceFiles(buildNormalizedPath(workingDir, path));
 
         if(targetType != TargetType.executable)
             commands~= "-o"~buildNormalizedPath(outputDirectory, getOutputName(targetType, name, os));

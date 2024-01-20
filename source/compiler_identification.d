@@ -37,6 +37,8 @@ Compiler getCompiler(string compilerOrPath)
 {
     import std.process;
     import std.exception;
+    if(compilerOrPath == null) compilerOrPath = "dmd";
+
     immutable inference = [
         &tryInferDmd,
         &tryInferLdc,

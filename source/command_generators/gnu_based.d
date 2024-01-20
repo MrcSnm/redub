@@ -15,13 +15,11 @@ string[] parseBuildConfiguration(immutable BuildConfiguration b, OS os)
     with(b)
     {
         if(isDebug) commands~= "-g";
-        commands~= versions.map!((v) => "--std="~v).array;
+        commands~= versions.map!((v) => "-D"~v~"=1").array;
         commands~= importDirectories.map!((i) => "-I"~i).array;
 
         if(targetType == TargetType.executable)
             commands~= "-c"; //Compile only
-        // else
-        //     commands~= "--o-";
         
         string outFlag = getTargetTypeFlag(targetType);
         if(outFlag) commands~= outFlag;
@@ -32,7 +30,7 @@ string[] parseBuildConfiguration(immutable BuildConfiguration b, OS os)
             commands~= "-o "~buildNormalizedPath(outputDirectory, name~getObjectExtension(os));
 
         foreach(path; sourcePaths)
-            commands~= getSourceFiles(buildNormalizedPath(workingDir, path));
+            commands~= getCSourceFiles(buildNormalizedPath(workingDir, path));
         foreach(f; sourceFiles)
         {
             if(!isAbsolute(f)) commands ~= buildNormalizedPath(workingDir, f);

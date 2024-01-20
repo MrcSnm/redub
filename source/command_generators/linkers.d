@@ -1,10 +1,11 @@
 module command_generators.linkers;
+public import compiler_identification;
 public import buildapi;
 public import std.system;
 import command_generators.commons;
 
 
-string[] parseLinkConfiguration(immutable BuildConfiguration b, OS target, string compiler)
+string[] parseLinkConfiguration(immutable BuildConfiguration b, OS target, Compiler compiler)
 {
     import std.algorithm.iteration;
     import std.path;
@@ -25,7 +26,7 @@ string[] parseLinkConfiguration(immutable BuildConfiguration b, OS target, strin
     return commands;
 }
 
-string[] parseLinkConfigurationMSVC(immutable BuildConfiguration b, OS target, string compiler)
+string[] parseLinkConfigurationMSVC(immutable BuildConfiguration b, OS target, Compiler compiler)
 {
     import std.algorithm.iteration;
     import std.path;
@@ -47,12 +48,19 @@ string[] parseLinkConfigurationMSVC(immutable BuildConfiguration b, OS target, s
 }
 
 
-string getTargetTypeFlag(TargetType o, string compiler)
+string getTargetTypeFlag(TargetType o, Compiler compiler)
 {
-    import command_generators.dmd;
-    import command_generators.ldc;
-    if(compiler == "dmd")
-        return command_generators.dmd.getTargetTypeFlag(o);
-    else
-        return command_generators.ldc.getTargetTypeFlag(o);
+    static import command_generators.dmd;
+    static import command_generators.ldc;
+    static import command_generators.gnu_based;
+    static import command_generators.gnu_based_ccplusplus;
+
+    switch(compiler.compiler) with(AcceptedCompiler)
+    {
+        case dmd: return command_generators.dmd.getTargetTypeFlag(o);
+        case ldc2: return command_generators.ldc.getTargetTypeFlag(o);
+        case gcc: return command_generators.gnu_based.getTargetTypeFlag(o);
+        case gxx: return command_generators.gnu_based_ccplusplus.getTargetTypeFlag(o);
+        default: throw new Error("Unsupported compiler "~compiler.binOrPath);
+    }
 }

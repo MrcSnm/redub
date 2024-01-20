@@ -4,6 +4,7 @@ import logging;
 import buildapi;
 import std.system;
 import std.concurrency;
+import compiler_identification;
 import command_generators.automatic;
 
 struct CompilationResult
@@ -37,7 +38,7 @@ private ExecutionResult executeCommands(const string[] commandsList, string list
     return ExecutionResult(0, "Success");
 }
 
-void compile2(immutable BuildConfiguration cfg, shared ProjectNode pack, OS os, string compiler, CompilationCache cache)
+void compile2(immutable BuildConfiguration cfg, shared ProjectNode pack, OS os, Compiler compiler, CompilationCache cache)
 {
     import std.file;
     import std.process;
@@ -85,7 +86,7 @@ void compile2(immutable BuildConfiguration cfg, shared ProjectNode pack, OS os, 
 }
 
 
-CompilationResult link(immutable BuildConfiguration cfg, OS os, string compiler)
+CompilationResult link(immutable BuildConfiguration cfg, OS os, Compiler compiler)
 {
     import std.process;
     CompilationResult ret;
@@ -101,7 +102,7 @@ CompilationResult link(immutable BuildConfiguration cfg, OS os, string compiler)
 }
 
 
-bool buildProjectParallelSimple(ProjectNode root, string compiler, OS os)
+bool buildProjectParallelSimple(ProjectNode root, Compiler compiler, OS os)
 {
     import std.concurrency;
     ProjectNode[] dependencyFreePackages = root.findLeavesNodes();
@@ -116,7 +117,7 @@ bool buildProjectParallelSimple(ProjectNode root, string compiler, OS os)
                 spawned[dep] = true;
                 spawn(&compile2, 
                     dep.requirements.cfg.idup, cast(shared)dep, os, 
-                    compiler.idup, CompilationCache.get(mainPackHash, dep.requirements, compiler)
+                    compiler, CompilationCache.get(mainPackHash, dep.requirements, compiler)
                 );
             }
         }
@@ -140,7 +141,7 @@ bool buildProjectParallelSimple(ProjectNode root, string compiler, OS os)
 }
 
 
-bool buildProjectFullyParallelized(ProjectNode root, string compiler, OS os)
+bool buildProjectFullyParallelized(ProjectNode root, Compiler compiler, OS os)
 {
     import std.concurrency;
     string mainPackHash = hashFrom(root.requirements, compiler);
@@ -150,7 +151,7 @@ bool buildProjectFullyParallelized(ProjectNode root, string compiler, OS os)
     {
         spawn(&compile2, 
             pack.requirements.cfg.idup, 
-            cast(shared)pack, os, compiler.idup, 
+            cast(shared)pack, os, compiler, 
             cache[i++]
         );
     }
@@ -194,7 +195,7 @@ private void buildFailed(ProjectNode node, CompilationResult res)
     );
 }
 
-private bool doLink(immutable BuildRequirements req, OS os, string compiler, string mainPackHash, bool isUpToDate)
+private bool doLink(immutable BuildRequirements req, OS os, Compiler compiler, string mainPackHash, bool isUpToDate)
 {
     if(req.cfg.targetType.isStaticLibrary || isUpToDate)
     {

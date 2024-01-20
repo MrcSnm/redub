@@ -1,5 +1,7 @@
 module building.cache;
 public import std.bigint;
+public import compiler_identification;
+public import core.int128;
 import package_searching.dub;
 import buildapi;
 static import std.file;
@@ -11,25 +13,6 @@ import std.encoding;
 enum cacheFolder = ".redub";
 enum cacheFile = "redub_cache.json";
 
-string getCompilerVersion(string compiler)
-{
-    static string _version;
-    if(_version is null)
-    {
-        import std.process;
-        switch(compiler)
-        {
-            case "ldc", "ldc2": compiler = "ldc2"; break;
-            case "dmd", "gcc", "g++": break;
-            default: throw new Error("Unsupported compiler: "~compiler);
-        }
-        auto result = executeShell(compiler~" --version");
-        if(result.status) throw new Error("Could not get compiler "~compiler~" version. Is it installed on your system?");
-        _version = result.output;
-    }
-    return _version;
-}
-
 struct CompilationCache
 {
     ///Key for finding the cache
@@ -39,7 +22,7 @@ struct CompilationCache
     ///Second member of the cache array
     string contentCache;
 
-    static CompilationCache get(string rootHash, const BuildRequirements req, string compiler)
+    static CompilationCache get(string rootHash, const BuildRequirements req, Compiler compiler)
     {
         import std.exception;
         JSONValue c = *getCache();
@@ -57,7 +40,7 @@ struct CompilationCache
         return CompilationCache(reqCache, caches[0].str, caches[1].str);
     }
 
-    bool isUpToDate(const BuildRequirements req, string compiler, ref BigInt[string] cachedDirTime) const
+    bool isUpToDate(const BuildRequirements req, Compiler compiler, ref BigInt[string] cachedDirTime) const
     {
         return requirementCache == hashFrom(req, compiler) &&
             dateCache == hashFromDates(req.cfg, cachedDirTime);
@@ -69,7 +52,7 @@ struct CompilationCache
  *   root = 
  * Returns: Current cache status from root, without modifying it
  */
-CompilationCache[] cacheStatusForProject(ProjectNode root, string compiler)
+CompilationCache[] cacheStatusForProject(ProjectNode root, Compiler compiler)
 {
     CompilationCache[] cache = new CompilationCache[](root.collapse.length);
     string rootCache = hashFrom(root.requirements, compiler);
@@ -82,7 +65,7 @@ CompilationCache[] cacheStatusForProject(ProjectNode root, string compiler)
 /**
 *   Invalidate caches that aren't up to date
 */
-void invalidateCaches(ProjectNode root, string compiler)
+void invalidateCaches(ProjectNode root, Compiler compiler)
 {
     import std.array;
     const CompilationCache[] cacheStatus = cacheStatusForProject(root, compiler);
@@ -103,11 +86,11 @@ string hashFunction(const char[] input)
     return md5Of(input).toHexString.idup;
 }
 
-string hashFrom(const BuildRequirements req, string compiler)
+string hashFrom(const BuildRequirements req, Compiler compiler)
 {
     import std.conv:to;
     import std.array:join;
-    string[] inputHash = [getCompilerVersion(compiler)];
+    string[] inputHash = [compiler.versionString];
     inputHash~= req.targetConfiguration;
     inputHash~= req.version_;
     static foreach(i, v; BuildConfiguration.tupleof)

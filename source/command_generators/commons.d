@@ -107,17 +107,37 @@ string getOutputName(TargetType t, string name, OS os)
     return outputName;
 }
 
-
-
-string[] getSourceFiles(string path)
+string[] getDSourceFiles(string path)
 {
     import std.file;
     import std.string:endsWith;
     import std.array;
     import std.algorithm.iteration;
     return dirEntries(path, SpanMode.depth)
-        .filter!((entry) => { entry.name.endsWith(".d") || entry.name.endsWith(".c") || entry.name.endsWith(".cpp") ||
-                              entry.name.endsWith(".cc") || entry.name.endsWith(".mm") || entry.name.endsWith(".cxx") ||
+        .filter!((entry) => entry.name.endsWith(".d")).map!((entry => entry.name)).array;
+}
+
+
+string[] getCSourceFiles(string path)
+{
+    import std.file;
+    import std.string:endsWith;
+    import std.array;
+    import std.algorithm.iteration;
+    return dirEntries(path, SpanMode.depth)
+        .filter!((entry) => entry.name.endsWith(".c") || entry.name.endsWith(".i"))
+        .map!((entry => entry.name)).array;
+}
+
+string[] getCppSourceFiles(string path)
+{
+    import std.file;
+    import std.string:endsWith;
+    import std.array;
+    import std.algorithm.iteration;
+    return dirEntries(path, SpanMode.depth)
+        .filter!((entry){ return entry.name.endsWith(".c") || entry.name.endsWith(".cpp") ||
+                              entry.name.endsWith(".cc") || entry.name.endsWith(".i") || entry.name.endsWith(".cxx") ||
                             entry.name.endsWith(".c++"); })
         .map!((entry => entry.name)).array;
 }
