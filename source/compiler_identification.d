@@ -30,6 +30,9 @@ struct Compiler
 
     ///Accepts both a complete path to an executable or a global environment search path name
     string binOrPath;
+
+    ///Librarian tool
+    string archiver = "llvm-ar";
 }
 
 

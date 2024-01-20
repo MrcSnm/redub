@@ -11,6 +11,7 @@ enum TargetType
     dynamicLibrary,
     sourceLibrary
 }
+
 bool isStaticLibrary(TargetType t)
 {
     return t == TargetType.staticLibrary || t == TargetType.library;
