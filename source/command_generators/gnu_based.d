@@ -46,21 +46,19 @@ string[] parseBuildConfiguration(immutable BuildConfiguration b, OS os)
 
         commands~= importDirectories.map!((i) => "-I"~i).array;
 
-        if(targetType == TargetType.executable)
-            commands~= "-c"; //Compile only
-
         foreach(path; sourcePaths)
             commands~= getCppSourceFiles(buildNormalizedPath(workingDir, path));
 
         string outFlag = getTargetTypeFlag(targetType);
         if(outFlag) commands~= outFlag;
 
-        if(targetType == TargetType.executable ||
-            targetType == TargetType.dynamicLibrary)
+        if(targetType == TargetType.dynamicLibrary ||
+            targetType == TargetType.executable)
         {
             commands~= "-o";
             commands ~= buildNormalizedPath(outputDirectory, getOutputName(targetType, name, os));
         }
+
 
     }
 
