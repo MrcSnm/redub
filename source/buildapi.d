@@ -189,17 +189,9 @@ ref string[] exclusiveMerge (return scope ref string[] a, string[] b)
     return a;
 }
 
-ref string[] exclusiveMergeFront (return scope ref string[] a, string[] b)
-{
-    import std.algorithm.searching:countUntil;
-    int pushFrontCount;
-    foreach(v; b) if(a.countUntil(v) == -1) pushFrontCount++;
-    string[] toPush = new string[](pushFrontCount);
-    int i = 0;
-    foreach(v; b) if(a.countUntil(v) == -1) toPush[i++] = v;
-    a = toPush~a;
-    return a;
-}
+/** 
+ * Used when dealing with paths. It normalizes them for not getting the same path twice.
+ */
 ref string[] exclusiveMergePaths(return scope ref string[] a, string[] b)
 {
     import std.algorithm.searching:countUntil;
@@ -220,6 +212,9 @@ ref string[] exclusiveMergePaths(return scope ref string[] a, string[] b)
     return a;
 }
 
+/** 
+ * This may be more useful in the future. Also may increase compilation speed
+ */
 enum Visibility
 {
     public_,  
@@ -256,6 +251,12 @@ struct Dependency
     }
 }
 
+struct PendingMergeConfiguration
+{
+    bool isPending = false;
+    BuildConfiguration configuration;
+}
+
 struct BuildRequirements
 {
     BuildConfiguration cfg;
@@ -283,6 +284,24 @@ struct BuildRequirements
     }
 
     Configuration configuration;
+    private PendingMergeConfiguration pending;
+
+    BuildRequirements addPending(PendingMergeConfiguration pending) const
+    {
+        BuildRequirements ret = cast()this;
+        ret.pending = pending;
+        return ret;
+    }
+
+    BuildRequirements mergePending() const
+    {
+        if(!pending.isPending) return cast()this;
+        BuildRequirements ret = cast()this;
+        ret.cfg = ret.cfg.merge(ret.pending.configuration);
+        ret.pending = PendingMergeConfiguration.init;
+        return ret;
+    }
+
     string targetConfiguration() const { return configuration.name; }
     string[string] getSubConfigurations() const
     {
@@ -301,7 +320,7 @@ struct BuildRequirements
             cfg.idup,
             dependencies.idup,
             version_,
-            configuration
+            configuration,
         );
     }
 

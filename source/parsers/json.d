@@ -120,7 +120,8 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
                     c.firstRun = false;
                     BuildRequirements subCfgReq = parse(configurationToUse, c);
                     req.configuration = c.subConfiguration;
-                    req = req.merge(subCfgReq);
+                    req = req.mergeDependencies(subCfgReq);
+                    req = req.addPending(PendingMergeConfiguration(true, subCfgReq.cfg));
                 }
             }
         },

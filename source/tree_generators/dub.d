@@ -25,20 +25,7 @@ ProjectNode getProjectTree(BuildRequirements req, string compiler)
     string[string] subConfigs = req.getSubConfigurations;
     ProjectNode tree =  getProjectTreeImpl(req, compiler, subConfigs, visited, collapsed);
     detectCycle(tree);
-
-    ProjectNode a = new ProjectNode(BuildRequirements.init);
-    ProjectNode b = new ProjectNode(BuildRequirements.init);
-    ProjectNode c = new ProjectNode(BuildRequirements.init);
-
-    a.addDependency(b);
-    b.addDependency(c);
-    c.addDependency(a);
-
-    // detectCycle(a);
     tree.finish(collapsed);
-
-
-
     return tree;
 }   
 
