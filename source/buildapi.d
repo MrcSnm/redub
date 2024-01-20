@@ -534,9 +534,16 @@ class ProjectNode
 }
 
 
+enum ProjectType
+{
+    D,
+    C,
+    CPP
+}
+
 private TargetType inferTargetType(BuildConfiguration cfg)
 {
-    static immutable string[] filesThatInfersExecutable = ["app.d", "main.d"];
+    static immutable string[] filesThatInfersExecutable = ["app.d", "main.d", "app.c", "main.c"];
     foreach(p; cfg.sourcePaths)
     {
         static import std.file;

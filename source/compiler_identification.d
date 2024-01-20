@@ -111,19 +111,25 @@ private bool tryInferDmd(string compilerOrPath, string vString, out Compiler com
 private bool tryInferGcc(string compilerOrPath, string _vString, out Compiler comp)
 {
     import std.path;
+    import logging;
     string type = compilerOrPath.baseName.stripExtension;
     switch(type)
     {
-        case "gcc", "tcc": comp = Compiler(AcceptedCompiler.gcc, SemVer.init, SemVer.init, _vString, compilerOrPath); return true;
+        case "gcc", "tcc":
+            comp = Compiler(AcceptedCompiler.gcc, SemVer.init, SemVer.init, _vString, compilerOrPath); 
+            error("GCC Compiler detected. Beware that it is still very untested.");
+            return true;
         default: return false;
     }
 }
 private bool tryInferGxx(string compilerOrPath, string _vString, out Compiler comp)
 {
     import std.path;
+    import logging;
     string type = compilerOrPath.baseName.stripExtension;
     if(type != "g++") return false;
     comp = Compiler(AcceptedCompiler.gxx, SemVer.init, SemVer.init, _vString, compilerOrPath);
+    error("G++ Compiler detected. Beware that it is still very untested.");
     return true;
 }
 

@@ -20,6 +20,9 @@ string[] parseBuildConfiguration(immutable BuildConfiguration b, OS os)
 
         if(targetType == TargetType.executable)
             commands~= "-c"; //Compile only
+
+        foreach(path; sourcePaths)
+            commands~= getCSourceFiles(buildNormalizedPath(workingDir, path));
         
         string outFlag = getTargetTypeFlag(targetType);
         if(outFlag) commands~= outFlag;
@@ -29,8 +32,6 @@ string[] parseBuildConfiguration(immutable BuildConfiguration b, OS os)
         else
             commands~= "-o "~buildNormalizedPath(outputDirectory, name~getObjectExtension(os));
 
-        foreach(path; sourcePaths)
-            commands~= getCSourceFiles(buildNormalizedPath(workingDir, path));
         foreach(f; sourceFiles)
         {
             if(!isAbsolute(f)) commands ~= buildNormalizedPath(workingDir, f);
@@ -48,6 +49,6 @@ string getTargetTypeFlag(TargetType o)
         case none: throw new Error("Invalid targetType: none");
         case autodetect, executable, sourceLibrary, staticLibrary: return null;
         case dynamicLibrary: return "-shared";
-        case library: return null;
+        case library: throw new Error("GCC can't build a static library right now. Maybe it can with clang. Submit a PR for supporting it. (or `ar` in the same command)");
     }
 }
