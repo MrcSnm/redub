@@ -39,11 +39,16 @@ Compiler getCompiler(string compilerOrPath)
     import std.exception;
     import std.path;
     if(compilerOrPath == null) compilerOrPath = "dmd";
+    //Tries to find in the local folder for an executable file with the name of compilerOrPath
     if(!isAbsolute(compilerOrPath))
     {
         import std.file;
-        if(compilerOrPath.length > 0 && compilerOrPath[0] == '.')
-            compilerOrPath = buildNormalizedPath(getcwd(), compilerOrPath);
+        string tempPath = buildNormalizedPath(getcwd(), compilerOrPath);
+        version(Windows) enum targetExtension = ".exe";
+        else enum targetExtension = cast(string)null;
+        //If it does not, simply assume global
+        if(exists(tempPath) && !isDir(tempPath) && tempPath.extension == targetExtension)
+            compilerOrPath = tempPath;
     }
 
     immutable inference = [
