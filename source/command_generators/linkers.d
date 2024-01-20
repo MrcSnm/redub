@@ -4,6 +4,52 @@ public import buildapi;
 public import std.system;
 import command_generators.commons;
 
+private string[] convertExtensionToObj(string[] srcFiles)
+{
+    import std.algorithm: canFind;
+    import std.string : endsWith;
+    import std.array : replace;
+
+    string[] commands;
+    string[] exts = [ ".c", ".cpp", ".cxx", ".c++", ".cc", ".i" ];
+
+    foreach(string sources; srcFiles)
+    {
+        foreach (string ext; exts)
+        {
+            if (sources.endsWith(ext))
+            {
+                version (windows) {
+                    sources.replace(ext, ".obj");
+                } else {
+                    sources.replace(ext, ".o");
+                }
+
+                commands ~= sources;
+            }
+        }
+
+    }
+
+    return commands;
+}
+
+private string[] getObjectAsList(immutable BuildConfiguration b, string[] commands)
+{
+    import std.file;
+
+    string[][] allSourceFiles;
+
+    foreach(path; b.sourceFiles)
+        allSourceFiles~= getCppSourceFiles(path);
+    
+    string[] linkFiles;
+
+    foreach(sources; allSourceFiles)
+        linkFiles~= convertExtensionToObj(sources);
+
+    return linkFiles;
+}
 
 string[] parseLinkConfiguration(immutable BuildConfiguration b, OS target, Compiler compiler)
 {
@@ -33,7 +79,11 @@ string[] parseLinkConfiguration(immutable BuildConfiguration b, OS target, Compi
             commands ~= "--format=default";
             commands ~= "rcs";
             commands ~= buildNormalizedPath(outputDirectory, getOutputName(targetType, name, os));
-            commands ~= getLinkFiles(b.sourceFiles);
+            
+            foreach (string key; getObjectAsList(b, commands))
+            {
+                commands ~= key;
+            }
         }
     }
 
