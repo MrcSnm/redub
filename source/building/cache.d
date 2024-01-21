@@ -39,7 +39,7 @@ struct CompilationCache
         return CompilationCache(reqCache, caches[0].str, caches[1].str);
     }
 
-    bool isUpToDate(const BuildRequirements req, Compiler compiler, ref Int128[string] cachedDirTime) const
+    bool isUpToDate(const BuildRequirements req, Compiler compiler, Int128[string]* cachedDirTime) const
     {
         return requirementCache == hashFrom(req, compiler) &&
             dateCache == hashFromDates(req.cfg, cachedDirTime);
@@ -74,7 +74,7 @@ void invalidateCaches(ProjectNode root, Compiler compiler)
     foreach_reverse(ProjectNode n; root.collapse.array)
     {
         if(!n.isUpToDate) continue;
-        if(!cacheStatus[--i].isUpToDate(n.requirements, compiler, cachedDirTime))
+        if(!cacheStatus[--i].isUpToDate(n.requirements, compiler, &cachedDirTime))
             n.invalidateCache();
     }
 }
@@ -100,7 +100,7 @@ string hashFrom(const BuildRequirements req, Compiler compiler)
     return hashFunction(inputHash.join);
 }
 
-string hashFromPathDates(ref Int128[string] cachedDirTime, scope const(string[]) entryPaths...)
+string hashFromPathDates(Int128[string]* cachedDirTime, scope const(string[]) entryPaths...)
 {
     import std.conv:to;
     import std.file;
@@ -108,7 +108,7 @@ string hashFromPathDates(ref Int128[string] cachedDirTime, scope const(string[])
     foreach(path; entryPaths)
     {
         if(!std.file.exists(path)) continue;
-        if(path in cachedDirTime) bInt+= cachedDirTime[path];
+        if(cachedDirTime !is null && path in *cachedDirTime) bInt+= (*cachedDirTime)[path];
         else if(std.file.isDir(path))
         {
             Int128 dirTime;
@@ -119,7 +119,7 @@ string hashFromPathDates(ref Int128[string] cachedDirTime, scope const(string[])
                 dirTime+= e.timeLastModified.stdTime;
             }
             bInt+= dirTime;
-            cachedDirTime[path] = dirTime;
+            if(cachedDirTime !is null) (*cachedDirTime)[path] = dirTime;
         }
         else
             bInt+= std.file.timeLastModified(path).stdTime;
@@ -136,7 +136,7 @@ string hashFromPathDates(ref Int128[string] cachedDirTime, scope const(string[])
     return (output[0..i]).dup;
 }
 
-string hashFromDates(const BuildConfiguration cfg, ref Int128[string] cachedDirTime)
+string hashFromDates(const BuildConfiguration cfg, Int128[string]* cachedDirTime)
 {
     import std.system;
     import command_generators.commons;

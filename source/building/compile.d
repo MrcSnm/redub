@@ -93,8 +93,7 @@ void execCompilation(immutable BuildConfiguration cfg, shared ProjectNode pack, 
                 return;
         }
         
-        Int128[string] _;
-        res.cache.dateCache = hashFromDates(cfg,_);
+        res.cache.dateCache = hashFromDates(cfg,null);
     }
     catch(Throwable e)
     {
