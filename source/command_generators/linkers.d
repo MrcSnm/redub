@@ -4,52 +4,6 @@ public import buildapi;
 public import std.system;
 import command_generators.commons;
 
-private string[] convertExtensionToObj(string[] srcFiles)
-{
-    import std.algorithm: canFind;
-    import std.string : endsWith;
-    import std.array : replace;
-
-    string[] commands;
-    string[] exts = [ ".c", ".cpp", ".cxx", ".c++", ".cc", ".i" ];
-
-    foreach(string sources; srcFiles)
-    {
-        foreach (string ext; exts)
-        {
-            if (sources.endsWith(ext))
-            {
-                version (windows) {
-                    sources.replace(ext, ".obj");
-                } else {
-                    sources.replace(ext, ".o");
-                }
-
-                commands ~= sources;
-            }
-        }
-
-    }
-
-    return commands;
-}
-
-private string[] getObjectAsList(immutable BuildConfiguration b, string[] commands)
-{
-    import std.file;
-
-    string[][] allSourceFiles;
-
-    foreach(path; b.sourceFiles)
-        allSourceFiles~= getCppSourceFiles(path);
-    
-    string[] linkFiles;
-
-    foreach(sources; allSourceFiles)
-        linkFiles~= convertExtensionToObj(sources);
-
-    return linkFiles;
-}
 
 string[] parseLinkConfiguration(immutable BuildConfiguration b, OS target, Compiler compiler)
 {
@@ -63,8 +17,7 @@ string[] parseLinkConfiguration(immutable BuildConfiguration b, OS target, Compi
         if(targetType == TargetType.dynamicLibrary)
             commands~= getTargetTypeFlag(targetType, compiler);
         
-        if (targetType != TargetType.library &&
-            targetType != TargetType.staticLibrary)
+        if (targetType.isLinkedSeparately)
         {
             commands~= libraryPaths.map!((lp) => "-L-L"~lp).array;
             commands~= libraries.map!((l) => "-L-l"~l).reverseArray;
@@ -74,16 +27,12 @@ string[] parseLinkConfiguration(immutable BuildConfiguration b, OS target, Compi
             commands~= buildNormalizedPath(outputDirectory, name~getObjectExtension(target));
             commands~= "-of"~buildNormalizedPath(outputDirectory, getOutputName(targetType, name, os));
         }
-        else
+        else //Generates a static library using archiver. FIXME: BuildRequirements should know its files.
         {
-            commands ~= "--format=default";
-            commands ~= "rcs";
-            commands ~= buildNormalizedPath(outputDirectory, getOutputName(targetType, name, os));
-            
-            foreach (string key; getObjectAsList(b, commands))
-            {
-                commands ~= key;
-            }
+            commands~= "--format=default";
+            commands~= "rcs";
+            commands~= buildNormalizedPath(outputDirectory, getOutputName(targetType, name, os));
+            commands~= getObjectFiles(b, os);
         }
     }
 
@@ -127,4 +76,21 @@ string getTargetTypeFlag(TargetType o, Compiler compiler)
         case gxx: return command_generators.gnu_based_ccplusplus.getTargetTypeFlag(o);
         default: throw new Error("Unsupported compiler "~compiler.binOrPath);
     }
+}
+
+
+private string[] getObjectFiles(immutable BuildConfiguration b, OS os)
+{
+    import std.file;
+    import std.path;
+    import std.array;
+    import std.algorithm.iteration;
+
+    string[] objectFiles;
+    objectFiles~= b.sourceFiles.map!((string src) => setExtension(src, getObjectExtension(os))).array;
+
+    foreach(path; b.sourcePaths)
+        objectFiles~= getCppSourceFiles(path).map!((string src) => setExtension(src, getObjectExtension(os))).array;
+
+    return objectFiles;
 }

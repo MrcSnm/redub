@@ -36,6 +36,11 @@ struct Compiler
 }
 
 
+bool isDCompiler(immutable Compiler comp)
+{
+    return comp.compiler == AcceptedCompiler.dmd || comp.compiler == AcceptedCompiler.ldc2;
+}
+
 Compiler getCompiler(string compilerOrPath)
 {
     import std.process;

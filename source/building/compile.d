@@ -38,11 +38,13 @@ private ExecutionResult executeCommands(const string[] commandsList, string list
     return ExecutionResult(0, "Success");
 }
 
-void compile2(immutable BuildConfiguration cfg, shared ProjectNode pack, OS os, Compiler compiler, CompilationCache cache)
+void execCompilation(immutable BuildConfiguration cfg, shared ProjectNode pack, OS os, Compiler compiler, CompilationCache cache)
 {
     import std.file;
     import std.process;
     import std.datetime.stopwatch;
+    import command_generators.commons;
+
     CompilationResult res;
     res.node = pack;
     res.cache.requirementCache = cache.requirementCache;
@@ -61,9 +63,33 @@ void compile2(immutable BuildConfiguration cfg, shared ProjectNode pack, OS os, 
         }
         if(executeCommands(cfg.preBuildCommands, "preBuildCommand", res, cfg.workingDir).status)
             return;
+
+        ExecutionResult ret;
+        if(isDCompiler(compiler) && os.isWindows)
+        {
+            string[] flags = getCompilationFlags(cfg, os, compiler);
+            string commandFile = createCommandFile(cfg, os, compiler, flags, res.compilationCommand);
+            res.compilationCommand = compiler.binOrPath ~ " "~res.compilationCommand;
+            ret = executeShell(compiler.binOrPath ~ " @"~commandFile);
+            std.file.remove(commandFile);
+        }
+        else
+        {
+            ///Creates a folder to C output since it doesn't do automatically.
+            if(!isDCompiler(compiler))
+                createOutputDirFolder(cfg);
+            res.compilationCommand = getCompileCommands(cfg, os, compiler);
+            ret = executeShell(res.compilationCommand, null, Config.none, size_t.max, cfg.workingDir);
+
+            if(!isDCompiler(compiler) && !ret.status) //Always requires link.
+            {
+                CompilationResult linkRes = link(cfg, os, compiler);
+                ret.status = linkRes.status;
+                ret.output~= linkRes.message;
+                res.compilationCommand~= linkRes.compilationCommand;
+            }
+        }
         
-        res.compilationCommand = getCompileCommands(cfg, os, compiler);
-        auto ret = executeShell(res.compilationCommand, null, Config.none, size_t.max, cfg.workingDir);
 
         res.status = ret.status;
         res.message = ret.output;
@@ -76,8 +102,7 @@ void compile2(immutable BuildConfiguration cfg, shared ProjectNode pack, OS os, 
                 return;
         }
         
-        BigInt[string] _;
-        res.cache.dateCache = hashFromDates(cfg,_);
+        res.cache.dateCache = hashFromDates(cfg,null);
     }
     catch(Throwable e)
     {
@@ -97,8 +122,7 @@ CompilationResult link(immutable BuildConfiguration cfg, OS os, Compiler compile
     auto exec = executeShell(ret.compilationCommand);
     ret.status = exec.status;
     ret.message = exec.output;
-
-    if(cfg.targetType == TargetType.executable)
+    if(cfg.targetType.isLinkedSeparately)
         executeCommands(cfg.postGenerateCommands, "postGenerateCommand", ret, cfg.workingDir);
 
     return ret;
@@ -118,7 +142,7 @@ bool buildProjectParallelSimple(ProjectNode root, Compiler compiler, OS os)
             if(!(dep in spawned))
             {
                 spawned[dep] = true;
-                spawn(&compile2, 
+                spawn(&execCompilation, 
                     dep.requirements.cfg.idup, cast(shared)dep, os, 
                     compiler, CompilationCache.get(mainPackHash, dep.requirements, compiler)
                 );
@@ -152,7 +176,7 @@ bool buildProjectFullyParallelized(ProjectNode root, Compiler compiler, OS os)
     size_t i = 0;
     foreach(pack; root.collapse)
     {
-        spawn(&compile2, 
+        spawn(&execCompilation, 
             pack.requirements.cfg.idup, 
             cast(shared)pack, os, compiler, 
             cache[i++]
@@ -200,7 +224,7 @@ private void buildFailed(ProjectNode node, CompilationResult res)
 
 private bool doLink(immutable BuildRequirements req, OS os, Compiler compiler, string mainPackHash, bool isUpToDate)
 {
-    if(isUpToDate)
+    if(isUpToDate || (compiler.isDCompiler && req.cfg.targetType.isStaticLibrary))
     {
         if(isUpToDate)
             infos("Up-to-Date: ", req.name, ", skipping linking");
@@ -219,6 +243,7 @@ private bool doLink(immutable BuildRequirements req, OS os, Compiler compiler, s
     else
     {
         infos("Linked: ", req.name, " finished!");
+        vlog("\n\t", linkRes.compilationCommand, " \n");
         updateCache(mainPackHash, CompilationCache.get(mainPackHash, req, compiler), true);
 
     }

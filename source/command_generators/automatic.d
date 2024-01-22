@@ -9,26 +9,27 @@ static import command_generators.gnu_based_ccplusplus;
 static import command_generators.dmd;
 static import command_generators.ldc;
 
-string getCompileCommands(immutable BuildConfiguration cfg, OS os, Compiler compiler)
+
+string[] getCompilationFlags(immutable BuildConfiguration cfg, OS os, Compiler compiler)
 {
-    string[] flags;
     switch(compiler.compiler) with(AcceptedCompiler)
     {
         case gxx:
-            flags = command_generators.gnu_based_ccplusplus.parseBuildConfiguration(cfg, os);
-            break;
+            return command_generators.gnu_based_ccplusplus.parseBuildConfiguration(cfg, os);
         case gcc:
-            flags = command_generators.gnu_based.parseBuildConfiguration(cfg, os);
-            break;
+            return command_generators.gnu_based.parseBuildConfiguration(cfg, os);
         case dmd:
-            flags = command_generators.dmd.parseBuildConfiguration(cfg, os);
-            break;
+            return command_generators.dmd.parseBuildConfiguration(cfg, os);
         case ldc2:
-            flags = command_generators.ldc.parseBuildConfiguration(cfg, os);
-            break;
+            return command_generators.ldc.parseBuildConfiguration(cfg, os);
         default:throw new Error("Unsupported compiler "~compiler.binOrPath);
     }
 
+}
+
+string getCompileCommands(immutable BuildConfiguration cfg, OS os, Compiler compiler)
+{
+    string[] flags = getCompilationFlags(cfg,os,compiler);
     return escapeShellCommand(compiler.binOrPath ~ flags);
 }
 
@@ -37,19 +38,13 @@ string getLinkCommands(immutable BuildConfiguration cfg, OS os, Compiler compile
     import command_generators.linkers;
     string[] flags;
     
-    version(Windows) {
-        flags = parseLinkConfigurationMSVC(cfg, os, compiler);
-    }
-    else {
-        flags = parseLinkConfiguration(cfg, os, compiler);
-    }
+    version(Windows) flags = parseLinkConfigurationMSVC(cfg, os, compiler);
+    else flags = parseLinkConfiguration(cfg, os, compiler);
 
     if(compiler.compiler == AcceptedCompiler.invalid)
         throw new Error("Unsupported compiler " ~ compiler.binOrPath);
 
-    if (TargetType.library == cfg.targetType ||
-        TargetType.staticLibrary == cfg.targetType)
-        return escapeShellCommand(compiler.archiver ~ flags);
-
-    return null;
+    if(compiler.isDCompiler)
+        return escapeShellCommand(compiler.binOrPath ~ flags);
+    return escapeShellCommand(compiler.archiver ~ flags);
 }

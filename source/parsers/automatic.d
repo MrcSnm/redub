@@ -39,6 +39,7 @@ BuildRequirements parseProject(
 
 /** 
  * This function finishes some parts of the build requirement:
+ * - Merge pending configuration (this guarantees the order is always correct.)
  * - Transforms relative paths into absolute paths
  * - If no import directory exists, it will be reflected by source paths.
  * After that, it makes possible to merge with other build requirements. But, it is not completely
@@ -49,6 +50,7 @@ BuildRequirements parseProject(
 private void partiallyFinishBuildRequirements(ref BuildRequirements req)
 {
     import std.path;
+    req = req.mergePending();
     if(!isAbsolute(req.cfg.outputDirectory))
         req.cfg.outputDirectory = buildNormalizedPath(req.cfg.workingDir, req.cfg.outputDirectory);
 
