@@ -38,18 +38,13 @@ string getLinkCommands(immutable BuildConfiguration cfg, OS os, Compiler compile
     import command_generators.linkers;
     string[] flags;
     
-    version(Windows) {
-        flags = parseLinkConfigurationMSVC(cfg, os, compiler);
-    }
-    else {
-        flags = parseLinkConfiguration(cfg, os, compiler);
-    }
+    version(Windows) flags = parseLinkConfigurationMSVC(cfg, os, compiler);
+    else flags = parseLinkConfiguration(cfg, os, compiler);
 
     if(compiler.compiler == AcceptedCompiler.invalid)
         throw new Error("Unsupported compiler " ~ compiler.binOrPath);
 
-    if (TargetType.library == cfg.targetType ||
-        TargetType.staticLibrary == cfg.targetType)
+    if (cfg.targetType.isStaticLibrary)
         return escapeShellCommand(compiler.archiver ~ flags);
 
     return null;

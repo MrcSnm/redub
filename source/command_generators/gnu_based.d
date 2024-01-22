@@ -16,26 +16,9 @@ string[] parseBuildConfiguration(immutable BuildConfiguration b, OS os)
     
     with(b)
     {
-        import std.algorithm: canFind;
-
         if(isDebug) commands~= "-g";
-
         commands~= versions.map!((v) => "-D"~v~"=1").array;
-     
-        string[2][] standards = [ [ "C17", "--std=c17" ], 
-                                    [ "C11", "--std=c11" ], [ "C99", "--std=c99" ], 
-                                    [ "ANSI", "--std=c89" ] ]; 
-
-        foreach (string[2] key; standards)
-        {
-            /* check for a c++ standard */
-            if (b.dFlags.canFind(key[1]) ||
-                b.dFlags.canFind(key[0]))
-            {
-                commands ~= key[1];
-            }
-        }
-
+        commands~= dFlags;
         commands~="-v";
 
         foreach(f; sourceFiles)
@@ -52,8 +35,7 @@ string[] parseBuildConfiguration(immutable BuildConfiguration b, OS os)
         string outFlag = getTargetTypeFlag(targetType);
         if(outFlag) commands~= outFlag;
 
-        if(targetType == TargetType.dynamicLibrary ||
-            targetType == TargetType.executable)
+        if(targetType.isLinkedSeparately)
         {
             commands~= "-o";
             commands ~= buildNormalizedPath(outputDirectory, getOutputName(targetType, name, os));
