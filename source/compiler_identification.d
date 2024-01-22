@@ -41,7 +41,7 @@ bool isDCompiler(immutable Compiler comp)
     return comp.compiler == AcceptedCompiler.dmd || comp.compiler == AcceptedCompiler.ldc2;
 }
 
-Compiler getCompiler(string compilerOrPath)
+Compiler getCompiler(string compilerOrPath, string compilerAssumption)
 {
     import std.process;
     import std.exception;
@@ -66,18 +66,62 @@ Compiler getCompiler(string compilerOrPath)
         &tryInferGxx
     ];
 
-    auto compVersionRes = executeShell(compilerOrPath ~ " --version");
-    enforce(compVersionRes.status == 0, compilerOrPath~" --version returned a non zero code.");
-    string versionString = compVersionRes.output;
-
     Compiler ret;
-    foreach(inf; inference)
+    if(compilerAssumption == null)
     {
-        if(inf(compilerOrPath, versionString, ret))
-            return ret;
+        auto compVersionRes = executeShell(compilerOrPath ~ " --version");
+        enforce(compVersionRes.status == 0, compilerOrPath~" --version returned a non zero code.");
+        string versionString = compVersionRes.output;
+        foreach(inf; inference)
+        {
+            if(inf(compilerOrPath, versionString, ret))
+                return ret;
+        }
+    }
+    else
+    {
+        return assumeCompiler(compilerOrPath, compilerAssumption);
     }
     throw new Error("Could not infer which compiler you're using from "~compilerOrPath);
 }
+
+private Compiler assumeCompiler(string compilerOrPath, string compilerAssumption)
+{
+    import std.string;
+    import std.exception;
+    Compiler ret;
+    ret.binOrPath = compilerOrPath;
+    ret.versionString = compilerAssumption;
+    ptrdiff_t compEndIndex = indexOfAny(compilerAssumption, [' ']);
+    enforce(compEndIndex != -1, "Expected 'compiler v[...] f[...]'. The compiler assumption must have a space between it and its version/frontend");
+    string compiler = compilerAssumption[0..compEndIndex];
+
+    switch(compiler)
+    {
+        case "dmd":
+            ptrdiff_t _;
+            string dmdVer = inBetween(compilerOrPath, "v[", "]", _);
+            enforce(dmdVer is null, "Can only assume compiler with versions, received "~compilerAssumption);
+            string feVer = inBetween(compilerOrPath, "f[", "]", _);
+            ret.compiler = AcceptedCompiler.dmd;
+            ret.version_ = SemVer(dmdVer);
+            ret.frontendVersion = feVer is null ? ret.version_ : SemVer(feVer);
+            break;
+        case "ldc", "ldc2":
+            ptrdiff_t _;
+            string ldcVer = inBetween(compilerOrPath, "v[", "]", _);
+            enforce(ldcVer is null, "Can only assume compiler with versions, received "~compilerAssumption);
+            string feVer = inBetween(compilerOrPath, "f[", "]", _);
+            enforce(feVer is null, "LDC2 must contain a frontend version, received "~compilerAssumption);
+            ret.compiler = AcceptedCompiler.ldc2;
+            ret.version_ = SemVer(ldcVer);
+            ret.frontendVersion = SemVer(feVer);
+            break;
+        default: throw new Error("Can only assume dmd, ldc and ldc2 at this moment, received "~compilerAssumption);
+    }
+    return ret;
+}
+
 
 private bool tryInferLdc(string compilerOrPath, string vString, out Compiler comp)
 {

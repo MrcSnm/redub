@@ -208,7 +208,7 @@ private ProjectDetails resolveDependencies(string[] args)
     parsers.environment.setupBuildEnvironmentVariables(bArgs, DubBuildArguments.init, os, args);
     StopWatch st = StopWatch(AutoStart.yes);
 
-    Compiler compiler = getCompiler(bArgs.compiler);
+    Compiler compiler = getCompiler(bArgs.compiler, bArgs.compilerAssumption);
 
     BuildRequirements req = parseProject(workingDir, bArgs.compiler, BuildRequirements.Configuration(bArgs.config, false), subPackage, recipe);
     parsers.environment.setupEnvironmentVariablesForRootPackage(cast(immutable)req);

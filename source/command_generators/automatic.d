@@ -22,7 +22,7 @@ string[] getCompilationFlags(immutable BuildConfiguration cfg, OS os, Compiler c
             return command_generators.dmd.parseBuildConfiguration(cfg, os);
         case ldc2:
             return command_generators.ldc.parseBuildConfiguration(cfg, os);
-        default:throw new Error("Unsupported compiler "~compiler.binOrPath);
+        default:throw new Error("Unsupported compiler '"~compiler.binOrPath~"'");
     }
 
 }
@@ -42,7 +42,7 @@ string getLinkCommands(immutable BuildConfiguration cfg, OS os, Compiler compile
     else flags = parseLinkConfiguration(cfg, os, compiler);
 
     if(compiler.compiler == AcceptedCompiler.invalid)
-        throw new Error("Unsupported compiler " ~ compiler.binOrPath);
+        throw new Error("Unsupported compiler '" ~ compiler.binOrPath~"'");
 
     if(compiler.isDCompiler)
         return escapeShellCommand(compiler.binOrPath ~ flags);

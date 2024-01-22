@@ -116,6 +116,14 @@ struct DubArguments
     )
     string compiler = "dmd";
 
+    @(
+        "Specifies a version string which contains the compiler name and its version "~
+        "This can make the dependency resolution a lot faster since executing compiler --version won't be necessary "~
+        "Valid format: \"dmd v[2.106.0]\", \"ldc2 v[1.36.0] f[2.105.0]\" - v stands for compiler version, f for frontend"
+    )
+    @("assume-compiler")
+    string compilerAssumption;
+
     @("Force a different architecture (e.g. x86 or x86_64)")
     @("a|arch")
     string arch;
