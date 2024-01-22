@@ -19,6 +19,7 @@ string[] parseBuildConfiguration(immutable BuildConfiguration b, OS os)
         if(isDebug) commands~= "-g";
 
         commands~= versions.map!((v) => "-D"~v~"=1").array;
+        commands~= dFlags;
         commands~="-v";
 
         foreach(f; sourceFiles)

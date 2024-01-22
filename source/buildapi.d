@@ -182,33 +182,98 @@ struct BuildConfiguration
         return ret;
     }
 }
+
+/**
+*   Optimized for direct memory allocation.
+*/
 ref string[] exclusiveMerge (return scope ref string[] a, string[] b)
 {
-    import std.algorithm.searching:countUntil;
-    foreach(v; b)
-        if(a.countUntil(v) == -1) a~= v;
+    size_t notFoundCount;
+    foreach(bV; b)
+    {
+        bool found = false;
+        foreach(aV; a)
+        {
+            if(aV == bV) 
+            {
+                found = true;
+                break;
+            }
+        }
+        if(!found) notFoundCount++;
+    }
+
+    if(notFoundCount)
+    {
+        size_t length = a.length;
+        a.length+= notFoundCount;
+        foreach(bV; b)
+        {
+            bool found = false;
+            foreach(i; 0..length)
+            {
+                if(a[i] == bV)
+                {
+                    found = true;
+                    break;
+                }
+            }
+            if(!found)
+                a[length++] = bV;
+        }
+    }
     return a;
 }
 
 /** 
  * Used when dealing with paths. It normalizes them for not getting the same path twice.
+ * This function has been optimized for less memory allocation
  */
 ref string[] exclusiveMergePaths(return scope ref string[] a, string[] b)
 {
-    import std.algorithm.searching:countUntil;
-    foreach(v; b)
+    static string noTrailingSlash(string input)
     {
-        string normB = buildNormalizedPath(v);
-        ptrdiff_t index = -1;
-        foreach(i, path; a)
+        if(input.length > 0 && (input[$-1] == '\\' || input[$-1] == '/')) return input[0..$-1];
+        return input;
+    }
+    static string noInitialDot(string input)
+    {
+        if(input.length > 1 && input[0] == '.' && (input[1] == '/' || input[1] == '\\')) return input[2..$];
+        return input;
+    }
+    static string fixPath(string input)
+    {
+        return noTrailingSlash(noInitialDot(input));
+    }
+    size_t countToMerge;
+    foreach(bPath; b)
+    {
+        bool found;
+        foreach(aPath; a)
         {
-            if(buildNormalizedPath(path) == normB)
-            {
-                index = i;
+            found = fixPath(bPath) == fixPath(aPath);
+            if(found)
                 break;
-            }
         }
-        if(index == -1) a~= v;
+        if(!found)
+            countToMerge++;
+    } 
+    if(countToMerge > 0)
+    {
+        size_t putStart = a.length, length = a.length ;
+        a.length+= countToMerge;
+        foreach(bPath; b) 
+        {
+            bool found;
+            foreach(i; 0..length)
+            {
+                found = fixPath(bPath) == fixPath(a[i]);
+                if(found)
+                    break;
+            }
+            if(!found)
+                a[putStart++] = bPath;
+        }
     }
     return a;
 }

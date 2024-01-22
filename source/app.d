@@ -52,6 +52,9 @@ int main(string[] args)
         case "clean":
             args = args[0] ~ args[2..$];
             return cleanMain(args);
+        case "describe":
+            args = args[0] ~ args[2..$];
+            return describeMain(args);
         case "run":
             args = args[0] ~ args[2..$];
             goto default;
@@ -93,6 +96,18 @@ int runMain(string[] args)
         buildNormalizedPath(d.tree.requirements.cfg.outputDirectory, 
         d.tree.requirements.cfg.name~getExecutableExtension(os)) ~  execArgs
     ));
+}
+
+int describeMain(string[] args)
+{
+    ProjectDetails d = resolveDependencies(args);
+    if(!d.tree)
+        return 1;
+
+    
+
+
+    return 0;
 }
 
 int cleanMain(string[] args)
@@ -237,6 +252,6 @@ private void updateVerbosity(DubCommonArguments a)
     if(a.verror) return setLogLevel(LogLevel.error);
     if(a.quiet) return setLogLevel(LogLevel.warn);
     if(a.verbose) return setLogLevel(LogLevel.verbose);
-    if(a.vverbose) return setLogLevel(LogLevel.verbose);
+    if(a.vverbose) return setLogLevel(LogLevel.vverbose);
     return setLogLevel(LogLevel.info);
 }
