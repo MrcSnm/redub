@@ -11,18 +11,32 @@ string[] parseLinkConfiguration(immutable BuildConfiguration b, OS target, Compi
     import std.path;
     import std.array;
     string[] commands;
+
     with(b)
     {
         if(targetType == TargetType.dynamicLibrary)
             commands~= getTargetTypeFlag(targetType, compiler);
-        commands~= libraryPaths.map!((lp) => "-L-L"~lp).array;
-        commands~= libraries.map!((l) => "-L-l"~l).reverseArray;
-        commands~= getLinkFiles(b.sourceFiles);
-        commands~= linkFlags.map!((l) => "-L"~l).array;
         
-        commands~= buildNormalizedPath(outputDirectory, name~getObjectExtension(target));
-        commands~= "-of"~buildNormalizedPath(outputDirectory, getOutputName(targetType, name, os));
+        if (targetType != TargetType.library &&
+            targetType != TargetType.staticLibrary)
+        {
+            commands~= libraryPaths.map!((lp) => "-L-L"~lp).array;
+            commands~= libraries.map!((l) => "-L-l"~l).reverseArray;
+            commands~= getLinkFiles(b.sourceFiles);
+            commands~= linkFlags.map!((l) => "-L"~l).array;
+            
+            commands~= buildNormalizedPath(outputDirectory, name~getObjectExtension(target));
+            commands~= "-of"~buildNormalizedPath(outputDirectory, getOutputName(targetType, name, os));
+        }
+        else
+        {
+            commands ~= "--format=default";
+            commands ~= "rcs";
+            commands ~= buildNormalizedPath(outputDirectory, getOutputName(targetType, name, os));
+            commands ~= getLinkFiles(b.sourceFiles);
+        }
     }
+
     return commands;
 }
 

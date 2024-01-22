@@ -2,8 +2,9 @@
 	"authors": [
 		"Amlal El Mahrouss"
 	],
+	"dflags": [ "--std=c++20" ],
 	"sourcePaths": ["source"],
-	"targetType": "staticLibrary",
+	"targetType": "dynamicLibrary",
 	"configurations": [
 		{
 			"name": "Linux",
@@ -17,5 +18,5 @@
 	"copyright": "Copyright © 2024, Amlal El Mahrouss",
 	"description": "A minimal C++ application.",
 	"license": "MIT",
-	"name": "gcc_example"
+	"name": "gxx_example"
 }

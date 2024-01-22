@@ -37,10 +37,22 @@ string getLinkCommands(immutable BuildConfiguration cfg, OS os, Compiler compile
 {
     import command_generators.linkers;
     string[] flags;
-    version(Windows) flags = parseLinkConfigurationMSVC(cfg, os, compiler);
-    else flags = parseLinkConfiguration(cfg, os, compiler);
+    
+    version(Windows) {
+        flags = parseLinkConfigurationMSVC(cfg, os, compiler);
+    }
+    else {
+        flags = parseLinkConfiguration(cfg, os, compiler);
+    }
 
     if(compiler.compiler == AcceptedCompiler.invalid)
-        throw new Error("Unsupported compiler "~compiler.binOrPath);
-    return escapeShellCommand(compiler.binOrPath ~ flags);
+        throw new Error("Unsupported compiler " ~ compiler.binOrPath);
+
+    if (TargetType.library == cfg.targetType ||
+        TargetType.staticLibrary == cfg.targetType)
+        return escapeShellCommand(compiler.archiver ~ flags);
+    else if (TargetType.executable == cfg.targetType)
+        return escapeShellCommand(compiler.binOrPath ~ flags);
+
+    return null;
 }
