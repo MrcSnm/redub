@@ -4,6 +4,7 @@ import std.array;
 import std.path;
 import std.file;
 import std.process;
+import redub_api;
 
 import compiler_identification;
 import logging;
@@ -13,7 +14,7 @@ import tree_generators.dub;
 import cli.dub;
 import command_generators.commons;
 
-enum RedubVersion = "Redub - A reimagined DUB: v1.0.3";
+enum RedubVersion = "Redub - A reimagined DUB: v1.1.0";
 
 
 string formatError(string err)
@@ -64,23 +65,9 @@ int main(string[] args)
 }
 
 
-auto timed(T)(scope T delegate() action)
-{
-    import std.datetime.stopwatch;
-    StopWatch sw = StopWatch(AutoStart.yes);
-    static struct Value
-    {
-        T value;
-        long msecs;
-    }
-    Value ret = Value(action());
-    ret.msecs = sw.peek.total!"msecs";
-    return ret;
-}
-
 int runMain(string[] args)
 {
-    ProjectDetails d = buildBase(args);
+    ProjectDetails d = buildProject(resolveDependencies(args));
     if(!d.tree) return 1;
     if(d.tree.requirements.cfg.targetType != TargetType.executable)
         return 1;
@@ -103,9 +90,6 @@ int describeMain(string[] args)
     ProjectDetails d = resolveDependencies(args);
     if(!d.tree)
         return 1;
-
-    
-
 
     return 0;
 }
@@ -142,94 +126,56 @@ int cleanMain(string[] args)
 
 int buildMain(string[] args)
 {
-    if(!buildBase(args).tree)
+    if(!buildProject(resolveDependencies(args)).tree)
         return 1;
     return 0;
 }
 
-private ProjectDetails buildBase(string[] args)
+
+ProjectDetails resolveDependencies(string[] args)
 {
-    import building.compile;
-    import std.system;
-    
-    ProjectDetails d = resolveDependencies(args);
-
-    if(!d.tree)
-        return d;
-
-    ProjectNode tree = d.tree;
-
-    auto result = timed(()
-    {
-        if(tree.isFullyParallelizable)
-        {
-            info("Project ", tree.name," is fully parallelizable! Will build everything at the same time");
-            return buildProjectFullyParallelized(tree, d.compiler, os); 
-        }
-        else
-            return buildProjectParallelSimple(tree, d.compiler, os); 
-    });
-    bool buildSucceeded = result.value;
-    if(!buildSucceeded)
-        throw new Error("Build failure");
-    info("Built project in ", result.msecs, " ms.");
-
-    return d;
-}
-
-private ProjectDetails resolveDependencies(string[] args)
-{
-    import std.getopt;
-    import std.datetime.stopwatch;
-    import std.system;
-    import building.cache;
-    import package_searching.entry;
+    import std.algorithm.comparison:either;
     static import parsers.environment;
-    static import command_generators.dmd;
-
+    import redub_api;
     string subPackage = parseSubpackageFromCli(args);
     string workingDir = std.file.getcwd();
     string recipe;
+
     DubArguments bArgs;
     GetoptResult res = betterGetopt(args, bArgs);
     if(res.helpWanted)
     {
+        import std.getopt;
         defaultGetoptPrinter("redub build information\n\t", res.options);
         return ProjectDetails.init;
     }
     updateVerbosity(bArgs.cArgs);
     if(bArgs.arch) bArgs.compiler = "ldc2";
-
     DubCommonArguments cArgs = bArgs.cArgs;
     if(cArgs.root)
         workingDir = cArgs.getRoot(workingDir);
     if(cArgs.recipe)
         recipe = cArgs.getRecipe(workingDir);
-    parsers.environment.setupBuildEnvironmentVariables(bArgs, DubBuildArguments.init, os, args);
-    StopWatch st = StopWatch(AutoStart.yes);
 
-    Compiler compiler = getCompiler(bArgs.compiler, bArgs.compilerAssumption);
+    return redub_api.resolveDependencies(
+        bArgs.build.force,
+        os,
+        CompilationDetails(either(bArgs.compiler, "dmd"), bArgs.arch, bArgs.compilerAssumption),
+        ProjectToParse(bArgs.config, workingDir, subPackage, recipe),
+        getInitialDubVariablesFromArguments(bArgs, DubBuildArguments.init, os, args)
+    );
 
-    BuildRequirements req = parseProject(workingDir, bArgs.compiler, BuildRequirements.Configuration(bArgs.config, false), subPackage, recipe);
-    parsers.environment.setupEnvironmentVariablesForRootPackage(cast(immutable)req);
-    req.cfg = req.cfg.merge(parsers.environment.parse());
-
-    ProjectNode tree = getProjectTree(req, bArgs.compiler);
-    parsers.environment.setupEnvironmentVariablesForPackageTree(tree);
-
-    if(bArgs.build.force)
-        tree.invalidateCacheOnTree();
-    else 
-        invalidateCaches(tree, compiler);
-    
-    info("Dependencies resolved in ", (st.peek.total!"msecs"), " ms.") ;
-    return ProjectDetails(tree, compiler);
 }
 
-private struct ProjectDetails
+void updateVerbosity(DubCommonArguments a)
 {
-    ProjectNode tree;
-    Compiler compiler;
+    import logging;
+    if(a.vquiet) return setLogLevel(LogLevel.none);
+    if(a.verror) return setLogLevel(LogLevel.error);
+    if(a.quiet) return setLogLevel(LogLevel.warn);
+    if(a.verbose) return setLogLevel(LogLevel.verbose);
+    if(a.vverbose) return setLogLevel(LogLevel.vverbose);
+    return setLogLevel(LogLevel.info);
 }
 
 private string parseSubpackageFromCli(ref string[] args)
@@ -243,15 +189,4 @@ private string parseSubpackageFromCli(ref string[] args)
     ret = args[subPackIndex][1..$];
     args = args[0..subPackIndex] ~ args[subPackIndex+1..$];
     return ret;
-}
-
-private void updateVerbosity(DubCommonArguments a)
-{
-    import logging;
-    if(a.vquiet) return setLogLevel(LogLevel.none);
-    if(a.verror) return setLogLevel(LogLevel.error);
-    if(a.quiet) return setLogLevel(LogLevel.warn);
-    if(a.verbose) return setLogLevel(LogLevel.verbose);
-    if(a.vverbose) return setLogLevel(LogLevel.vverbose);
-    return setLogLevel(LogLevel.info);
 }

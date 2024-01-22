@@ -33,6 +33,19 @@ struct Compiler
 
     ///Librarian tool
     string archiver = "llvm-ar";
+
+
+    string getCompilerString() const
+    {
+        final switch(compiler) with(AcceptedCompiler)
+        {
+            case dmd: return "dmd";
+            case ldc2: return "ldc";
+            case gcc: return "gcc";
+            case gxx: return "g++";
+            case invalid: throw new Error("Invalid compiler.");
+        }
+    }
 }
 
 

@@ -1,4 +1,5 @@
 module cli.dub;
+public import std.getopt;
 
 /// The URL to the official package registry and it's default fallback registries.
 static immutable string[] defaultRegistryURLs = [
@@ -186,7 +187,6 @@ struct DubBuildArguments
 }
 
 
-import std.getopt;
 
 GetoptResult betterGetopt(T)(ref string[] args, out T opts) if(is(T == struct))
 {

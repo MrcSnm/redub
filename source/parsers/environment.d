@@ -74,7 +74,7 @@ struct InitialDubVariables
     ///"TRUE" if the --temp-build flag was used, empty otherwise
     string DUB_TEMP_BUILD ;
     ///"TRUE" if the --parallel flag was used, empty otherwise
-    string DUB_PARALLEL_BUILD ;
+    string DUB_PARALLEL_BUILD="TRUE";
     ///Contains the arguments passed to the built executable in shell compatible format
     string DUB_RUN_ARGS ;
 
@@ -118,28 +118,31 @@ struct PackageDubVariables
 
 }
 
-void setupBuildEnvironmentVariables(DubArguments args, DubBuildArguments bArgs, OS os, string[] rawArgs)
+void setupBuildEnvironmentVariables(InitialDubVariables dubVars)
 {
-    import std.file:getcwd;
+    static foreach(member; __traits(allMembers, InitialDubVariables))
+    {
+        if(__traits(child, dubVars, member).length)
+            environment[member] = __traits(child, dubVars, member);
+    }
+}
+
+
+InitialDubVariables getInitialDubVariablesFromArguments(DubArguments args, DubBuildArguments bArgs, OS os, string[] rawArgs)
+{
+    import std.file;
     InitialDubVariables dubVars;
     dubVars.DUB_BUILD_TYPE = args.buildType;
     dubVars.DUB_CONFIG = args.config;
     dubVars.DC_BASE = args.compiler;
     dubVars.DUB_ARCH = args.arch;
     dubVars.DUB_PLATFORM = os.str;
-    dubVars.DUB_PARALLEL_BUILD = true.str;
     dubVars.DUB_TEMP_BUILD = bArgs.tempBuild.str;
     dubVars.DUB_RDMD = bArgs.rdmd.str;
     dubVars.DUB_FORCE = bArgs.force.str;
     dubVars.DUB_RUN_ARGS = escapeShellCommand(rawArgs[1..$]);
-    dubVars.DUB_WORKING_DIRECTORY = getcwd();
-    
-
-    static foreach(member; __traits(allMembers, InitialDubVariables))
-    {
-        if(__traits(child, dubVars, member).length)
-            environment[member] = __traits(child, dubVars, member);
-    }
+    dubVars.DUB_WORKING_DIRECTORY = args.cArgs.getRoot(std.file.getcwd());
+    return dubVars;
 }
 
 void setupEnvironmentVariablesForRootPackage(immutable BuildRequirements root)
@@ -275,7 +278,7 @@ private string toUppercase(string a)
 
 
 
-private string str(OS os)
+string str(OS os)
 {
     switch(os)
     {
@@ -285,4 +288,4 @@ private string str(OS os)
         default: return "posix";
     }
 }
-private string str(bool b){return b ? "TRUE" : "FALSE";}
+string str(bool b){return b ? "TRUE" : "FALSE";}
