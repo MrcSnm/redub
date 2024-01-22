@@ -1,5 +1,5 @@
 {
-    "fileVersion": 1,
+	"fileVersion": 1,
 	"versions": {
 		"colorize": {"path":"colorize"},
 		"semver": {"path":"semver"}

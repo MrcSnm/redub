@@ -80,11 +80,20 @@ void execCompilation(immutable BuildConfiguration cfg, shared ProjectNode pack, 
                 createOutputDirFolder(cfg);
             res.compilationCommand = getCompileCommands(cfg, os, compiler);
             ret = executeShell(res.compilationCommand, null, Config.none, size_t.max, cfg.workingDir);
+
+            if(!isDCompiler(compiler) && !ret.status) //Always requires link.
+            {
+                CompilationResult linkRes = link(cfg, os, compiler);
+                ret.status = linkRes.status;
+                ret.output~= linkRes.message;
+                res.compilationCommand~= linkRes.compilationCommand;
+            }
         }
         
 
         res.status = ret.status;
         res.message = ret.output;
+
         if(res.status == 0)
         {
             if(executeCommands(cfg.postBuildCommands, "postBuildCommand", res, cfg.workingDir).status)
@@ -107,6 +116,7 @@ CompilationResult link(immutable BuildConfiguration cfg, OS os, Compiler compile
 {
     import std.process;
     CompilationResult ret;
+
     ret.compilationCommand = getLinkCommands(cfg, os, compiler);
 
     auto exec = executeShell(ret.compilationCommand);
@@ -214,7 +224,7 @@ private void buildFailed(ProjectNode node, CompilationResult res)
 
 private bool doLink(immutable BuildRequirements req, OS os, Compiler compiler, string mainPackHash, bool isUpToDate)
 {
-    if(req.cfg.targetType.isStaticLibrary || isUpToDate)
+    if(isUpToDate || (compiler.isDCompiler && req.cfg.targetType.isStaticLibrary))
     {
         if(isUpToDate)
             infos("Up-to-Date: ", req.name, ", skipping linking");

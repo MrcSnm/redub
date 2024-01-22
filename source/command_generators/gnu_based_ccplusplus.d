@@ -3,20 +3,22 @@ module command_generators.gnu_based_ccplusplus;
 public import buildapi;
 public import std.system;
 import command_generators.commons;
+import logging;
 
-/// Parse GCC configuration
+/// Parse G++ configuration
 string[] parseBuildConfiguration(immutable BuildConfiguration b, OS os)
 {
     import std.algorithm.iteration:map;
     import std.array:array;
     import std.path;
     
-    string[] commands = [ "" ];
+    string[] commands;
+    
     with(b)
     {
-        if(isDebug) commands~= "-g ";
+        if(isDebug) commands~= "-g";
+
         commands~= versions.map!((v) => "-D"~v~"=1").array;
-        commands~= "--std=c++17"; // FIXME
         commands~="-v";
 
         foreach(f; sourceFiles)
@@ -27,19 +29,17 @@ string[] parseBuildConfiguration(immutable BuildConfiguration b, OS os)
 
         commands~= importDirectories.map!((i) => "-I"~i).array;
 
-        if(targetType == TargetType.executable)
-            commands~= "-c"; //Compile only
-        
-        string outFlag = getTargetTypeFlag(targetType);
-        if(outFlag) commands~= outFlag;
-
         foreach(path; sourcePaths)
             commands~= getCppSourceFiles(buildNormalizedPath(workingDir, path));
 
-        if(targetType != TargetType.executable)
-            commands~= "-o"~buildNormalizedPath(outputDirectory, getOutputName(targetType, name, os));
-        else
-            commands~= "-o"~buildNormalizedPath(outputDirectory, name~getObjectExtension(os));
+        string outFlag = getTargetTypeFlag(targetType);
+        if(outFlag) commands~= outFlag;
+
+        if(targetType.isLinkedSeparately)
+        {
+            commands~= "-o " ~ buildNormalizedPath(outputDirectory, getOutputName(targetType, name, os));
+        }
+
     }
 
     return commands;
@@ -50,8 +50,8 @@ string getTargetTypeFlag(TargetType o)
     final switch(o) with(TargetType)
     {
         case none: throw new Error("Invalid targetType: none");
-        case autodetect, executable, sourceLibrary, staticLibrary: return null;
+        case autodetect, executable, sourceLibrary: return null;
         case dynamicLibrary: return "-shared";
-        case library: return null;
+        case staticLibrary, library: return "-c";
     }
 }

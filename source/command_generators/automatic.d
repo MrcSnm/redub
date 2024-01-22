@@ -37,10 +37,14 @@ string getLinkCommands(immutable BuildConfiguration cfg, OS os, Compiler compile
 {
     import command_generators.linkers;
     string[] flags;
+    
     version(Windows) flags = parseLinkConfigurationMSVC(cfg, os, compiler);
     else flags = parseLinkConfiguration(cfg, os, compiler);
 
     if(compiler.compiler == AcceptedCompiler.invalid)
-        throw new Error("Unsupported compiler "~compiler.binOrPath);
-    return escapeShellCommand(compiler.binOrPath ~ flags);
+        throw new Error("Unsupported compiler " ~ compiler.binOrPath);
+
+    if(compiler.isDCompiler)
+        return escapeShellCommand(compiler.binOrPath ~ flags);
+    return escapeShellCommand(compiler.archiver ~ flags);
 }
