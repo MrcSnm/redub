@@ -1,0 +1,12 @@
+{
+	"authors": [
+		"Hipreme"
+	],
+	"copyright": "Copyright © 2024, Hipreme",
+	"dependencies": {
+		"redub": "~>1.1.0"
+	},
+	"description": "A minimal D application.",
+	"license": "proprietary",
+	"name": "redub_lib"
+}

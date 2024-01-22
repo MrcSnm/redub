@@ -4,17 +4,17 @@ import std.array;
 import std.path;
 import std.file;
 import std.process;
-import redub_api;
+import redub.api;
 
-import compiler_identification;
-import logging;
-import buildapi;
-import parsers.automatic;
-import tree_generators.dub;
-import cli.dub;
-import command_generators.commons;
+import redub.compiler_identification;
+import redub.logging;
+import redub.buildapi;
+import redub.parsers.automatic;
+import redub.tree_generators.dub;
+import redub.cli.dub;
+import redub.command_generators.commons;
 
-enum RedubVersion = "Redub - A reimagined DUB: v1.1.0";
+enum RedubVersion = "Redub - A reimagined DUB: v1.2.0";
 
 
 string formatError(string err)
@@ -77,7 +77,7 @@ int runMain(string[] args)
     if(execArgsInit != -1) execArgs = " " ~ escapeShellCommand(args[execArgsInit+1..$]);
 
 
-    import command_generators.commons;
+    import redub.command_generators.commons;
     
     return wait(spawnShell(
         buildNormalizedPath(d.tree.requirements.cfg.outputDirectory, 
@@ -135,8 +135,7 @@ int buildMain(string[] args)
 ProjectDetails resolveDependencies(string[] args)
 {
     import std.algorithm.comparison:either;
-    static import parsers.environment;
-    import redub_api;
+    import redub.api;
     string subPackage = parseSubpackageFromCli(args);
     string workingDir = std.file.getcwd();
     string recipe;
@@ -157,7 +156,7 @@ ProjectDetails resolveDependencies(string[] args)
     if(cArgs.recipe)
         recipe = cArgs.getRecipe(workingDir);
 
-    return redub_api.resolveDependencies(
+    return redub.api.resolveDependencies(
         bArgs.build.force,
         os,
         CompilationDetails(either(bArgs.compiler, "dmd"), bArgs.arch, bArgs.compilerAssumption),
@@ -169,7 +168,7 @@ ProjectDetails resolveDependencies(string[] args)
 
 void updateVerbosity(DubCommonArguments a)
 {
-    import logging;
+    import redub.logging;
     if(a.vquiet) return setLogLevel(LogLevel.none);
     if(a.verror) return setLogLevel(LogLevel.error);
     if(a.quiet) return setLogLevel(LogLevel.warn);

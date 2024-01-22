@@ -1,9 +1,11 @@
 build
+.history
 *.exe
+.vs
 *.a
 *.lib
 *.o
 *.obj
 bin
 .DS_Store
-a.out
+*.out

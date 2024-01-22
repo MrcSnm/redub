@@ -1,0 +1,16 @@
+.dub
+docs.json
+__dummy.html
+docs/
+/redub_lib
+redub_lib.so
+redub_lib.dylib
+redub_lib.dll
+redub_lib.a
+redub_lib.lib
+redub_lib-test-*
+*.exe
+*.pdb
+*.o
+*.obj
+*.lst
