@@ -107,6 +107,47 @@ string getOutputName(TargetType t, string name, OS os)
     return outputName;
 }
 
+void putSourceFiles(
+    ref string[] output,
+    const string workingDir,
+    const string[] paths, 
+    const string[] files, 
+    const string[] excludeFiles,
+    scope const string[] extensions...
+)
+{
+    import std.file;
+    import std.path;
+    import std.string:endsWith;
+    import std.algorithm.searching;
+
+    size_t length = output.length;
+    output.length+= files.length;
+
+    foreach(i, f; files)
+    {
+        if(!isAbsolute(f)) output[length+i] = buildNormalizedPath(workingDir, f);
+        else output[length+i] = f;
+    }
+
+    foreach(path; paths)
+    {
+        foreach(DirEntry e; dirEntries(path, SpanMode.depth))
+        {
+            if(countUntil(excludeFiles, e.name) != -1)
+                continue;
+            foreach(ext; extensions) 
+            {
+                if(e.name.endsWith(ext))
+                {
+                    output~= e.name;
+                    break;
+                }
+            }
+        }
+    }
+}
+
 string[] getDSourceFiles(string path)
 {
     import std.file;
@@ -115,31 +156,6 @@ string[] getDSourceFiles(string path)
     import std.algorithm.iteration;
     return dirEntries(path, SpanMode.depth)
         .filter!((entry) => entry.name.endsWith(".d")).map!((entry => entry.name)).array;
-}
-
-
-string[] getCSourceFiles(string path)
-{
-    import std.file;
-    import std.string:endsWith;
-    import std.array;
-    import std.algorithm.iteration;
-    return dirEntries(path, SpanMode.depth)
-        .filter!((entry) => entry.name.endsWith(".c") || entry.name.endsWith(".i"))
-        .map!((entry => entry.name)).array;
-}
-
-string[] getCppSourceFiles(string path)
-{
-    import std.file;
-    import std.string:endsWith;
-    import std.array;
-    import std.algorithm.iteration;
-    return dirEntries(path, SpanMode.depth)
-        .filter!((entry){ return entry.name.endsWith(".c") || entry.name.endsWith(".cpp") ||
-                              entry.name.endsWith(".cc") || entry.name.endsWith(".i") || entry.name.endsWith(".cxx") ||
-                            entry.name.endsWith(".c++"); })
-        .map!((entry => entry.name)).array;
 }
 
 string[] getLinkFiles(const string[] filesToLink)

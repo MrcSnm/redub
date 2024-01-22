@@ -54,6 +54,7 @@ struct BuildConfiguration
     string[] dFlags;
     string[] sourcePaths;
     string[] sourceFiles;
+    string[] excludeSourceFiles;
     string[] preGenerateCommands;
     string[] postGenerateCommands;
     string[] preBuildCommands;
@@ -100,6 +101,7 @@ struct BuildConfiguration
             dFlags.idup,
             sourcePaths.idup,
             sourceFiles.idup,
+            excludeSourceFiles.idup,
             preGenerateCommands.idup,
             postGenerateCommands.idup,
             preBuildCommands.idup,
@@ -121,6 +123,7 @@ struct BuildConfiguration
         ret.targetType = either(other.targetType, ret.targetType);
         ret.stringImportPaths.exclusiveMergePaths(other.stringImportPaths);
         ret.sourceFiles.exclusiveMerge(other.sourceFiles);
+        ret.excludeSourceFiles.exclusiveMerge(other.excludeSourceFiles);
         ret.sourcePaths.exclusiveMergePaths(other.sourcePaths);
         ret.importDirectories.exclusiveMergePaths(other.importDirectories);
         ret.versions.exclusiveMerge(other.versions);

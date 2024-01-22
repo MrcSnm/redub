@@ -8,6 +8,14 @@
         "debugInfoC",
         "debugMode"
     ],
+    "configurations": [
+        {"name": "cli"},
+        {
+            "name": "library",
+            "targetType": "staticLibrary",
+            "excludedSourceFiles": ["source/app.d"]
+        }
+    ],
     "license": "MIT",
     "dependencies": {
         "semver": {"path": "semver"},

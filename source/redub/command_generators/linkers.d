@@ -87,10 +87,6 @@ private string[] getObjectFiles(immutable BuildConfiguration b, OS os)
     import std.algorithm.iteration;
 
     string[] objectFiles;
-    objectFiles~= b.sourceFiles.map!((string src) => setExtension(src, getObjectExtension(os))).array;
-
-    foreach(path; b.sourcePaths)
-        objectFiles~= getCppSourceFiles(path).map!((string src) => setExtension(src, getObjectExtension(os))).array;
-
-    return objectFiles;
+    putSourceFiles(objectFiles, b.workingDir, b.sourcePaths, b.sourceFiles, b.excludeSourceFiles, ".c", ".cpp", ".cc", ".i", ".cxx", ".c++");
+    return objectFiles.map!((src) => setExtension(src, getObjectExtension(os))).array;
 }

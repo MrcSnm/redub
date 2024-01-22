@@ -1,8 +1,8 @@
 {
 	"fileVersion": 1,
 	"versions": {
-		"colorize": {"path":"../../../../AppData/Local/dub/packages/redub/1.1.0/redub/colorize"},
-		"redub": "1.1.0",
-		"semver": {"path":"../../../../AppData/Local/dub/packages/redub/1.1.0/redub/semver"}
+		"colorize": {"path":"../../../../AppData/Local/dub/packages/redub/1.2.0/redub/colorize"},
+		"redub": "1.2.0",
+		"semver": {"path":"../../../../AppData/Local/dub/packages/redub/1.2.0/redub/semver"}
 	}
 }

@@ -38,6 +38,7 @@ void addSourcePaths(ref BuildRequirements req, string[] paths, ParseConfig c)
     else req.cfg.sourcePaths.exclusiveMergePaths(paths);
 }
 void addSourceFiles(ref BuildRequirements req, string[] files, ParseConfig c){req.cfg.sourceFiles.exclusiveMerge(files);}
+void addExcludedSourceFiles(ref BuildRequirements req, string[] files, ParseConfig c){req.cfg.excludeSourceFiles.exclusiveMerge(files);}
 void addLibPaths(ref BuildRequirements req, string[] paths, ParseConfig c){req.cfg.libraryPaths.exclusiveMerge(paths);}
 void addLibs(ref BuildRequirements req, string[] libs, ParseConfig c){req.cfg.libraries.exclusiveMerge(libs);}
 void addVersions(ref BuildRequirements req, string[] vers, ParseConfig c){req.cfg.versions.exclusiveMerge(vers);}

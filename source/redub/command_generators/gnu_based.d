@@ -23,17 +23,9 @@ string[] parseBuildConfiguration(immutable BuildConfiguration b, OS os)
         commands~= versions.map!((v) => "-D"~v~"=1").array;
         commands~= dFlags;
         commands~="-v";
-
-        foreach(f; sourceFiles)
-        {
-            if(!isAbsolute(f)) commands ~= buildNormalizedPath(workingDir, f);
-            else commands ~= f;
-        }
-
         commands~= importDirectories.map!((i) => "-I"~i).array;
+        putSourceFiles(commands, workingDir, sourcePaths, sourceFiles, excludeSourceFiles, ".c", ".i");
 
-        foreach(path; sourcePaths)
-            commands~= getCppSourceFiles(buildNormalizedPath(workingDir, path));
 
         string outFlag = getTargetTypeFlag(targetType);
         if(outFlag) commands~= outFlag;

@@ -60,6 +60,7 @@ private void partiallyFinishBuildRequirements(ref BuildRequirements req)
         &req.cfg.libraryPaths,
         &req.cfg.stringImportPaths,
         &req.cfg.sourcePaths,
+        &req.cfg.excludeSourceFiles,
         &req.cfg.sourceFiles,
     ];
 

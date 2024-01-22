@@ -1,12 +1,12 @@
 import std.stdio;
-import logging;
-import redub_api;
+import redub.logging;
+import redub.api;
 
 void main()
 {
 	import std.file;
 
-	setLogLevel(LogLevel.info);
+	setLogLevel(LogLevel.verbose);
 	
 	ProjectDetails d = resolveDependencies(
 		false,
