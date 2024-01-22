@@ -2,6 +2,7 @@
 	"authors": [
 		"Amlal El Mahrouss"
 	],
+	"dflags": [ "C++20" ],
 	"sourcePaths": ["source"],
 	"configurations": [
 		{
