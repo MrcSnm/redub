@@ -9,7 +9,10 @@
         "debugMode"
     ],
     "configurations": [
-        {"name": "cli"},
+        {
+            "name": "cli",
+            "targetType": "executable"
+        },
         {
             "name": "library",
             "targetType": "staticLibrary",

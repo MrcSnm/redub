@@ -45,7 +45,7 @@ BuildConfiguration parse()
 struct InitialDubVariables
 {
     ///Path to the DUB executable
-    string DUB ;
+    string DUB;
     ///Name of the package
     string DUB_PACKAGE ;
     ///Version of the package
@@ -121,10 +121,7 @@ struct PackageDubVariables
 void setupBuildEnvironmentVariables(InitialDubVariables dubVars)
 {
     static foreach(member; __traits(allMembers, InitialDubVariables))
-    {
-        if(__traits(child, dubVars, member).length)
-            environment[member] = __traits(child, dubVars, member);
-    }
+        environment[member] = mixin("dubVars.",member);
 }
 
 
@@ -132,6 +129,7 @@ InitialDubVariables getInitialDubVariablesFromArguments(DubArguments args, DubBu
 {
     import std.file;
     InitialDubVariables dubVars;
+    dubVars.DUB = rawArgs[0];
     dubVars.DUB_BUILD_TYPE = args.buildType;
     dubVars.DUB_CONFIG = args.config;
     dubVars.DC_BASE = args.compiler;

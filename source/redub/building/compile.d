@@ -22,12 +22,12 @@ alias ExecutionResult = Tuple!(int, "status", string, "output");
 /**
 *   If any command has status, it will stop executing them and return
 */
-private ExecutionResult executeCommands(const string[] commandsList, string listName, ref CompilationResult res, string workingDir)
+private ExecutionResult executeCommands(const string[] commandsList, string listName, ref CompilationResult res, string workingDir, immutable string[string] env)
 {
     import std.process;
     foreach(cmd; commandsList)
     {
-        auto execRes  = executeShell(cmd, null, Config.none, size_t.max, workingDir);
+        auto execRes  = executeShell(cmd, env, Config.none, size_t.max, workingDir);
         if(execRes.status)
         {
             res.status = execRes.status;
@@ -38,7 +38,7 @@ private ExecutionResult executeCommands(const string[] commandsList, string list
     return ExecutionResult(0, "Success");
 }
 
-void execCompilation(immutable BuildConfiguration cfg, shared ProjectNode pack, OS os, Compiler compiler, CompilationCache cache)
+void execCompilation(immutable BuildConfiguration cfg, shared ProjectNode pack, OS os, Compiler compiler, CompilationCache cache, immutable string[string] env)
 {
     import std.file;
     import std.process;
@@ -61,7 +61,7 @@ void execCompilation(immutable BuildConfiguration cfg, shared ProjectNode pack, 
             res.cache = cache;
             return;
         }
-        if(executeCommands(cfg.preBuildCommands, "preBuildCommand", res, cfg.workingDir).status)
+        if(executeCommands(cfg.preBuildCommands, "preBuildCommand", res, cfg.workingDir, env).status)
             return;
 
         ExecutionResult ret;
@@ -83,7 +83,7 @@ void execCompilation(immutable BuildConfiguration cfg, shared ProjectNode pack, 
 
             if(!isDCompiler(compiler) && !ret.status) //Always requires link.
             {
-                CompilationResult linkRes = link(cfg, os, compiler);
+                CompilationResult linkRes = link(cfg, os, compiler, env);
                 ret.status = linkRes.status;
                 ret.output~= linkRes.message;
                 res.compilationCommand~= linkRes.compilationCommand;
@@ -96,9 +96,9 @@ void execCompilation(immutable BuildConfiguration cfg, shared ProjectNode pack, 
 
         if(res.status == 0)
         {
-            if(executeCommands(cfg.postBuildCommands, "postBuildCommand", res, cfg.workingDir).status)
+            if(executeCommands(cfg.postBuildCommands, "postBuildCommand", res, cfg.workingDir, env).status)
                 return;
-            if(cfg.targetType != TargetType.executable && executeCommands(cfg.postGenerateCommands, "postGenerateCommand", res, cfg.workingDir).status)
+            if(cfg.targetType != TargetType.executable && executeCommands(cfg.postGenerateCommands, "postGenerateCommand", res, cfg.workingDir, env).status)
                 return;
         }
         
@@ -112,7 +112,7 @@ void execCompilation(immutable BuildConfiguration cfg, shared ProjectNode pack, 
 }
 
 
-CompilationResult link(immutable BuildConfiguration cfg, OS os, Compiler compiler)
+CompilationResult link(immutable BuildConfiguration cfg, OS os, Compiler compiler, immutable string[string] env)
 {
     import std.process;
     CompilationResult ret;
@@ -123,7 +123,7 @@ CompilationResult link(immutable BuildConfiguration cfg, OS os, Compiler compile
     ret.status = exec.status;
     ret.message = exec.output;
     if(cfg.targetType.isLinkedSeparately)
-        executeCommands(cfg.postGenerateCommands, "postGenerateCommand", ret, cfg.workingDir);
+        executeCommands(cfg.postGenerateCommands, "postGenerateCommand", ret, cfg.workingDir, env);
 
     return ret;
 }
@@ -135,6 +135,9 @@ bool buildProjectParallelSimple(ProjectNode root, Compiler compiler, OS os)
     ProjectNode[] dependencyFreePackages = root.findLeavesNodes();
     string mainPackHash = hashFrom(root.requirements, compiler);
     bool[ProjectNode] spawned;
+
+    import std.process;
+    immutable string[string] env = cast(immutable)(environment.toAA);
     while(true)
     {
         foreach(dep; dependencyFreePackages)
@@ -144,7 +147,8 @@ bool buildProjectParallelSimple(ProjectNode root, Compiler compiler, OS os)
                 spawned[dep] = true;
                 spawn(&execCompilation, 
                     dep.requirements.cfg.idup, cast(shared)dep, os, 
-                    compiler, CompilationCache.get(mainPackHash, dep.requirements, compiler)
+                    compiler, CompilationCache.get(mainPackHash, dep.requirements, compiler),
+                    env
                 );
             }
         }
@@ -164,7 +168,7 @@ bool buildProjectParallelSimple(ProjectNode root, Compiler compiler, OS os)
                 break;
         }
     }
-    return doLink(root.requirements.idup, os, compiler, mainPackHash, root.isUpToDate);
+    return doLink(root.requirements.idup, os, compiler, mainPackHash, root.isUpToDate, env);
 }
 
 
@@ -173,13 +177,16 @@ bool buildProjectFullyParallelized(ProjectNode root, Compiler compiler, OS os)
     import std.concurrency;
     string mainPackHash = hashFrom(root.requirements, compiler);
     CompilationCache[] cache = cacheStatusForProject(root, compiler);
+    import std.process;
+    immutable string[string] env = cast(immutable)(environment.toAA);
     size_t i = 0;
     foreach(pack; root.collapse)
     {
         spawn(&execCompilation, 
             pack.requirements.cfg.idup, 
             cast(shared)pack, os, compiler, 
-            cache[i++]
+            cache[i++],
+            env
         );
     }
     foreach(pack; root.collapse)
@@ -199,7 +206,7 @@ bool buildProjectFullyParallelized(ProjectNode root, Compiler compiler, OS os)
             buildSucceeded(finishedPackage, res);
         }
     }
-    return doLink(root.requirements.idup, os, compiler, mainPackHash, root.isUpToDate);
+    return doLink(root.requirements.idup, os, compiler, mainPackHash, root.isUpToDate, env);
 }
 
 private void buildSucceeded(ProjectNode node, CompilationResult res)
@@ -222,7 +229,7 @@ private void buildFailed(ProjectNode node, CompilationResult res)
     );
 }
 
-private bool doLink(immutable BuildRequirements req, OS os, Compiler compiler, string mainPackHash, bool isUpToDate)
+private bool doLink(immutable BuildRequirements req, OS os, Compiler compiler, string mainPackHash, bool isUpToDate, immutable string[string] env)
 {
     if(isUpToDate || (compiler.isDCompiler && req.cfg.targetType.isStaticLibrary))
     {
@@ -231,7 +238,7 @@ private bool doLink(immutable BuildRequirements req, OS os, Compiler compiler, s
         updateCache(mainPackHash, CompilationCache.get(mainPackHash, req, compiler), true);
         return true;
     }
-    CompilationResult linkRes = link(req.cfg, os, compiler);
+    CompilationResult linkRes = link(req.cfg, os, compiler, env);
     if(linkRes.status)
     {
         errorTitle("Linking Error: ", req.name, ". Failed with flags: \n\t",
