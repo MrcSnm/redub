@@ -61,11 +61,7 @@ string getLibraryExtension(OS os)
 
 bool isLibraryExtension(string ext)
 {
-    switch(ext)
-    {
-        case ".a", ".lib": return true;
-        default: return false;
-    }
+    return ext == ".a" || ext == ".lib";
 }
 bool isObjectExtension(string ext)
 {

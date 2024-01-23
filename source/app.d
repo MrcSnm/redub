@@ -87,9 +87,79 @@ int runMain(string[] args)
 
 int describeMain(string[] args)
 {
+    DubDescribeArguments desc;
+    GetoptResult res = betterGetopt(args, desc);
+    if(res.helpWanted)
+    {
+        defaultGetoptPrinter("redub describe help info ", res.options);
+        return 1;
+    }
     ProjectDetails d = resolveDependencies(args);
     if(!d.tree)
         return 1;
+    
+    alias OutputData = string[];
+
+    static immutable outputs =[
+        "main-source-file": (ref string[] dataContainer, const ProjectNode root){dataContainer~= root.requirements.cfg.sourceEntryPoint;},
+        "dflags": (ref string[] dataContainer, const ProjectNode root){dataContainer~= root.requirements.cfg.dFlags;},
+        "lflags": (ref string[] dataContainer, const ProjectNode root){dataContainer~= root.requirements.cfg.linkFlags;},
+        "libs": (ref string[] dataContainer, const ProjectNode root){dataContainer~= root.requirements.cfg.libraries;},
+        "linker-files": (ref string[] dataContainer, const ProjectNode root)
+        {
+            import std.algorithm.iteration;
+            import std.range;
+            import std.array;
+            dataContainer~= root.requirements.extra.librariesFullPath.map!((string libPath)
+            {
+                return buildNormalizedPath(dirName(libPath), getOutputName(TargetType.staticLibrary, baseName(libPath), os));
+            }).retro.array;
+
+            
+            if(root.requirements.cfg.targetType.isStaticLibrary)
+                dataContainer~= buildNormalizedPath(
+                    root.requirements.cfg.outputDirectory, 
+                    getOutputName(
+                        root.requirements.cfg.targetType, 
+                        root.requirements.cfg.name, 
+                        os));
+        },
+        "source-files": (ref string[] dataContainer, const ProjectNode root)
+        {
+            foreach(node; (cast()root).collapse)
+            {
+                import redub.command_generators.commons;
+                putSourceFiles(dataContainer, 
+                    node.requirements.cfg.workingDir,
+                    node.requirements.cfg.sourcePaths,
+                    node.requirements.cfg.sourceFiles,
+                    node.requirements.cfg.excludeSourceFiles,
+                    ".d"
+                );
+            }
+        },
+        "versions": (ref string[] dataContainer, const ProjectNode root){dataContainer~= root.requirements.cfg.versions;},
+        // "debug-versions": (){},
+        "import-paths": (ref string[] dataContainer, const ProjectNode root){dataContainer~= root.requirements.cfg.importDirectories;},
+        "string-import-paths": (ref string[] dataContainer, const ProjectNode root){dataContainer~= root.requirements.cfg.stringImportPaths;}, 
+        "import-files": (ref string[] dataContainer, const ProjectNode root){}, 
+        "options": (ref string[] dataContainer, const ProjectNode root){}
+    ];
+    OutputData[] outputContainer = new OutputData[](desc.data.length);
+    foreach(i, data; desc.data)
+    {
+        auto handler = data in outputs;
+        if(handler)
+            (*handler)(outputContainer[i], d.tree);
+    }
+
+    foreach(data; outputContainer)
+    {
+        import std.stdio;
+        writeln(escapeShellCommand(data));
+    }
+
+
 
     return 0;
 }

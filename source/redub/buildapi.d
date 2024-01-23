@@ -191,7 +191,7 @@ struct BuildConfiguration
 /**
 *   Optimized for direct memory allocation.
 */
-ref string[] exclusiveMerge (return scope ref string[] a, string[] b)
+ref string[] exclusiveMerge (return scope ref string[] a, scope string[] b)
 {
     size_t notFoundCount;
     foreach(bV; b)
@@ -326,6 +326,31 @@ struct PendingMergeConfiguration
 {
     bool isPending = false;
     BuildConfiguration configuration;
+
+    immutable(PendingMergeConfiguration) idup() inout
+    {
+        return immutable PendingMergeConfiguration(
+            isPending,
+            configuration.idup
+        );
+    }
+}
+
+/**
+*   The information inside this struct is not used directly on the build process,
+*   but may be used in other areas. One such example is for `describe`. Which will
+*   get the full path for each library.
+*/
+struct ExtraInformation
+{
+    string[] librariesFullPath;
+
+    immutable(ExtraInformation) idup() inout
+    {
+        return immutable ExtraInformation(
+            librariesFullPath.idup
+        );
+    }
 }
 
 struct BuildRequirements
@@ -355,7 +380,16 @@ struct BuildRequirements
     }
 
     Configuration configuration;
+    /**
+    *   Should not be managed directly. This member is used
+    * for holding configuration until the parsing is finished.
+    * This will guarantee the correct evaluation order.
+    */
     private PendingMergeConfiguration pending;
+
+    ExtraInformation extra;
+
+
 
     BuildRequirements addPending(PendingMergeConfiguration pending) const
     {
@@ -392,6 +426,8 @@ struct BuildRequirements
             dependencies.idup,
             version_,
             configuration,
+            pending.idup,
+            extra.idup
         );
     }
 
@@ -418,7 +454,7 @@ struct BuildRequirements
         import std.exception;
         BuildRequirements ret = cast()this;
 
-        vlog("Merging dependencies: ", ret.name, " with ", other.name, " ", other.dependencies);
+        vvlog("Merging dependencies: ", ret.name, " with ", other.name, " ", other.dependencies);
         foreach(dep; other.dependencies)
         {
             ptrdiff_t index = countUntil!((d) => d.isSameAs(dep))(ret.dependencies);
@@ -535,6 +571,9 @@ class ProjectNode
                         BuildConfiguration other = requirements.cfg.clone;
                         other.libraries~= other.name;
                         other.libraryPaths~= other.outputDirectory;
+                        p.requirements.extra.librariesFullPath.exclusiveMerge(
+                            [buildNormalizedPath(other.outputDirectory, other.name)]
+                        );
                         p.requirements.cfg = p.requirements.cfg.mergeLibraries(other);
                         p.requirements.cfg = p.requirements.cfg.mergeLibPaths(other);
                     break;
