@@ -9,13 +9,14 @@ import redub.parsers.base;
 BuildRequirements parse(string filePath, 
     string projectWorkingDir, 
     string compiler, 
+    string arch,
     string version_, 
     BuildRequirements.Configuration subConfiguration,
     string subPackage
 )
 {
     import std.path;
-    ParseConfig c = ParseConfig(projectWorkingDir, subConfiguration, subPackage, version_, compiler);
+    ParseConfig c = ParseConfig(projectWorkingDir, subConfiguration, subPackage, version_, compiler, arch);
     return parse(parseJSONCached(filePath), c);
 }
 
@@ -199,7 +200,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
                 const(JSONValue)* name = "name" in p;
                 enforce(name, "All subPackages entries must contain a name.");
                 if(name.str == cfg.subPackage)
-                    return parse(p, ParseConfig(cfg.workingDir, cfg.subConfiguration, null, null, cfg.compiler, cfg.requiredBy, true, true));
+                    return parse(p, ParseConfig(cfg.workingDir, cfg.subConfiguration, null, null, cfg.compiler, cfg.arch, cfg.requiredBy, true, true));
             }
             else ///Subpackage is on other file
             {
@@ -216,7 +217,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
                 {
                     import redub.parsers.automatic;
                     isSubpackageInPackage = true;
-                    return parseProject(subPackagePath, cfg.compiler, cfg.subConfiguration, null, null);
+                    return parseProject(subPackagePath, cfg.compiler, cfg.arch, cfg.subConfiguration, null, null);
                 }
             } 
         }

@@ -62,6 +62,7 @@ struct BuildConfiguration
     string sourceEntryPoint;
     string outputDirectory;
     string workingDir;
+    string arch;
     TargetType targetType;
 
     static BuildConfiguration defaultInit(string workingDir)
@@ -109,6 +110,7 @@ struct BuildConfiguration
             sourceEntryPoint,
             outputDirectory,
             workingDir,
+            arch,
             targetType
         );
 

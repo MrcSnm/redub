@@ -20,6 +20,7 @@ static import redub.parsers.environment;
 BuildRequirements parseProject(
     string projectWorkingDir, 
     string compiler, 
+    string arch,
     BuildRequirements.Configuration subConfiguration, 
     string subPackage, 
     string recipe
@@ -37,12 +38,13 @@ BuildRequirements parseProject(
 
     switch(extension(projectFile))
     {
-        case ".sdl":   req = redub.parsers.sdl.parse(projectFile, projectWorkingDir, compiler, null, subConfiguration, subPackage); break;
-        case ".json":  req = redub.parsers.json.parse(projectFile, projectWorkingDir, compiler, null, subConfiguration, subPackage); break;
+        case ".sdl":   req = redub.parsers.sdl.parse(projectFile, projectWorkingDir, compiler, arch, null, subConfiguration, subPackage); break;
+        case ".json":  req = redub.parsers.json.parse(projectFile, projectWorkingDir, compiler, arch, null, subConfiguration, subPackage); break;
         default: throw new Error("Unsupported project type "~projectFile~" at dir "~projectWorkingDir);
     }
     redub.parsers.environment.setupEnvironmentVariablesForPackage(cast(immutable)req);
     req.cfg = redub.parsers.environment.parseEnvironment(req.cfg);
+    req.cfg.arch = arch;
 
     partiallyFinishBuildRequirements(req);
     

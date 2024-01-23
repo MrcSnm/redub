@@ -2,6 +2,8 @@ module redub.parsers.base;
 import redub.logging;
 import redub.buildapi;
 import redub.package_searching.dub;
+
+
 struct ParseConfig
 {
     string workingDir;
@@ -9,6 +11,7 @@ struct ParseConfig
     string subPackage;
     string version_ = "~master";
     string compiler;
+    string arch;
     string requiredBy;
     bool firstRun = true;
     bool preGenerateRun = true;

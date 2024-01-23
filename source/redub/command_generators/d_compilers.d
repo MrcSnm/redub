@@ -14,6 +14,7 @@ string[] parseBuildConfiguration(AcceptedCompiler comp, immutable BuildConfigura
     with(b)
     {
         if(isDebug) commands~= "-debug";
+        if(b.arch) commands~= mapper(ValidDFlags.arch) ~ b.arch;
         commands = mapAppendPrefix(commands, versions, mapper(ValidDFlags.versions));
         commands = mapAppendPrefix(commands, importDirectories, mapper(ValidDFlags.importPaths));
 
@@ -72,6 +73,7 @@ string dmdFlags(ValidDFlags flag)
         case buildAsLibrary: return "-lib";
         case buildAsShared: return "-shared";
         case compileOnly: return "-c";
+        case arch: throw new Error("arch not supported by dmd.");
     }
 }
 string ldcFlags(ValidDFlags flag)
@@ -87,6 +89,7 @@ string ldcFlags(ValidDFlags flag)
         case buildAsLibrary: return "--lib";
         case buildAsShared: return "--shared";
         case compileOnly: return "-c";
+        case arch: return "--mtriple=";
     }
 }
 
@@ -101,5 +104,6 @@ enum ValidDFlags
     outputFile,
     buildAsLibrary,
     buildAsShared,
-    compileOnly
+    compileOnly,
+    arch
 }

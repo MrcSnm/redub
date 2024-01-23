@@ -126,15 +126,16 @@ ProjectDetails resolveDependencies(
     redub.parsers.environment.setupBuildEnvironmentVariables(dubVars);
     BuildRequirements req = parseProject(
         proj.workingDir, 
-        compiler.getCompilerString, 
+        compiler.getCompilerString,
+        cDetails.arch, 
         BuildRequirements.Configuration(proj.configuration, false), 
-        proj.subPackage, 
+        proj.subPackage,
         proj.recipe
     );
     redub.parsers.environment.setupEnvironmentVariablesForRootPackage(cast(immutable)req);
     req.cfg = req.cfg.merge(redub.parsers.environment.parse());
 
-    ProjectNode tree = getProjectTree(req, compiler.getCompilerString);
+    ProjectNode tree = getProjectTree(req, compiler.getCompilerString, cDetails.arch);
     redub.parsers.environment.setupEnvironmentVariablesForPackageTree(tree);
 
     if(invalidateCache)

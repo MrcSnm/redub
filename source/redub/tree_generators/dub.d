@@ -18,12 +18,12 @@ import redub.parsers.automatic;
  * Returns: A tree out of the BuildRequirements, with all its compilation flags merged. It is the final step
  * before being able to correctly use the compilation flags
  */
-ProjectNode getProjectTree(BuildRequirements req, string compiler)
+ProjectNode getProjectTree(BuildRequirements req, string compiler, string arch)
 {
     ProjectNode[string] visited;
     ProjectNode[] collapsed;
     string[string] subConfigs = req.getSubConfigurations;
-    ProjectNode tree =  getProjectTreeImpl(req, compiler, subConfigs, visited, collapsed);
+    ProjectNode tree =  getProjectTreeImpl(req, compiler, arch, subConfigs, visited, collapsed);
     detectCycle(tree);
     tree.finish(collapsed);
     return tree;
@@ -67,6 +67,7 @@ void detectCycle(ProjectNode t)
 private ProjectNode getProjectTreeImpl(
     BuildRequirements req, 
     string compiler, 
+    string arch,
     const string[string] subConfigurations,
     ref ProjectNode[string] visited, 
     ref ProjectNode[] collapsed)
@@ -88,7 +89,7 @@ private ProjectNode getProjectTreeImpl(
             /// and the new is a default one.
             if(visitedDep.requirements.configuration != dep.subConfiguration && !dep.subConfiguration.isDefault)
             {
-                BuildRequirements depConfig = parseProjectWithParent(dep, req, compiler);
+                BuildRequirements depConfig = parseProjectWithParent(dep, req, compiler, arch);
                 if(visitedDep.requirements.targetConfiguration != depConfig.targetConfiguration)
                 {
                     //Print merging different subConfigs?
@@ -101,8 +102,8 @@ private ProjectNode getProjectTreeImpl(
         }
         else
         {
-            BuildRequirements buildReq = parseProjectWithParent(dep, req, compiler);
-            depNode = getProjectTreeImpl(buildReq, compiler, subConfigurations, visited, collapsed);
+            BuildRequirements buildReq = parseProjectWithParent(dep, req, compiler, arch);
+            depNode = getProjectTreeImpl(buildReq, compiler, arch, subConfigurations, visited, collapsed);
         }
         visited[dep.fullName] = depNode;
         root.addDependency(depNode);
@@ -118,9 +119,9 @@ private ProjectNode getProjectTreeImpl(
  *   subConfiguration = 
  * Returns: 
  */
-private BuildRequirements parseProjectWithParent(Dependency dep, BuildRequirements parent, string compiler)
+private BuildRequirements parseProjectWithParent(Dependency dep, BuildRequirements parent, string compiler, string arch)
 {
-    BuildRequirements depReq = parseProject(dep.path, compiler, dep.subConfiguration, dep.subPackage, null);
+    BuildRequirements depReq = parseProject(dep.path, compiler, arch, dep.subConfiguration, dep.subPackage, null);
     depReq.cfg.name = dep.fullName;
     return mergeProjectWithParent(depReq, parent);
 }

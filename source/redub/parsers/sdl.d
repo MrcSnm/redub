@@ -5,6 +5,7 @@ BuildRequirements parse(
     string filePath, 
     string workingDir,  
     string compiler, 
+    string arch,
     string version_, 
     BuildRequirements.Configuration subConfiguration, 
     string subPackage
@@ -24,7 +25,7 @@ BuildRequirements parse(
     
     string tempFile = filePath~".json"; //.sdl.json
     std.file.write(tempFile, exec.output);
-    BuildRequirements ret = redub.parsers.json.parse(tempFile, workingDir, compiler, version_, subConfiguration, subPackage);
+    BuildRequirements ret = redub.parsers.json.parse(tempFile, workingDir, compiler, arch, version_, subConfiguration, subPackage);
     chdir(currDir);
     std.file.remove(tempFile);
     return ret;
