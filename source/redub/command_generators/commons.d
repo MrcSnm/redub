@@ -116,15 +116,11 @@ void putSourceFiles(
     import std.path;
     import std.string:endsWith;
     import std.algorithm.searching;
+    import std.exception;
 
     size_t length = output.length;
     output.length+= files.length;
-
-    foreach(i, f; files)
-    {
-        if(!isAbsolute(f)) output[length+i] = buildNormalizedPath(workingDir, f);
-        else output[length+i] = f;
-    }
+    output[length..length+files.length] = files[];
 
     foreach(path; paths)
     {
@@ -184,6 +180,60 @@ void createOutputDirFolder(immutable BuildConfiguration cfg)
     import std.file;
     if(cfg.outputDirectory)
         mkdirRecurse(cfg.outputDirectory);
+}
+
+/** 
+ * This function is a lot more efficient than map!.array, since it won't need to 
+ * allocate intermediary memory and won't use range interface
+ * Params:
+ *   appendTarget = The target in which will have the mapInput appended
+ *   mapInput = Array which is going to be mapped
+ *   mapFn = Map conversion function
+ * Returns: appendTarget with the mapped elements from mapInput appended
+ */
+ref string[] mapAppend(Q, T)(return ref string[] appendTarget, const scope Q[] mapInput, scope T delegate(Q) mapFn)
+{
+    if(mapInput.length == 0) return appendTarget;
+    size_t length = appendTarget.length;
+    appendTarget.length+= mapInput.length;
+
+    foreach(i; 0..mapInput.length)
+        appendTarget[length++] = mapFn(mapInput[i]);
+    return appendTarget;
+}
+/** 
+ * This function is a is a less generic mapAppend. It constructs the array with more efficiency
+ * Params:
+ *   appendTarget = The target in which will have the mapInput appended
+ *   mapInput = Array which is going to be mapped
+ *   prefix = Prefix before appending
+ * Returns: appendTarget with the mapped elements from mapInput appended
+ */
+ref string[] mapAppendPrefix(return ref string[] appendTarget, const scope string[] mapInput, string prefix)
+{
+    if(mapInput.length == 0) return appendTarget;
+    size_t length = appendTarget.length;
+    appendTarget.length+= mapInput.length;
+
+    foreach(i; 0..mapInput.length)
+    {
+        char[] newStr = new char[](mapInput[i].length+prefix.length);
+        newStr[0..prefix.length] = prefix[];
+        newStr[prefix.length..$] = mapInput[i][];
+        appendTarget[length++] = cast(string)newStr;
+    }
+    return appendTarget;
+}
+
+ref string[] mapAppendReverse(Q, T)(return ref string[] appendTarget, const scope Q[] mapInput, scope T delegate(Q) mapFn)
+{
+    if(mapInput.length == 0) return appendTarget;
+    size_t length = appendTarget.length;
+    appendTarget.length+= mapInput.length;
+
+    foreach(i; 0..mapInput.length)
+        appendTarget[length++] = mapFn(mapInput[$-(i+1)]);
+    return appendTarget;
 }
 
 string createCommandFile(immutable BuildConfiguration cfg, OS os, Compiler compiler, string[] flags, out string joinedFlags)

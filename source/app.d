@@ -114,11 +114,6 @@ int describeMain(string[] args)
             import std.algorithm.iteration;
             import std.range;
             import std.array;
-            dataContainer~= root.requirements.extra.librariesFullPath.map!((string libPath)
-            {
-                return buildNormalizedPath(dirName(libPath), getOutputName(TargetType.staticLibrary, baseName(libPath), os));
-            }).retro.array;
-
             
             if(root.requirements.cfg.targetType.isStaticLibrary)
                 dataContainer~= buildNormalizedPath(
@@ -127,6 +122,12 @@ int describeMain(string[] args)
                         root.requirements.cfg.targetType, 
                         root.requirements.cfg.name, 
                         os));
+                        
+            dataContainer~= root.requirements.extra.librariesFullPath.map!((string libPath)
+            {
+                return buildNormalizedPath(dirName(libPath), getOutputName(TargetType.staticLibrary, baseName(libPath), os));
+            }).retro.array;
+
         },
         "source-files": (ref string[] dataContainer, const ProjectNode root)
         {

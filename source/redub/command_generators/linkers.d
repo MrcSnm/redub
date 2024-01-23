@@ -19,20 +19,20 @@ string[] parseLinkConfiguration(immutable BuildConfiguration b, OS target, Compi
         
         if (targetType.isLinkedSeparately)
         {
-            commands~= libraryPaths.map!((lp) => "-L-L"~lp).array;
-            commands~= libraries.map!((l) => "-L-l"~l).reverseArray;
+            commands = mapAppend(commands, libraryPaths, (string lp) => "-L-L"~lp);
+            commands = mapAppendReverse(commands, libraries, (string l) => "-L-l"~l);
             commands~= getLinkFiles(b.sourceFiles);
-            commands~= linkFlags.map!((l) => "-L"~l).array;
+            commands = mapAppend(commands, linkFlags, (string l) => "-L"~l);
             
             commands~= buildNormalizedPath(outputDirectory, name~getObjectExtension(target));
             commands~= "-of"~buildNormalizedPath(outputDirectory, getOutputName(targetType, name, os));
         }
-        else //Generates a static library using archiver. FIXME: BuildRequirements should know its files.
+        else if(!compiler.isDCompiler) //Generates a static library using archiver. FIXME: BuildRequirements should know its files.
         {
             commands~= "--format=default";
             commands~= "rcs";
             commands~= buildNormalizedPath(outputDirectory, getOutputName(targetType, name, os));
-            commands~= getObjectFiles(b, os);
+            putObjectFiles(commands, b, os);
         }
     }
 
@@ -63,15 +63,13 @@ string[] parseLinkConfigurationMSVC(immutable BuildConfiguration b, OS target, C
 
 string getTargetTypeFlag(TargetType o, Compiler compiler)
 {
-    static import redub.command_generators.dmd;
-    static import redub.command_generators.ldc;
+    static import redub.command_generators.d_compilers;
     static import redub.command_generators.gnu_based;
     static import redub.command_generators.gnu_based_ccplusplus;
 
     switch(compiler.compiler) with(AcceptedCompiler)
     {
-        case dmd: return redub.command_generators.dmd.getTargetTypeFlag(o);
-        case ldc2: return redub.command_generators.ldc.getTargetTypeFlag(o);
+        case dmd, ldc2: return redub.command_generators.d_compilers.getTargetTypeFlag(o, compiler.compiler);
         case gcc: return redub.command_generators.gnu_based.getTargetTypeFlag(o);
         case gxx: return redub.command_generators.gnu_based_ccplusplus.getTargetTypeFlag(o);
         default: throw new Error("Unsupported compiler "~compiler.binOrPath);
@@ -79,14 +77,11 @@ string getTargetTypeFlag(TargetType o, Compiler compiler)
 }
 
 
-private string[] getObjectFiles(immutable BuildConfiguration b, OS os)
+private void putObjectFiles(ref string[] target, immutable BuildConfiguration b, OS os)
 {
     import std.file;
     import std.path;
-    import std.array;
-    import std.algorithm.iteration;
-
     string[] objectFiles;
     putSourceFiles(objectFiles, b.workingDir, b.sourcePaths, b.sourceFiles, b.excludeSourceFiles, ".c", ".cpp", ".cc", ".i", ".cxx", ".c++");
-    return objectFiles.map!((src) => setExtension(src, getObjectExtension(os))).array;
+    target = mapAppend(target, objectFiles, (string src) => setExtension(src, getObjectExtension(os)));
 }
