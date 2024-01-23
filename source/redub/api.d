@@ -85,21 +85,21 @@ ProjectDetails resolveDependencies(
 {
     import std.datetime.stopwatch;
     import redub.building.cache;
+    import std.algorithm.comparison;
     static import redub.parsers.environment;
 
     StopWatch st = StopWatch(AutoStart.yes);
     Compiler compiler = getCompiler(cDetails.compilerOrPath, cDetails.assumption);
 
-    if(dubVars == InitialDubVariables.init)
+    with(dubVars)
     {
-        with(dubVars)
-        {
-            DUB_CONFIG = proj.configuration;
-            DC_BASE = compiler.binOrPath;
-            DUB_ARCH = cDetails.arch;
-            DUB_PLATFORM = redub.parsers.environment.str(os);
-            DUB_FORCE = redub.parsers.environment.str(invalidateCache);
-        }
+        DUB = either(DUB, "redub");
+        DUB_CONFIG = either(DUB_CONFIG, proj.configuration);
+        DC_BASE = either(DC_BASE, compiler.binOrPath);
+        DUB_ARCH = either(DUB_ARCH, cDetails.arch);
+        DUB_PLATFORM = either(DUB_PLATFORM, redub.parsers.environment.str(os));
+        DUB_FORCE = either(DUB_FORCE, redub.parsers.environment.str(invalidateCache));
+
     }
     redub.parsers.environment.setupBuildEnvironmentVariables(dubVars);
     BuildRequirements req = parseProject(
