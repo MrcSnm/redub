@@ -61,6 +61,11 @@ void execCompilation(immutable BuildConfiguration cfg, shared ProjectNode pack, 
             res.cache = cache;
             return;
         }
+        //Remove existing binary, since it won't be replaced by simply executing commands
+        string outDir = getConfigurationOutputDir(cfg, os);
+        if(exists(outDir))
+            remove(outDir);
+        
         if(executeCommands(cfg.preBuildCommands, "preBuildCommand", res, cfg.workingDir, env).status)
             return;
 

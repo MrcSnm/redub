@@ -7,7 +7,6 @@ import redub.command_generators.commons;
 
 string[] parseLinkConfiguration(immutable BuildConfiguration b, OS target, Compiler compiler)
 {
-    import std.algorithm.iteration;
     import std.path;
     import std.array;
     string[] commands;
@@ -19,10 +18,10 @@ string[] parseLinkConfiguration(immutable BuildConfiguration b, OS target, Compi
         
         if (targetType.isLinkedSeparately)
         {
-            commands = mapAppend(commands, libraryPaths, (string lp) => "-L-L"~lp);
+            commands = mapAppendPrefix(commands, libraryPaths, "-L-L");
             commands = mapAppendReverse(commands, libraries, (string l) => "-L-l"~l);
             commands~= getLinkFiles(b.sourceFiles);
-            commands = mapAppend(commands, linkFlags, (string l) => "-L"~l);
+            commands = mapAppendPrefix(commands, linkFlags, "-L");
             
             commands~= buildNormalizedPath(outputDirectory, name~getObjectExtension(target));
             commands~= "-of"~buildNormalizedPath(outputDirectory, getOutputName(targetType, name, os));
@@ -49,10 +48,10 @@ string[] parseLinkConfigurationMSVC(immutable BuildConfiguration b, OS target, C
     {
         if(targetType == TargetType.dynamicLibrary)
             commands~= getTargetTypeFlag(targetType, compiler);
-        commands~= libraryPaths.map!((lp) => "-L/LIBPATH:"~lp).array;
+        commands = mapAppendPrefix(commands, libraryPaths, "-L/LIBPATH:");
         commands~= getLinkFiles(b.sourceFiles);
-        commands~= libraries.map!((l) => "-L"~l~".lib").array;
-        commands~= linkFlags.map!((l) => "-L"~l).array;
+        commands = mapAppend(commands, libraries, (string l) => "-L"~l~".lib");
+        commands = mapAppendPrefix(commands, linkFlags, "-L");
         
         commands~= buildNormalizedPath(outputDirectory, name~getObjectExtension(target));
         commands~= "-of"~buildNormalizedPath(outputDirectory, getOutputName(targetType, name, os));

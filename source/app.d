@@ -14,7 +14,7 @@ import redub.tree_generators.dub;
 import redub.cli.dub;
 import redub.command_generators.commons;
 
-enum RedubVersion = "Redub - A reimagined DUB: v1.2.2";
+enum RedubVersion = "Redub - A reimagined DUB: v1.2.4";
 
 
 string formatError(string err)
@@ -122,7 +122,7 @@ int describeMain(string[] args)
                         root.requirements.cfg.targetType, 
                         root.requirements.cfg.name, 
                         os));
-                        
+
             dataContainer~= root.requirements.extra.librariesFullPath.map!((string libPath)
             {
                 return buildNormalizedPath(dirName(libPath), getOutputName(TargetType.staticLibrary, baseName(libPath), os));

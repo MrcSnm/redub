@@ -23,6 +23,17 @@ string getObjectDir(string projWorkingDir)
     return objDir;
 }
 
+string getConfigurationOutputDir(const BuildConfiguration conf, OS os)
+{
+    import std.path;
+    with(conf)
+    {
+        if(targetType.isStaticLibrary)
+            return buildNormalizedPath(outputDirectory, getOutputName(targetType, name, os));
+        return buildNormalizedPath(outputDirectory, name~getObjectExtension(os));
+    }
+}
+
 string getExecutableExtension(OS os)
 {
     if(os == OS.win32 || os == OS.win64)

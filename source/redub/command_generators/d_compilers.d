@@ -29,12 +29,7 @@ string[] parseBuildConfiguration(AcceptedCompiler comp, immutable BuildConfigura
             commands~= mapper(ValidDFlags.buildAsShared);
 
         commands~= mapper(ValidDFlags.objectDir)~getObjectDir(b.workingDir);
-
-        if(targetType.isStaticLibrary)
-            commands~= mapper(ValidDFlags.outputFile)~buildNormalizedPath(outputDirectory, getOutputName(targetType, name, os));
-        else
-            commands~= mapper(ValidDFlags.outputFile)~buildNormalizedPath(outputDirectory, name~getObjectExtension(os));
-
+        commands~= mapper(ValidDFlags.outputFile) ~ getConfigurationOutputDir(b, os);
         
         putSourceFiles(commands, workingDir, sourcePaths, sourceFiles, excludeSourceFiles, ".d");
     }
