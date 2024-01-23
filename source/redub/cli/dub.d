@@ -98,7 +98,6 @@ struct DubCommonArguments
 
 struct DubDescribeArguments
 {
-    DubArguments args;
     @(
         "The accepted values for --data=VALUE are:
 

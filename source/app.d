@@ -88,12 +88,16 @@ int runMain(string[] args)
 int describeMain(string[] args)
 {
     DubDescribeArguments desc;
-    GetoptResult res = betterGetopt(args, desc);
-    if(res.helpWanted)
+    try 
     {
-        defaultGetoptPrinter("redub describe help info ", res.options);
-        return 1;
+        GetoptResult res = betterGetopt(args, desc);
+        if(res.helpWanted)
+        {
+            defaultGetoptPrinter("redub describe help info ", res.options);
+            return 1;
+        }
     }
+    catch(GetOptException e){}
     ProjectDetails d = resolveDependencies(args);
     if(!d.tree)
         return 1;
@@ -126,17 +130,17 @@ int describeMain(string[] args)
         },
         "source-files": (ref string[] dataContainer, const ProjectNode root)
         {
-            foreach(node; (cast()root).collapse)
-            {
-                import redub.command_generators.commons;
+            import redub.command_generators.commons;
+            // foreach(node; (cast()root).collapse)
+            // {
                 putSourceFiles(dataContainer, 
-                    node.requirements.cfg.workingDir,
-                    node.requirements.cfg.sourcePaths,
-                    node.requirements.cfg.sourceFiles,
-                    node.requirements.cfg.excludeSourceFiles,
+                    root.requirements.cfg.workingDir,
+                    root.requirements.cfg.sourcePaths,
+                    root.requirements.cfg.sourceFiles,
+                    root.requirements.cfg.excludeSourceFiles,
                     ".d"
                 );
-            }
+            // }
         },
         "versions": (ref string[] dataContainer, const ProjectNode root){dataContainer~= root.requirements.cfg.versions;},
         // "debug-versions": (){},
@@ -158,9 +162,6 @@ int describeMain(string[] args)
         import std.stdio;
         writeln(escapeShellCommand(data));
     }
-
-
-
     return 0;
 }
 
