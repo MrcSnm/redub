@@ -14,18 +14,30 @@ struct ProjectDetails
     Compiler compiler;
 }
 
+/** 
+ * CompilationDetails are required for making proper compilation.
+ */
 struct CompilationDetails
 {
+    ///This is the only required member of this struct. Must be a path to compiler or a compiler in the global context, i.e: `dmd`
     string compilerOrPath;
+    ///Arch is only being used for LDC2 compilers. If arch is used, ldc2 is automatically inferred
     string arch;
+    ///Assumption to make dependency resolution slightly faster
     string assumption;
 }
-
+/** 
+ * Project in which should be parsed.
+ */
 struct ProjectToParse
 {
+    ///Optinal configuration to build
     string configuration;
+    ///If working directory is null, std.file.getcwd() is used
     string workingDir;
+    ///Optional subpackage to build
     string subPackage;
+    ///Optinal recipe to use instead of workingDir's dub.json
     string recipe;
 }
 
@@ -75,6 +87,16 @@ ProjectDetails buildProject(ProjectDetails d)
 }
 
 
+/** 
+ * Use this function to get a project information.
+ * Params:
+ *   invalidateCache = Should invalidate cache or should auto check
+ *   os = Target operating system
+ *   cDetails = CompilationDetails, receives, the compiler to be inferred, architecture and assumptions
+ *   proj = Detailed information in which project to parse. Most of the time, workingDir is the most important part.
+ *   dubVars = InitialDubVariables to setup on the project
+ * Returns: Completely resolved project, with all its necessary flags and and paths, but still, the directory will be iterated on compilation searching for source files.
+ */
 ProjectDetails resolveDependencies(
     bool invalidateCache,
     OS os = std.system.os,
@@ -99,8 +121,8 @@ ProjectDetails resolveDependencies(
         DUB_ARCH = either(DUB_ARCH, cDetails.arch);
         DUB_PLATFORM = either(DUB_PLATFORM, redub.parsers.environment.str(os));
         DUB_FORCE = either(DUB_FORCE, redub.parsers.environment.str(invalidateCache));
-
     }
+
     redub.parsers.environment.setupBuildEnvironmentVariables(dubVars);
     BuildRequirements req = parseProject(
         proj.workingDir, 

@@ -606,7 +606,10 @@ class ProjectNode
         shouldRebuild = true;
         foreach(p; parent) p.invalidateCache();
     }
-    ///Helper function for --force
+    
+    /** 
+     * This function basically invalidates the entire tree, forcing a rebuild
+     */
     void invalidateCacheOnTree()
     {
         foreach(node; collapse) node.shouldRebuild = true;

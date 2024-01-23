@@ -54,6 +54,13 @@ bool isDCompiler(immutable Compiler comp)
     return comp.compiler == AcceptedCompiler.dmd || comp.compiler == AcceptedCompiler.ldc2;
 }
 
+/** 
+ * Use this function to get extensive information about the Compiler to use.
+ * Params:
+ *   compilerOrPath = Can be used both as a global, such as `dmd` or a complete path to a compiler
+ *   compilerAssumption = Optinal version string, such as `dmd v[2.105.0] f[2.106.0]`, v being its version, f being frontend version
+ * Returns: The Compiler information that was found, or inferred if compilerAssumption was used.
+ */
 Compiler getCompiler(string compilerOrPath, string compilerAssumption)
 {
     import std.process;

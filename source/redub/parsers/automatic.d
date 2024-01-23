@@ -5,6 +5,18 @@ static import redub.parsers.json;
 static import redub.parsers.sdl;
 static import redub.parsers.environment;
 
+/** 
+ * Parses an initial directory, not recursively. Currently only .sdl and .json are parsed.
+ * After the parse happens, it also partially finish the requirements by using a generalized fix
+ * for after the parsing stage.
+ * Params:
+ *   projectWorkingDir = Optional working dir. What is the root being considered for the recipe file
+ *   compiler = Which compiler to use
+ *   subConfiguration = Sub configuration to use
+ *   subPackage = Optional sub package
+ *   recipe = Optional recipe to read. It's path is not used as root.
+ * Returns: The build requirements to the project. Not recursive.
+ */
 BuildRequirements parseProject(
     string projectWorkingDir, 
     string compiler, 

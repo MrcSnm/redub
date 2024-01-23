@@ -118,6 +118,9 @@ struct PackageDubVariables
 
 }
 
+/** 
+ * Reflects InitialDubVariables in the environment
+ */
 void setupBuildEnvironmentVariables(InitialDubVariables dubVars)
 {
     static foreach(member; __traits(allMembers, InitialDubVariables))
@@ -143,6 +146,15 @@ InitialDubVariables getInitialDubVariablesFromArguments(DubArguments args, DubBu
     return dubVars;
 }
 
+/** 
+ * This, setups on environment the following variables:
+ * - DUB_ROOT_PACKAGE
+ * - DUB_ROOT_PACKAGE_TARGET_TYPE
+ * - DUB_ROOT_TARGET_PATH
+ * - DUB_ROOT_PACKAGE_TARGET_NAME
+ * Params:
+ *   root = The root project being parsed
+ */
 void setupEnvironmentVariablesForRootPackage(immutable BuildRequirements root)
 {
     import std.conv:to;
@@ -151,6 +163,16 @@ void setupEnvironmentVariablesForRootPackage(immutable BuildRequirements root)
     environment["DUB_ROOT_PACKAGE_TARGET_PATH"] = root.cfg.outputDirectory;
     environment["DUB_ROOT_PACKAGE_TARGET_NAME"] = root.cfg.name;
 }
+
+
+/** 
+ * This function traverses the project tree, while generating environment variables for the directory
+ * of the package, by using its name and post-fixed with _PACKAGE_DIR
+ * e.g:
+ * - redub will generate REDUB_PACKAGE_DIR: containing its working directory
+ * Params:
+ *   root = The root where <PKG>_PACKAGE_DIR will be started to be put on environment
+ */
 void setupEnvironmentVariablesForPackageTree(ProjectNode root)
 {
     ///Path to a specific package that is part of the package's dependency graph. $ must be in uppercase letters without the semver string.
@@ -159,6 +181,14 @@ void setupEnvironmentVariablesForPackageTree(ProjectNode root)
         environment[mem.name.toUppercase~"_PACKAGE_DIR"] = mem.requirements.cfg.workingDir;
 }
 
+/** 
+ * Setups environment variables based on BuildRequirements -
+ * - PACKAGE_DIR
+ * - DUB_TARGET_TYPE
+ * - DUB_TARGET_PATH
+ * - DUB_TARGET_NAME
+ * - DUB_MAIN_SOURCE_FILE
+ */
 void setupEnvironmentVariablesForPackage(immutable BuildRequirements root)
 {
     import std.conv:to;

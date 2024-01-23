@@ -60,9 +60,15 @@ CompilationCache[] cacheStatusForProject(ProjectNode root, Compiler compiler)
     return cache;
 }
 
-/**
-*   Invalidate caches that aren't up to date
-*/
+/** 
+ * This function mutates the ProjectNode|s, isUpToDate property. It checks on the entire tree
+ * if it is not up to date, when it is not, it invalidates itself and all their parents.
+ * It requires the existing cache status for the project and then, starts comparing, with its current
+ * situation
+ * Params:
+ *   root = Project root for traversing
+ *   compiler = Which compiler is being used to check the caches
+ */
 void invalidateCaches(ProjectNode root, Compiler compiler)
 {
     import std.array;
