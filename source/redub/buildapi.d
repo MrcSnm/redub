@@ -317,6 +317,10 @@ struct Dependency
     {
         return this.name == name && this.subPackage == subPackage;
     }
+    bool isSubConfigurationOnly() const
+    {
+        return path.length == 0 && subConfiguration.name.length != 0;
+    }
 
     bool isSameAs(Dependency other) const{return isSameAs(other.name, other.subPackage);}
 

@@ -77,6 +77,8 @@ private void getProjectTreeImpl(
     ProjectNode node = queue[0];
     foreach(dep; node.requirements.dependencies)
     {
+        if(dep.isSubConfigurationOnly)
+            continue;            
         ProjectNode* visitedDep = dep.fullName in visited;
         ProjectNode depNode;
         if(dep.subConfiguration.isDefault && dep.name in subConfigurations)
