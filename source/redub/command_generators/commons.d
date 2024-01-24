@@ -114,6 +114,14 @@ string getOutputName(TargetType t, string name, OS os)
     return outputName;
 }
 
+string getOutputName(const BuildConfiguration cfg, OS os)
+{
+    import std.string;
+    if(cfg.arch.indexOf("wasm") != -1)
+        return cfg.name~".wasm";
+    return getOutputName(cfg.targetType, cfg.name, os);
+}
+
 void putSourceFiles(
     ref string[] output,
     const string workingDir,

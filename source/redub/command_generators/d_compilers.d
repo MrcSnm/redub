@@ -13,6 +13,7 @@ string[] parseBuildConfiguration(AcceptedCompiler comp, immutable BuildConfigura
     string[] commands = [mapper(ValidDFlags.enableColor)];
     with(b)
     {
+        commands~= dFlags;
         if(isDebug) commands~= "-debug";
         if(b.arch) commands~= mapper(ValidDFlags.arch) ~ b.arch;
         commands = mapAppendPrefix(commands, versions, mapper(ValidDFlags.versions));
@@ -21,7 +22,6 @@ string[] parseBuildConfiguration(AcceptedCompiler comp, immutable BuildConfigura
         if(targetType.isLinkedSeparately)
             commands~= mapper(ValidDFlags.compileOnly);
         commands = mapAppendPrefix(commands, stringImportPaths, mapper(ValidDFlags.stringImportPaths));
-        commands~= dFlags;
 
 
         if(targetType.isStaticLibrary)
@@ -48,6 +48,21 @@ string getTargetTypeFlag(TargetType t, AcceptedCompiler c)
         case dynamicLibrary: return mapper(ValidDFlags.buildAsShared);
         default: throw new Error("Unsupported target type");
     }
+}
+
+
+/** 
+ * 
+ * Params:
+ *   dflags = The dFlags which should contain link flags
+ * Returns: Only the link flags.
+ */
+string[] filterLinkFlags(const string[] dflags)
+{
+    import std.algorithm.iteration:filter;
+    import std.array;
+    auto filtered = dflags.filter!((df => df.length >= 2 && df[0..2] == "-L"));
+    return cast(string[])(filtered.array);
 }
 
 string function(ValidDFlags) getFlagMapper(AcceptedCompiler comp)

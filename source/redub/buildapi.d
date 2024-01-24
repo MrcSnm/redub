@@ -153,6 +153,13 @@ struct BuildConfiguration
         ret.importDirectories.exclusiveMergePaths(other.importDirectories);
         return ret;
     }
+    BuildConfiguration mergeStringImport(BuildConfiguration other) const
+    {
+        BuildConfiguration ret = clone;
+        ret.stringImportPaths.exclusiveMergePaths(other.stringImportPaths);
+        return ret;
+    }
+
 
     BuildConfiguration mergeDFlags(BuildConfiguration other) const
     {
@@ -592,6 +599,7 @@ class ProjectNode
             {
                 vvlog("Merging ", node.name, " into ", p.name);
                 p.requirements.cfg = p.requirements.cfg.mergeImport(node.requirements.cfg);
+                p.requirements.cfg = p.requirements.cfg.mergeStringImport(node.requirements.cfg);
                 p.requirements.cfg = p.requirements.cfg.mergeVersions(node.requirements.cfg);
                 p.requirements.cfg = p.requirements.cfg.mergeDFlags(node.requirements.cfg);
                 p.requirements.cfg = p.requirements.cfg.mergeLinkFilesFromSource(node.requirements.cfg);
