@@ -561,58 +561,69 @@ class ProjectNode
      */
     void finish()
     {
-        foreach(dep; dependencies)
-            dep.finish();
-        import std.string:replace;
-        requirements.cfg.name = requirements.cfg.name.replace(":", "_");
-        requirements.cfg.versions.exclusiveMerge(["Have_"~requirements.cfg.name.replace("-", "_")]);
-        if(requirements.cfg.targetType == TargetType.autodetect)
-            requirements.cfg.targetType = inferTargetType(requirements.cfg);
-        
-        BuildConfiguration toMerge;
-        foreach(dep; dependencies)
+        scope bool[ProjectNode] visitedBuffer;
+
+        static void finishImpl(ProjectNode node, ref bool[ProjectNode] visited)
         {
-            import std.string:replace;
-            toMerge.versions~= "Have_"~dep.name.replace("-", "_");
-        }
-        requirements.cfg = requirements.cfg.mergeVersions(toMerge);
-        foreach(p; parent)
-        {
-            p.requirements.cfg = p.requirements.cfg.mergeImport(requirements.cfg);
-            p.requirements.cfg = p.requirements.cfg.mergeVersions(requirements.cfg);
-            p.requirements.cfg = p.requirements.cfg.mergeDFlags(requirements.cfg);
-            p.requirements.cfg = p.requirements.cfg.mergeLinkFilesFromSource(requirements.cfg);
-            HandleTargetType: final switch(requirements.cfg.targetType) with(TargetType)
+            if(node in visited) return;
+            foreach(dep; node.dependencies)
             {
-                case autodetect: requirements.cfg.targetType = inferTargetType(requirements.cfg); goto HandleTargetType;
-                case library, staticLibrary:
-                        BuildConfiguration other = requirements.cfg.clone;
-                        other.libraries~= other.name;
-                        other.libraryPaths~= other.outputDirectory;
-                        p.requirements.extra.librariesFullPath.exclusiveMerge(
-                            [buildNormalizedPath(other.outputDirectory, other.name)]
-                        );
-                        p.requirements.cfg = p.requirements.cfg.mergeLibraries(other);
-                        p.requirements.cfg = p.requirements.cfg.mergeLibPaths(other);
-                    break;
-                case sourceLibrary: 
-                    p.requirements.cfg = p.requirements.cfg.mergeLibraries(requirements.cfg);
-                    p.requirements.cfg = p.requirements.cfg.mergeLibPaths(requirements.cfg);
-                    p.requirements.cfg = p.requirements.cfg.mergeSourcePaths(requirements.cfg);
-                    p.requirements.cfg = p.requirements.cfg.mergeSourceFiles(requirements.cfg);
-                    break;
-                case dynamicLibrary: throw new Error("Uninplemented support for shared libraries");
-                case executable: break;
-                case none: throw new Error("Invalid targetType: none");
+                if(!(node in visited))
+                    finishImpl(dep, visited);
             }
+            import std.string:replace;
+            node.requirements.cfg.name = node.requirements.cfg.name.replace(":", "_");
+            node.requirements.cfg.versions.exclusiveMerge(["Have_"~node.requirements.cfg.name.replace("-", "_")]);
+            if(node.requirements.cfg.targetType == TargetType.autodetect)
+                node.requirements.cfg.targetType = inferTargetType(node.requirements.cfg);
+            
+            BuildConfiguration toMerge;
+            foreach(dep; node.dependencies)
+            {
+                import std.string:replace;
+                toMerge.versions~= "Have_"~dep.name.replace("-", "_");
+            }
+            node.requirements.cfg = node.requirements.cfg.mergeVersions(toMerge);
+            foreach(p; node.parent)
+            {
+                vvlog("Merging ", node.name, " into ", p.name);
+                p.requirements.cfg = p.requirements.cfg.mergeImport(node.requirements.cfg);
+                p.requirements.cfg = p.requirements.cfg.mergeVersions(node.requirements.cfg);
+                p.requirements.cfg = p.requirements.cfg.mergeDFlags(node.requirements.cfg);
+                p.requirements.cfg = p.requirements.cfg.mergeLinkFilesFromSource(node.requirements.cfg);
+                HandleTargetType: final switch(node.requirements.cfg.targetType) with(TargetType)
+                {
+                    case autodetect: node.requirements.cfg.targetType = inferTargetType(node.requirements.cfg); goto HandleTargetType;
+                    case library, staticLibrary:
+                            BuildConfiguration other = node.requirements.cfg.clone;
+                            other.libraries~= other.name;
+                            other.libraryPaths~= other.outputDirectory;
+                            p.requirements.extra.librariesFullPath.exclusiveMerge(
+                                [buildNormalizedPath(other.outputDirectory, other.name)]
+                            );
+                            p.requirements.cfg = p.requirements.cfg.mergeLibraries(other);
+                            p.requirements.cfg = p.requirements.cfg.mergeLibPaths(other);
+                        break;
+                    case sourceLibrary: 
+                        p.requirements.cfg = p.requirements.cfg.mergeLibraries(node.requirements.cfg);
+                        p.requirements.cfg = p.requirements.cfg.mergeLibPaths(node.requirements.cfg);
+                        p.requirements.cfg = p.requirements.cfg.mergeSourcePaths(node.requirements.cfg);
+                        p.requirements.cfg = p.requirements.cfg.mergeSourceFiles(node.requirements.cfg);
+                        break;
+                    case dynamicLibrary: throw new Error("Uninplemented support for shared libraries");
+                    case executable: break;
+                    case none: throw new Error("Invalid targetType: none");
+                }
+            }
+            
+            if(node.requirements.cfg.targetType == TargetType.sourceLibrary)
+            {
+                vlog("Project ", node.name, " is a sourceLibrary. Becoming independent.");
+                node.becomeIndependent();
+            }
+            visited[node] = true;
         }
-        
-        
-        if(requirements.cfg.targetType == TargetType.sourceLibrary)
-        {
-            vlog("Project ", name, " is a sourceLibrary. Becoming independent.");
-            becomeIndependent();
-        }
+        finishImpl(this, visitedBuffer);
     }
     
     bool isUpToDate() const { return !shouldRebuild; }

@@ -82,9 +82,7 @@ private void partiallyFinishBuildRequirements(ref BuildRequirements req)
         foreach(ref string dir; *arr)
             if(!isAbsolute(dir)) dir = buildNormalizedPath(req.cfg.workingDir, dir);
 
-    if(req.cfg.importDirectories.length == 0)
-        req.cfg.importDirectories = req.cfg.sourcePaths;
-        
+    req.cfg.importDirectories.exclusiveMerge(req.cfg.sourcePaths);
     if(!isAbsolute(req.cfg.sourceEntryPoint)) 
         req.cfg.sourceEntryPoint = buildNormalizedPath(req.cfg.workingDir, req.cfg.sourceEntryPoint);
 
