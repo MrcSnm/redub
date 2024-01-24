@@ -20,12 +20,13 @@ import redub.parsers.automatic;
  */
 ProjectNode getProjectTree(BuildRequirements req, string compiler, string arch)
 {
-    ProjectNode[string] visited;
-    ProjectNode[] collapsed;
+    ProjectNode tree = new ProjectNode(req);
     string[string] subConfigs = req.getSubConfigurations;
-    ProjectNode tree =  getProjectTreeImpl(req, compiler, arch, subConfigs, visited, collapsed);
+    ProjectNode[string] visited;
+    ProjectNode[] queue = [tree];
+    getProjectTreeImpl(queue, compiler, arch, subConfigs, visited);
     detectCycle(tree);
-    tree.finish(collapsed);
+    tree.finish();
     return tree;
 }   
 
@@ -64,24 +65,22 @@ void detectCycle(ProjectNode t)
  * 
  * Returns: 
  */
-private ProjectNode getProjectTreeImpl(
-    BuildRequirements req, 
+private void getProjectTreeImpl(
+    ref ProjectNode[] queue,
     string compiler, 
     string arch,
-    const string[string] subConfigurations,
+    string[string] subConfigurations,
     ref ProjectNode[string] visited, 
-    ref ProjectNode[] collapsed)
+)
 {
-    ProjectNode root = new ProjectNode(req);
-    if(req.cfg.targetType != TargetType.sourceLibrary) //Source libraries are not considered.
-        collapsed~= root;
-    foreach(dep; req.dependencies)
+    if(queue.length == 0) return;
+    ProjectNode node = queue[0];
+    foreach(dep; node.requirements.dependencies)
     {
         ProjectNode* visitedDep = dep.fullName in visited;
         ProjectNode depNode;
         if(dep.subConfiguration.isDefault && dep.name in subConfigurations)
             dep.subConfiguration = BuildRequirements.Configuration(subConfigurations[dep.name], false);
-        //If visited already, just add the new dflags and versions
         if(visitedDep)
         {
             depNode = *visitedDep;
@@ -89,7 +88,7 @@ private ProjectNode getProjectTreeImpl(
             /// and the new is a default one.
             if(visitedDep.requirements.configuration != dep.subConfiguration && !dep.subConfiguration.isDefault)
             {
-                BuildRequirements depConfig = parseProjectWithParent(dep, req, compiler, arch);
+                BuildRequirements depConfig = parseProjectWithParent(dep, node.requirements, compiler, arch);
                 if(visitedDep.requirements.targetConfiguration != depConfig.targetConfiguration)
                 {
                     //Print merging different subConfigs?
@@ -102,13 +101,15 @@ private ProjectNode getProjectTreeImpl(
         }
         else
         {
-            BuildRequirements buildReq = parseProjectWithParent(dep, req, compiler, arch);
-            depNode = getProjectTreeImpl(buildReq, compiler, arch, subConfigurations, visited, collapsed);
+            depNode = new ProjectNode(parseProjectWithParent(dep, node.requirements, compiler, arch));
+            subConfigurations = depNode.requirements.mergeSubConfigurations(subConfigurations);
+            visited[dep.fullName] = depNode;
+            queue~= depNode;
         }
-        visited[dep.fullName] = depNode;
-        root.addDependency(depNode);
+        node.addDependency(depNode);
     }
-    return root;
+    queue = queue[1..$];
+    getProjectTreeImpl(queue, compiler, arch, subConfigurations, visited);
 }
 
 /** 

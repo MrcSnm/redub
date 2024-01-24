@@ -199,6 +199,7 @@ ref string[] exclusiveMerge (return scope ref string[] a, scope string[] b)
     foreach(bV; b)
     {
         bool found = false;
+        if(bV.length == 0) continue;
         foreach(aV; a)
         {
             if(aV == bV) 
@@ -213,10 +214,12 @@ ref string[] exclusiveMerge (return scope ref string[] a, scope string[] b)
     if(notFoundCount)
     {
         size_t length = a.length;
+        size_t index = length;
         a.length+= notFoundCount;
         foreach(bV; b)
         {
             bool found = false;
+            if(bV.length == 0) continue;
             foreach(i; 0..length)
             {
                 if(a[i] == bV)
@@ -226,7 +229,7 @@ ref string[] exclusiveMerge (return scope ref string[] a, scope string[] b)
                 }
             }
             if(!found)
-                a[length++] = bV;
+                a[index++] = bV;
         }
     }
     return a;
@@ -421,6 +424,20 @@ struct BuildRequirements
         return ret;
     }
 
+    /**
+    *   Put every subConfiguration which aren't default and not existing in
+    *   a subConfigurations map. This is useful for subConfigurations resolution.
+    */
+    ref string[string] mergeSubConfigurations(ref return string[string] output) const
+    {
+        foreach(dep; dependencies)
+        {
+            if(!dep.subConfiguration.isDefault && !(dep.name in output))
+                output[dep.name] = dep.subConfiguration.name;
+        }
+        return output;
+    }
+
     immutable(BuildRequirements) idup() inout
     {
         return immutable BuildRequirements(
@@ -542,11 +559,10 @@ class ProjectNode
      *
      * Also receives an argument containing the collapsed reference of its unique nodes.
      */
-    void finish(ProjectNode[] collapsedRef)
+    void finish()
     {
-        this.collapsedRef = collapsedRef;
         foreach(dep; dependencies)
-            dep.finish(collapsedRef);
+            dep.finish();
         import std.string:replace;
         requirements.cfg.name = requirements.cfg.name.replace(":", "_");
         requirements.cfg.versions.exclusiveMerge(["Have_"~requirements.cfg.name.replace("-", "_")]);
@@ -635,6 +651,11 @@ class ProjectNode
     ///Collapses the tree in a single list.
     final auto collapse()
     {
+        if(collapsedRef is null) 
+        {
+            collapsedRef = generateCollapsed();
+            foreach(node; collapsedRef) node.collapsedRef = collapsedRef;
+        }
         static struct CollapsedRange
         {
             private ProjectNode[] nodes;
@@ -646,6 +667,24 @@ class ProjectNode
         }
 
         return CollapsedRange(collapsedRef);
+    }
+
+    private ProjectNode[] generateCollapsed()
+    {
+        ProjectNode[] collapsedList;
+        scope bool[ProjectNode] visitedMap;
+        static void generateCollapsedImpl(ProjectNode node, ref ProjectNode[] list, ref bool[ProjectNode] visited)
+        {
+            if(!(node in visited) && node.requirements.cfg.targetType != TargetType.sourceLibrary)
+            {
+                list~= node;
+                visited[node] = true;
+            }
+            foreach(dep; node.dependencies)
+                generateCollapsedImpl(dep, list, visited);
+        }
+        generateCollapsedImpl(this, collapsedList, visitedMap);
+        return collapsedList;
     }
 
     ProjectNode[] findLeavesNodes()
