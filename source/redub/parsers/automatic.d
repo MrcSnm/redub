@@ -91,5 +91,6 @@ private void partiallyFinishBuildRequirements(ref BuildRequirements req)
     import std.algorithm.sorting;
     ///Sort dependencies for predictability
     sort!((Dependency a, Dependency b) => a.name < b.name)(req.dependencies);
+    sort!((Dependency a, Dependency b) => !a.subConfiguration.isDefault && b.subConfiguration.isDefault)(req.dependencies);
 
 }
