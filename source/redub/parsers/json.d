@@ -6,17 +6,25 @@ import std.json;
 import std.file;
 import redub.parsers.base;
 
+immutable string[] commandsWithHostFilters = [
+    "preBuildCommands",
+    "postBuildCommands",
+    "preGenerateCommands",
+    "postGenerateCommands"
+];
+
 BuildRequirements parse(string filePath, 
     string projectWorkingDir, 
     string compiler, 
     string arch,
     string version_, 
     BuildRequirements.Configuration subConfiguration,
-    string subPackage
+    string subPackage,
+    OS targetOS
 )
 {
     import std.path;
-    ParseConfig c = ParseConfig(projectWorkingDir, subConfiguration, subPackage, version_, compiler, arch);
+    ParseConfig c = ParseConfig(projectWorkingDir, subConfiguration, subPackage, version_, compiler, arch, targetOS);
     return parse(parseJSONCached(filePath), c);
 }
 
@@ -200,7 +208,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
                 const(JSONValue)* name = "name" in p;
                 enforce(name, "All subPackages entries must contain a name.");
                 if(name.str == cfg.subPackage)
-                    return parse(p, ParseConfig(cfg.workingDir, cfg.subConfiguration, null, null, cfg.compiler, cfg.arch, cfg.requiredBy, true, true));
+                    return parse(p, ParseConfig(cfg.workingDir, cfg.subConfiguration, null, null, cfg.compiler, cfg.arch, cfg.targetOS, cfg.requiredBy, true, true));
             }
             else ///Subpackage is on other file
             {
@@ -217,7 +225,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
                 {
                     import redub.parsers.automatic;
                     isSubpackageInPackage = true;
-                    return parseProject(subPackagePath, cfg.compiler, cfg.arch, cfg.subConfiguration, null, null);
+                    return parseProject(subPackagePath, cfg.compiler, cfg.arch, cfg.subConfiguration, null, null, cfg.targetOS);
                 }
             } 
         }
@@ -245,6 +253,7 @@ private void runHandlers(
     ref BuildRequirements buildRequirements, ParseConfig cfg,
     JSONValue target, bool bGetUnusedKeys, out string[] unusedKeys)
 {
+    import std.algorithm.searching;
     foreach(string key, JSONValue v; target)
     {
         bool mustExecuteHandler = true;
@@ -253,8 +262,11 @@ private void runHandlers(
         {
             CommandWithFilter filtered = CommandWithFilter.fromKey(key);
             fn = filtered.command in handler;
+            
+            OS osToMatch = cfg.targetOS;
+            if(commandsWithHostFilters.countUntil(filtered.command) != -1) osToMatch = std.system.os;
 
-            mustExecuteHandler = filtered.matchesOS(os) && filtered.matchesCompiler(cfg.compiler) && fn;
+            mustExecuteHandler = filtered.matchesOS(osToMatch) && filtered.matchesCompiler(cfg.compiler) && fn;
         }
         if(mustExecuteHandler)
             (*fn)(buildRequirements, v, cfg);

@@ -9,6 +9,20 @@ import std.process;
 import std.datetime.stopwatch;
 
 
+OS osFromArch(string arch)
+{
+    import std.string;
+    static bool contains(string a, string b){return a.indexOf(b) != -1;}
+    if(contains(arch, "x86_64-windows")) return OS.win64;
+    else if(contains(arch, "i686-windows")) return OS.win32;
+    else if(contains(arch, "android")) return OS.android;
+    else if(contains(arch, "linux")) return OS.linux;
+    else if(contains(arch, "macos")) return OS.osx;
+    else if(contains(arch, "ios")) return OS.iOS;
+    else if(contains(arch, "wasm32")) return OS.otherPosix;
+    else return std.system.os;
+}
+
 string getObjectDir(string projWorkingDir)
 {
     import std.path;

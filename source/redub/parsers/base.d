@@ -1,4 +1,5 @@
 module redub.parsers.base;
+import std.system;
 import redub.logging;
 import redub.buildapi;
 import redub.package_searching.dub;
@@ -12,6 +13,7 @@ struct ParseConfig
     string version_ = "~master";
     string compiler;
     string arch;
+    OS targetOS;
     string requiredBy;
     bool firstRun = true;
     bool preGenerateRun = true;

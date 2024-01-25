@@ -61,22 +61,23 @@ auto timed(T)(scope T delegate() action)
 ProjectDetails buildProject(ProjectDetails d)
 {
     import redub.building.compile;
-    import std.system;
+    import redub.command_generators.commons;
 
     if(!d.tree)
         return d;
 
     ProjectNode tree = d.tree;
+    OS targetOS = osFromArch(tree.requirements.cfg.arch);
 
     auto result = timed(()
     {
         if(tree.isFullyParallelizable)
         {
             info("Project ", tree.name," is fully parallelizable! Will build everything at the same time");
-            return buildProjectFullyParallelized(tree, d.compiler, os); 
+            return buildProjectFullyParallelized(tree, d.compiler, targetOS); 
         }
         else
-            return buildProjectParallelSimple(tree, d.compiler, os); 
+            return buildProjectParallelSimple(tree, d.compiler, targetOS); 
     });
     bool buildSucceeded = result.value;
     if(!buildSucceeded)
@@ -108,6 +109,7 @@ ProjectDetails resolveDependencies(
     import std.datetime.stopwatch;
     import redub.building.cache;
     import std.algorithm.comparison;
+    import redub.command_generators.commons;
     static import redub.parsers.environment;
 
     StopWatch st = StopWatch(AutoStart.yes);
@@ -130,12 +132,13 @@ ProjectDetails resolveDependencies(
         cDetails.arch, 
         BuildRequirements.Configuration(proj.configuration, false), 
         proj.subPackage,
-        proj.recipe
+        proj.recipe,
+        osFromArch(cDetails.arch)
     );
     redub.parsers.environment.setupEnvironmentVariablesForRootPackage(cast(immutable)req);
     req.cfg = req.cfg.merge(redub.parsers.environment.parse());
 
-    ProjectNode tree = getProjectTree(req, compiler.getCompilerString, cDetails.arch);
+    ProjectNode tree = getProjectTree(req, CompilationInfo(compiler.getCompilerString, cDetails.arch, osFromArch(cDetails.arch)));
     redub.parsers.environment.setupEnvironmentVariablesForPackageTree(tree);
 
     if(invalidateCache)

@@ -1,5 +1,6 @@
 module redub.parsers.sdl;
 public import redub.buildapi;
+public import std.system;
 
 BuildRequirements parse(
     string filePath, 
@@ -8,7 +9,8 @@ BuildRequirements parse(
     string arch,
     string version_, 
     BuildRequirements.Configuration subConfiguration, 
-    string subPackage
+    string subPackage,
+    OS targetOS
 )
 {
     static import redub.parsers.json;
@@ -25,7 +27,7 @@ BuildRequirements parse(
     
     string tempFile = filePath~".json"; //.sdl.json
     std.file.write(tempFile, exec.output);
-    BuildRequirements ret = redub.parsers.json.parse(tempFile, workingDir, compiler, arch, version_, subConfiguration, subPackage);
+    BuildRequirements ret = redub.parsers.json.parse(tempFile, workingDir, compiler, arch, version_, subConfiguration, subPackage, targetOS);
     chdir(currDir);
     std.file.remove(tempFile);
     return ret;

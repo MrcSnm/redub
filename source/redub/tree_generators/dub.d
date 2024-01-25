@@ -6,6 +6,14 @@ import redub.package_searching.entry;
 import redub.parsers.automatic;
 
 
+struct CompilationInfo
+{
+    string compiler;
+    string arch;
+    OS targetOS;
+}
+
+
 /** 
  * This function receives an already parsed project path (BuildRequirements) and finishes parsing
  * its dependees. While it parses them, it also merge the root build flags with their dependees and
@@ -18,13 +26,13 @@ import redub.parsers.automatic;
  * Returns: A tree out of the BuildRequirements, with all its compilation flags merged. It is the final step
  * before being able to correctly use the compilation flags
  */
-ProjectNode getProjectTree(BuildRequirements req, string compiler, string arch)
+ProjectNode getProjectTree(BuildRequirements req, CompilationInfo info)
 {
     ProjectNode tree = new ProjectNode(req);
     string[string] subConfigs = req.getSubConfigurations;
     ProjectNode[string] visited;
     ProjectNode[] queue = [tree];
-    getProjectTreeImpl(queue, compiler, arch, subConfigs, visited);
+    getProjectTreeImpl(queue, info, subConfigs, visited);
     detectCycle(tree);
     tree.finish();
     return tree;
@@ -67,8 +75,7 @@ void detectCycle(ProjectNode t)
  */
 private void getProjectTreeImpl(
     ref ProjectNode[] queue,
-    string compiler, 
-    string arch,
+    CompilationInfo info,
     string[string] subConfigurations,
     ref ProjectNode[string] visited, 
 )
@@ -90,7 +97,7 @@ private void getProjectTreeImpl(
             /// and the new is a default one.
             if(visitedDep.requirements.configuration != dep.subConfiguration && !dep.subConfiguration.isDefault)
             {
-                BuildRequirements depConfig = parseProjectWithParent(dep, node.requirements, compiler, arch);
+                BuildRequirements depConfig = parseProjectWithParent(dep, node.requirements, info);
                 if(visitedDep.requirements.targetConfiguration != depConfig.targetConfiguration)
                 {
                     //Print merging different subConfigs?
@@ -103,7 +110,7 @@ private void getProjectTreeImpl(
         }
         else
         {
-            depNode = new ProjectNode(parseProjectWithParent(dep, node.requirements, compiler, arch));
+            depNode = new ProjectNode(parseProjectWithParent(dep, node.requirements, info));
             subConfigurations = depNode.requirements.mergeSubConfigurations(subConfigurations);
             visited[dep.fullName] = depNode;
             queue~= depNode;
@@ -111,7 +118,7 @@ private void getProjectTreeImpl(
         node.addDependency(depNode);
     }
     queue = queue[1..$];
-    getProjectTreeImpl(queue, compiler, arch, subConfigurations, visited);
+    getProjectTreeImpl(queue, info, subConfigurations, visited);
 }
 
 /** 
@@ -122,9 +129,9 @@ private void getProjectTreeImpl(
  *   subConfiguration = 
  * Returns: 
  */
-private BuildRequirements parseProjectWithParent(Dependency dep, BuildRequirements parent, string compiler, string arch)
+private BuildRequirements parseProjectWithParent(Dependency dep, BuildRequirements parent, CompilationInfo info)
 {
-    BuildRequirements depReq = parseProject(dep.path, compiler, arch, dep.subConfiguration, dep.subPackage, null);
+    BuildRequirements depReq = parseProject(dep.path, info.compiler, info.arch, dep.subConfiguration, dep.subPackage, null, info.targetOS);
     depReq.cfg.name = dep.fullName;
     return mergeProjectWithParent(depReq, parent);
 }

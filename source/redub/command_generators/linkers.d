@@ -19,7 +19,6 @@ string[] parseLinkConfiguration(immutable BuildConfiguration b, OS target, Compi
             auto mapper = getFlagMapper(compiler.compiler);
             if(b.arch) commands~= mapper(ValidDFlags.arch) ~ b.arch;
             commands~= filterLinkFlags(b.dFlags);
-
         }
         if(targetType == TargetType.dynamicLibrary)
             commands~= getTargetTypeFlag(targetType, compiler);
@@ -51,15 +50,25 @@ string[] parseLinkConfigurationMSVC(immutable BuildConfiguration b, OS target, C
     import std.algorithm.iteration;
     import std.path;
     import std.array;
+
+    if(!target.isWindows) return parseLinkConfiguration(b, target, compiler);
     string[] commands;
     with(b)
     {
+        if(compiler.isDCompiler)
+        {
+            import redub.command_generators.d_compilers;
+            auto mapper = getFlagMapper(compiler.compiler);
+            if(b.arch) commands~= mapper(ValidDFlags.arch) ~ b.arch;
+            commands~= filterLinkFlags(b.dFlags);
+        }
         if(targetType == TargetType.dynamicLibrary)
             commands~= getTargetTypeFlag(targetType, compiler);
+        commands = mapAppendPrefix(commands, linkFlags, "-L");
+
         commands = mapAppendPrefix(commands, libraryPaths, "-L/LIBPATH:");
         commands~= getLinkFiles(b.sourceFiles);
         commands = mapAppend(commands, libraries, (string l) => "-L"~l~".lib");
-        commands = mapAppendPrefix(commands, linkFlags, "-L");
         
         commands~= buildNormalizedPath(outputDirectory, name~getObjectExtension(target));
         commands~= "-of"~buildNormalizedPath(outputDirectory, getOutputName(targetType, name, os));
