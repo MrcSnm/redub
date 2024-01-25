@@ -135,25 +135,25 @@ struct BuildConfiguration
         ret.linkFlags.exclusiveMerge(other.linkFlags);
         return ret;
     }
-    BuildConfiguration mergeLibraries(BuildConfiguration other) const
+    BuildConfiguration mergeLibraries(const BuildConfiguration other) const
     {
         BuildConfiguration ret = clone;
         ret.libraries.exclusiveMerge(other.libraries);
         return ret;
     }
-    BuildConfiguration mergeLibPaths(BuildConfiguration other) const
+    BuildConfiguration mergeLibPaths(const BuildConfiguration other) const
     {
         BuildConfiguration ret = clone;
         ret.libraryPaths.exclusiveMergePaths(other.libraryPaths);
         return ret;
     }
-    BuildConfiguration mergeImport(BuildConfiguration other) const
+    BuildConfiguration mergeImport(const BuildConfiguration other) const
     {
         BuildConfiguration ret = clone;
         ret.importDirectories.exclusiveMergePaths(other.importDirectories);
         return ret;
     }
-    BuildConfiguration mergeStringImport(BuildConfiguration other) const
+    BuildConfiguration mergeStringImport(const BuildConfiguration other) const
     {
         BuildConfiguration ret = clone;
         ret.stringImportPaths.exclusiveMergePaths(other.stringImportPaths);
@@ -161,26 +161,26 @@ struct BuildConfiguration
     }
 
 
-    BuildConfiguration mergeDFlags(BuildConfiguration other) const
+    BuildConfiguration mergeDFlags(const BuildConfiguration other) const
     {
         BuildConfiguration ret = clone;
         ret.dFlags.exclusiveMerge(other.dFlags);
         return ret;
     }
     
-    BuildConfiguration mergeVersions(BuildConfiguration other) const
+    BuildConfiguration mergeVersions(const BuildConfiguration other) const
     {
         BuildConfiguration ret = clone;
         ret.versions.exclusiveMerge(other.versions);
         return ret;
     }
-    BuildConfiguration mergeSourceFiles(BuildConfiguration other) const
+    BuildConfiguration mergeSourceFiles(const BuildConfiguration other) const
     {
         BuildConfiguration ret = clone;
         ret.sourceFiles.exclusiveMerge(other.sourceFiles);
         return ret;
     }
-    BuildConfiguration mergeSourcePaths(BuildConfiguration other) const
+    BuildConfiguration mergeSourcePaths(const BuildConfiguration other) const
     {
         BuildConfiguration ret = clone;
         ret.sourcePaths.exclusiveMergePaths(other.sourcePaths);
@@ -188,7 +188,7 @@ struct BuildConfiguration
     }
 
 
-    BuildConfiguration mergeLinkFilesFromSource(BuildConfiguration other) const
+    BuildConfiguration mergeLinkFilesFromSource(const BuildConfiguration other) const
     {
         import redub.command_generators.commons;
         BuildConfiguration ret = clone;
@@ -200,7 +200,7 @@ struct BuildConfiguration
 /**
 *   Optimized for direct memory allocation.
 */
-ref string[] exclusiveMerge (return scope ref string[] a, scope string[] b)
+ref string[] exclusiveMerge (return scope ref string[] a, const scope string[] b)
 {
     size_t notFoundCount;
     foreach(bV; b)
@@ -246,7 +246,7 @@ ref string[] exclusiveMerge (return scope ref string[] a, scope string[] b)
  * Used when dealing with paths. It normalizes them for not getting the same path twice.
  * This function has been optimized for less memory allocation
  */
-ref string[] exclusiveMergePaths(return scope ref string[] a, string[] b)
+ref string[] exclusiveMergePaths(return scope ref string[] a, const string[] b)
 {
     static string noTrailingSlash(string input)
     {
@@ -331,9 +331,13 @@ struct Dependency
 
     bool isSameAs(Dependency other) const{return isSameAs(other.name, other.subPackage);}
 
-    string fullName()
+    string fullName() const
     {
-        if(subPackage.length) return name~":"~subPackage;
+        // if(_fullName is null)
+        {
+            if(subPackage.length) return name~":"~subPackage;
+            // else _fullName = name;
+        }
         return name;
     }
 }
@@ -574,14 +578,18 @@ class ProjectNode
     {
         scope bool[ProjectNode] visitedBuffer;
 
-        static void finishImpl(ProjectNode node, ref bool[ProjectNode] visited)
+        static bool hasPrivateRelationship(const ProjectNode parent, const ProjectNode child)
         {
-            if(node in visited) return;
-            foreach(dep; node.dependencies)
+            foreach(dep; parent.requirements.dependencies)
             {
-                if(!(node in visited))
-                    finishImpl(dep, visited);
+                if(dep.fullName == child.name && dep.visibility == Visibility.private_)
+                    return true;
             }
+            return false;
+        }
+        static void finishSelfRequirements(ProjectNode node)
+        {
+            //Finish self requirements
             import std.string:replace;
             node.requirements.cfg.name = node.requirements.cfg.name.replace(":", "_");
             node.requirements.cfg.versions.exclusiveMerge(["Have_"~node.requirements.cfg.name.replace("-", "_")]);
@@ -595,47 +603,78 @@ class ProjectNode
                 toMerge.versions~= "Have_"~dep.name.replace("-", "_");
             }
             node.requirements.cfg = node.requirements.cfg.mergeVersions(toMerge);
+        }
+        static void finishMerging(ProjectNode target, const ProjectNode input)
+        {
+            vvlog("Merging ", input.name, " into ", target.name);
+            target.requirements.cfg = target.requirements.cfg.mergeImport(input.requirements.cfg);
+            target.requirements.cfg = target.requirements.cfg.mergeStringImport(input.requirements.cfg);
+            target.requirements.cfg = target.requirements.cfg.mergeVersions(input.requirements.cfg);
+            target.requirements.cfg = target.requirements.cfg.mergeDFlags(input.requirements.cfg);
+            target.requirements.cfg = target.requirements.cfg.mergeLinkFilesFromSource(input.requirements.cfg);
+            final switch(input.requirements.cfg.targetType) with(TargetType)
+            {
+                case autodetect: throw new Error("Node should not be autodetect at this point");
+                case library, staticLibrary:
+                        BuildConfiguration other = input.requirements.cfg.clone;
+                        other.libraries~= other.name;
+                        other.libraryPaths~= other.outputDirectory;
+                        target.requirements.extra.librariesFullPath.exclusiveMerge(
+                            [buildNormalizedPath(other.outputDirectory, other.name)]
+                        );
+                        target.requirements.cfg = target.requirements.cfg.mergeLibraries(other);
+                        target.requirements.cfg = target.requirements.cfg.mergeLibPaths(other);
+                    break;
+                case sourceLibrary: 
+                    target.requirements.cfg = target.requirements.cfg.mergeLibraries(input.requirements.cfg);
+                    target.requirements.cfg = target.requirements.cfg.mergeLibPaths(input.requirements.cfg);
+                    target.requirements.cfg = target.requirements.cfg.mergeSourcePaths(input.requirements.cfg);
+                    target.requirements.cfg = target.requirements.cfg.mergeSourceFiles(input.requirements.cfg);
+                    break;
+                case dynamicLibrary: throw new Error("Uninplemented support for shared libraries");
+                case executable: break;
+                case none: throw new Error("Invalid targetType: none");
+            }
+        }
+
+        static void finishPublic(ProjectNode node, ref bool[ProjectNode] visited)
+        {
+            if(node in visited) return;
+            foreach(dep; node.dependencies)
+            {
+                if(!(node in visited))
+                    finishPublic(dep, visited);
+            }
+            finishSelfRequirements(node);
             foreach(p; node.parent)
             {
-                vvlog("Merging ", node.name, " into ", p.name);
-                p.requirements.cfg = p.requirements.cfg.mergeImport(node.requirements.cfg);
-                p.requirements.cfg = p.requirements.cfg.mergeStringImport(node.requirements.cfg);
-                p.requirements.cfg = p.requirements.cfg.mergeVersions(node.requirements.cfg);
-                p.requirements.cfg = p.requirements.cfg.mergeDFlags(node.requirements.cfg);
-                p.requirements.cfg = p.requirements.cfg.mergeLinkFilesFromSource(node.requirements.cfg);
-                HandleTargetType: final switch(node.requirements.cfg.targetType) with(TargetType)
+                if(!hasPrivateRelationship(p, node))
+                   finishMerging(p, node);
+            }
+            visited[node] = true;
+        }
+        static void finishPrivate(ProjectNode node, ref bool[ProjectNode] visited)
+        {
+            if(node in visited) return;
+            foreach(dep; node.dependencies)
+            {
+                if(!(node in visited))
                 {
-                    case autodetect: node.requirements.cfg.targetType = inferTargetType(node.requirements.cfg); goto HandleTargetType;
-                    case library, staticLibrary:
-                            BuildConfiguration other = node.requirements.cfg.clone;
-                            other.libraries~= other.name;
-                            other.libraryPaths~= other.outputDirectory;
-                            p.requirements.extra.librariesFullPath.exclusiveMerge(
-                                [buildNormalizedPath(other.outputDirectory, other.name)]
-                            );
-                            p.requirements.cfg = p.requirements.cfg.mergeLibraries(other);
-                            p.requirements.cfg = p.requirements.cfg.mergeLibPaths(other);
-                        break;
-                    case sourceLibrary: 
-                        p.requirements.cfg = p.requirements.cfg.mergeLibraries(node.requirements.cfg);
-                        p.requirements.cfg = p.requirements.cfg.mergeLibPaths(node.requirements.cfg);
-                        p.requirements.cfg = p.requirements.cfg.mergeSourcePaths(node.requirements.cfg);
-                        p.requirements.cfg = p.requirements.cfg.mergeSourceFiles(node.requirements.cfg);
-                        break;
-                    case dynamicLibrary: throw new Error("Uninplemented support for shared libraries");
-                    case executable: break;
-                    case none: throw new Error("Invalid targetType: none");
+                    if(hasPrivateRelationship(node, dep))
+                        finishMerging(node, dep);
+                    finishPrivate(dep, visited);
                 }
             }
-            
+            visited[node] = true;
             if(node.requirements.cfg.targetType == TargetType.sourceLibrary)
             {
                 vlog("Project ", node.name, " is a sourceLibrary. Becoming independent.");
                 node.becomeIndependent();
             }
-            visited[node] = true;
         }
-        finishImpl(this, visitedBuffer);
+        finishPublic(this, visitedBuffer);
+        visitedBuffer.clear();
+        finishPrivate(this, visitedBuffer);
     }
     
     bool isUpToDate() const { return !shouldRebuild; }
