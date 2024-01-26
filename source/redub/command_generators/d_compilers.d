@@ -30,7 +30,7 @@ string[] parseBuildConfiguration(AcceptedCompiler comp, immutable BuildConfigura
             commands~= mapper(ValidDFlags.buildAsShared);
 
         commands~= mapper(ValidDFlags.objectDir)~getObjectDir(b.workingDir);
-        commands~= mapper(ValidDFlags.outputFile) ~ getConfigurationOutputDir(b, target);
+        commands~= mapper(ValidDFlags.outputFile) ~ getConfigurationOutputPath(b, target);
         
         putSourceFiles(commands, workingDir, sourcePaths, sourceFiles, excludeSourceFiles, ".d");
     }

@@ -31,14 +31,14 @@ string[] parseLinkConfiguration(immutable BuildConfiguration b, OS target, Compi
             commands~= getLinkFiles(b.sourceFiles);
             
             commands~= buildNormalizedPath(outputDirectory, name~getObjectExtension(target));
-            commands~= "-of"~buildNormalizedPath(outputDirectory, getOutputName(b, os));
+            commands~= "-of"~buildNormalizedPath(outputDirectory, getOutputName(b, target));
         }
         else if(!compiler.isDCompiler) //Generates a static library using archiver. FIXME: BuildRequirements should know its files.
         {
             commands~= "--format=default";
             commands~= "rcs";
-            commands~= buildNormalizedPath(outputDirectory, getOutputName(b, os));
-            putObjectFiles(commands, b, os);
+            commands~= buildNormalizedPath(outputDirectory, getOutputName(b, target));
+            putObjectFiles(commands, b, target);
         }
     }
 
@@ -71,7 +71,7 @@ string[] parseLinkConfigurationMSVC(immutable BuildConfiguration b, OS target, C
         commands = mapAppend(commands, libraries, (string l) => "-L"~l~".lib");
         
         commands~= buildNormalizedPath(outputDirectory, name~getObjectExtension(target));
-        commands~= "-of"~buildNormalizedPath(outputDirectory, getOutputName(targetType, name, os));
+        commands~= "-of"~buildNormalizedPath(outputDirectory, getOutputName(targetType, name, target));
     }
     return commands;
 }

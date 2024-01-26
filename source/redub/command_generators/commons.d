@@ -37,7 +37,7 @@ string getObjectDir(string projWorkingDir)
     return objDir;
 }
 
-string getConfigurationOutputDir(const BuildConfiguration conf, OS os)
+string getConfigurationOutputPath(const BuildConfiguration conf, OS os)
 {
     import std.path;
     with(conf)
@@ -122,7 +122,7 @@ string getExtension(TargetType t, OS target)
 string getOutputName(TargetType t, string name, OS os)
 {
     string outputName;
-    if(os.isPosix && t.isStaticLibrary)
+    if(os.isPosix && t.isAnyLibrary)
         outputName = "lib";
     outputName~= name~t.getExtension(os);
     return outputName;

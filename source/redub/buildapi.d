@@ -19,6 +19,11 @@ bool isStaticLibrary(TargetType t)
     return t == TargetType.staticLibrary || t == TargetType.library;
 }
 
+bool isAnyLibrary(TargetType t)
+{
+    return t == TargetType.staticLibrary || t == TargetType.library || t == TargetType.dynamicLibrary;
+}
+
 bool isLinkedSeparately(TargetType t)
 {
     return t == TargetType.executable || t == TargetType.dynamicLibrary;
@@ -577,12 +582,17 @@ class ProjectNode
     void finish()
     {
         scope bool[ProjectNode] visitedBuffer;
+        scope ProjectNode[] privatesToMerge;
+        scope ProjectNode[] sourceLibrariesToRemove;
+        privatesToMerge.reserve(128);
+        sourceLibrariesToRemove.reserve(64);
 
+        
         static bool hasPrivateRelationship(const ProjectNode parent, const ProjectNode child)
         {
             foreach(dep; parent.requirements.dependencies)
             {
-                if(dep.fullName == child.name && dep.visibility == Visibility.private_)
+                if(dep.visibility == Visibility.private_ && matches(dep.fullName, child.name))
                     return true;
             }
             return false;
@@ -637,44 +647,42 @@ class ProjectNode
             }
         }
 
-        static void finishPublic(ProjectNode node, ref bool[ProjectNode] visited)
+        static void finishPublic(ProjectNode node, ref bool[ProjectNode] visited, ref ProjectNode[] privatesToMerge, ref ProjectNode[] sourceLibrariesToRemove)
         {
             if(node in visited) return;
             foreach(dep; node.dependencies)
             {
                 if(!(node in visited))
-                    finishPublic(dep, visited);
+                    finishPublic(dep, visited, privatesToMerge, sourceLibrariesToRemove);
             }
             finishSelfRequirements(node);
             foreach(p; node.parent)
             {
                 if(!hasPrivateRelationship(p, node))
                    finishMerging(p, node);
-            }
-            visited[node] = true;
-        }
-        static void finishPrivate(ProjectNode node, ref bool[ProjectNode] visited)
-        {
-            if(node in visited) return;
-            foreach(dep; node.dependencies)
-            {
-                if(!(node in visited))
-                {
-                    if(hasPrivateRelationship(node, dep))
-                        finishMerging(node, dep);
-                    finishPrivate(dep, visited);
-                }
+                else
+                    privatesToMerge~= [p, node];
             }
             visited[node] = true;
             if(node.requirements.cfg.targetType == TargetType.sourceLibrary)
+                sourceLibrariesToRemove~= node;
+        }
+        static void finishPrivate(ProjectNode[] privatesToMerge, ProjectNode[] sourceLibrariesToRemove)
+        {
+            for(int i = 0; i < privatesToMerge.length; i+= 2)
+                finishMerging(privatesToMerge[0], privatesToMerge[1]);
+            foreach(node; sourceLibrariesToRemove)
             {
                 vlog("Project ", node.name, " is a sourceLibrary. Becoming independent.");
                 node.becomeIndependent();
             }
         }
-        finishPublic(this, visitedBuffer);
+        finishPublic(this, visitedBuffer, privatesToMerge, sourceLibrariesToRemove);
+        finishPrivate(privatesToMerge, sourceLibrariesToRemove);
+
         visitedBuffer.clear();
-        finishPrivate(this, visitedBuffer);
+        sourceLibrariesToRemove = null;
+        privatesToMerge = null;
     }
     
     bool isUpToDate() const { return !shouldRebuild; }
@@ -724,8 +732,10 @@ class ProjectNode
             int index = 0;
             bool empty(){return index >= nodes.length; }
             void popFront(){index++;}
+            alias popBack = popFront;
             size_t length(){return nodes.length;}
             inout(ProjectNode) front() inout {return nodes[index];}
+            inout(ProjectNode) back() inout {return nodes[nodes.length - (index+1)];}
         }
 
         return CollapsedRange(collapsedRef);
@@ -792,4 +802,19 @@ private TargetType inferTargetType(BuildConfiguration cfg)
             return TargetType.executable;
     }
     return TargetType.library;
+}
+
+
+pragma(inline, true)
+private bool matches(string inputName, string toMatch) @nogc nothrow
+{
+    import std.ascii;
+    if(inputName.length != toMatch.length) return false;
+    foreach(i; 0..inputName.length)
+    {
+        ///Ignore if both is not alpha num (related to _ and :)
+        if(inputName[i] != toMatch[i] && (inputName[i].isAlphaNum || toMatch[i].isAlphaNum))
+            return false;
+    }
+    return true;
 }

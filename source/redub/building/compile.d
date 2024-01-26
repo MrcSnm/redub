@@ -62,7 +62,7 @@ void execCompilation(immutable BuildConfiguration cfg, shared ProjectNode pack, 
             return;
         }
         //Remove existing binary, since it won't be replaced by simply executing commands
-        string outDir = getConfigurationOutputDir(cfg, os);
+        string outDir = getConfigurationOutputPath(cfg, os);
         if(exists(outDir))
             remove(outDir);
         
@@ -70,7 +70,7 @@ void execCompilation(immutable BuildConfiguration cfg, shared ProjectNode pack, 
             return;
 
         ExecutionResult ret;
-        if(isDCompiler(compiler) && os.isWindows)
+        if(isDCompiler(compiler) && std.system.os.isWindows)
         {
             string[] flags = getCompilationFlags(cfg, os, compiler);
             string commandFile = createCommandFile(cfg, os, compiler, flags, res.compilationCommand);
@@ -103,7 +103,7 @@ void execCompilation(immutable BuildConfiguration cfg, shared ProjectNode pack, 
         {
             if(executeCommands(cfg.postBuildCommands, "postBuildCommand", res, cfg.workingDir, env).status)
                 return;
-            if(cfg.targetType != TargetType.executable && executeCommands(cfg.postGenerateCommands, "postGenerateCommand", res, cfg.workingDir, env).status)
+            if(!cfg.targetType.isLinkedSeparately && executeCommands(cfg.postGenerateCommands, "postGenerateCommand", res, cfg.workingDir, env).status)
                 return;
         }
         
@@ -127,6 +127,10 @@ CompilationResult link(immutable BuildConfiguration cfg, OS os, Compiler compile
     auto exec = executeShell(ret.compilationCommand);
     ret.status = exec.status;
     ret.message = exec.output;
+
+    if(exec.status != 0)
+        return ret;
+
     if(cfg.targetType.isLinkedSeparately)
         executeCommands(cfg.postGenerateCommands, "postGenerateCommand", ret, cfg.workingDir, env);
 
