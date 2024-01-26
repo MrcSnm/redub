@@ -29,12 +29,14 @@ string[] getCompilationFlags(immutable BuildConfiguration cfg, OS os, Compiler c
 
 string getCompileCommands(immutable BuildConfiguration cfg, OS os, Compiler compiler)
 {
+    import std.array:join;
     string[] flags = getCompilationFlags(cfg,os,compiler);
-    return escapeShellCommand(compiler.binOrPath ~ flags);
+    return escapeShellCommand(compiler.binOrPath) ~ flags.join(" ");
 }
 
 string getLinkCommands(immutable BuildConfiguration cfg, OS os, Compiler compiler)
 {
+    import std.array:join;
     import command_generators.linkers;
     string[] flags;
     
@@ -45,6 +47,6 @@ string getLinkCommands(immutable BuildConfiguration cfg, OS os, Compiler compile
         throw new Error("Unsupported compiler '" ~ compiler.binOrPath~"'");
 
     if(compiler.isDCompiler)
-        return escapeShellCommand(compiler.binOrPath ~ flags);
-    return escapeShellCommand(compiler.archiver ~ flags);
+        return escapeShellCommand(compiler.binOrPath) ~ " "~ flags.join(" ");
+    return escapeShellCommand(compiler.archiver) ~ flags.join(" ");
 }

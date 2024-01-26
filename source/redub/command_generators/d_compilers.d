@@ -61,8 +61,39 @@ string[] filterLinkFlags(const string[] dflags)
 {
     import std.algorithm.iteration:filter;
     import std.array;
-    auto filtered = dflags.filter!((df => df.length >= 2 && df[0..2] == "-L"));
+    auto filtered = dflags.filter!((df => isLinkerDFlag(df)));
     return cast(string[])(filtered.array);
+}
+
+///Courtesy directly from dub
+bool isLinkerDFlag(string arg)
+{
+    static bool startsWith(string input, string what)
+    {
+        if(input.length < what.length || what.length == 0) return false;
+        return input[0..what.length] == what;
+    }
+    if (arg.length > 2 && arg[0..2] == "--")
+        arg = arg[1..$]; // normalize to 1 leading hyphen
+
+    switch (arg) {
+        case "-g", "-gc", "-m32", "-m64", "-shared", "-lib",
+                "-betterC", "-disable-linker-strip-dead", "-static":
+            return true;
+        default:
+            return startsWith(arg, "-L")
+                || startsWith(arg, "-Xcc=")
+                || startsWith(arg, "-defaultlib=")
+                || startsWith(arg, "-platformlib=")
+                || startsWith(arg, "-flto")
+                || startsWith(arg, "-fsanitize=")
+                || startsWith(arg, "-gcc=")
+                || startsWith(arg, "-link-")
+                || startsWith(arg, "-linker=")
+                || startsWith(arg, "-march=")
+                || startsWith(arg, "-mscrtlib=")
+                || startsWith(arg, "-mtriple=");
+    }
 }
 
 string function(ValidDFlags) getFlagMapper(AcceptedCompiler comp)

@@ -16,6 +16,12 @@ string[] parseLinkConfiguration(immutable BuildConfiguration b, OS target, Compi
         if(compiler.isDCompiler)
         {
             import redub.command_generators.d_compilers;
+                    
+            if (targetType.isLinkedSeparately)
+            {
+                commands~= "-of"~buildNormalizedPath(outputDirectory, getOutputName(b, target));
+                commands~= buildNormalizedPath(outputDirectory, name~getObjectExtension(target));
+            }
             auto mapper = getFlagMapper(compiler.compiler);
             if(b.arch) commands~= mapper(ValidDFlags.arch) ~ b.arch;
             commands~= filterLinkFlags(b.dFlags);
@@ -30,8 +36,6 @@ string[] parseLinkConfiguration(immutable BuildConfiguration b, OS target, Compi
             commands = mapAppendReverse(commands, libraries, (string l) => "-L-l"~l);
             commands~= getLinkFiles(b.sourceFiles);
             
-            commands~= buildNormalizedPath(outputDirectory, name~getObjectExtension(target));
-            commands~= "-of"~buildNormalizedPath(outputDirectory, getOutputName(b, target));
         }
         else if(!compiler.isDCompiler) //Generates a static library using archiver. FIXME: BuildRequirements should know its files.
         {
