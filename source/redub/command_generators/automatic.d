@@ -31,7 +31,7 @@ string getCompileCommands(immutable BuildConfiguration cfg, OS os, Compiler comp
 {
     import std.array:join;
     string[] flags = getCompilationFlags(cfg,os,compiler);
-    return escapeShellCommand(compiler.binOrPath) ~ flags.join(" ");
+    return escapeShellCommand(compiler.binOrPath) ~ " " ~ flags.join(" ");
 }
 
 string getLinkCommands(immutable BuildConfiguration cfg, OS os, Compiler compiler)
@@ -48,5 +48,5 @@ string getLinkCommands(immutable BuildConfiguration cfg, OS os, Compiler compile
 
     if(compiler.isDCompiler)
         return escapeShellCommand(compiler.binOrPath) ~ " "~ flags.join(" ");
-    return escapeShellCommand(compiler.archiver) ~ flags.join(" ");
+    return escapeShellCommand(compiler.archiver) ~ " " ~ flags.join(" ");
 }
