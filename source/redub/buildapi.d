@@ -622,6 +622,9 @@ class ProjectNode
             target.requirements.cfg = target.requirements.cfg.mergeVersions(input.requirements.cfg);
             target.requirements.cfg = target.requirements.cfg.mergeDFlags(input.requirements.cfg);
             target.requirements.cfg = target.requirements.cfg.mergeLinkFilesFromSource(input.requirements.cfg);
+            target.requirements.extra.librariesFullPath.exclusiveMerge(
+                input.requirements.extra.librariesFullPath
+            );
             final switch(input.requirements.cfg.targetType) with(TargetType)
             {
                 case autodetect: throw new Error("Node should not be autodetect at this point");
