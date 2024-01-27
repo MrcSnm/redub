@@ -79,7 +79,11 @@ void invalidateCaches(ProjectNode root, Compiler compiler)
     {
         if(!n.isUpToDate) continue;
         if(!cacheStatus[--i].isUpToDate(n.requirements, compiler, &cachedDirTime))
+        {
+            import redub.logging;
+            info("Project ", n.name," requires rebuild.");
             n.invalidateCache();
+        }
     }
 }
 
@@ -104,11 +108,20 @@ string hashFrom(const BuildRequirements req, Compiler compiler)
     return hashFunction(inputHash.join);
 }
 
+
+struct DateCache
+{
+    ///The timestamp for a given key(file or directory (the directory will store accumulated))
+    Int128[string] timeStamp;
+
+    alias timeStamp this;
+}
+
 string hashFromPathDates(Int128[string]* cachedDirTime, scope const(string[]) entryPaths...)
 {
-    import std.conv:to;
     import std.file;
     Int128 bInt;
+    DateCache cache;
     foreach(path; entryPaths)
     {
         if(!std.file.exists(path)) continue;
@@ -120,13 +133,18 @@ string hashFromPathDates(Int128[string]* cachedDirTime, scope const(string[]) en
             {
                 // import std.string;
                 // if(e.name.endsWith(".o")) throw new Error("Found .o at "~e.name);
+                // cache[e.name] = Int128(e.timeLastModified.stdTime);
                 dirTime+= e.timeLastModified.stdTime;
             }
             bInt+= dirTime;
+            // cache[path] = dirTime;
             if(cachedDirTime !is null) (*cachedDirTime)[path] = dirTime;
         }
         else
+        {
             bInt+= std.file.timeLastModified(path).stdTime;
+            // cache[path] = Int128(std.file.timeLastModified(path).stdTime);
+        }
     }
     
     char[2048] output;
@@ -144,11 +162,8 @@ string hashFromDates(const BuildConfiguration cfg, Int128[string]* cachedDirTime
 {
     import std.system;
     import redub.command_generators.commons;
-    string[] sourceFiles = new string[](cfg.sourceFiles.length);
     string[] libs = new string[](cfg.libraries.length);
 
-    foreach(i, s; cfg.sourceFiles)
-        sourceFiles[i] = buildNormalizedPath(cfg.workingDir, s);
     foreach(i, s; cfg.libraries)
         libs[i] = buildNormalizedPath(cfg.workingDir, s);
 
@@ -157,7 +172,7 @@ string hashFromDates(const BuildConfiguration cfg, Int128[string]* cachedDirTime
         cfg.importDirectories~
         cfg.sourcePaths ~
         cfg.stringImportPaths~
-        sourceFiles~
+        cfg.sourceFiles~
         libs ~ 
         buildNormalizedPath(cfg.outputDirectory, getOutputName(cfg.targetType, cfg.name, os))
         // cfg.libraryPaths~ ///This is causing problems when using subPackages without output path, they may clash after
