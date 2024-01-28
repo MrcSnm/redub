@@ -1,0 +1,16 @@
+.dub
+docs.json
+__dummy.html
+docs/
+/adv_cache
+adv_cache.so
+adv_cache.dylib
+adv_cache.dll
+adv_cache.a
+adv_cache.lib
+adv_cache-test-*
+*.exe
+*.pdb
+*.o
+*.obj
+*.lst

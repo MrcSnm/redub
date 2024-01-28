@@ -1,5 +1,6 @@
 module redub.building.cache;
 public import redub.compiler_identification;
+public import redub.libs.adv_diff.files;
 public import std.int128;
 import redub.package_searching.dub;
 import redub.buildapi;
@@ -40,6 +41,7 @@ struct CompilationCache
 
     bool isUpToDate(const BuildRequirements req, Compiler compiler, Int128[string]* cachedDirTime) const
     {
+        string[] diffs;
         return requirementCache == hashFrom(req, compiler) &&
             dateCache == hashFromDates(req.cfg, cachedDirTime);
     }
@@ -158,6 +160,23 @@ string hashFromPathDates(Int128[string]* cachedDirTime, scope const(string[]) en
     return (output[0..i]).dup;
 }
 
+AdvCacheFormula generateCache(const BuildConfiguration cfg)
+{
+    static contentHasher = (ubyte[] content)
+    {
+        return cast(ubyte[])hashFunction(cast(string)content);
+    };
+    string[] libs = new string[](cfg.libraries.length);
+    foreach(i, s; cfg.libraries)
+        libs[i] = buildNormalizedPath(cfg.workingDir, s);
+
+    return AdvCacheFormula.make(
+        contentHasher, 
+        joinFlattened(cfg.importDirectories, cfg.sourcePaths, cfg.stringImportPaths),
+        joinFlattened(cfg.sourceFiles, libs)
+    );
+}
+
 string hashFromDates(const BuildConfiguration cfg, Int128[string]* cachedDirTime)
 {
     import std.system;
@@ -181,18 +200,6 @@ string hashFromDates(const BuildConfiguration cfg, Int128[string]* cachedDirTime
     
 }
 
-string hashFromPathContents(scope const string[] entryPaths...)
-{
-    import std.array;
-    import std.conv:to;
-    import std.file;
-    scope string[] contentsToInclude;
-    foreach(path; entryPaths)
-        foreach(DirEntry e; dirEntries(path, SpanMode.depth))
-            contentsToInclude~= cast(string)std.file.read(e.name);
-    
-    return hashFunction(contentsToInclude.join);
-}
 
 string[] updateCache(string rootCache, CompilationCache cache, bool writeToDisk = false)
 {
