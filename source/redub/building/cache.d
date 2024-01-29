@@ -7,6 +7,7 @@ import redub.buildapi;
 static import std.file;
 import std.path;
 import std.json;
+import redub.command_generators.commons;
 
 
 enum cacheFolder = ".redub";
@@ -40,8 +41,13 @@ struct CompilationCache
 {
     ///Key for finding the cache
     string requirementCache;
-
     private AdvCacheFormula cache;
+
+    static CompilationCache make(string requirementCache, const BuildConfiguration cfg, OS target)
+    {
+        return CompilationCache(requirementCache, generateCache(cfg, target));
+    }
+    
 
     static CompilationCache get(string rootHash, const BuildRequirements req, Compiler compiler)
     {
@@ -58,11 +64,11 @@ struct CompilationCache
         return CompilationCache(reqCache, AdvCacheFormula.deserialize(*targetCache));
     }
 
-    bool isUpToDate(const BuildRequirements req, Compiler compiler, Int128[string]* cachedDirTime) const
+    bool isUpToDate(const BuildRequirements req, Compiler compiler, OS target, Int128[string]* cachedDirTime) const
     {
         string[] diffs;
         size_t diffCount;
-        AdvCacheFormula otherFormula = generateCache(req.cfg);
+        AdvCacheFormula otherFormula = generateCache(req.cfg, target);
         return requirementCache == hashFrom(req, compiler) &&
             cache.diffStatus(otherFormula, diffs, diffCount);
     }
@@ -92,7 +98,7 @@ CompilationCache[] cacheStatusForProject(ProjectNode root, Compiler compiler)
  *   root = Project root for traversing
  *   compiler = Which compiler is being used to check the caches
  */
-void invalidateCaches(ProjectNode root, Compiler compiler)
+void invalidateCaches(ProjectNode root, Compiler compiler, OS target)
 {
     const CompilationCache[] cacheStatus = cacheStatusForProject(root, compiler);
     ptrdiff_t i = cacheStatus.length;
@@ -101,7 +107,7 @@ void invalidateCaches(ProjectNode root, Compiler compiler)
     foreach_reverse(ProjectNode n; root.collapse)
     {
         if(!n.isUpToDate) continue;
-        if(!cacheStatus[--i].isUpToDate(n.requirements, compiler, &cachedDirTime))
+        if(!cacheStatus[--i].isUpToDate(n.requirements, compiler, target, &cachedDirTime))
         {
             import redub.logging;
             info("Project ", n.name," requires rebuild.");
@@ -132,30 +138,31 @@ string hashFrom(const BuildRequirements req, Compiler compiler)
 }
 
 
-AdvCacheFormula generateCache(const BuildConfiguration cfg)
+AdvCacheFormula generateCache(const BuildConfiguration cfg, OS target)
 {
+    import std.algorithm.iteration, std.array;
     static contentHasher = (ubyte[] content)
     {
         return cast(ubyte[])hashFunction(cast(string)content);
     };
-    string[] libs = new string[](cfg.libraries.length);
-    foreach(i, s; cfg.libraries)
-        libs[i] = buildNormalizedPath(cfg.workingDir, s);
+    string[] libs = cfg.libraries.map!((libName) => getLibraryPath(libName, cfg.outputDirectory, target)).array;
 
     return AdvCacheFormula.make(
         contentHasher, 
-        joinFlattened(cfg.importDirectories, cfg.sourcePaths, cfg.stringImportPaths), ///This is causing problems when using subPackages without output path, they may clash after
+        //DO NOT use sourcePaths since importPaths is always custom + sourcePaths
+        joinFlattened(cfg.importDirectories, cfg.stringImportPaths), ///This is causing problems when using subPackages without output path, they may clash after
         // the compilation is finished. Solving this would require hash calculation after linking
         joinFlattened(cfg.sourceFiles, libs)
     );
 }
 
 
-string[] updateCache(string rootCache, CompilationCache cache, bool writeToDisk = false)
+string[] updateCache(string rootCache, const CompilationCache cache, bool writeToDisk = false)
 {
     JSONValue* v = getCache();
     if(!(rootCache in *v)) (*v)[rootCache] = JSONValue.emptyObject;
-    (*v)[rootCache][cache.requirementCache] = JSONValue([cache.dateCache, cache.contentCache]);
+    (*v)[rootCache][cache.requirementCache] = JSONValue.emptyObject;
+    cache.cache.serialize((*v)[rootCache][cache.requirementCache]);
     if(writeToDisk)
         std.file.write(getCacheFilePath, getCache().toString());
     return null;

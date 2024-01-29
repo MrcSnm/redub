@@ -14,7 +14,7 @@ struct CompilationResult
     size_t msNeeded;
     int status;
     shared ProjectNode node;
-    CompilationCache cache;
+    shared CompilationCache cache;
 }
 
 import std.typecons;
@@ -38,7 +38,7 @@ private ExecutionResult executeCommands(const string[] commandsList, string list
     return ExecutionResult(0, "Success");
 }
 
-void execCompilation(immutable BuildConfiguration cfg, shared ProjectNode pack, OS os, Compiler compiler, CompilationCache cache, immutable string[string] env)
+void execCompilation(immutable BuildConfiguration cfg, shared ProjectNode pack, OS os, Compiler compiler, shared CompilationCache cache, immutable string[string] env)
 {
     import std.file;
     import std.process;
@@ -47,7 +47,6 @@ void execCompilation(immutable BuildConfiguration cfg, shared ProjectNode pack, 
 
     CompilationResult res;
     res.node = pack;
-    res.cache.requirementCache = cache.requirementCache;
     StopWatch sw = StopWatch(AutoStart.yes);
     scope(exit)
     {
@@ -107,7 +106,7 @@ void execCompilation(immutable BuildConfiguration cfg, shared ProjectNode pack, 
                 return;
         }
         
-        res.cache.dateCache = hashFromDates(cfg,null);
+        res.cache = cast(shared)CompilationCache.make(cache.requirementCache, cfg, os);
     }
     catch(Throwable e)
     {
@@ -156,7 +155,7 @@ bool buildProjectParallelSimple(ProjectNode root, Compiler compiler, OS os)
                 spawned[dep] = true;
                 spawn(&execCompilation, 
                     dep.requirements.cfg.idup, cast(shared)dep, os, 
-                    compiler, CompilationCache.get(mainPackHash, dep.requirements, compiler),
+                    compiler, cast(shared)CompilationCache.get(mainPackHash, dep.requirements, compiler),
                     env
                 );
             }
@@ -194,7 +193,7 @@ bool buildProjectFullyParallelized(ProjectNode root, Compiler compiler, OS os)
         spawn(&execCompilation, 
             pack.requirements.cfg.idup, 
             cast(shared)pack, os, compiler, 
-            cache[i++],
+            cast(shared)cache[i++],
             env
         );
     }
@@ -211,7 +210,7 @@ bool buildProjectFullyParallelized(ProjectNode root, Compiler compiler, OS os)
         }
         else
         {
-            updateCache(mainPackHash, res.cache);
+            updateCache(mainPackHash, cast()res.cache);
             buildSucceeded(finishedPackage, res);
         }
     }

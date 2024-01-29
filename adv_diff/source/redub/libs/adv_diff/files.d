@@ -15,7 +15,7 @@ struct AdvFile
 	long timeModified;
 	ubyte[] contentHash;
 
-	void serialize(ref JSONValue output, string fileName)
+	void serialize(ref JSONValue output, string fileName) const
 	{
 		import std.digest:toHexString;
 		output[fileName] = JSONValue([JSONValue(timeModified), JSONValue(contentHash.toHexString)]);
@@ -41,20 +41,20 @@ struct AdvDirectory
 	ubyte[] contentHash;
 	AdvFile[string] files;
 
-	void serialize(ref JSONValue output, string dirName)
+	void serialize(ref JSONValue output, string dirName) const
 	{
 		JSONValue dir = JSONValue.emptyObject;
 		foreach(fileName, advFile; files)
 		{
 			advFile.serialize(dir, fileName);
 		}
-
-		output[dirName] = JSONValue([JSONValue(total.data.hi), JSONValue(total.data.lo), dir]);
+		import std.digest;
+		output[dirName] = JSONValue([JSONValue(total.data.hi), JSONValue(total.data.lo), JSONValue(toHexString(contentHash)), dir]);
 	}
 
 	/** 
 	 * Specification:
-	 * [$INT128_HI, $INT128_LOW, {[FILENAME] : ADV_FILE_SPEC}]
+	 * [$INT128_HI, $INT128_LOW, $CONTENT_HASH, {[FILENAME] : ADV_FILE_SPEC}]
 	 * Params:
 	 *   input = 
 	 * Returns: 
@@ -65,14 +65,15 @@ struct AdvDirectory
 		JSONValue[] v = input.array;
 		enforce(v.length == 3, "Input of directory is missing members.");
 		enforce(v[0].type == JSONType.integer && v[1].type == JSONType.integer, "Input of AdvDirectory must be first 2 integers.");
-		enforce(v[2].type == JSONType.object, "AdvDirectory index 2 must be an object");
+		enforce(v[2].type == JSONType.string, "AdvDirectory index 2 must be a string");
+		enforce(v[3].type == JSONType.object, "AdvDirectory index 3 must be an object");
 		AdvFile[string] files;
 
 		foreach(string fileName, JSONValue advFile; v[3].object)
 		{
 			files[fileName] = AdvFile.deserialize(advFile);
 		}
-		return AdvDirectory(Int128(input[0].integer, input[1].integer), files);
+		return AdvDirectory(Int128(v[0].integer, v[1].integer), cast(ubyte[])v[2].str, files);
 	}
 }
 
@@ -111,14 +112,14 @@ struct AdvCacheFormula
 		return AdvCacheFormula(Int128(v[0].integer, v[1].integer), dirs, files);
 	}
 
-	void serialize(ref JSONValue output)
+	void serialize(ref JSONValue output) const
 	{
 		JSONValue dirsJson;
 		JSONValue filesJson;
 
-		foreach(string dirName, AdvDirectory advDir; directories)
+		foreach(string dirName, const AdvDirectory advDir; directories)
 			advDir.serialize(dirsJson, dirName);
-		foreach(string fileName, AdvFile advFile; files)
+		foreach(string fileName, const AdvFile advFile; files)
 			advFile.serialize(filesJson, fileName);
 		output = JSONValue([JSONValue(total.data.hi), JSONValue(total.data.lo), dirsJson, filesJson]);
 	}
@@ -148,11 +149,8 @@ struct AdvCacheFormula
 					fSize = e.size;
 					if(fSize > fileBuffer.length) fileBuffer.length = fSize;
 					File(e.name).rawRead(fileBuffer[0..fSize]);
-					if(hashedContent.length)
-					{
-						advDir.contentHash = contentHasher()
-					}
 					hashedContent = contentHasher(fileBuffer[0..fSize]);
+					advDir.contentHash = contentHasher(joinFlattened(advDir.contentHash, hashedContent));
 				}
 				advDir.files[e.name] = AdvFile(time, hashedContent);
                 dirTime+= time;
@@ -164,6 +162,8 @@ struct AdvCacheFormula
         {
 			///May throw if it is a directory.
 			size_t fSize;
+			import std.stdio;
+			writeln(file);
 			File f = File(file);
 			if(!f.isOpen) continue; //Does not exists
 			if(contentHasher !is null)
@@ -243,7 +243,7 @@ struct AdvCacheFormula
 			}
 			else
 			{
-				if(otherAdvDir.total != advDir.total)
+				if(otherAdvDir.total != advDir.total && otherAdvDir.contentHash != advDir.contentHash)
 				{
 					//If directory total is different, check per file
 					diffCount = diffFiles(otherAdvDir.files, advDir.files, diffs, diffCount);

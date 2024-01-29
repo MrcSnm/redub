@@ -144,7 +144,7 @@ ProjectDetails resolveDependencies(
     if(invalidateCache)
         tree.invalidateCacheOnTree();
     else 
-        invalidateCaches(tree, compiler);
+        invalidateCaches(tree, compiler, osFromArch(cDetails.arch));
     
     info("Dependencies resolved in ", (st.peek.total!"msecs"), " ms.") ;
     return ProjectDetails(tree, compiler);
