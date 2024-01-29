@@ -22,7 +22,8 @@
     "license": "MIT",
     "dependencies": {
         "semver": {"path": "semver"},
-        "colorize": {"path": "colorize"}
+        "colorize": {"path": "colorize"},
+        "adv_diff": {"path": "adv_diff"}
     }
 
 }

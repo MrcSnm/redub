@@ -5,25 +5,88 @@
  */
 module redub.libs.adv_diff.files;
 public import std.int128;
+public import std.json;
+
+import std.exception;
 
 struct AdvFile
 {
 	///This will be used to compare before content hash
 	long timeModified;
 	ubyte[] contentHash;
+
+	void serialize(ref JSONValue output, string fileName)
+	{
+		import std.digest:toHexString;
+		output[fileName] = JSONValue([JSONValue(timeModified), JSONValue(contentHash.toHexString)]);
+	}
+
+	static AdvFile deserialize(JSONValue input)
+	{
+		enforce(input.type == JSONType.array, "Input json for AdvFile deserialization is not an array.");
+		enforce(input.array.length == 2, "Input json for AdvFile deserialization is an array with size different from 2.");
+		return AdvFile(input.array[0].integer, cast(ubyte[])input.array[1].str);
+	}
 }
 
 struct AdvDirectory
 {
-	AdvFile[string] files;
 	Int128 total;
+	AdvFile[string] files;
+
+	void serialize(ref JSONValue output, string dirName)
+	{
+		JSONValue dir = JSONValue.emptyObject;
+		foreach(fileName, advFile; files)
+		{
+			advFile.serialize(dir[fileName], fileName);
+		}
+
+		output[dirName] = JSONValue([JSONValue(total.data.hi), JSONValue(total.data.lo), dir]);
+	}
+
+	static AdvDirectory deserialize(JSONValue input)
+	{
+		enforce(input.type == JSONType.array, "Input of directory is not an array.");
+		JSONValue[] v = input.array;
+		enforce(v.length == 3, "Input of directory is missing members.");
+		enforce(v[0].type == JSONType.integer && v[1].type == JSONType.integer, "Input of AdvDirectory must be first 2 integers.");
+		enforce(v[2].type == JSONType.object, "AdvDirectory index 2 must be an object");
+		AdvFile[string] files;
+
+		foreach(string fileName, JSONValue advFile; v[3].object)
+		{
+			files[fileName] = AdvFile.deserialize(advFile);
+		}
+		return AdvDirectory(Int128(input[0].integer, input[1].integer), files);
+	}
 }
 
 struct AdvCacheFormula
 {
+	Int128 total;
 	AdvDirectory[string] directories;
 	AdvFile[string] files;
-	Int128 total;
+
+
+	static AdvCacheFormula deserialize(JSONValue input)
+	{
+		enforce(input.type == JSONType.array, "AdvCacheFormula input must be an array");
+		JSONValue[] v = input.array;
+		enforce(v.length == 4, "AdvCacheFormula must contain a tuple of 4 values");
+		enforce(v[0].type == JSONType.integer && v[1].type == JSONType.integer, "AdvCacheFormula must contain 2 integers on its start");
+		enforce(v[2].type == JSONType.object && v[3].type == JSONType.object, "AdvCacheFormula must contain objects on index 2 and 3");
+
+		AdvFile[string] files;
+		AdvDirectory[string] dirs;
+
+		foreach(string fileName, JSONValue advDir; v[3].object)
+			dirs[fileName] = AdvDirectory.deserialize(advDir);
+
+		foreach(string fileName, JSONValue advFile; v[3].object)
+			files[fileName] = AdvFile.deserialize(advFile);
+		return AdvCacheFormula(Int128(v[0].integer, v[1].integer), dirs, files);
+	}
 
 
 	static AdvCacheFormula make(ubyte[] function(ubyte[]) contentHasher, scope const string[] directories, scope const string[] files = null)

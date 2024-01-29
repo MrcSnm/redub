@@ -12,6 +12,64 @@ import std.json;
 enum cacheFolder = ".redub";
 enum cacheFile = "redub_cache.json";
 
+
+/** 
+ * JSON specification:
+ * [$REQUIREMENT_HASH]: {
+ *   [$DEP_REQ_HASH] : [$DEP_TOTAL, {DIRS : [$DIR_TIME, {$FILE: [$FILE_STAMP, $FILE_HASH]}}], {FILES}]
+ * }
+ * 
+ * Returns: 
+ */
+AdvCacheFormula fromJSON(JSONValue input)
+{
+    AdvCacheFormula ret;
+    JSONValue[] advTuple = input.array;
+    //ret.total = input[0].str;
+
+    //0 -> Int128, string format
+    //1 -> AdvDirectory[string], object
+    //2 -> AdvFile[string], object
+    foreach(string fileName, JSONValue dirObj ; advTuple[1].object)
+    {
+        AdvDirectory newDir;
+        //0 is dir total time
+        //1 is 
+    }
+
+    foreach()
+
+    return ret;
+}
+
+Int128 toInt128(string input)
+{
+    if(input.length == 0) throw new Exception("Tried to send an empty string to convert.");
+    Int128 ret;
+    bool isNegative;
+    if(input[0] == '-') 
+    {
+        input = input[1..$];
+        isNegative = true;
+    }
+    foreach(c; input)
+    {
+        if(c < '0' || c > '9') throw new Exception("Input string "~input~" is not a number.");
+        int digit = c - '0';
+        Int128 newResult = ret * 10 + digit;
+        if(newResult < ret)
+            throw new Exception("Input string "~input~" is too large for an Int128");
+        ret = newResult;
+    }
+    return isNegative ? ret * -1 : ret;
+}
+
+Int128 toInt128(string hi, string low)
+{
+    return Int128(hi.to!long, low.to!long);
+}
+
+
 struct CompilationCache
 {
     ///Key for finding the cache
