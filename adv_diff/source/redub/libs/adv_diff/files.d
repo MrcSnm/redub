@@ -20,7 +20,13 @@ struct AdvFile
 		import std.digest:toHexString;
 		output[fileName] = JSONValue([JSONValue(timeModified), JSONValue(contentHash.toHexString)]);
 	}
-
+	/** 
+	 * Specification:
+	 * [TIME_LONG, CONTENT_HASH]
+	 * Params:
+	 *   input = 
+	 * Returns: 
+	 */
 	static AdvFile deserialize(JSONValue input)
 	{
 		enforce(input.type == JSONType.array, "Input json for AdvFile deserialization is not an array.");
@@ -45,6 +51,13 @@ struct AdvDirectory
 		output[dirName] = JSONValue([JSONValue(total.data.hi), JSONValue(total.data.lo), dir]);
 	}
 
+	/** 
+	 * Specification:
+	 * [$INT128_HI, $INT128_LOW, {[FILENAME] : ADV_FILE_SPEC}]
+	 * Params:
+	 *   input = 
+	 * Returns: 
+	 */
 	static AdvDirectory deserialize(JSONValue input)
 	{
 		enforce(input.type == JSONType.array, "Input of directory is not an array.");
@@ -62,6 +75,8 @@ struct AdvDirectory
 	}
 }
 
+
+
 struct AdvCacheFormula
 {
 	Int128 total;
@@ -69,6 +84,15 @@ struct AdvCacheFormula
 	AdvFile[string] files;
 
 
+	
+	/** 
+	* JSON specification:
+	* [$REQUIREMENT_HASH]: {
+	*   [$DEP_REQ_HASH] : [$DEP_TOTAL, {DIRS : [$DIR_TIME, {$FILE: [$FILE_STAMP, $FILE_HASH]}}], {FILES}]
+	* }
+	* 
+	* Returns: AdvCacheFormula
+	*/
 	static AdvCacheFormula deserialize(JSONValue input)
 	{
 		enforce(input.type == JSONType.array, "AdvCacheFormula input must be an array");
@@ -108,6 +132,7 @@ struct AdvCacheFormula
 		AdvCacheFormula ret;
 		Int128 totalTime;
 		ubyte[] fileBuffer;
+		ubyte[] hashedContent;
 		foreach(dir; directories)
 		{
             Int128 dirTime;
@@ -118,10 +143,15 @@ struct AdvCacheFormula
             {
 				if(e.isDir) continue;
 				long time = e.timeLastModified.stdTime;
-				size_t fSize = e.size;
-				if(fSize > fileBuffer.length) fileBuffer.length = fSize;
-				File(e.name).rawRead(fileBuffer[0..fSize]);
-				advDir.files[e.name] = AdvFile(time, contentHasher(fileBuffer[0..fSize]));
+				size_t fSize; 
+				if(contentHasher !is null)
+				{
+					fSize = e.size;
+					if(fSize > fileBuffer.length) fileBuffer.length = fSize;
+					File(e.name).rawRead(fileBuffer[0..fSize]);
+					hashedContent = contentHasher(fileBuffer[0..fSize]);
+				}
+				advDir.files[e.name] = AdvFile(time, hashedContent);
                 dirTime+= time;
             }
 			totalTime+= advDir.total = dirTime;
@@ -130,14 +160,19 @@ struct AdvCacheFormula
 		foreach(file; files)
         {
 			///May throw if it is a directory.
+			size_t fSize;
 			File f = File(file);
 			if(!f.isOpen) continue; //Does not exists
-			size_t fSize = f.size;
-			if(fSize > fileBuffer.length) fileBuffer.length = fSize;
-			f.rawRead(fileBuffer[0..fSize]);
+			if(contentHasher !is null)
+			{
+				fSize = f.size;
+				if(fSize > fileBuffer.length) fileBuffer.length = fSize;
+				f.rawRead(fileBuffer[0..fSize]);
+				hashedContent = contentHasher(fileBuffer[0..fSize]);
+			}
 			long time = std.file.timeLastModified(file).stdTime;
             totalTime+= time;
-            ret.files[file] = AdvFile(time, fileBuffer[0..fSize]);
+            ret.files[file] = AdvFile(time, hashedContent);
         }
 		ret.total = totalTime;
 		fileBuffer = null;
