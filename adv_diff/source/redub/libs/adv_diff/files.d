@@ -39,7 +39,7 @@ struct AdvDirectory
 		JSONValue dir = JSONValue.emptyObject;
 		foreach(fileName, advFile; files)
 		{
-			advFile.serialize(dir[fileName], fileName);
+			advFile.serialize(dir, fileName);
 		}
 
 		output[dirName] = JSONValue([JSONValue(total.data.hi), JSONValue(total.data.lo), dir]);
@@ -88,6 +88,18 @@ struct AdvCacheFormula
 		return AdvCacheFormula(Int128(v[0].integer, v[1].integer), dirs, files);
 	}
 
+	void serialize(ref JSONValue output)
+	{
+		JSONValue dirsJson;
+		JSONValue filesJson;
+
+		foreach(string dirName, AdvDirectory advDir; directories)
+			advDir.serialize(dirsJson, dirName);
+		foreach(string fileName, AdvFile advFile; files)
+			advFile.serialize(filesJson, fileName);
+		output = JSONValue([JSONValue(total.data.hi), JSONValue(total.data.lo), dirsJson, filesJson]);
+	}
+
 
 	static AdvCacheFormula make(ubyte[] function(ubyte[]) contentHasher, scope const string[] directories, scope const string[] files = null)
 	{
@@ -112,7 +124,7 @@ struct AdvCacheFormula
 				advDir.files[e.name] = AdvFile(time, contentHasher(fileBuffer[0..fSize]));
                 dirTime+= time;
             }
-			totalTime+= dirTime;
+			totalTime+= advDir.total = dirTime;
 			ret.directories[dir] = advDir;
 		}
 		foreach(file; files)
@@ -237,4 +249,9 @@ unittest
 	import std.stdio;
 	size_t diffCount;
 	writeln(formula.diffStatus(formula2, diffCount)[0..diffCount]);
+
+	JSONValue v = JSONValue.emptyObject;
+	formula.serialize(v);
+
+	writeln(v.toPrettyString());
 }
