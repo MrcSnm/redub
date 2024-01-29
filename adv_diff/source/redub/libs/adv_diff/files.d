@@ -31,7 +31,7 @@ struct AdvFile
 	{
 		enforce(input.type == JSONType.array, "Input json for AdvFile deserialization is not an array.");
 		enforce(input.array.length == 2, "Input json for AdvFile deserialization is an array with size different from 2.");
-		return AdvFile(input.array[0].integer, cast(ubyte[])input.array[1].str);
+		return AdvFile(input.array[0].get!long, cast(ubyte[])input.array[1].str);
 	}
 }
 
@@ -61,19 +61,19 @@ struct AdvDirectory
 	 */
 	static AdvDirectory deserialize(JSONValue input)
 	{
-		enforce(input.type == JSONType.array, "Input of directory is not an array.");
+		enforce(input.type == JSONType.array, "AdvDirectory input must be an array.");
 		JSONValue[] v = input.array;
-		enforce(v.length == 3, "Input of directory is missing members.");
-		enforce(v[0].type == JSONType.integer && v[1].type == JSONType.integer, "Input of AdvDirectory must be first 2 integers.");
+		enforce(v.length == 4, "AdvDirectory must contain 4 members.");
+		enforce(v[0].type.isInteger && v[1].type.isInteger, "Input of AdvDirectory must be first 2 integers.");
 		enforce(v[2].type == JSONType.string, "AdvDirectory index 2 must be a string");
-		enforce(v[3].type == JSONType.object, "AdvDirectory index 3 must be an object");
+		enforce(v[3].type.isObject, "AdvDirectory index 3 must be an object");
 		AdvFile[string] files;
 
-		foreach(string fileName, JSONValue advFile; v[3].object)
+		if(!v[3].isNull) foreach(string fileName, JSONValue advFile; v[3].object)
 		{
 			files[fileName] = AdvFile.deserialize(advFile);
 		}
-		return AdvDirectory(Int128(v[0].integer, v[1].integer), cast(ubyte[])v[2].str, files);
+		return AdvDirectory(Int128(v[0].get!long, v[1].get!long), cast(ubyte[])v[2].str, files);
 	}
 }
 
@@ -95,30 +95,31 @@ struct AdvCacheFormula
 	*/
 	static AdvCacheFormula deserialize(JSONValue input)
 	{
+		import std.conv:to;
 		enforce(input.type == JSONType.array, "AdvCacheFormula input must be an array");
 		JSONValue[] v = input.array;
 		enforce(v.length == 4, "AdvCacheFormula must contain a tuple of 4 values");
-		enforce(v[0].type == JSONType.integer && v[1].type == JSONType.integer, "AdvCacheFormula must contain 2 integers on its start");
-		enforce(v[2].type == JSONType.object && v[3].type == JSONType.object, "AdvCacheFormula must contain objects on index 2 and 3");
+		enforce(v[0].type.isInteger && v[1].type.isInteger, "AdvCacheFormula must contain 2 integers on its start, got types ["~v[0].type.to!string~", "~v[1].type.to!string~"]");
+		enforce(v[2].type.isObject && v[3].type.isObject, "AdvCacheFormula must contain objects on index 2 and 3, got types ["~v[2].type.to!string~", "~v[3].type.to!string~"]");
 
-		AdvFile[string] files;
 		AdvDirectory[string] dirs;
-
-		foreach(string fileName, JSONValue advDir; v[3].object)
+		if(!v[2].isNull) foreach(string fileName, JSONValue advDir; v[2].object)
 			dirs[fileName] = AdvDirectory.deserialize(advDir);
 
-		foreach(string fileName, JSONValue advFile; v[3].object)
+		AdvFile[string] files;
+		if(!v[3].isNull) foreach(string fileName, JSONValue advFile; v[3].object)
 			files[fileName] = AdvFile.deserialize(advFile);
-		return AdvCacheFormula(Int128(v[0].integer, v[1].integer), dirs, files);
+
+		return AdvCacheFormula(Int128(v[0].get!long, v[1].get!long), dirs, files);
 	}
 
 	void serialize(ref JSONValue output) const
 	{
 		JSONValue dirsJson;
-		JSONValue filesJson;
-
 		foreach(string dirName, const AdvDirectory advDir; directories)
 			advDir.serialize(dirsJson, dirName);
+		
+		JSONValue filesJson;
 		foreach(string fileName, const AdvFile advFile; files)
 			advFile.serialize(filesJson, fileName);
 		output = JSONValue([JSONValue(total.data.hi), JSONValue(total.data.lo), dirsJson, filesJson]);
@@ -162,8 +163,6 @@ struct AdvCacheFormula
         {
 			///May throw if it is a directory.
 			size_t fSize;
-			import std.stdio;
-			writeln(file);
 			File f = File(file);
 			if(!f.isOpen) continue; //Does not exists
 			if(contentHasher !is null)
@@ -293,3 +292,6 @@ unittest
 
 	writeln(v.toPrettyString());
 }
+
+private bool isInteger(JSONType type){return type == JSONType.integer || type == JSONType.uinteger;}
+private bool isObject(JSONType type){return type == JSONType.object || type == JSONType.null_;}

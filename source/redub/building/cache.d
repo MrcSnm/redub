@@ -43,9 +43,9 @@ struct CompilationCache
     string requirementCache;
     private AdvCacheFormula cache;
 
-    static CompilationCache make(string requirementCache, const BuildConfiguration cfg, OS target)
+    static CompilationCache make(string requirementCache, const BuildRequirements req, OS target)
     {
-        return CompilationCache(requirementCache, generateCache(cfg, target));
+        return CompilationCache(requirementCache, generateCache(req, target));
     }
     
 
@@ -68,7 +68,7 @@ struct CompilationCache
     {
         string[] diffs;
         size_t diffCount;
-        AdvCacheFormula otherFormula = generateCache(req.cfg, target);
+        AdvCacheFormula otherFormula = generateCache(req, target);
         return requirementCache == hashFrom(req, compiler) &&
             cache.diffStatus(otherFormula, diffs, diffCount);
     }
@@ -138,21 +138,21 @@ string hashFrom(const BuildRequirements req, Compiler compiler)
 }
 
 
-AdvCacheFormula generateCache(const BuildConfiguration cfg, OS target)
+AdvCacheFormula generateCache(const BuildRequirements req, OS target)
 {
     import std.algorithm.iteration, std.array;
     static contentHasher = (ubyte[] content)
     {
         return cast(ubyte[])hashFunction(cast(string)content);
     };
-    string[] libs = cfg.libraries.map!((libName) => getLibraryPath(libName, cfg.outputDirectory, target)).array;
+    string[] libs = req.extra.librariesFullPath.map!((libPath) => getLibraryPath(libPath, req.cfg.outputDirectory, target)).array;
 
     return AdvCacheFormula.make(
         contentHasher, 
         //DO NOT use sourcePaths since importPaths is always custom + sourcePaths
-        joinFlattened(cfg.importDirectories, cfg.stringImportPaths), ///This is causing problems when using subPackages without output path, they may clash after
+        joinFlattened(req.cfg.importDirectories, req.cfg.stringImportPaths), ///This is causing problems when using subPackages without output path, they may clash after
         // the compilation is finished. Solving this would require hash calculation after linking
-        joinFlattened(cfg.sourceFiles, libs)
+        joinFlattened(req.cfg.sourceFiles, libs)
     );
 }
 
@@ -161,8 +161,10 @@ string[] updateCache(string rootCache, const CompilationCache cache, bool writeT
 {
     JSONValue* v = getCache();
     if(!(rootCache in *v)) (*v)[rootCache] = JSONValue.emptyObject;
-    (*v)[rootCache][cache.requirementCache] = JSONValue.emptyObject;
-    cache.cache.serialize((*v)[rootCache][cache.requirementCache]);
+    JSONValue serializeTarget;
+    cache.cache.serialize(serializeTarget);
+    (*v)[rootCache][cache.requirementCache] = serializeTarget;
+
     if(writeToDisk)
         std.file.write(getCacheFilePath, getCache().toString());
     return null;

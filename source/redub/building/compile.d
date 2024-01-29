@@ -38,7 +38,7 @@ private ExecutionResult executeCommands(const string[] commandsList, string list
     return ExecutionResult(0, "Success");
 }
 
-void execCompilation(immutable BuildConfiguration cfg, shared ProjectNode pack, OS os, Compiler compiler, shared CompilationCache cache, immutable string[string] env)
+void execCompilation(immutable BuildRequirements req, shared ProjectNode pack, OS os, Compiler compiler, shared CompilationCache cache, immutable string[string] env)
 {
     import std.file;
     import std.process;
@@ -48,6 +48,7 @@ void execCompilation(immutable BuildConfiguration cfg, shared ProjectNode pack, 
     CompilationResult res;
     res.node = pack;
     StopWatch sw = StopWatch(AutoStart.yes);
+    immutable BuildConfiguration cfg = req.cfg;
     scope(exit)
     {
         res.msNeeded = sw.peek.total!"msecs";
@@ -106,7 +107,7 @@ void execCompilation(immutable BuildConfiguration cfg, shared ProjectNode pack, 
                 return;
         }
         
-        res.cache = cast(shared)CompilationCache.make(cache.requirementCache, cfg, os);
+        res.cache = cast(shared)CompilationCache.make(cache.requirementCache, req, os);
     }
     catch(Throwable e)
     {
@@ -154,7 +155,7 @@ bool buildProjectParallelSimple(ProjectNode root, Compiler compiler, OS os)
             {
                 spawned[dep] = true;
                 spawn(&execCompilation, 
-                    dep.requirements.cfg.idup, cast(shared)dep, os, 
+                    dep.requirements.idup, cast(shared)dep, os, 
                     compiler, cast(shared)CompilationCache.get(mainPackHash, dep.requirements, compiler),
                     env
                 );
@@ -191,7 +192,7 @@ bool buildProjectFullyParallelized(ProjectNode root, Compiler compiler, OS os)
     foreach(pack; root.collapse)
     {
         spawn(&execCompilation, 
-            pack.requirements.cfg.idup, 
+            pack.requirements.idup, 
             cast(shared)pack, os, compiler, 
             cast(shared)cache[i++],
             env
