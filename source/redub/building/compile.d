@@ -52,6 +52,7 @@ void execCompilation(immutable BuildRequirements req, shared ProjectNode pack, O
     scope(exit)
     {
         res.msNeeded = sw.peek.total!"msecs";
+        res.cache.requirementCache = cache.requirementCache;
         ownerTid.send(res);
     }
     try
@@ -107,7 +108,7 @@ void execCompilation(immutable BuildRequirements req, shared ProjectNode pack, O
                 return;
         }
         
-        res.cache = cast(shared)CompilationCache.make(cache.requirementCache, req, os);
+        // res.cache = cast(shared)CompilationCache.make(cache.requirementCache, req, os);
     }
     catch(Throwable e)
     {
@@ -211,7 +212,7 @@ bool buildProjectFullyParallelized(ProjectNode root, Compiler compiler, OS os)
         }
         else
         {
-            updateCache(mainPackHash, cast()res.cache);
+            updateCache(mainPackHash, CompilationCache.make(res.cache.requirementCache, cast()res.node.requirements, os));
             buildSucceeded(finishedPackage, res);
         }
     }

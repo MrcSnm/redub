@@ -12,7 +12,7 @@ import std.exception;
 struct AdvFile
 {
 	///This will be used to compare before content hash
-	long timeModified;
+	ulong timeModified;
 	ubyte[] contentHash;
 
 	void serialize(ref JSONValue output, string fileName) const
@@ -31,7 +31,7 @@ struct AdvFile
 	{
 		enforce(input.type == JSONType.array, "Input json for AdvFile deserialization is not an array.");
 		enforce(input.array.length == 2, "Input json for AdvFile deserialization is an array with size different from 2.");
-		return AdvFile(input.array[0].get!long, cast(ubyte[])input.array[1].str);
+		return AdvFile(input.array[0].get!ulong, fromHexString(input.array[1].str));
 	}
 }
 
@@ -73,7 +73,8 @@ struct AdvDirectory
 		{
 			files[fileName] = AdvFile.deserialize(advFile);
 		}
-		return AdvDirectory(Int128(v[0].get!long, v[1].get!long), cast(ubyte[])v[2].str, files);
+		
+		return AdvDirectory(Int128(v[0].get!ulong, v[1].get!ulong), fromHexString(v[2].str), files);
 	}
 }
 
@@ -110,7 +111,7 @@ struct AdvCacheFormula
 		if(!v[3].isNull) foreach(string fileName, JSONValue advFile; v[3].object)
 			files[fileName] = AdvFile.deserialize(advFile);
 
-		return AdvCacheFormula(Int128(v[0].get!long, v[1].get!long), dirs, files);
+		return AdvCacheFormula(Int128(v[0].get!ulong, v[1].get!ulong), dirs, files);
 	}
 
 	void serialize(ref JSONValue output) const
@@ -162,6 +163,7 @@ struct AdvCacheFormula
 		foreach(file; files)
         {
 			///May throw if it is a directory.
+			scope(failure) continue;
 			size_t fSize;
 			File f = File(file);
 			if(!f.isOpen) continue; //Does not exists
@@ -261,6 +263,28 @@ string hashFromTime(const scope Int128 input)
     foreach(c; toChars(input.data.hi)) output[i++] = c;
     foreach(c; toChars(input.data.lo)) output[i++] = c;
     return (output[0..i]).dup;
+}
+
+ubyte[] fromHexString(string hexStr)
+{
+	import std.conv : parse;
+	size_t sz = hexStr.length/2;
+	size_t index = 0;
+	ubyte[] ret;
+	if(hexStr.length % 2 != 0)
+	{
+		ret = new ubyte[](sz + 1);
+		string str = hexStr[0..1];
+		ret[0] = str.parse!ubyte(16);
+		hexStr = hexStr[1..$];
+		index = 1;
+	} else ret = new ubyte[](sz);
+	foreach(i; 0..hexStr.length/2)
+	{
+		string str = hexStr[i*2..(i+1)*2];
+		ret[index++] = str.parse!ubyte(16);
+	}
+	return ret;
 }
 
 T[] joinFlattened(T)(scope const T[][] args...)

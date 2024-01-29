@@ -66,11 +66,12 @@ struct CompilationCache
 
     bool isUpToDate(const BuildRequirements req, Compiler compiler, OS target, Int128[string]* cachedDirTime) const
     {
-        string[] diffs;
-        size_t diffCount;
+        import std.stdio;
         AdvCacheFormula otherFormula = generateCache(req, target);
-        return requirementCache == hashFrom(req, compiler) &&
-            cache.diffStatus(otherFormula, diffs, diffCount);
+        size_t diffCount;
+        string[] diffs = cache.diffStatus(otherFormula, diffCount)[0..diffCount];
+        writeln("Diffs found: ", diffs, " in project ", req.name);
+        return requirementCache == hashFrom(req, compiler) && diffCount == 0;
     }
 }
 
