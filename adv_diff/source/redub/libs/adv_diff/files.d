@@ -38,6 +38,7 @@ struct AdvFile
 struct AdvDirectory
 {
 	Int128 total;
+	ubyte[] contentHash;
 	AdvFile[string] files;
 
 	void serialize(ref JSONValue output, string dirName)
@@ -87,9 +88,7 @@ struct AdvCacheFormula
 	
 	/** 
 	* JSON specification:
-	* [$REQUIREMENT_HASH]: {
-	*   [$DEP_REQ_HASH] : [$DEP_TOTAL, {DIRS : [$DIR_TIME, {$FILE: [$FILE_STAMP, $FILE_HASH]}}], {FILES}]
-	* }
+	* [$ADV_TOTAL_HI, $ADV_TOTAL_LO, {DIRS}, {FILES}]
 	* 
 	* Returns: AdvCacheFormula
 	*/
@@ -138,7 +137,7 @@ struct AdvCacheFormula
             Int128 dirTime;
 			AdvDirectory advDir;
 			if(!std.file.exists(dir)) continue;
-			if(!std.file.isDir(dir)) assert(false, "Path sent is not a directory: "~dir);
+			enforce(std.file.isDir(dir), "Path sent is not a directory: "~dir);
 			foreach(DirEntry e; dirEntries(dir, SpanMode.depth))
             {
 				if(e.isDir) continue;
@@ -149,6 +148,10 @@ struct AdvCacheFormula
 					fSize = e.size;
 					if(fSize > fileBuffer.length) fileBuffer.length = fSize;
 					File(e.name).rawRead(fileBuffer[0..fSize]);
+					if(hashedContent.length)
+					{
+						advDir.contentHash = contentHasher()
+					}
 					hashedContent = contentHasher(fileBuffer[0..fSize]);
 				}
 				advDir.files[e.name] = AdvFile(time, hashedContent);

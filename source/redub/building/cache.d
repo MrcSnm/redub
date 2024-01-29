@@ -12,36 +12,6 @@ import std.json;
 enum cacheFolder = ".redub";
 enum cacheFile = "redub_cache.json";
 
-
-/** 
- * JSON specification:
- * [$REQUIREMENT_HASH]: {
- *   [$DEP_REQ_HASH] : [$DEP_TOTAL, {DIRS : [$DIR_TIME, {$FILE: [$FILE_STAMP, $FILE_HASH]}}], {FILES}]
- * }
- * 
- * Returns: 
- */
-AdvCacheFormula fromJSON(JSONValue input)
-{
-    AdvCacheFormula ret;
-    JSONValue[] advTuple = input.array;
-    //ret.total = input[0].str;
-
-    //0 -> Int128, string format
-    //1 -> AdvDirectory[string], object
-    //2 -> AdvFile[string], object
-    foreach(string fileName, JSONValue dirObj ; advTuple[1].object)
-    {
-        AdvDirectory newDir;
-        //0 is dir total time
-        //1 is 
-    }
-
-    foreach()
-
-    return ret;
-}
-
 Int128 toInt128(string input)
 {
     if(input.length == 0) throw new Exception("Tried to send an empty string to convert.");
@@ -64,20 +34,14 @@ Int128 toInt128(string input)
     return isNegative ? ret * -1 : ret;
 }
 
-Int128 toInt128(string hi, string low)
-{
-    return Int128(hi.to!long, low.to!long);
-}
 
 
 struct CompilationCache
 {
     ///Key for finding the cache
     string requirementCache;
-    ///First member of the cache array
-    string dateCache;
-    ///Second member of the cache array
-    string contentCache;
+
+    private AdvCacheFormula cache;
 
     static CompilationCache get(string rootHash, const BuildRequirements req, Compiler compiler)
     {
@@ -91,17 +55,16 @@ struct CompilationCache
         JSONValue* targetCache = reqCache in *root;
         if(!targetCache)
             return CompilationCache(reqCache);
-            
-        enforce(targetCache.type == JSONType.array, "Cache is corrupted, delete it.");
-        JSONValue[] caches = targetCache.array;
-        return CompilationCache(reqCache, caches[0].str, caches[1].str);
+        return CompilationCache(reqCache, AdvCacheFormula.deserialize(*targetCache));
     }
 
     bool isUpToDate(const BuildRequirements req, Compiler compiler, Int128[string]* cachedDirTime) const
     {
         string[] diffs;
+        size_t diffCount;
+        AdvCacheFormula otherFormula = generateCache(req.cfg);
         return requirementCache == hashFrom(req, compiler) &&
-            dateCache == hashFromDates(req.cfg, cachedDirTime);
+            cache.diffStatus(otherFormula, diffs, diffCount);
     }
 }
 
@@ -169,55 +132,6 @@ string hashFrom(const BuildRequirements req, Compiler compiler)
 }
 
 
-struct DateCache
-{
-    ///The timestamp for a given key(file or directory (the directory will store accumulated))
-    Int128[string] timeStamp;
-
-    alias timeStamp this;
-}
-
-string hashFromPathDates(Int128[string]* cachedDirTime, scope const(string[]) entryPaths...)
-{
-    import std.file;
-    Int128 bInt;
-    DateCache cache;
-    foreach(path; entryPaths)
-    {
-        if(!std.file.exists(path)) continue;
-        if(cachedDirTime !is null && path in *cachedDirTime) bInt+= (*cachedDirTime)[path];
-        else if(std.file.isDir(path))
-        {
-            Int128 dirTime;
-            foreach(DirEntry e; dirEntries(path, SpanMode.depth))
-            {
-                // import std.string;
-                // if(e.name.endsWith(".o")) throw new Error("Found .o at "~e.name);
-                // cache[e.name] = Int128(e.timeLastModified.stdTime);
-                dirTime+= e.timeLastModified.stdTime;
-            }
-            bInt+= dirTime;
-            // cache[path] = dirTime;
-            if(cachedDirTime !is null) (*cachedDirTime)[path] = dirTime;
-        }
-        else
-        {
-            bInt+= std.file.timeLastModified(path).stdTime;
-            // cache[path] = Int128(std.file.timeLastModified(path).stdTime);
-        }
-    }
-    
-    char[2048] output;
-    import std.conv;
-    int i = 0;
-    foreach(c; toChars(bInt.data.hi))
-        output[i++] = c;
-    foreach(c; toChars(bInt.data.lo))
-        output[i++] = c;
-    // return hashFunction(output[0..length]); No need to use hash, use just the number.
-    return (output[0..i]).dup;
-}
-
 AdvCacheFormula generateCache(const BuildConfiguration cfg)
 {
     static contentHasher = (ubyte[] content)
@@ -230,32 +144,10 @@ AdvCacheFormula generateCache(const BuildConfiguration cfg)
 
     return AdvCacheFormula.make(
         contentHasher, 
-        joinFlattened(cfg.importDirectories, cfg.sourcePaths, cfg.stringImportPaths),
+        joinFlattened(cfg.importDirectories, cfg.sourcePaths, cfg.stringImportPaths), ///This is causing problems when using subPackages without output path, they may clash after
+        // the compilation is finished. Solving this would require hash calculation after linking
         joinFlattened(cfg.sourceFiles, libs)
     );
-}
-
-string hashFromDates(const BuildConfiguration cfg, Int128[string]* cachedDirTime)
-{
-    import std.system;
-    import redub.command_generators.commons;
-    string[] libs = new string[](cfg.libraries.length);
-
-    foreach(i, s; cfg.libraries)
-        libs[i] = buildNormalizedPath(cfg.workingDir, s);
-
-    return hashFromPathDates(
-        cachedDirTime,
-        cfg.importDirectories~
-        cfg.sourcePaths ~
-        cfg.stringImportPaths~
-        cfg.sourceFiles~
-        libs ~ 
-        buildNormalizedPath(cfg.outputDirectory, getOutputName(cfg.targetType, cfg.name, os))
-        // cfg.libraryPaths~ ///This is causing problems when using subPackages without output path, they may clash after
-        // the compilation is finished. Solving this would require hash calculation after linking
-    );
-    
 }
 
 
