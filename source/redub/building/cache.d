@@ -41,11 +41,11 @@ struct CompilationCache
 {
     ///Key for finding the cache
     string requirementCache;
-    private AdvCacheFormula cache;
+    private AdvCacheFormula formula;
 
-    static CompilationCache make(string requirementCache, const BuildRequirements req, OS target)
+    static CompilationCache make(string requirementCache, const BuildRequirements req, OS target, AdvCacheFormula* preprocessed)
     {
-        return CompilationCache(requirementCache, generateCache(req, target));
+        return CompilationCache(requirementCache, generateCache(req, target, preprocessed));
     }
     
 
@@ -64,11 +64,20 @@ struct CompilationCache
         return CompilationCache(reqCache, AdvCacheFormula.deserialize(*targetCache));
     }
 
-    bool isUpToDate(const BuildRequirements req, Compiler compiler, OS target, Int128[string]* cachedDirTime) const
+    /** 
+     * 
+     * Params:
+     *   req = Requirement to generate hash 
+     *   compiler = Compiler to generate hash
+     *   target = Target to generate hash
+     *   cache = Optional argument which stores precalculated results
+     * Returns: isUpToDate
+     */
+    bool isUpToDate(const BuildRequirements req, Compiler compiler, OS target, AdvCacheFormula* preprocessed) const
     {
-        AdvCacheFormula otherFormula = generateCache(req, target);
+        AdvCacheFormula otherFormula = generateCache(req, target, preprocessed);
         size_t diffCount;
-        string[64] diffs = cache.diffStatus(otherFormula, diffCount);
+        string[64] diffs = formula.diffStatus(otherFormula, diffCount);
         return requirementCache == hashFrom(req, compiler) && diffCount == 0;
     }
 }
@@ -101,13 +110,13 @@ void invalidateCaches(ProjectNode root, Compiler compiler, OS target)
 {
     const CompilationCache[] cacheStatus = cacheStatusForProject(root, compiler);
     ptrdiff_t i = cacheStatus.length;
-    Int128[string] cachedDirTime;
+    AdvCacheFormula preprocessed;
 
     foreach_reverse(ProjectNode n; root.collapse)
     {
         --i;
         if(!n.isUpToDate) continue;
-        if(!cacheStatus[i].isUpToDate(n.requirements, compiler, target, &cachedDirTime))
+        if(!cacheStatus[i].isUpToDate(n.requirements, compiler, target, &preprocessed))
         {
             import redub.logging;
             info("Project ", n.name," requires rebuild.");
@@ -136,9 +145,7 @@ string hashFrom(const BuildRequirements req, Compiler compiler)
     import std.conv:to;
     import std.array:join;
     import std.digest;
-    string[] inputHash = [compiler.versionString];
-    inputHash~= req.targetConfiguration;
-    inputHash~= req.version_;
+    string[] inputHash = [compiler.versionString, req.targetConfiguration, req.version_];
     static foreach(i, v; BuildConfiguration.tupleof)
     {
         static if(is(typeof(v) == string)) inputHash~= req.cfg.tupleof[i];
@@ -149,12 +156,12 @@ string hashFrom(const BuildRequirements req, Compiler compiler)
 }
 
 
-AdvCacheFormula generateCache(const BuildRequirements req, OS target)
+AdvCacheFormula generateCache(const BuildRequirements req, OS target, AdvCacheFormula* preprocessed)
 {
     import std.algorithm.iteration, std.array;
     static contentHasher = (ubyte[] content, ref ubyte[] output)
     {
-        return cast(ubyte[])hashFunction(cast(string)content, output);
+        return hashFunction(cast(string)content, output);
     };
     string[] libs = req.extra.librariesFullPath.map!((libPath) => getLibraryPath(libPath, req.cfg.outputDirectory, target)).array;
 
@@ -163,7 +170,8 @@ AdvCacheFormula generateCache(const BuildRequirements req, OS target)
         //DO NOT use sourcePaths since importPaths is always custom + sourcePaths
         joinFlattened(req.cfg.importDirectories, req.cfg.stringImportPaths), ///This is causing problems when using subPackages without output path, they may clash after
         // the compilation is finished. Solving this would require hash calculation after linking
-        joinFlattened(req.cfg.sourceFiles, libs)
+        joinFlattened(req.cfg.sourceFiles, libs),
+        preprocessed
     );
 }
 
@@ -173,7 +181,7 @@ string[] updateCache(string rootCache, const CompilationCache cache, bool writeT
     JSONValue* v = getCache();
     if(!(rootCache in *v)) (*v)[rootCache] = JSONValue.emptyObject;
     JSONValue serializeTarget;
-    cache.cache.serialize(serializeTarget);
+    cache.formula.serialize(serializeTarget);
     (*v)[rootCache][cache.requirementCache] = serializeTarget;
 
     if(writeToDisk)

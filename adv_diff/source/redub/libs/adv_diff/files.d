@@ -132,8 +132,16 @@ struct AdvCacheFormula
 		output = JSONValue([JSONValue(total.data.hi), JSONValue(total.data.lo), dirsJson, filesJson]);
 	}
 
-
-	static AdvCacheFormula make(ubyte[] function(ubyte[], ref ubyte[] output) contentHasher, scope const string[] directories, scope const string[] files = null)
+	/** 
+	 * 
+	 * Params:
+	 *   contentHasher = Optional. If this input is given, it will read each file content and hash them
+	 *   directories = Which directories it should put on this formula
+	 *   files = Which files it should put on this formula
+	 *   cacheHolder = Optional. If this is given, instead of looking into file system, it will use this cache holder instead. If no input is found on this cache holder, it will be populated with the new content.
+	 * Returns: A completely new AdvCacheFormula which may reference or not the cacheHolder fields.
+	 */
+	static AdvCacheFormula make(ubyte[] function(ubyte[], ref ubyte[] output) contentHasher, scope const string[] directories, scope const string[] files = null, AdvCacheFormula* cacheHolder = null)
 	{
 		import std.file;
 		import std.stdio;
@@ -143,6 +151,12 @@ struct AdvCacheFormula
 		ubyte[] hashedContent;
 		foreach(dir; directories)
 		{
+			if(cacheHolder !is null && dir in cacheHolder.directories)
+			{
+				ret.directories[dir] = cacheHolder.directories[dir];
+				totalTime+= cacheHolder.directories[dir].total;
+				continue;
+			}
             Int128 dirTime;
 			AdvDirectory advDir;
 			if(!std.file.exists(dir)) continue;
@@ -165,9 +179,17 @@ struct AdvCacheFormula
             }
 			totalTime+= advDir.total = dirTime;
 			ret.directories[dir] = advDir;
+			if(cacheHolder !is null)
+				cacheHolder.directories[dir] = advDir;
 		}
 		foreach(file; files)
         {
+			if(cacheHolder !is null && file in cacheHolder.files)
+			{
+				ret.files[file] = cacheHolder.files[file];
+				totalTime+= cacheHolder.files[file].timeModified;
+				continue;
+			}
 			///May throw if it is a directory.
 			scope(failure) continue;
 			size_t fSize;
@@ -183,6 +205,8 @@ struct AdvCacheFormula
 			long time = std.file.timeLastModified(file).stdTime;
             totalTime+= time;
             ret.files[file] = AdvFile(time, hashedContent);
+			if(cacheHolder !is null)
+				cacheHolder.files[file] = AdvFile(time, hashedContent);
         }
 		ret.total = totalTime;
 		fileBuffer = null;
@@ -259,16 +283,6 @@ struct AdvCacheFormula
 		}
 		return diffCount == 0;
 	}
-}
-
-string hashFromTime(const scope Int128 input)
-{
-    import std.conv;
-    char[2048] output;
-    int i = 0;
-    foreach(c; toChars(input.data.hi)) output[i++] = c;
-    foreach(c; toChars(input.data.lo)) output[i++] = c;
-    return (output[0..i]).dup;
 }
 
 ubyte[] fromHexString(string hexStr)

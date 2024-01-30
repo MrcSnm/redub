@@ -261,10 +261,12 @@ private bool doLink(ProjectNode root, OS os, Compiler compiler, string mainPackH
         infos("Linked: ", root.name, " finished!");
         vlog("\n\t", linkRes.compilationCommand, " \n");
 
+
+        AdvCacheFormula cache;
         foreach(node; root.collapse)
         {
             if(!node.isUpToDate)
-                updateCache(mainPackHash, CompilationCache.make(hashFrom(node.requirements, compiler), node.requirements, os));
+                updateCache(mainPackHash, CompilationCache.make(hashFrom(node.requirements, compiler), node.requirements, os, &cache));
         }
         updateCacheOnDisk();
 
