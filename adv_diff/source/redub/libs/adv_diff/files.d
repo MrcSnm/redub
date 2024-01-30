@@ -15,10 +15,10 @@ struct AdvFile
 	ulong timeModified;
 	ubyte[] contentHash;
 
-	void serialize(ref JSONValue output, string fileName) const
+	void serialize(ref JSONValue output) const
 	{
 		import std.digest:toHexString;
-		output[fileName] = JSONValue([JSONValue(timeModified), JSONValue(contentHash.toHexString)]);
+		output = JSONValue([JSONValue(timeModified), JSONValue(contentHash.toHexString)]);
 	}
 	/** 
 	 * Specification:
@@ -46,7 +46,9 @@ struct AdvDirectory
 		JSONValue dir = JSONValue.emptyObject;
 		foreach(fileName, advFile; files)
 		{
-			advFile.serialize(dir, fileName);
+			JSONValue v;
+			advFile.serialize(v);
+			dir[fileName] = v;
 		}
 		import std.digest;
 		output[dirName] = JSONValue([JSONValue(total.data.hi), JSONValue(total.data.lo), JSONValue(toHexString(contentHash)), dir]);
@@ -116,13 +118,17 @@ struct AdvCacheFormula
 
 	void serialize(ref JSONValue output) const
 	{
-		JSONValue dirsJson;
+		JSONValue dirsJson = JSONValue.emptyObject;
 		foreach(string dirName, const AdvDirectory advDir; directories)
 			advDir.serialize(dirsJson, dirName);
 		
-		JSONValue filesJson;
+		JSONValue filesJson = JSONValue.emptyObject;
 		foreach(string fileName, const AdvFile advFile; files)
-			advFile.serialize(filesJson, fileName);
+		{
+			JSONValue v;
+			advFile.serialize(v);
+			filesJson[fileName] = v;
+		}
 		output = JSONValue([JSONValue(total.data.hi), JSONValue(total.data.lo), dirsJson, filesJson]);
 	}
 
@@ -238,6 +244,8 @@ struct AdvCacheFormula
 			const(AdvDirectory)* advDir = dirName in directories;
 			if(advDir is null)
 			{
+				import std.stdio;
+				debug writeln("Could not find dir ",dirName,". Existing dirs: ", directories.keys);
 				if(diffCount + 1 < diffs.length)
 					diffs[diffCount] = dirName;
 				diffCount++;

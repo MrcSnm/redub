@@ -66,11 +66,9 @@ struct CompilationCache
 
     bool isUpToDate(const BuildRequirements req, Compiler compiler, OS target, Int128[string]* cachedDirTime) const
     {
-        import std.stdio;
         AdvCacheFormula otherFormula = generateCache(req, target);
         size_t diffCount;
         string[] diffs = cache.diffStatus(otherFormula, diffCount)[0..diffCount];
-        writeln("Diffs found: ", diffs, " in project ", req.name);
         return requirementCache == hashFrom(req, compiler) && diffCount == 0;
     }
 }
@@ -107,8 +105,9 @@ void invalidateCaches(ProjectNode root, Compiler compiler, OS target)
 
     foreach_reverse(ProjectNode n; root.collapse)
     {
+        --i;
         if(!n.isUpToDate) continue;
-        if(!cacheStatus[--i].isUpToDate(n.requirements, compiler, target, &cachedDirTime))
+        if(!cacheStatus[i].isUpToDate(n.requirements, compiler, target, &cachedDirTime))
         {
             import redub.logging;
             info("Project ", n.name," requires rebuild.");
@@ -167,7 +166,7 @@ string[] updateCache(string rootCache, const CompilationCache cache, bool writeT
     (*v)[rootCache][cache.requirementCache] = serializeTarget;
 
     if(writeToDisk)
-        std.file.write(getCacheFilePath, getCache().toString());
+        std.file.write(getCacheFilePath, getCache().toString(JSONOptions.doNotEscapeSlashes));
     return null;
 }
 
