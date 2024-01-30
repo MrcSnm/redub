@@ -148,7 +148,7 @@ AdvCacheFormula generateCache(const BuildRequirements req, OS target)
     string[] libs = req.extra.librariesFullPath.map!((libPath) => getLibraryPath(libPath, req.cfg.outputDirectory, target)).array;
 
     return AdvCacheFormula.make(
-        contentHasher, 
+        null, 
         //DO NOT use sourcePaths since importPaths is always custom + sourcePaths
         joinFlattened(req.cfg.importDirectories, req.cfg.stringImportPaths), ///This is causing problems when using subPackages without output path, they may clash after
         // the compilation is finished. Solving this would require hash calculation after linking
