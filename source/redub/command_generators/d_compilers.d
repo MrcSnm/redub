@@ -4,7 +4,7 @@ import redub.command_generators.commons;
 import redub.compiler_identification;
 import redub.command_generators.ldc;
 
-string[] parseBuildConfiguration(AcceptedCompiler comp, immutable BuildConfiguration b, OS target)
+string[] parseBuildConfiguration(AcceptedCompiler comp, const BuildConfiguration b, OS target)
 {
     import std.path;
     string function(ValidDFlags) mapper = getFlagMapper(comp);

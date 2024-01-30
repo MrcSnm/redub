@@ -6,7 +6,7 @@ import redub.command_generators.d_compilers;
 
 
 
-string[] parseBuildConfiguration(immutable BuildConfiguration b, OS os)
+string[] parseBuildConfiguration(const BuildConfiguration b, OS os)
 {
     return redub.command_generators.d_compilers.parseBuildConfiguration(AcceptedCompiler.ldc2, b, os);
 }

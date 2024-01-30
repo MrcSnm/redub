@@ -68,7 +68,7 @@ struct CompilationCache
     {
         AdvCacheFormula otherFormula = generateCache(req, target);
         size_t diffCount;
-        string[] diffs = cache.diffStatus(otherFormula, diffCount)[0..diffCount];
+        string[64] diffs = cache.diffStatus(otherFormula, diffCount);
         return requirementCache == hashFrom(req, compiler) && diffCount == 0;
     }
 }
@@ -116,16 +116,26 @@ void invalidateCaches(ProjectNode root, Compiler compiler, OS target)
     }
 }
 
-string hashFunction(const char[] input)
+ubyte[] hashFunction(const char[] input, ref ubyte[] output)
 {
-    import std.digest.md:md5Of, toHexString;
-    return md5Of(input).toHexString.idup;
+    import xxhash3;
+    XXH_64 xxh;
+    xxh.put(cast(const ubyte[])input);
+
+    auto hash = xxh.finish;
+    if(output.length < hash.length)
+    {
+        output.length = hash.length;
+        output[] = hash[];
+    }
+    return output;
 }
 
 string hashFrom(const BuildRequirements req, Compiler compiler)
 {
     import std.conv:to;
     import std.array:join;
+    import std.digest;
     string[] inputHash = [compiler.versionString];
     inputHash~= req.targetConfiguration;
     inputHash~= req.version_;
@@ -134,21 +144,22 @@ string hashFrom(const BuildRequirements req, Compiler compiler)
         static if(is(typeof(v) == string)) inputHash~= req.cfg.tupleof[i];
         else inputHash~= req.cfg.tupleof[i].to!string;
     }
-    return hashFunction(inputHash.join);
+    ubyte[] output;
+    return hashFunction(inputHash.join, output).toHexString.idup;
 }
 
 
 AdvCacheFormula generateCache(const BuildRequirements req, OS target)
 {
     import std.algorithm.iteration, std.array;
-    static contentHasher = (ubyte[] content)
+    static contentHasher = (ubyte[] content, ref ubyte[] output)
     {
-        return cast(ubyte[])hashFunction(cast(string)content);
+        return cast(ubyte[])hashFunction(cast(string)content, output);
     };
     string[] libs = req.extra.librariesFullPath.map!((libPath) => getLibraryPath(libPath, req.cfg.outputDirectory, target)).array;
 
     return AdvCacheFormula.make(
-        null, 
+        contentHasher, 
         //DO NOT use sourcePaths since importPaths is always custom + sourcePaths
         joinFlattened(req.cfg.importDirectories, req.cfg.stringImportPaths), ///This is causing problems when using subPackages without output path, they may clash after
         // the compilation is finished. Solving this would require hash calculation after linking
@@ -166,8 +177,13 @@ string[] updateCache(string rootCache, const CompilationCache cache, bool writeT
     (*v)[rootCache][cache.requirementCache] = serializeTarget;
 
     if(writeToDisk)
-        std.file.write(getCacheFilePath, getCache().toString(JSONOptions.doNotEscapeSlashes));
+        updateCacheOnDisk();
     return null;
+}
+
+void updateCacheOnDisk()
+{
+    std.file.write(getCacheFilePath, getCache().toString(JSONOptions.doNotEscapeSlashes));
 }
 
 private JSONValue* getCache()

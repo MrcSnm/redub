@@ -23,7 +23,8 @@
     "dependencies": {
         "semver": {"path": "semver"},
         "colorize": {"path": "colorize"},
-        "adv_diff": {"path": "adv_diff"}
+        "adv_diff": {"path": "adv_diff"},
+        "xxhash3": "~>0.0.5"
     }
 
 }

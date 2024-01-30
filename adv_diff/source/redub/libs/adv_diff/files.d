@@ -133,7 +133,7 @@ struct AdvCacheFormula
 	}
 
 
-	static AdvCacheFormula make(ubyte[] function(ubyte[]) contentHasher, scope const string[] directories, scope const string[] files = null)
+	static AdvCacheFormula make(ubyte[] function(ubyte[], ref ubyte[] output) contentHasher, scope const string[] directories, scope const string[] files = null)
 	{
 		import std.file;
 		import std.stdio;
@@ -157,8 +157,8 @@ struct AdvCacheFormula
 					fSize = e.size;
 					if(fSize > fileBuffer.length) fileBuffer.length = fSize;
 					File(e.name).rawRead(fileBuffer[0..fSize]);
-					hashedContent = contentHasher(fileBuffer[0..fSize]);
-					advDir.contentHash = contentHasher(joinFlattened(advDir.contentHash, hashedContent));
+					hashedContent = contentHasher(fileBuffer[0..fSize], hashedContent);
+					advDir.contentHash = contentHasher(joinFlattened(advDir.contentHash, hashedContent), hashedContent);
 				}
 				advDir.files[e.name] = AdvFile(time, hashedContent);
                 dirTime+= time;
@@ -178,7 +178,7 @@ struct AdvCacheFormula
 				fSize = f.size;
 				if(fSize > fileBuffer.length) fileBuffer.length = fSize;
 				f.rawRead(fileBuffer[0..fSize]);
-				hashedContent = contentHasher(fileBuffer[0..fSize]);
+				hashedContent = contentHasher(fileBuffer[0..fSize], hashedContent);
 			}
 			long time = std.file.timeLastModified(file).stdTime;
             totalTime+= time;
@@ -244,8 +244,6 @@ struct AdvCacheFormula
 			const(AdvDirectory)* advDir = dirName in directories;
 			if(advDir is null)
 			{
-				import std.stdio;
-				debug writeln("Could not find dir ",dirName,". Existing dirs: ", directories.keys);
 				if(diffCount + 1 < diffs.length)
 					diffs[diffCount] = dirName;
 				diffCount++;

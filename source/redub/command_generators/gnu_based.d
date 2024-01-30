@@ -6,7 +6,7 @@ import redub.command_generators.commons;
 import redub.logging;
 
 /// Parse G++ configuration
-string[] parseBuildConfiguration(immutable BuildConfiguration b, OS os)
+string[] parseBuildConfiguration(const BuildConfiguration b, OS os)
 {
     import std.algorithm.iteration:map;
     import std.array:array;

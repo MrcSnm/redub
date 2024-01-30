@@ -10,7 +10,7 @@ static import redub.command_generators.dmd;
 static import redub.command_generators.ldc;
 
 
-string[] getCompilationFlags(immutable BuildConfiguration cfg, OS os, Compiler compiler)
+string[] getCompilationFlags(const BuildConfiguration cfg, OS os, Compiler compiler)
 {
     switch(compiler.compiler) with(AcceptedCompiler)
     {
@@ -27,14 +27,14 @@ string[] getCompilationFlags(immutable BuildConfiguration cfg, OS os, Compiler c
 
 }
 
-string getCompileCommands(immutable BuildConfiguration cfg, OS os, Compiler compiler)
+string getCompileCommands(const BuildConfiguration cfg, OS os, Compiler compiler)
 {
     import std.array:join;
     string[] flags = getCompilationFlags(cfg,os,compiler);
     return escapeShellCommand(compiler.binOrPath) ~ " " ~ flags.join(" ");
 }
 
-string getLinkCommands(immutable BuildConfiguration cfg, OS os, Compiler compiler)
+string getLinkCommands(const BuildConfiguration cfg, OS os, Compiler compiler)
 {
     import std.array:join;
     import command_generators.linkers;

@@ -5,7 +5,7 @@ public import std.system;
 import redub.command_generators.commons;
 
 
-string[] parseLinkConfiguration(immutable BuildConfiguration b, OS target, Compiler compiler)
+string[] parseLinkConfiguration(const BuildConfiguration b, OS target, Compiler compiler)
 {
     import std.path;
     import std.array;
@@ -49,7 +49,7 @@ string[] parseLinkConfiguration(immutable BuildConfiguration b, OS target, Compi
     return commands;
 }
 
-string[] parseLinkConfigurationMSVC(immutable BuildConfiguration b, OS target, Compiler compiler)
+string[] parseLinkConfigurationMSVC(const BuildConfiguration b, OS target, Compiler compiler)
 {
     import std.algorithm.iteration;
     import std.path;
@@ -97,7 +97,7 @@ string getTargetTypeFlag(TargetType o, Compiler compiler)
 }
 
 
-private void putObjectFiles(ref string[] target, immutable BuildConfiguration b, OS os)
+private void putObjectFiles(ref string[] target, const BuildConfiguration b, OS os)
 {
     import std.file;
     import std.path;

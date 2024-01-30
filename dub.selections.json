@@ -1,7 +1,9 @@
 {
 	"fileVersion": 1,
 	"versions": {
+		"adv_diff": {"path":"adv_diff"},
 		"colorize": {"path":"colorize"},
-		"semver": {"path":"semver"}
+		"semver": {"path":"semver"},
+		"xxhash3": "0.0.5"
 	}
 }

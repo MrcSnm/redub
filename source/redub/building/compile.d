@@ -118,7 +118,7 @@ void execCompilation(immutable BuildRequirements req, shared ProjectNode pack, O
 }
 
 
-CompilationResult link(immutable BuildConfiguration cfg, OS os, Compiler compiler, immutable string[string] env)
+CompilationResult link(const BuildConfiguration cfg, OS os, Compiler compiler, immutable string[string] env)
 {
     import std.process;
     CompilationResult ret;
@@ -178,7 +178,7 @@ bool buildProjectParallelSimple(ProjectNode root, Compiler compiler, OS os)
                 break;
         }
     }
-    return doLink(root.requirements.idup, os, compiler, mainPackHash, root.isUpToDate, env);
+    return doLink(root, os, compiler, mainPackHash, env);
 }
 
 
@@ -212,11 +212,11 @@ bool buildProjectFullyParallelized(ProjectNode root, Compiler compiler, OS os)
         }
         else
         {
-            updateCache(mainPackHash, CompilationCache.make(res.cache.requirementCache, cast()res.node.requirements, os));
+            // updateCache(mainPackHash, CompilationCache.make(res.cache.requirementCache, cast()res.node.requirements, os));
             buildSucceeded(finishedPackage, res);
         }
     }
-    return doLink(root.requirements.idup, os, compiler, mainPackHash, root.isUpToDate, env);
+    return doLink(root, os, compiler, mainPackHash, env);
 }
 
 private void buildSucceeded(ProjectNode node, CompilationResult res)
@@ -225,7 +225,6 @@ private void buildSucceeded(ProjectNode node, CompilationResult res)
         infos("Up-to-Date: ", node.name, " ",node.requirements.version_," [", node.requirements.targetConfiguration,"]. Took ", res.msNeeded, "ms");
     else
     {
-        // writeln("Succesfully built with cmd:", res.compilationCommand);
         infos("Built: ", node.name, " ",node.requirements.version_," [", node.requirements.targetConfiguration,"]. Took ", res.msNeeded, "ms");
         vlog("\n\t", res.compilationCommand, " \n");
 
@@ -239,19 +238,19 @@ private void buildFailed(ProjectNode node, CompilationResult res)
     );
 }
 
-private bool doLink(immutable BuildRequirements req, OS os, Compiler compiler, string mainPackHash, bool isUpToDate, immutable string[string] env)
+private bool doLink(ProjectNode root, OS os, Compiler compiler, string mainPackHash, immutable string[string] env)
 {
-    if(isUpToDate || (compiler.isDCompiler && req.cfg.targetType.isStaticLibrary))
+    bool isUpToDate = root.isUpToDate;
+    if(isUpToDate || (compiler.isDCompiler && root.requirements.cfg.targetType.isStaticLibrary))
     {
         if(isUpToDate)
-            infos("Up-to-Date: ", req.name, ", skipping linking");
-        updateCache(mainPackHash, CompilationCache.get(mainPackHash, req, compiler), true);
+            infos("Up-to-Date: ", root.name, ", skipping linking");
         return true;
     }
-    CompilationResult linkRes = link(req.cfg, os, compiler, env);
+    CompilationResult linkRes = link(root.requirements.cfg, os, compiler, env);
     if(linkRes.status)
     {
-        errorTitle("Linking Error: ", req.name, ". Failed with flags: \n\t",
+        errorTitle("Linking Error: ", root.name, ". Failed with flags: \n\t",
             linkRes.compilationCommand,"\n\t\t  :\n\t",
             linkRes.message
         );
@@ -259,9 +258,15 @@ private bool doLink(immutable BuildRequirements req, OS os, Compiler compiler, s
     }
     else
     {
-        infos("Linked: ", req.name, " finished!");
+        infos("Linked: ", root.name, " finished!");
         vlog("\n\t", linkRes.compilationCommand, " \n");
-        updateCache(mainPackHash, CompilationCache.get(mainPackHash, req, compiler), true);
+
+        foreach(node; root.collapse)
+        {
+            if(!node.isUpToDate)
+                updateCache(mainPackHash, CompilationCache.make(hashFrom(node.requirements, compiler), node.requirements, os));
+        }
+        updateCacheOnDisk();
 
     }
 
