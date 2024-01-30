@@ -43,9 +43,14 @@ struct CompilationCache
     string requirementCache;
     private AdvCacheFormula formula;
 
-    static CompilationCache make(string requirementCache, const BuildRequirements req, OS target, AdvCacheFormula* preprocessed)
+    const(AdvCacheFormula) getFormula() const
     {
-        return CompilationCache(requirementCache, generateCache(req, target, preprocessed));
+        return formula;
+    }
+
+    static CompilationCache make(string requirementCache, const BuildRequirements req, OS target, const(AdvCacheFormula)* existing, AdvCacheFormula* preprocessed)
+    {
+        return CompilationCache(requirementCache, generateCache(req, target, existing, preprocessed));
     }
     
 
@@ -75,7 +80,7 @@ struct CompilationCache
      */
     bool isUpToDate(const BuildRequirements req, Compiler compiler, OS target, AdvCacheFormula* preprocessed) const
     {
-        AdvCacheFormula otherFormula = generateCache(req, target, preprocessed);
+        AdvCacheFormula otherFormula = generateCache(req, target, &formula, preprocessed);
         size_t diffCount;
         string[64] diffs = formula.diffStatus(otherFormula, diffCount);
         return requirementCache == hashFrom(req, compiler) && diffCount == 0;
@@ -133,10 +138,8 @@ ubyte[] hashFunction(const char[] input, ref ubyte[] output)
 
     auto hash = xxh.finish;
     if(output.length < hash.length)
-    {
         output.length = hash.length;
-        output[] = hash[];
-    }
+    output[] = hash[];
     return output;
 }
 
@@ -156,7 +159,7 @@ string hashFrom(const BuildRequirements req, Compiler compiler)
 }
 
 
-AdvCacheFormula generateCache(const BuildRequirements req, OS target, AdvCacheFormula* preprocessed)
+AdvCacheFormula generateCache(const BuildRequirements req, OS target, const(AdvCacheFormula)* existing, AdvCacheFormula* preprocessed)
 {
     import std.algorithm.iteration, std.array;
     static contentHasher = (ubyte[] content, ref ubyte[] output)
@@ -171,6 +174,7 @@ AdvCacheFormula generateCache(const BuildRequirements req, OS target, AdvCacheFo
         joinFlattened(req.cfg.importDirectories, req.cfg.stringImportPaths), ///This is causing problems when using subPackages without output path, they may clash after
         // the compilation is finished. Solving this would require hash calculation after linking
         joinFlattened(req.cfg.sourceFiles, libs),
+        existing,
         preprocessed
     );
 }

@@ -15,6 +15,13 @@ struct AdvFile
 	ulong timeModified;
 	ubyte[] contentHash;
 
+	AdvFile dup() const
+	{
+		ubyte[] returnHash;
+		if(contentHash.length) returnHash = contentHash.dup;
+		return AdvFile(timeModified, returnHash);
+	}
+
 	void serialize(ref JSONValue output) const
 	{
 		import std.digest:toHexString;
@@ -138,10 +145,17 @@ struct AdvCacheFormula
 	 *   contentHasher = Optional. If this input is given, it will read each file content and hash them
 	 *   directories = Which directories it should put on this formula
 	 *   files = Which files it should put on this formula
+	 *	 existing = Optional. If this is given and exists, it will compare dates and if they have a difference, a content hash will be generated.
 	 *   cacheHolder = Optional. If this is given, instead of looking into file system, it will use this cache holder instead. If no input is found on this cache holder, it will be populated with the new content.
 	 * Returns: A completely new AdvCacheFormula which may reference or not the cacheHolder fields.
 	 */
-	static AdvCacheFormula make(ubyte[] function(ubyte[], ref ubyte[] output) contentHasher, scope const string[] directories, scope const string[] files = null, AdvCacheFormula* cacheHolder = null)
+	static AdvCacheFormula make(
+		ubyte[] function(ubyte[], ref ubyte[] output) contentHasher, 
+		scope const string[] directories, 
+		scope const string[] files = null, 
+		const(AdvCacheFormula)* existing = null, 
+		AdvCacheFormula* cacheHolder = null
+	)
 	{
 		import std.file;
 		import std.stdio;
@@ -149,6 +163,27 @@ struct AdvCacheFormula
 		Int128 totalTime;
 		ubyte[] fileBuffer;
 		ubyte[] hashedContent;
+
+		static bool hashContent(string url, ref ubyte[] buffer, ref ubyte[] outputHash, ubyte[] function(ubyte[], ref ubyte[] output) contentHasher)
+		{
+			try
+			{
+				size_t fSize;
+				File f = File(url);
+				//Does not exists
+				if(!f.isOpen) 
+				{
+					outputHash = null;
+					return false; 
+				}
+				fSize = f.size;
+				if(fSize > buffer.length) buffer.length = fSize;
+				f.rawRead(buffer[0..fSize]);
+				contentHasher(buffer[0..fSize], outputHash);
+			}
+			catch(Exception e) return false;
+			return true;
+		}
 		foreach(dir; directories)
 		{
 			if(cacheHolder !is null && dir in cacheHolder.directories)
@@ -159,23 +194,32 @@ struct AdvCacheFormula
 			}
             Int128 dirTime;
 			AdvDirectory advDir;
+			const(AdvDirectory)* existingDir;
+			if(existing) existingDir = dir in existing.directories;
+
 			if(!std.file.exists(dir)) continue;
 			enforce(std.file.isDir(dir), "Path sent is not a directory: "~dir);
 			foreach(DirEntry e; dirEntries(dir, SpanMode.depth))
             {
 				if(e.isDir) continue;
 				long time = e.timeLastModified.stdTime;
-				size_t fSize; 
-				if(contentHasher !is null)
-				{
-					fSize = e.size;
-					if(fSize > fileBuffer.length) fileBuffer.length = fSize;
-					File(e.name).rawRead(fileBuffer[0..fSize]);
-					hashedContent = contentHasher(fileBuffer[0..fSize], hashedContent);
-					advDir.contentHash = contentHasher(joinFlattened(advDir.contentHash, hashedContent), hashedContent);
-				}
-				advDir.files[e.name] = AdvFile(time, hashedContent);
                 dirTime+= time;
+				if(existingDir)
+				{
+					const(AdvFile)* existingFile = e.name in existingDir.files;
+					if(existingFile)
+					{
+						if(existingFile.timeModified == time)
+						{
+							advDir.files[e.name] = existingFile.dup;
+							advDir.contentHash = contentHasher(joinFlattened(advDir.contentHash, existingFile.contentHash), hashedContent);
+							continue;
+						}
+					}
+				}
+				if(!hashContent(e.name, fileBuffer, hashedContent, contentHasher)) continue;
+				advDir.files[e.name] = AdvFile(time, hashedContent.dup);
+				advDir.contentHash = contentHasher(joinFlattened(advDir.contentHash, hashedContent), hashedContent).dup;
             }
 			totalTime+= advDir.total = dirTime;
 			ret.directories[dir] = advDir;
@@ -192,21 +236,24 @@ struct AdvCacheFormula
 			}
 			///May throw if it is a directory.
 			scope(failure) continue;
-			size_t fSize;
-			File f = File(file);
-			if(!f.isOpen) continue; //Does not exists
-			if(contentHasher !is null)
-			{
-				fSize = f.size;
-				if(fSize > fileBuffer.length) fileBuffer.length = fSize;
-				f.rawRead(fileBuffer[0..fSize]);
-				hashedContent = contentHasher(fileBuffer[0..fSize], hashedContent);
-			}
 			long time = std.file.timeLastModified(file).stdTime;
             totalTime+= time;
-            ret.files[file] = AdvFile(time, hashedContent);
+
+			if(existing)
+			{
+				const(AdvFile)* existingFile = file in existing.files;
+				if(existingFile && existingFile.timeModified == time)
+				{
+					ret.files[file] = existingFile.dup;
+					if(cacheHolder !is null)
+						cacheHolder.files[file] = ret.files[file];
+					continue;
+				}
+			}
+			if(!hashContent(file, fileBuffer, hashedContent, contentHasher)) continue;
+			ret.files[file] = AdvFile(time, hashedContent.dup);
 			if(cacheHolder !is null)
-				cacheHolder.files[file] = AdvFile(time, hashedContent);
+				cacheHolder.files[file] = ret.files[file];
         }
 		ret.total = totalTime;
 		fileBuffer = null;
