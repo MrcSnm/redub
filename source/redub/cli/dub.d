@@ -113,13 +113,13 @@ struct DubArguments
     DubCommonArguments cArgs;
     DubBuildArguments build;
     
-    @("Specifies the type of build to perform. Note that setting the DFLAGS environment variable will override the build type with custom flags.",
+    @("Specifies the type of build to perform. Note that setting the DFLAGS environment variable will override the build type with custom flags." ~
     "Possible names:")
-    @("b|build")
+    @("build|b")
     string buildType;
 
     @("Builds the specified configuration. Configurations can be defined in dub.json")
-    @("c|config")
+    @("config|c")
     string config;
 
     @(

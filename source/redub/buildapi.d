@@ -15,6 +15,36 @@ enum TargetType
     sourceLibrary
 }
 
+enum BuildType
+{
+    debug_ = "debug",
+    plain = "plain",
+    release = "release",
+    release_debug = "release-debug",
+    release_nobounds = "release-nobounds",
+    unittest_ = "unittest",
+    profile = "profile",
+    profile_gc = "profile-gc",
+    docs = "docs",
+    ddox = "ddox",
+    cov = "cov",
+    cov_ctfe = "cov-ctfe",
+    unittest_cov = "unittest-cov",
+    unittest_cov_ctfe = "unittest-cov-ctfe",
+    syntax = "syntax",
+}
+
+BuildType buildTypeFromString(string bt)
+{
+    switch(bt)
+    {
+        static foreach(member; __traits(allMembers, BuildType))
+            case __traits(getMember, BuildType, member):
+                return __traits(getMember, BuildType, member);
+        default: throw new Error("Could not find build type for string "~bt);
+    }
+}
+
 bool isStaticLibrary(TargetType t)
 {
     return t == TargetType.staticLibrary || t == TargetType.library;

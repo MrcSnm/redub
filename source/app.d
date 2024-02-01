@@ -14,7 +14,7 @@ import redub.tree_generators.dub;
 import redub.cli.dub;
 import redub.command_generators.commons;
 
-enum RedubVersion = "Redub - A reimagined DUB: v1.2.20";
+enum RedubVersion = "Redub - A reimagined DUB: v1.3.0";
 
 
 string formatError(string err)
@@ -228,12 +228,16 @@ ProjectDetails resolveDependencies(string[] args)
     if(cArgs.recipe)
         recipe = cArgs.getRecipe(workingDir);
 
+    BuildType bt = BuildType.debug_;
+    if(bArgs.buildType) bt = buildTypeFromString(bArgs.buildType);
+
     return redub.api.resolveDependencies(
         bArgs.build.force,
         os,
         CompilationDetails(either(bArgs.compiler, "dmd"), bArgs.arch, bArgs.compilerAssumption),
         ProjectToParse(bArgs.config, workingDir, subPackage, recipe),
-        getInitialDubVariablesFromArguments(bArgs, DubBuildArguments.init, os, args)
+        getInitialDubVariablesFromArguments(bArgs, DubBuildArguments.init, os, args),
+        bt
     );
 
 }

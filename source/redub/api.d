@@ -103,7 +103,8 @@ ProjectDetails resolveDependencies(
     OS os = std.system.os,
     CompilationDetails cDetails = CompilationDetails.init,
     ProjectToParse proj = ProjectToParse.init,
-    InitialDubVariables dubVars = InitialDubVariables.init
+    InitialDubVariables dubVars = InitialDubVariables.init,
+    BuildType buildType = BuildType.debug_
 )
 {
     import std.datetime.stopwatch;
@@ -111,6 +112,7 @@ ProjectDetails resolveDependencies(
     import std.algorithm.comparison;
     import redub.command_generators.commons;
     static import redub.parsers.environment;
+    static import redub.parsers.build_type;
 
     StopWatch st = StopWatch(AutoStart.yes);
     Compiler compiler = getCompiler(cDetails.compilerOrPath, cDetails.assumption);
@@ -137,6 +139,7 @@ ProjectDetails resolveDependencies(
     );
     redub.parsers.environment.setupEnvironmentVariablesForRootPackage(cast(immutable)req);
     req.cfg = req.cfg.merge(redub.parsers.environment.parse());
+    req.cfg = req.cfg.merge(redub.parsers.build_type.parse(buildType, compiler.compiler));
 
     ProjectNode tree = getProjectTree(req, CompilationInfo(compiler.getCompilerString, cDetails.arch, osFromArch(cDetails.arch)));
     redub.parsers.environment.setupEnvironmentVariablesForPackageTree(tree);
@@ -145,7 +148,8 @@ ProjectDetails resolveDependencies(
         tree.invalidateCacheOnTree();
     else 
         invalidateCaches(tree, compiler, osFromArch(cDetails.arch));
+    import redub.libs.colorize;
     
-    info("Dependencies resolved in ", (st.peek.total!"msecs"), " ms.") ;
+    infos("Dependencies resolved ", "in ", (st.peek.total!"msecs"), " ms for \"", color(buildType, fg.magenta),"\" using ", compiler.binOrPath);
     return ProjectDetails(tree, compiler);
 }

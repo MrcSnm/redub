@@ -110,6 +110,19 @@ string dmdFlags(ValidDFlags flag)
 {
     final switch(flag) with (ValidDFlags)
     {
+        case debugMode: return "-debug";
+        case debugInfo: return "-g";
+        case releaseMode: return "-release";
+        case optimize: return "-O";
+        case inline: return "-inline";
+        case noBoundsCheck: return "-noboundscheck";
+        case unittests: return "-unittest";
+        case syntaxOnly: return "-o-";
+        case profile: return "-profile";
+        case profileGC: return "-profile=gc";
+        case coverage: return "-cov";
+        case coverageCTFE: return "-cov=ctfe";
+        
         case enableColor: return "-color=on";
         case stringImportPaths: return "-J=";
         case versions: return "-version=";
@@ -126,6 +139,19 @@ string ldcFlags(ValidDFlags flag)
 {
     final switch(flag) with (ValidDFlags)
     {
+        case debugMode: return "-d-debug";
+        case debugInfo: return "-g";
+        case releaseMode: return "-release";
+        case optimize: return "-O3";
+        case inline: return "-enable-inlining";
+        case noBoundsCheck: return "-boundscheck=off";
+        case unittests: return "-unittest";
+        case syntaxOnly: return "-o-";
+        case profile: return "-fdmd-trace-functions";
+        case profileGC: return "";
+        case coverage: return "-cov";
+        case coverageCTFE: return "-cov=ctfe";
+
         case enableColor: return "--enable-color=true";
         case stringImportPaths: return "-J=";
         case versions: return "--d-version=";
@@ -139,9 +165,21 @@ string ldcFlags(ValidDFlags flag)
     }
 }
 
-
 enum ValidDFlags
 {
+    @"buildOption" debugMode,
+    @"buildOption" debugInfo,
+    @"buildOption" releaseMode,
+    @"buildOption" optimize,
+    @"buildOption" inline,
+    @"buildOption" noBoundsCheck,
+    @"buildOption" unittests,
+    @"buildOption" syntaxOnly,
+    @"buildOption" profile,
+    @"buildOption" profileGC,
+    @"buildOption" coverage,
+    @"buildOption" coverageCTFE,
+
     enableColor,
     stringImportPaths,
     versions,
