@@ -5,6 +5,7 @@ public import std.system;
 static import redub.parsers.json;
 static import redub.parsers.sdl;
 static import redub.parsers.environment;
+import redub.command_generators.commons;
 
 /** 
  * Parses an initial directory, not recursively. Currently only .sdl and .json are parsed.
@@ -87,6 +88,7 @@ private void partiallyFinishBuildRequirements(ref BuildRequirements req)
     req.cfg.importDirectories.exclusiveMerge(req.cfg.sourcePaths);
     if(!isAbsolute(req.cfg.sourceEntryPoint)) 
         req.cfg.sourceEntryPoint = buildNormalizedPath(req.cfg.workingDir, req.cfg.sourceEntryPoint);
+
 
     import std.algorithm.sorting;
     ///Sort dependencies for predictability

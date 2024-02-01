@@ -158,7 +158,16 @@ string hashFrom(const BuildRequirements req, Compiler compiler)
     return hashFunction(inputHash.join, output).toHexString.idup;
 }
 
-
+/** 
+ * This function will generate a formula based on its inputs. Every dependency will check for its output artifact. This is the most reliable way
+ * to build across multiple compilers and configurations without having a separate cache.
+ * Params:
+ *   req = The requirements will load adv_diff with the paths to watch for changes
+ *   target = Target is important for knowing how the library is called
+ *   existing = An existing formula reference as input is important for getting content hash if they aren't up to date
+ *   preprocessed = This will store calculations on an AdvCacheFormula, so, subsequent checks are much faster
+ * Returns: A new AdvCacheFormula
+ */
 AdvCacheFormula generateCache(const BuildRequirements req, OS target, const(AdvCacheFormula)* existing, AdvCacheFormula* preprocessed)
 {
     import std.algorithm.iteration, std.array;
@@ -173,7 +182,7 @@ AdvCacheFormula generateCache(const BuildRequirements req, OS target, const(AdvC
         //DO NOT use sourcePaths since importPaths is always custom + sourcePaths
         joinFlattened(req.cfg.importDirectories, req.cfg.stringImportPaths), ///This is causing problems when using subPackages without output path, they may clash after
         // the compilation is finished. Solving this would require hash calculation after linking
-        joinFlattened(req.cfg.sourceFiles, libs),
+        joinFlattened(req.cfg.sourceFiles, libs, [req.extra.expectedArtifact]),
         existing,
         preprocessed
     );

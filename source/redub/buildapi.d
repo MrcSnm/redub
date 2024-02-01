@@ -1,6 +1,7 @@
 module redub.buildapi;
 
 import std.path;
+public import std.system:OS;
 import redub.logging;
 
 enum TargetType
@@ -369,6 +370,7 @@ struct PendingMergeConfiguration
 struct ExtraInformation
 {
     string[] librariesFullPath;
+    string expectedArtifact;
 
     immutable(ExtraInformation) idup() inout
     {
@@ -575,11 +577,12 @@ class ProjectNode
      * - Infer target type if it is on autodetect
      * - Add the dependency as a library if it is a library
      * - Add the dependency's libraries 
+     * - Outputs on extra information the expected artifact
      * - Remove source libraries from projects to build
      *
      * Also receives an argument containing the collapsed reference of its unique nodes.
      */
-    void finish()
+    void finish(OS targetOS)
     {
         scope bool[ProjectNode] visitedBuffer;
         scope ProjectNode[] privatesToMerge;
@@ -597,7 +600,7 @@ class ProjectNode
             }
             return false;
         }
-        static void finishSelfRequirements(ProjectNode node)
+        static void finishSelfRequirements(ProjectNode node, OS targetOS)
         {
             //Finish self requirements
             import std.string:replace;
@@ -613,6 +616,11 @@ class ProjectNode
                 toMerge.versions~= "Have_"~dep.name.replace("-", "_");
             }
             node.requirements.cfg = node.requirements.cfg.mergeVersions(toMerge);
+            import redub.command_generators.commons;
+            node.requirements.extra.expectedArtifact = buildNormalizedPath(
+                node.requirements.cfg.outputDirectory, 
+                getOutputName(node.requirements.cfg.targetType, node.requirements.cfg.name, targetOS)
+            );
         }
         static void finishMerging(ProjectNode target, const ProjectNode input)
         {
@@ -650,15 +658,15 @@ class ProjectNode
             }
         }
 
-        static void finishPublic(ProjectNode node, ref bool[ProjectNode] visited, ref ProjectNode[] privatesToMerge, ref ProjectNode[] sourceLibrariesToRemove)
+        static void finishPublic(ProjectNode node, ref bool[ProjectNode] visited, ref ProjectNode[] privatesToMerge, ref ProjectNode[] sourceLibrariesToRemove, OS targetOS)
         {
             if(node in visited) return;
             foreach(dep; node.dependencies)
             {
                 if(!(node in visited))
-                    finishPublic(dep, visited, privatesToMerge, sourceLibrariesToRemove);
+                    finishPublic(dep, visited, privatesToMerge, sourceLibrariesToRemove, targetOS);
             }
-            finishSelfRequirements(node);
+            finishSelfRequirements(node, targetOS);
             foreach(p; node.parent)
             {
                 if(!hasPrivateRelationship(p, node))
@@ -680,7 +688,7 @@ class ProjectNode
                 node.becomeIndependent();
             }
         }
-        finishPublic(this, visitedBuffer, privatesToMerge, sourceLibrariesToRemove);
+        finishPublic(this, visitedBuffer, privatesToMerge, sourceLibrariesToRemove, targetOS);
         finishPrivate(privatesToMerge, sourceLibrariesToRemove);
 
         visitedBuffer.clear();
