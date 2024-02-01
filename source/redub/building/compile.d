@@ -241,27 +241,29 @@ private void buildFailed(ProjectNode node, CompilationResult res)
 private bool doLink(ProjectNode root, OS os, Compiler compiler, string mainPackHash, immutable string[string] env)
 {
     bool isUpToDate = root.isUpToDate;
-    if(isUpToDate || (compiler.isDCompiler && root.requirements.cfg.targetType.isStaticLibrary))
-    {
-        if(isUpToDate)
-            infos("Up-to-Date: ", root.name, ", skipping linking");
-        return true;
-    }
-    CompilationResult linkRes = link(root.requirements.cfg, os, compiler, env);
-    if(linkRes.status)
-    {
-        errorTitle("Linking Error: ", root.name, ". Failed with flags: \n\t",
-            linkRes.compilationCommand,"\n\t\t  :\n\t",
-            linkRes.message
-        );
-        return false;
-    }
-    else
-    {
-        infos("Linked: ", root.name, " finished!");
-        vlog("\n\t", linkRes.compilationCommand, " \n");
+    bool shouldSkipLinking = isUpToDate || (compiler.isDCompiler && root.requirements.cfg.targetType.isStaticLibrary);
 
-
+    if(!shouldSkipLinking)
+    {
+        CompilationResult linkRes = link(root.requirements.cfg, os, compiler, env);
+        if(linkRes.status)
+        {
+            errorTitle("Linking Error: ", root.name, ". Failed with flags: \n\t",
+                linkRes.compilationCommand,"\n\t\t  :\n\t",
+                linkRes.message
+            );
+            return false;
+        }
+        else
+        {
+            infos("Linked: ", root.name, " finished!");
+            vlog("\n\t", linkRes.compilationCommand, " \n");
+        }
+    }
+    if(isUpToDate)
+        infos("Up-to-Date: ", root.name, ", skipping linking");
+    else 
+    {
         AdvCacheFormula cache;
         foreach(node; root.collapse)
         {
@@ -273,8 +275,7 @@ private bool doLink(ProjectNode root, OS os, Compiler compiler, string mainPackH
             }
         }
         updateCacheOnDisk();
-
     }
-
+        
     return true;
 }
