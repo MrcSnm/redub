@@ -157,9 +157,17 @@ struct SemVer
             }
         }
 
-        if(parts.length > 0) handlePart(parts[0], major, comparison[0]);
-        if(parts.length > 1) handlePart(parts[1], minor, comparison[1]);
-        if(parts.length > 2) handlePart(parts[2], patch, comparison[2]);
+        try
+        {
+            if(parts.length > 0) handlePart(parts[0], major, comparison[0]);
+            if(parts.length > 1) handlePart(parts[1], minor, comparison[1]);
+            if(parts.length > 2) handlePart(parts[2], patch, comparison[2]);
+        }
+        catch(Exception e)
+        {
+            setInvalid("Version received is not a valid SemVer.");
+            return;
+        }
 
 
         ver = RawVersion(major, minor, patch);

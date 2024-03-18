@@ -150,17 +150,17 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
                 {
                     const(JSONValue)* depPath = "path" in value;
                     const(JSONValue)* depVer = "version" in value;
+                    const(JSONValue)* depRep = "repository" in value;
                     visibility = value.tryStr("visibility");
                     enforce(depPath || depVer, 
                         "Dependency named "~ name ~ 
                         " must contain at least a \"path\" or \"version\" property."
                     );
-
                     if("optional" in value && value["optional"].boolean == true)
                     {
                         if(!("default" in value) || value["default"].boolean == false)
                         {
-                            warn("redub does not handle optional dependencies.");
+                            warn("redub does not handle optional dependencies.'"~req.cfg.name~"' uses optional for "~name~"dependency");
                             continue;
                         }
                     }

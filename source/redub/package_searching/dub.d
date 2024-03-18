@@ -131,19 +131,36 @@ private string getDefaultLookupPathForPackages()
     return buildNormalizedPath(getDubWorkspacePath, "packages");
 }
 
+
 /** 
  * Git style (~master)
  * Params:
  *   str = ~branchName
  * Returns: 
  */
-private bool isGitStyle(string str)
+private bool isGitBranchStyle(string str)
 {
     import std.ascii:isAlphaNum;
     import std.algorithm.searching:canFind;
     // Must start with ~ and Can't find a non alpha numeric version 
     return str.length > 1 && str[0] == '~' && 
             !str[1..$].canFind!((ch) => !ch.isAlphaNum);
+}
+
+private bool isGitHashStyle(string str)
+{
+    import std.ascii:isHexDigit;
+    import std.algorithm.searching:canFind;
+    // Can't find a non hex digit version 
+    return str.length > 0 && !str.canFind!((ch) => !ch.isHexDigit);
+}
+
+/**
+*   Checks for both git branches and git hashes
+*/
+private bool isGitStyle(string str)
+{
+    return isGitBranchStyle(str) || isGitHashStyle(str);
 }
 
 
