@@ -120,7 +120,7 @@ struct BuildConfiguration
         if(initialSource) ret.sourcePaths = [initialSource];
         ret.targetType = TargetType.autodetect;
         ret.sourceEntryPoint = "source/app.d";
-        ret.outputDirectory = "bin";
+        ret.outputDirectory = ".";
         return ret;
     }
 

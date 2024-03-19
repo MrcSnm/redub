@@ -10,7 +10,7 @@ string[] parseBuildConfiguration(AcceptedCompiler comp, const BuildConfiguration
     string function(ValidDFlags) mapper = getFlagMapper(comp);
 
     
-    string[] commands = [mapper(ValidDFlags.enableColor)];
+    string[] commands = [mapper(ValidDFlags.enableColor), mapper(ValidDFlags.preserveNames)];
     with(b)
     {
         commands~= dFlags;
@@ -133,6 +133,7 @@ string dmdFlags(ValidDFlags flag)
         case buildAsShared: return "-shared";
         case compileOnly: return "-c";
         case arch: throw new Error("arch not supported by dmd.");
+        case preserveNames: return "-op";
     }
 }
 string ldcFlags(ValidDFlags flag)
@@ -162,6 +163,7 @@ string ldcFlags(ValidDFlags flag)
         case buildAsShared: return "--shared";
         case compileOnly: return "-c";
         case arch: return "--mtriple=";
+        case preserveNames: return "--oq";
     }
 }
 
@@ -189,5 +191,6 @@ enum ValidDFlags
     buildAsLibrary,
     buildAsShared,
     compileOnly,
-    arch
+    arch,
+    preserveNames
 }
