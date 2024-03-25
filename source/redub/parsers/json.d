@@ -2,7 +2,8 @@ module redub.parsers.json;
 import redub.logging;
 import std.system;
 import redub.buildapi;
-import std.json;
+import hipjson;
+// import std.json;
 import std.file;
 import redub.parsers.base;
 
@@ -35,6 +36,8 @@ private JSONValue parseJSONCached(string filePath)
     const(JSONValue)* cached = filePath in jsonCache;
     if(cached) return *cached;
     jsonCache[filePath] = parseJSON(std.file.readText(filePath));
+    if(jsonCache[filePath].hasErrorOccurred)
+        throw new Error(jsonCache[filePath].error);
     return jsonCache[filePath];
 }
 

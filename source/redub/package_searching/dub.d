@@ -1,6 +1,7 @@
 module redub.package_searching.dub;
 import redub.logging;
-import std.json;
+import hipjson;
+// import std.json;
 import redub.libs.semver;
 
 bool dubHook_PackageManagerDownloadPackage(string packageName, string packageVersion, string requiredBy= "")

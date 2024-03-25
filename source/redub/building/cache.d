@@ -6,7 +6,8 @@ import redub.package_searching.dub;
 import redub.buildapi;
 static import std.file;
 import std.path;
-import std.json;
+import hipjson;
+// import std.json;
 import redub.command_generators.commons;
 
 
@@ -204,7 +205,7 @@ string[] updateCache(string rootCache, const CompilationCache cache, bool writeT
 
 void updateCacheOnDisk()
 {
-    std.file.write(getCacheFilePath, getCache().toString(JSONOptions.doNotEscapeSlashes));
+    std.file.write(getCacheFilePath, getCache().toString());
 }
 
 private JSONValue* getCache()

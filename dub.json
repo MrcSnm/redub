@@ -24,6 +24,7 @@
         "semver": {"path": "semver"},
         "colorize": {"path": "colorize"},
         "adv_diff": {"path": "adv_diff"},
+        "hipjson": {"path": "hipjson"},
         "xxhash3": "~>0.0.5"
     }
 
