@@ -8,8 +8,8 @@ JSONValue parseJSON(string jsonData)
 struct JSONArray
 {
 	size_t length;
-	size_t capacity;
-	private JSONValue[0] value;
+	// size_t capacity;
+	private JSONValue[] value;
 
 	this(JSONValue[] v)
 	{
@@ -22,10 +22,13 @@ struct JSONArray
 		import core.memory;
 		if(v.type == JSONType.array)
 			v.data.array = JSONArray.trim(v.data.array);
-		if(self.length >= self.capacity)
+		size_t capacity = self.length;
+
+		if(self.length >= capacity)
 		{
-			self.capacity = cast(size_t)((self.length+1)*1.5);
-			self = cast(JSONArray*)GC.realloc(self, JSONArray.sizeof + JSONValue.sizeof*(self.capacity));
+			// self.capacity = cast(size_t)((self.length+1)*1.5);
+			self.value.length++;
+			// self = cast(JSONArray*)GC.realloc(self, JSONArray.sizeof + JSONValue.sizeof*(self.capacity));
 		}
 		self.value.ptr[self.length] = v;
 		self.length++;
@@ -36,19 +39,23 @@ struct JSONArray
 	{
 		import core.memory;
 		size_t selfLength = self.length;
-		if(self.length != self.capacity)
-			self = cast(JSONArray*)GC.realloc(self, JSONArray.sizeof + JSONValue.sizeof*selfLength);
-		self.capacity = selfLength;
-		self.length = selfLength;
+		self.value.length = selfLength;
+		// if(self.length != self.capacity)
+		// 	self = cast(JSONArray*)GC.realloc(self, JSONArray.sizeof + JSONValue.sizeof*selfLength);
+		// self.capacity = selfLength;
+		// self.length = selfLength;
 		return self;
 	}
 
 	static JSONArray* createNew(size_t initialSize = 8)
 	{
 		import core.memory;
-		JSONArray* ret = cast(JSONArray*)GC.malloc(JSONArray.sizeof + JSONValue.sizeof*initialSize, GC.BlkAttr.APPENDABLE | GC.BlkAttr.NO_SCAN);
-		ret.length = 0;
-		ret.capacity = initialSize;
+		JSONArray* ret = new JSONArray();
+		ret.value.length = initialSize;
+
+		// JSONArray* ret = cast(JSONArray*)GC.malloc(JSONArray.sizeof + JSONValue.sizeof*initialSize, GC.BlkAttr.APPENDABLE);
+		// ret.length = 0;
+		// ret.capacity = initialSize;
 		return ret;
 	}
 	static JSONArray* createNew(JSONValue[] data)
@@ -462,12 +469,18 @@ struct JSONValue
 			{
 				JSONValue* next = &stack[stackLength-1];
 				if(current.type == JSONType.array)
-					current.data.array = JSONArray.trim(current.data.array);
-				if(next.type == JSONType.array)
-					next.data.array.getArray[$-1] = *current;
-				else if(next.type == JSONType.object)
 				{
-					next.data.object.value[current.key] = *current;
+					current.data.array = JSONArray.trim(current.data.array);
+					if(next.type == JSONType.array)
+					{
+						next.data.array.getArray[$-1] = *current;
+					}
+				// 	else if(next.type == JSONType.object)
+				// 	{
+				// 		JSONValue* v = current.key in next.data.object.value;
+				// 		current.data.array = JSONArray.trim(current.data.array);
+				// 		*v = *current;
+				// 	}
 				}
 				current = next;
 				assert(current.type == JSONType.object || current.type == JSONType.array, "Unexpected value in stack. (Typed "~(cast(size_t)(current.type)).to!string);
