@@ -33,7 +33,7 @@ private JSONValue[string] jsonCache;
 ///Optimization to be used when dealing with subPackages
 private JSONValue parseJSONCached(string filePath)
 {
-    const(JSONValue)* cached = filePath in jsonCache;
+    JSONValue* cached = filePath in jsonCache;
     if(cached) return *cached;
     jsonCache[filePath] = parseJSON(std.file.readText(filePath));
     if(jsonCache[filePath].hasErrorOccurred)

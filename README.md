@@ -5,6 +5,7 @@ Have you ever wondered why [dub](https://github.com/dlang/dub) was slow? I tried
 
 - Lazy build project configuration evaluation
 - Parallelization on build sorted by dependency
+- Faster JSON parsing
 - Fully parallelized build when only link is waiting for dependencies
 
 ### Philosophy
