@@ -201,7 +201,7 @@ struct JSONValue
 		return data.array.getArray();
 	}
 
-    JSONValue object()
+    JSONValue object() const
     {
         assert(type == JSONType.object, "Tried to get type object but value is of type "~getTypeName); 
 		JSONValue ret;
@@ -669,7 +669,7 @@ struct JSONValue
 	if(op == "in")
 	{
 		if(type != JSONType.object)	return null;
-		return key in *(data.object).value;
+		return key in (*data.object).value;
 	}
     JSONValue* opBinaryRight(string op)(string key)
 	if(op == "in")
