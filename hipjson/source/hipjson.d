@@ -4,10 +4,12 @@ JSONValue parseJSON(string jsonData)
 {
     return JSONValue.parse(jsonData);
 }
+
 struct JSONArray
 {
-	private JSONValue[] value;
 	size_t length;
+	size_t capacity;
+	private JSONValue[0] value;
 
 	this(JSONValue[] v)
 	{
@@ -15,24 +17,51 @@ struct JSONArray
 		this.length = v.length;
 	}
 
-	ref JSONArray append(JSONValue v)
+	static JSONArray* append(JSONArray* self, JSONValue v)
 	{
-		if(length >= value.length)
-			value~= v;
-		else
-			value[length] = v;
-		length++;
-		return this;
+		import core.memory;
+		if(v.type == JSONType.array)
+			v.data.array = JSONArray.trim(v.data.array);
+		if(self.length >= self.capacity)
+		{
+			self.capacity = cast(size_t)((self.length+1)*1.5);
+			self = cast(JSONArray*)GC.realloc(self, JSONArray.sizeof + JSONValue.sizeof*(self.capacity));
+		}
+		self.value.ptr[self.length] = v;
+		self.length++;
+		return self;
 	}
-	static JSONArray* createNew()
+
+	private static JSONArray* trim(JSONArray* self)
 	{
-		import std.array;
-		JSONArray* ret = new JSONArray([]);
-		ret.value = uninitializedArray!(JSONValue[])(8);
+		import core.memory;
+		size_t selfLength = self.length;
+		if(self.length != self.capacity)
+			self = cast(JSONArray*)GC.realloc(self, JSONArray.sizeof + JSONValue.sizeof*selfLength);
+		self.capacity = selfLength;
+		self.length = selfLength;
+		return self;
+	}
+
+	static JSONArray* createNew(size_t initialSize = 8)
+	{
+		import core.memory;
+		JSONArray* ret = cast(JSONArray*)GC.malloc(JSONArray.sizeof + JSONValue.sizeof*initialSize, GC.BlkAttr.APPENDABLE | GC.BlkAttr.NO_SCAN);
+		ret.length = 0;
+		ret.capacity = initialSize;
+		return ret;
+	}
+	static JSONArray* createNew(JSONValue[] data)
+	{
+		JSONArray* ret = createNew(data.length);
+		ret.value.ptr[0..data.length] = data[];
+		ret.length = data.length;
 		return ret;
 	}
 
-	JSONValue[] getArray(){return value[0..length];}
+
+	JSONValue[] getArray(){return value.ptr[0..length];}
+	const(JSONValue)[] getArray() const {return value.ptr[0..length];}
 }
 struct JSONObject
 {
@@ -153,8 +182,8 @@ struct JSONValue
             size_t length(){return arr.length;}
             bool empty(){return idx == arr.length;}
             void popFront(){idx++;}
-            JSONValue front(){return arr.value[idx];}
-            JSONValue opIndex(size_t num){return arr.value[num];}
+            const(JSONValue) front(){return arr.getArray()[idx];}
+            const(JSONValue) opIndex(size_t num){return arr.getArray()[num];}
         }
         return JSONValueArrayIterator(data.array);
     }
@@ -162,7 +191,7 @@ struct JSONValue
 	JSONValue[] array()
 	{
 		assert(type == JSONType.array, "Tried to iterate a non array object of type "~getTypeName);
-		return data.array.getArray;
+		return data.array.getArray();
 	}
 
     JSONValue object()
@@ -274,36 +303,84 @@ struct JSONValue
 			return JSONValue.errorObj("Valid JSON starts with a '{'.");
 		}
 
+		StringPool pool = StringPool(cast(size_t)(data.length*0.75));
+
+		// bool getNextString(string data, ptrdiff_t currentIndex, out ptrdiff_t newIndex, out string theString)
+		// {
+		// 	import std.array;
+		// 	assert(data[currentIndex] == '"');
+		// 	ptrdiff_t i = currentIndex + 1;
+		// 	size_t returnLength = 0;
+		// 	// char[] ret = uninitializedArray!(char[])(128);
+		// 	char[] ret = pool.getNewString(64);
+		// 	char ch;
+
+		// 	ubyte[4] chars;
+		// 	bool escaped;
+		// 	LOOP: while(i < data.length)
+		// 	{
+		// 		ubyte count = nextByte32(chars, data, i);
+		// 		for(size_t byteIndex = 0; byteIndex < count; byteIndex++)
+		// 		{
+		// 			ch = cast(char)chars[byteIndex];
+		// 			if(!escaped)
+		// 			{
+		// 				if(ch == '"')
+		// 				{
+		// 					i+= byteIndex;
+		// 					break LOOP;
+		// 				}
+		// 				else if(ch == '\\')
+		// 				{
+		// 					escaped = true;
+		// 					continue;
+		// 				}
+		// 			}
+		// 			if(returnLength >= ret.length)
+		// 				ret = pool.resizeString(ret, ret.length*2);
+		// 			ret[returnLength++] = cast(char)chars[byteIndex];
+		// 			escaped = false;
+		// 		}
+		// 		i+= count;
+		// 	}
+		// 	ret = pool.resizeString(ret, returnLength);
+		// 	newIndex = i;
+		// 	if(newIndex == data.length) //Not found
+		// 		return false;
+		// 	theString = cast(string)ret;
+		// 	return true;
+		// }
+
 		bool getNextString(string data, ptrdiff_t currentIndex, out ptrdiff_t newIndex, out string theString)
 		{
-			import std.array;
-			assert(data[currentIndex] == '"');
+			assert(data[currentIndex] == '"', "getNextString must start with a quotation mark");
 			ptrdiff_t i = currentIndex + 1;
 			size_t returnLength = 0;
-			char[] ret = uninitializedArray!(char[])(128);
+			char[] ret = pool.getNewString(64);
 			char ch;
-			
-			LOOP: while(i < data.length)
+
+			while(i < data.length)
 			{
 				ch = data[i];
 				switch(ch)
 				{
-					case '"': break LOOP;
-					case '\\': i++; goto default;
-					default:
-						if(returnLength >= ret.length)
-							ret.length*= 2;
-						ret[returnLength++] = ch;
-						break;
+					case '"': 
+					{
+						ret = pool.resizeString(ret, returnLength);
+						newIndex = i;
+						theString = cast(string)ret;
+						return true;
+					}
+					case '\\': i++; ch = data[i]; break;
+					default: break;
 				}
+				if(returnLength >= ret.length)
+					ret = pool.resizeString(ret, ret.length*2);
+				
+				ret[returnLength++] = ch;
 				i++;
 			}
-			ret.length = returnLength;
-			newIndex = i;
-			if(newIndex == data.length) //Not found
-				return false;
-			theString = cast(string)ret;
-			return true;
+			return false;
 		}
 
 
@@ -373,7 +450,7 @@ struct JSONValue
 			if(currTemp.type == JSONType.object)
 				currTemp.data.object.value[val.key] = *current;
 			else
-				currTemp.data.array.append(*current);
+				currTemp.data.array = JSONArray.append(currTemp.data.array, *current);
 
 		}
 		void popScope()
@@ -383,10 +460,20 @@ struct JSONValue
 			stackLength--;
 			if(stackLength > 0)
 			{
-				current = &stack[stackLength-1];
+				JSONValue* next = &stack[stackLength-1];
+				if(current.type == JSONType.array)
+					current.data.array = JSONArray.trim(current.data.array);
+				if(next.type == JSONType.array)
+					next.data.array.getArray[$-1] = *current;
+				else if(next.type == JSONType.object)
+				{
+					next.data.object.value[current.key] = *current;
+				}
+				current = next;
 				assert(current.type == JSONType.object || current.type == JSONType.array, "Unexpected value in stack. (Typed "~(cast(size_t)(current.type)).to!string);
 			}
 		}
+
 
 		void pushToStack(JSONValue val)
 		{
@@ -396,7 +483,7 @@ struct JSONValue
 					current.data.object.value[val.key] = val;
 					break;
 				case array:
-					current.data.array.append(val);
+					current.data.array = JSONArray.append(current.data.array, val);
 					break;
 				default: assert(false, "Unexpected stack type: "~current.getTypeName);
 			}
@@ -504,8 +591,11 @@ struct JSONValue
 					switch(state)
 					{
 						case JSONState.value: //Any value
+						case JSONState.lookingForNext: //Array
 							if(ch.isNumeric)
 							{
+								if(state == JSONState.lookingForNext && current.type != JSONType.array)
+									return JSONValue.errorObj(getErr("unexpected number."));
 								if(!getNextNumber(data, index, index, lastValue.data, lastValue.type))
 									return JSONValue.errorObj(getErr("unexpected end of file."));
 								pushToStack(lastValue);
@@ -513,42 +603,23 @@ struct JSONValue
 							}
 							else if(index + "true".length < data.length && data[index.."true".length + index] == "true")
 							{
+								if(state == JSONState.lookingForNext && current.type != JSONType.array)
+									return JSONValue.errorObj(getErr("unexpected number."));
 								pushToStack(JSONValue.create!bool(true, lastKey));
 								state = JSONState.lookingForNext;
 							}
 							else if(index + "false".length < data.length && data[index.."false".length + index] == "false")
 							{
+								if(state == JSONState.lookingForNext && current.type != JSONType.array)
+									return JSONValue.errorObj(getErr("unexpected number."));
 								pushToStack(JSONValue.create!bool(false, lastKey));
 								state = JSONState.lookingForNext;
 							}
 							else if(index + "null".length < data.length && data[index.."null".length + index] == "null")
 							{
+								if(state == JSONState.lookingForNext && current.type != JSONType.array)
+									return JSONValue.errorObj(getErr("unexpected number."));
 								pushToStack(JSONValue.create(null, lastKey));
-								state = JSONState.lookingForNext;
-							}
-							break;
-						case JSONState.lookingForNext: //Array
-							if(ch.isNumeric)
-							{
-								if(current.type != JSONType.array)
-									return JSONValue.errorObj(getErr("unexpected number."));
-								if(!getNextNumber(data, index, index, lastValue.data, lastValue.type))
-									return JSONValue.errorObj(getErr("unexpected end of file."));
-								pushToStack(lastValue);
-								state = JSONState.lookingForNext;
-							}
-							else if(index + "true".length < data.length && data[index.."true".length + index] == "true")
-							{
-								if(current.type != JSONType.array)
-									return JSONValue.errorObj(getErr("unexpected number."));
-								pushToStack(JSONValue.create!bool(true, lastKey));
-								state = JSONState.lookingForNext;
-							}
-							else if(index + "false".length < data.length && data[index.."false".length + index] == "false")
-							{
-								if(current.type != JSONType.array)
-									return JSONValue.errorObj(getErr("unexpected number."));
-								pushToStack(JSONValue.create!bool(false, lastKey));
 								state = JSONState.lookingForNext;
 							}
 							break;
@@ -562,7 +633,12 @@ struct JSONValue
 		return ret;
 	}
 
-	JSONValue opIndex(string key) const
+	const(JSONValue) opIndex(string key) const
+	{
+		assert(type == JSONType.object, "Can't get a member from a non object.");
+		return (*data.object)[key];
+	}
+	JSONValue opIndex(string key)
 	{
 		assert(type == JSONType.object, "Can't get a member from a non object.");
 		return (*data.object)[key];
@@ -706,12 +782,82 @@ struct JSONValue
         
     }
 }
+
+private struct StringPool
+{
+	private char[] pool;
+	private size_t used;
+
+	this(size_t size)
+	{
+		import std.array;
+		this.pool = uninitializedArray!(char[])(size);
+	}
+
+	bool getSlice(size_t sliceSize, out char[] str)
+	{
+		if(used+sliceSize < pool.length)
+		{
+			str = pool[used..used+sliceSize];
+			used+= sliceSize;
+			return true;
+		}
+		return false;
+	}
+
+	char[] resizeString(char[] str, size_t newSize)
+	{
+		///Inside pool
+		if(newSize == str.length) return str;
+		if(pool.ptr <= str.ptr && pool.ptr + pool.length > str.ptr)
+		{
+			if(newSize > str.length)
+			{
+				if(newSize - str.length + used > pool.length)
+				{
+					used-= str.length;
+					import std.array;
+					char[] ret = uninitializedArray!(char[])(newSize);
+					ret[0..str.length] = str[];
+					return ret;
+				}
+				else
+				{
+					ptrdiff_t offset = str.ptr - pool.ptr;
+					assert(offset > 0, " Out of bounds?");
+					used+= newSize - str.length;
+					return pool[cast(size_t)offset..offset+newSize];
+				}
+			}
+			else
+			{
+				used-= str.length - newSize;
+				return str[0..newSize];
+			}
+		}
+		else
+			str.length = newSize;
+		return str;
+	}
+
+	/**
+	*	If the pool is not enough, it will allocate randomly
+	*/
+	char[] getNewString(size_t strSize)
+	{
+		char[] ret;
+		if(getSlice(strSize, ret))
+			return ret;
+		return new char[](strSize);
+	}
+}
+
 unittest
 {
 	import std.file;
 	import std.stdio;
 
-	writeln = "name" in parseJSON(`
+	writeln = parseJSON(`
 	{
     "name": "redub",
     "description": "Dub Based Build System, with parallelization per packages and easier to contribute",
@@ -742,6 +888,6 @@ unittest
         "xxhash3": "~>0.0.5"
     }
 
-}`)["configurations"].array[1];
+}`)["configurations"].array.capacity;
 
 }
