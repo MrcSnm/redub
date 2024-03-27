@@ -304,12 +304,6 @@ struct JSONValue
 			return JSONValue.errorObj("No data provided");
 		}
 		ptrdiff_t index = 0;
-		while(index < data.length && data[index++] != '{'){}
-		if(index == data.length)
-		{
-			return JSONValue.errorObj("Valid JSON starts with a '{'.");
-		}
-
 		StringPool pool = StringPool(cast(size_t)(data.length*0.75));
 
 		// bool getNextString(string data, ptrdiff_t currentIndex, out ptrdiff_t newIndex, out string theString)
@@ -431,19 +425,18 @@ struct JSONValue
 			return newIndex < data.length;
 		}
 		JSONValue ret;
-		ret.data.object = new JSONObject();
+		ret.type = JSONType.null_;
 		JSONValue* current = &ret;
-		JSONState state = JSONState.lookingForNext;
+		JSONState state = JSONState.value;
 		JSONValue lastValue = ret;
 
 		import std.array;
 		scope JSONValue[] stack = uninitializedArray!(JSONValue[])(128);
-		stack[0] = ret;
-		scope ptrdiff_t stackLength = 1;
+		scope ptrdiff_t stackLength = 0;
 
-		void pushNewScope(JSONValue val)
+		bool pushNewScope(JSONValue val)
 		{
-			assert(val.type == JSONType.object || val.type == JSONType.array, "Unexpected push.");
+			assert(val.type == JSONType.object || val.type == JSONType.array || val.type == JSONType.null_, "Unexpected push.");
 			JSONValue* currTemp = current;
 
 			stackLength++;
@@ -454,10 +447,22 @@ struct JSONValue
 
 			current = &stack[stackLength-1];
 
-			if(currTemp.type == JSONType.object)
-				currTemp.data.object.value[val.key] = *current;
-			else
-				currTemp.data.array = JSONArray.append(currTemp.data.array, *current);
+
+			switch(currTemp.type)
+			{
+				case JSONType.object:
+					currTemp.data.object.value[val.key] = *current;
+					break;
+				case JSONType.array:
+					currTemp.data.array = JSONArray.append(currTemp.data.array, *current);
+					break;
+				case JSONType.null_:
+					currTemp.type = val.type;
+					currTemp.data = val.data;
+					break;
+				default: return false;
+			}
+			return true;
 
 		}
 		void popScope()
@@ -498,6 +503,9 @@ struct JSONValue
 				case array:
 					current.data.array = JSONArray.append(current.data.array, val);
 					break;
+				case null_:
+					*current = val;
+					break;
 				default: assert(false, "Unexpected stack type: "~current.getTypeName);
 			}
 			lastValue = val;
@@ -523,7 +531,8 @@ struct JSONValue
 					if(state != JSONState.value)
 						return JSONValue.errorObj(getErr());
 					JSONValue obj = JSONValue.create(new JSONObject(), lastKey);
-					pushNewScope(obj);
+					if(!pushNewScope(obj))
+						return JSONValue.errorObj(getErr("Could not push new scope in JSON. Only array, object or null are valid"));
 
 					state = JSONState.key;
 					break;
@@ -575,9 +584,11 @@ struct JSONValue
 				}
 				case '[':
 				{
+					import std.stdio;
 					if(state != JSONState.lookingForNext && state != JSONState.value)
 						return JSONValue.errorObj(getErr(" expected to be a value. "));
-					pushNewScope(JSONValue.create(JSONArray.createNew(), lastKey));
+					if(!pushNewScope(JSONValue.create(JSONArray.createNew(), lastKey)))
+						return JSONValue.errorObj(getErr("Could not push new scope in JSON. Only array, object or null are valid"));
 					state = JSONState.value;
 					break;
 				}
