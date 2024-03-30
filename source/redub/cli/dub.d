@@ -163,6 +163,10 @@ struct DubArguments
     @("Treats the package name as a filename. The file must contain a package recipe comment.")
     bool single;
 
+    @("Shows redub version")
+    @("version")
+    bool version_;
+
     @("Deprecated option that does nothing.")
     @("force-remove")
     bool forceRemove;

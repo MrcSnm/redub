@@ -14,7 +14,7 @@ import redub.tree_generators.dub;
 import redub.cli.dub;
 import redub.command_generators.commons;
 
-enum RedubVersion = "Redub - A reimagined DUB: v1.3.5";
+enum RedubVersion = "Redub v1.3.7 - A reimagined DUB";
 
 
 string formatError(string err)
@@ -68,7 +68,12 @@ int main(string[] args)
 int runMain(string[] args)
 {
     ProjectDetails d = buildProject(resolveDependencies(args));
-    if(!d.tree) return 1;
+    if(!d.tree)
+    {
+        if(d.printOnly)
+            return 0;
+        return 1;
+    }
     if(d.tree.requirements.cfg.targetType != TargetType.executable)
         return 1;
 
@@ -219,6 +224,12 @@ ProjectDetails resolveDependencies(string[] args)
         import std.getopt;
         defaultGetoptPrinter("redub build information\n\t", res.options);
         return ProjectDetails.init;
+    }
+    if(bArgs.version_)
+    {
+        import std.stdio;
+        writeln(RedubVersion);
+        return ProjectDetails(null, Compiler.init, true);
     }
     updateVerbosity(bArgs.cArgs);
     if(bArgs.arch) bArgs.compiler = "ldc2";

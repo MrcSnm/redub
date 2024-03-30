@@ -12,6 +12,8 @@ struct ProjectDetails
 {
     ProjectNode tree;
     Compiler compiler;
+    ///Makes the return code 0 for when using print commands.
+    bool printOnly;
 }
 
 /** 

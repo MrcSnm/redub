@@ -711,7 +711,7 @@ class ProjectNode
         static void finishPrivate(ProjectNode[] privatesToMerge, ProjectNode[] sourceLibrariesToRemove)
         {
             for(int i = 0; i < privatesToMerge.length; i+= 2)
-                finishMerging(privatesToMerge[0], privatesToMerge[1]);
+                finishMerging(privatesToMerge[i], privatesToMerge[i+1]);
             foreach(node; sourceLibrariesToRemove)
             {
                 vlog("Project ", node.name, " is a sourceLibrary. Becoming independent.");
