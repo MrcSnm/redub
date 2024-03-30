@@ -821,7 +821,40 @@ class ProjectNode
             }
         }
     }
+}
 
+void putLinkerFiles(const ProjectNode tree, out string[] dataContainer)
+{
+    import std.algorithm.iteration;
+    import redub.command_generators.commons;
+    import std.range;
+    import std.path;
+    import std.array;
+    
+    if(tree.requirements.cfg.targetType.isStaticLibrary)
+        dataContainer~= buildNormalizedPath(
+            tree.requirements.cfg.outputDirectory, 
+            getOutputName(
+                tree.requirements.cfg.targetType, 
+                tree.requirements.cfg.name, 
+                os));
+
+    dataContainer~= tree.requirements.extra.librariesFullPath.map!((string libPath)
+    {
+        return buildNormalizedPath(dirName(libPath), getOutputName(TargetType.staticLibrary, baseName(libPath), os));
+    }).retro.array;
+}
+
+void putSourceFiles(const ProjectNode tree, out string[] dataContainer)
+{
+    import redub.command_generators.commons;
+    redub.command_generators.commons.putSourceFiles(dataContainer, 
+        tree.requirements.cfg.workingDir,
+        tree.requirements.cfg.sourcePaths,
+        tree.requirements.cfg.sourceFiles,
+        tree.requirements.cfg.excludeSourceFiles,
+        ".d"
+    );
 }
 
 

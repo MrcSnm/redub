@@ -116,37 +116,11 @@ int describeMain(string[] args)
         "libs": (ref string[] dataContainer, const ProjectNode root){dataContainer~= root.requirements.cfg.libraries;},
         "linker-files": (ref string[] dataContainer, const ProjectNode root)
         {
-            import std.algorithm.iteration;
-            import std.range;
-            import std.array;
-            
-            if(root.requirements.cfg.targetType.isStaticLibrary)
-                dataContainer~= buildNormalizedPath(
-                    root.requirements.cfg.outputDirectory, 
-                    getOutputName(
-                        root.requirements.cfg.targetType, 
-                        root.requirements.cfg.name, 
-                        os));
-
-            dataContainer~= root.requirements.extra.librariesFullPath.map!((string libPath)
-            {
-                return buildNormalizedPath(dirName(libPath), getOutputName(TargetType.staticLibrary, baseName(libPath), os));
-            }).retro.array;
-
+            root.putLinkerFiles(dataContainer);
         },
         "source-files": (ref string[] dataContainer, const ProjectNode root)
         {
-            import redub.command_generators.commons;
-            // foreach(node; (cast()root).collapse)
-            // {
-                putSourceFiles(dataContainer, 
-                    root.requirements.cfg.workingDir,
-                    root.requirements.cfg.sourcePaths,
-                    root.requirements.cfg.sourceFiles,
-                    root.requirements.cfg.excludeSourceFiles,
-                    ".d"
-                );
-            // }
+            root.putSourceFiles(dataContainer);
         },
         "versions": (ref string[] dataContainer, const ProjectNode root){dataContainer~= root.requirements.cfg.versions;},
         // "debug-versions": (){},

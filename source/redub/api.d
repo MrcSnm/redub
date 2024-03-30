@@ -14,6 +14,9 @@ struct ProjectDetails
     Compiler compiler;
     ///Makes the return code 0 for when using print commands.
     bool printOnly;
+
+    void getLinkerFiles(out string[] output) const {putLinkerFiles(tree, output);}
+    void getSourceFiles(out string[] output) const {putSourceFiles(tree, output);}
 }
 
 /** 
