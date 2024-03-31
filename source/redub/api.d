@@ -15,6 +15,8 @@ struct ProjectDetails
     ///Makes the return code 0 for when using print commands.
     bool printOnly;
 
+    bool error() const {return this == ProjectDetails.init; }
+
     void getLinkerFiles(out string[] output) const {putLinkerFiles(tree, output);}
     void getSourceFiles(out string[] output) const {putSourceFiles(tree, output);}
 }
