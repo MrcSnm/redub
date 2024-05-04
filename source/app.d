@@ -14,7 +14,7 @@ import redub.tree_generators.dub;
 import redub.cli.dub;
 import redub.command_generators.commons;
 
-enum RedubVersion = "Redub v1.3.9 - A reimagined DUB";
+enum RedubVersion = "Redub v1.3.10 - A reimagined DUB";
 
 
 string formatError(string err)
