@@ -69,13 +69,14 @@ ProjectDetails buildProject(ProjectDetails d)
 {
     import redub.building.compile;
     import redub.command_generators.commons;
+    import redub.misc.console_control_handler;
 
     if(!d.tree)
         return d;
 
     ProjectNode tree = d.tree;
     OS targetOS = osFromArch(tree.requirements.cfg.arch);
-
+    startHandlingConsoleControl();
     auto result = timed(()
     {
         if(tree.isFullyParallelizable)

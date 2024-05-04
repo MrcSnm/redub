@@ -16,12 +16,12 @@ string[] parseBuildConfiguration(AcceptedCompiler comp, const BuildConfiguration
         commands~= dFlags;
         if(isDebug) commands~= "-debug";
         if(b.arch) commands~= mapper(ValidDFlags.arch) ~ b.arch;
-        commands = mapAppendPrefix(commands, versions, mapper(ValidDFlags.versions));
-        commands = mapAppendPrefix(commands, importDirectories, mapper(ValidDFlags.importPaths));
+        commands = mapAppendPrefix(commands, versions, mapper(ValidDFlags.versions), false);
+        commands = mapAppendPrefix(commands, importDirectories, mapper(ValidDFlags.importPaths), true);
 
         if(targetType.isLinkedSeparately)
             commands~= mapper(ValidDFlags.compileOnly);
-        commands = mapAppendPrefix(commands, stringImportPaths, mapper(ValidDFlags.stringImportPaths));
+        commands = mapAppendPrefix(commands, stringImportPaths, mapper(ValidDFlags.stringImportPaths), true);
 
 
         if(targetType.isStaticLibrary)
@@ -29,8 +29,8 @@ string[] parseBuildConfiguration(AcceptedCompiler comp, const BuildConfiguration
         else if(targetType == TargetType.dynamicLibrary)
             commands~= mapper(ValidDFlags.buildAsShared);
 
-        commands~= mapper(ValidDFlags.objectDir)~getObjectDir(b.workingDir);
-        commands~= mapper(ValidDFlags.outputFile) ~ getConfigurationOutputPath(b, target);
+        commands~= mapper(ValidDFlags.objectDir)~getObjectDir(b.workingDir).escapePath;
+        commands~= mapper(ValidDFlags.outputFile) ~ getConfigurationOutputPath(b, target).escapePath;
         
         putSourceFiles(commands, workingDir, sourcePaths, sourceFiles, excludeSourceFiles, ".d");
     }

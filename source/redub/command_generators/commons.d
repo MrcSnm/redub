@@ -159,6 +159,14 @@ string getOutputName(const BuildConfiguration cfg, OS os)
     return getOutputName(cfg.targetType, cfg.name, os);
 }
 
+string escapePath(string sourceFile)
+{
+    import std.string;
+    if(indexOf(sourceFile, ' ') != -1)
+        return '"'~sourceFile~'"';
+    return sourceFile;
+}
+
 void putSourceFiles(
     ref string[] output,
     const string workingDir,
@@ -188,7 +196,7 @@ void putSourceFiles(
             {
                 if(e.name.endsWith(ext))
                 {
-                    output~= e.name;
+                    output~= escapePath(e.name);
                     break;
                 }
             }
@@ -196,15 +204,6 @@ void putSourceFiles(
     }
 }
 
-string[] getDSourceFiles(string path)
-{
-    import std.file;
-    import std.string:endsWith;
-    import std.array;
-    import std.algorithm.iteration;
-    return dirEntries(path, SpanMode.depth)
-        .filter!((entry) => entry.name.endsWith(".d")).map!((entry => entry.name)).array;
-}
 
 string[] getLinkFiles(const string[] filesToLink)
 {
@@ -265,7 +264,7 @@ ref string[] mapAppend(Q, T)(return ref string[] appendTarget, const scope Q[] m
  *   prefix = Prefix before appending
  * Returns: appendTarget with the mapped elements from mapInput appended
  */
-ref string[] mapAppendPrefix(return ref string[] appendTarget, const scope string[] mapInput, string prefix)
+ref string[] mapAppendPrefix(return ref string[] appendTarget, const scope string[] mapInput, string prefix, bool shouldEscapeInput)
 {
     if(mapInput.length == 0) return appendTarget;
     size_t length = appendTarget.length;
@@ -273,9 +272,10 @@ ref string[] mapAppendPrefix(return ref string[] appendTarget, const scope strin
 
     foreach(i; 0..mapInput.length)
     {
-        char[] newStr = new char[](mapInput[i].length+prefix.length);
+        string input = shouldEscapeInput ? escapePath(mapInput[i]) : mapInput[i];
+        char[] newStr = new char[](input.length+prefix.length);
         newStr[0..prefix.length] = prefix[];
-        newStr[prefix.length..$] = mapInput[i][];
+        newStr[prefix.length..$] = input[];
         appendTarget[length++] = cast(string)newStr;
     }
     return appendTarget;

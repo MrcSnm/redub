@@ -31,8 +31,8 @@ string[] parseLinkConfiguration(const BuildConfiguration b, OS target, Compiler 
         
         if (targetType.isLinkedSeparately)
         {
-            commands = mapAppendPrefix(commands, linkFlags, "-L");
-            commands = mapAppendPrefix(commands, libraryPaths, "-L-L");
+            commands = mapAppendPrefix(commands, linkFlags, "-L", false);
+            commands = mapAppendPrefix(commands, libraryPaths, "-L-L", true);
             commands = mapAppendReverse(commands, libraries, (string l) => "-L-l"~l);
             commands~= getLinkFiles(b.sourceFiles);
             
@@ -68,14 +68,14 @@ string[] parseLinkConfigurationMSVC(const BuildConfiguration b, OS target, Compi
         }
         if(targetType == TargetType.dynamicLibrary)
             commands~= getTargetTypeFlag(targetType, compiler);
-        commands = mapAppendPrefix(commands, linkFlags, "-L");
+        commands = mapAppendPrefix(commands, linkFlags, "-L", false);
 
-        commands = mapAppendPrefix(commands, libraryPaths, "-L/LIBPATH:");
+        commands = mapAppendPrefix(commands, libraryPaths, "-L/LIBPATH:", true);
         commands~= getLinkFiles(b.sourceFiles);
         commands = mapAppend(commands, libraries, (string l) => "-L"~l~".lib");
         
-        commands~= buildNormalizedPath(outputDirectory, name~getObjectExtension(target));
-        commands~= "-of"~buildNormalizedPath(outputDirectory, getOutputName(targetType, name, target));
+        commands~= buildNormalizedPath(outputDirectory, name~getObjectExtension(target)).escapePath;
+        commands~= "-of"~buildNormalizedPath(outputDirectory, getOutputName(targetType, name, target)).escapePath;
     }
     return commands;
 }
