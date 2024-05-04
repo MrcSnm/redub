@@ -1,5 +1,53 @@
 # Redub - Dub Based Build System
 
+
+## Running redub without having it on path
+- Change directory to the project you want to build and enter in terminal `dub run redub`
+- You may also get help by running `dub run redub -- --help`
+
+## Building redub
+- Enter in terminal and execute `dub`
+- Highly recommended that you build it with `dub -b debug-release --compiler=ldc2` since this will also improve its speed on dependency resolution
+
+## Using its library API
+
+The usage of the library APIispretty straightforward. You get mainly 2 functions
+1. `resolveDependencies` which will parse the project and its dependencies, after that, you got all the project information
+2. `buildProject` which will get the project information and build in parallel
+
+```d
+import redub.api;
+import redub.logging;
+
+void main()
+{
+  import std.file;
+  //Enables logging on redub
+  setLogLevel(LogLevel.verbose);
+
+  //Gets the project information
+  ProjectDetails d = resolveDependencies(
+    invalidateCache: false,
+    std.system.os,
+    CompilationDetails("dmd", "arch not yet implemented", "dmd v[2.105.0]"),
+    ProjectToParse("configuration", getcwd(), "subPackage", "path/to/dub/recipe.json (optional)")
+  );
+
+  /** Optionally, you can change some project information by accessing the details.tree (a ProjectNode), from there, you can freely modify the BuildRequirements of the project
+  * d.tree.requirements.cfg.outputDirectory = "some/path";
+  * d.tree.requirements.cfg.dFlags~= "-gc";
+  */
+
+  //Execute the build process
+  buildProject(d);
+}
+```
+
+
+
+# Project Meta
+
+
 ## Making it faster
 Have you ever wondered why [dub](https://github.com/dlang/dub) was slow? I tried solving it, but its codebase was fairly unreadable. After building this project, I've implemented features that dub don't use
 
