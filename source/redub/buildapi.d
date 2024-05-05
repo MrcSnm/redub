@@ -616,9 +616,9 @@ class ProjectNode
     {
         scope bool[ProjectNode] visitedBuffer;
         scope ProjectNode[] privatesToMerge;
-        scope ProjectNode[] sourceLibrariesToRemove;
+        scope ProjectNode[] dependenciesToRemove;
         privatesToMerge.reserve(128);
-        sourceLibrariesToRemove.reserve(64);
+        dependenciesToRemove.reserve(64);
 
         
         static bool hasPrivateRelationship(const ProjectNode parent, const ProjectNode child)
@@ -652,7 +652,7 @@ class ProjectNode
                 getOutputName(node.requirements.cfg.targetType, node.requirements.cfg.name, targetOS)
             );
         }
-        static void finishMerging(ProjectNode target, const ProjectNode input)
+        static void finishMerging(ProjectNode target, ProjectNode input)
         {
             vvlog("Merging ", input.name, " into ", target.name);
             target.requirements.cfg = target.requirements.cfg.mergeImport(input.requirements.cfg);
@@ -684,17 +684,25 @@ class ProjectNode
                     break;
                 case dynamicLibrary: throw new Error("Uninplemented support for shared libraries");
                 case executable: break;
-                case none: throw new Error("Invalid targetType: none");
+                case none: 
+                    if(input.parent.length == 0)
+                        throw new Error("targetType: none as a root project: nothing to do");
+                    else
+                    {
+                        target.dependencies~= input.dependencies;
+                        target.requirements.dependencies~= input.requirements.dependencies;
+                    }
+                    break;
             }
         }
 
-        static void finishPublic(ProjectNode node, ref bool[ProjectNode] visited, ref ProjectNode[] privatesToMerge, ref ProjectNode[] sourceLibrariesToRemove, OS targetOS)
+        static void finishPublic(ProjectNode node, ref bool[ProjectNode] visited, ref ProjectNode[] privatesToMerge, ref ProjectNode[] dependenciesToRemove, OS targetOS)
         {
             if(node in visited) return;
             foreach(dep; node.dependencies)
             {
                 if(!(node in visited))
-                    finishPublic(dep, visited, privatesToMerge, sourceLibrariesToRemove, targetOS);
+                    finishPublic(dep, visited, privatesToMerge, dependenciesToRemove, targetOS);
             }
             finishSelfRequirements(node, targetOS);
             foreach(p; node.parent)
@@ -705,24 +713,26 @@ class ProjectNode
                     privatesToMerge~= [p, node];
             }
             visited[node] = true;
-            if(node.requirements.cfg.targetType == TargetType.sourceLibrary)
-                sourceLibrariesToRemove~= node;
+            if(node.requirements.cfg.targetType == TargetType.sourceLibrary || node.requirements.cfg.targetType == TargetType.none)
+                dependenciesToRemove~= node;
         }
-        static void finishPrivate(ProjectNode[] privatesToMerge, ProjectNode[] sourceLibrariesToRemove)
+        static void finishPrivate(ProjectNode[] privatesToMerge, ProjectNode[] dependenciesToRemove)
         {
             for(int i = 0; i < privatesToMerge.length; i+= 2)
                 finishMerging(privatesToMerge[i], privatesToMerge[i+1]);
-            foreach(node; sourceLibrariesToRemove)
+            foreach(node; dependenciesToRemove)
             {
                 vlog("Project ", node.name, " is a sourceLibrary. Becoming independent.");
+                if(node.requirements.cfg.targetType == TargetType.none)
+                    node.dependencies = null;
                 node.becomeIndependent();
             }
         }
-        finishPublic(this, visitedBuffer, privatesToMerge, sourceLibrariesToRemove, targetOS);
-        finishPrivate(privatesToMerge, sourceLibrariesToRemove);
+        finishPublic(this, visitedBuffer, privatesToMerge, dependenciesToRemove, targetOS);
+        finishPrivate(privatesToMerge, dependenciesToRemove);
 
         visitedBuffer.clear();
-        sourceLibrariesToRemove = null;
+        dependenciesToRemove = null;
         privatesToMerge = null;
     }
     
@@ -744,6 +754,9 @@ class ProjectNode
         foreach(node; collapse) node.shouldRebuild = true;
     }
 
+    /** 
+     * Can only be independent if no dependency is found.
+     */
     void becomeIndependent()
     {
         assert(dependencies.length == 0, "Can't be independent when having dependencies.");

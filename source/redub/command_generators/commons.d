@@ -134,7 +134,7 @@ string getExtension(TargetType t, OS target)
 {
     final switch(t)
     {
-        case TargetType.none: throw new Error("Invalid targetType: none");
+        case TargetType.none: return null;
         case TargetType.autodetect, TargetType.sourceLibrary: return null;
         case TargetType.executable: return target.getExecutableExtension;
         case TargetType.library, TargetType.staticLibrary: return target.getLibraryExtension;
