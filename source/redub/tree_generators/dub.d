@@ -62,10 +62,10 @@ void detectCycle(ProjectNode t)
 /** 
  * 
  * Params:
- *   req = Requirement to generate node
- *   compiler = Compiler for parsing configs
+ *   queue = A queue for breadth first traversal
+ *   info = Compiler information for parsing nodes
+ *   subConfigurations = A map of subConfiguration[dependencyName] for mapping sub configuration matching
  *   visited = Cache for unique matching
- *   collapsed = A collapsed representation of the tree. This is useful 
  *  for saving CPU and memory instead if needing to recursively iterate all the time.
  *  this was moved here because it already implements the `visited` pattern inside the tree,
  *  so, it is an assumption that can be made to make it slightly faster. Might be removed

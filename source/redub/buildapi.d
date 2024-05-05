@@ -630,15 +630,39 @@ class ProjectNode
             }
             return false;
         }
+
+        static void transferNoneDependencies(ProjectNode node)
+        {
+            ///Enters in the deepest node
+            for(int i = 0; i < node.dependencies.length; i++)
+                transferNoneDependencies(node.dependencies[i]);
+            ///If the node is none, transfer all of its dependencies to all of its parents
+            if(node.requirements.cfg.targetType == TargetType.none)
+            {
+                for(int i = 0; i < node.parent.length; i++)
+                {
+                    ProjectNode p = node.parent[i];
+                    foreach(dep; node.dependencies)
+                        p.addDependency(dep);
+                }
+                node.dependencies = null;
+                node.becomeIndependent();
+            }
+            
+        }
+
         static void finishSelfRequirements(ProjectNode node, OS targetOS)
         {
             //Finish self requirements
             import std.string:replace;
+            ///Format from Have_project:subpackage to Have_project_subpackage
             node.requirements.cfg.name = node.requirements.cfg.name.replace(":", "_");
+            ///Format from projects such as match-3 into Have_match_3
             node.requirements.cfg.versions.exclusiveMerge(["Have_"~node.requirements.cfg.name.replace("-", "_")]);
             if(node.requirements.cfg.targetType == TargetType.autodetect)
                 node.requirements.cfg.targetType = inferTargetType(node.requirements.cfg);
-            
+
+            ///Transforms every dependency into Have_dependency
             BuildConfiguration toMerge;
             foreach(dep; node.dependencies)
             {
@@ -646,6 +670,9 @@ class ProjectNode
                 toMerge.versions~= "Have_"~dep.name.replace("-", "_");
             }
             node.requirements.cfg = node.requirements.cfg.mergeVersions(toMerge);
+
+            
+            ///Generates the name for the output file and save it somewhere
             import redub.command_generators.commons;
             node.requirements.extra.expectedArtifact = buildNormalizedPath(
                 node.requirements.cfg.outputDirectory, 
@@ -684,29 +711,38 @@ class ProjectNode
                     break;
                 case dynamicLibrary: throw new Error("Uninplemented support for shared libraries");
                 case executable: break;
-                case none: 
-                    if(input.parent.length == 0)
-                        throw new Error("targetType: none as a root project: nothing to do");
-                    else
-                    {
-                        target.dependencies~= input.dependencies;
-                        target.requirements.dependencies~= input.requirements.dependencies;
-                    }
-                    break;
+                case none: throw new Error("TargetTtype: none as a root project: nothing to do");
+                    // if(input.parent.length == 0)
+                    //     throw new Error("targetType: none as a root project: nothing to do");
+                    // else
+                    // {
+                    //     foreach(dep; input.dependencies)
+                    //     {
+                    //         target.addDependency(dep);
+                    //         finishMerging(target, dep);
+                    //     }
+                    //     target.requirements = target.requirements.mergeDependencies(input.requirements);
+                    // }
+                    // break;
             }
         }
 
         static void finishPublic(ProjectNode node, ref bool[ProjectNode] visited, ref ProjectNode[] privatesToMerge, ref ProjectNode[] dependenciesToRemove, OS targetOS)
         {
             if(node in visited) return;
-            foreach(dep; node.dependencies)
+            ///Enters in the deepest node
+            for(int i = 0; i < node.dependencies.length; i++)
             {
+                ProjectNode dep = node.dependencies[i];
                 if(!(node in visited))
                     finishPublic(dep, visited, privatesToMerge, dependenciesToRemove, targetOS);
             }
+            ///Finish defining its self requirements so they can be transferred to its parents
             finishSelfRequirements(node, targetOS);
-            foreach(p; node.parent)
+            ///If this has a private relationship, no merge occurs with parent. 
+            for(int i = 0; i < node.parent.length; i++)
             {
+                ProjectNode p = node.parent[i];
                 if(!hasPrivateRelationship(p, node))
                    finishMerging(p, node);
                 else
@@ -722,12 +758,13 @@ class ProjectNode
                 finishMerging(privatesToMerge[i], privatesToMerge[i+1]);
             foreach(node; dependenciesToRemove)
             {
-                vlog("Project ", node.name, " is a sourceLibrary. Becoming independent.");
+                vlog("Project ", node.name, " is a ", node.requirements.cfg.targetType == TargetType.sourceLibrary ? "sourceLibrary" : "none",". Becoming independent.");
                 if(node.requirements.cfg.targetType == TargetType.none)
                     node.dependencies = null;
                 node.becomeIndependent();
             }
         }
+        transferNoneDependencies(this);
         finishPublic(this, visitedBuffer, privatesToMerge, dependenciesToRemove, targetOS);
         finishPrivate(privatesToMerge, dependenciesToRemove);
 
