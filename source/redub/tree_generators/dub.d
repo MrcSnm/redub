@@ -147,6 +147,8 @@ private BuildRequirements mergeProjectWithParent(BuildRequirements base, BuildRe
 
 private BuildRequirements mergeDifferentSubConfigurations(BuildRequirements existingReq, BuildRequirements newReq)
 {
+    if(existingReq.configuration.isDefault)
+        return newReq;
     throw new Error(
         "Error in project: '"~existingReq.name~"' Can't merge different subConfigurations at this " ~
         "moment: "~existingReq.targetConfiguration~ " vs " ~ newReq.targetConfiguration
