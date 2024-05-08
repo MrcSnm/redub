@@ -8,12 +8,13 @@ bool dubHook_PackageManagerDownloadPackage(string packageName, string packageVer
 {
     import std.process;
     SemVer sv = SemVer(packageVersion);
-    info("Fetching ", packageName,"@",sv.toString, ", required by ", requiredBy);
     string dubFetchVersion = sv.toString;
     if(SemVer(0,0,0).satisfies(sv)) packageVersion = null;
-    else if(!sv.ver.major.isNull) dubFetchVersion = sv.ver.toString;
+    else if(!sv.ver.major.isNull) dubFetchVersion = sv.toString;
     string cmd = "dub fetch "~packageName;
     if(packageVersion) cmd~= "@\""~dubFetchVersion~"\"";
+
+    info("Fetching ", packageName," with command ", cmd, ". This was required by ", requiredBy);
 
     // writeln("dubHook_PackageManagerDownloadPackage with arguments (", packageName, ", ", packageVersion,") " ~
     // "required by '", requiredBy, "' is not implemented yet.");
