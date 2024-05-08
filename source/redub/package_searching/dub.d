@@ -13,7 +13,7 @@ bool dubHook_PackageManagerDownloadPackage(string packageName, string packageVer
     if(SemVer(0,0,0).satisfies(sv)) packageVersion = null;
     else if(!sv.ver.major.isNull) dubFetchVersion = sv.ver.toString;
     string cmd = "dub fetch "~packageName;
-    if(packageVersion) cmd~= "@"~dubFetchVersion;
+    if(packageVersion) cmd~= "@\""~dubFetchVersion~"\"";
 
     // writeln("dubHook_PackageManagerDownloadPackage with arguments (", packageName, ", ", packageVersion,") " ~
     // "required by '", requiredBy, "' is not implemented yet.");
@@ -54,7 +54,10 @@ string getPackagePath(string packageName, string packageVersion, string required
     if(!std.file.exists(downloadedPackagePath))
     {
         if(!dubHook_PackageManagerDownloadPackage(packageName, packageVersion, requiredBy))
+        {
+            errorTitle("Dub Fetch Error: ", "Could not fetch ", packageName, "@\"", packageVersion, "\" required by ", requiredBy);
             return null;
+        }
     }
 
     import std.algorithm.sorting;

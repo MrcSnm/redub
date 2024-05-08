@@ -131,6 +131,7 @@ private void getProjectTreeImpl(
  */
 private BuildRequirements parseProjectWithParent(Dependency dep, BuildRequirements parent, CompilationInfo info)
 {
+    vvlog("Parsing dependency ", dep.name, " with parent ", parent.name);
     BuildRequirements depReq = parseProject(dep.path, info.compiler, info.arch, dep.subConfiguration, dep.subPackage, null, info.targetOS);
     depReq.cfg.name = dep.fullName;
     return mergeProjectWithParent(depReq, parent);

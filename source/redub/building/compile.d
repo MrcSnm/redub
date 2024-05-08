@@ -166,7 +166,7 @@ bool buildProjectParallelSimple(ProjectNode root, Compiler compiler, OS os)
         ProjectNode finishedPackage = cast()res.node;
         if(res.status)
         {
-            buildFailed(finishedPackage, res);
+            buildFailed(finishedPackage, res, compiler);
             return false;
         }
         else
@@ -206,7 +206,7 @@ bool buildProjectFullyParallelized(ProjectNode root, Compiler compiler, OS os)
         if(res.status)
         {
             import core.thread;
-            buildFailed(finishedPackage, res);
+            buildFailed(finishedPackage, res, compiler);
             thread_joinAll();
             return false;
         }
@@ -230,16 +230,18 @@ private void buildSucceeded(ProjectNode node, CompilationResult res)
 
     } 
 }
-private void buildFailed(ProjectNode node, CompilationResult res)
+private void buildFailed(const ProjectNode node, CompilationResult res, const Compiler compiler)
 {
-    errorTitle("Build Failure: '", node.name, " ",node.requirements.version_," [", node.requirements.targetConfiguration,"] ",
-        "' using flags\n\t", res.compilationCommand, 
+    errorTitle("Build Failure: '", node.name, " ",node.requirements.version_," [", node.requirements.targetConfiguration,"]' \n\t",
+        RedubVersionShort, "\n\t", compiler.getCompilerWithVersion, "\n\tFailed with flags: \n\n\t",
+        res.compilationCommand, 
         "\nFailed after ", res.msNeeded,"ms with message\n\t", res.message
     );
 }
 
 private bool doLink(ProjectNode root, OS os, Compiler compiler, string mainPackHash, immutable string[string] env)
 {
+    import app;
     bool isUpToDate = root.isUpToDate;
     bool shouldSkipLinking = isUpToDate || (compiler.isDCompiler && root.requirements.cfg.targetType.isStaticLibrary);
 
@@ -248,7 +250,7 @@ private bool doLink(ProjectNode root, OS os, Compiler compiler, string mainPackH
         CompilationResult linkRes = link(root.requirements.cfg, os, compiler, env);
         if(linkRes.status)
         {
-            errorTitle("Linking Error: ", root.name, ". Failed with flags: \n\t",
+            errorTitle("Linking Error at \"", root.name, "\". \n\t"~ RedubVersionShort~ "\n\t" ~ compiler.getCompilerWithVersion ~ "\n\tFailed with flags: \n\n\t",
                 linkRes.compilationCommand,"\n\t\t  :\n\t",
                 linkRes.message
             );

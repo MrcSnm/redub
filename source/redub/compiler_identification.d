@@ -46,6 +46,11 @@ struct Compiler
             case invalid: throw new Error("Invalid compiler.");
         }
     }
+
+    string getCompilerWithVersion() const
+    {
+        return getCompilerString()~" "~version_.toString;
+    }
 }
 
 
