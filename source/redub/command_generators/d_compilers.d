@@ -18,9 +18,7 @@ string[] parseBuildConfiguration(AcceptedCompiler comp, const BuildConfiguration
 
         if(b.arch)
         {
-            if(comp != AcceptedCompiler.ldc2)
-                throw new Error("Only ldc2 supports --arch flag");
-            commands~= mapArch(b.arch);
+            commands~= mapArch(comp, b.arch);
         }
         commands = mapAppendPrefix(commands, versions, mapper(ValidDFlags.versions), false);
         commands = mapAppendPrefix(commands, importDirectories, mapper(ValidDFlags.importPaths), true);
@@ -175,8 +173,11 @@ string ldcFlags(ValidDFlags flag)
     }
 }
 
-string mapArch(string arch)
+string mapArch(AcceptedCompiler compiler, string arch)
 {
+    if(compiler != AcceptedCompiler.ldc2)
+        throw new Error("Only ldc2 supports --arch flag");
+
     switch (arch) 
     {
         case "": return null;

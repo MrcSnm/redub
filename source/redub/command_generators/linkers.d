@@ -22,8 +22,8 @@ string[] parseLinkConfiguration(const BuildConfiguration b, OS target, Compiler 
                 commands~= "-of"~buildNormalizedPath(outputDirectory, getOutputName(b, target));
                 commands~= buildNormalizedPath(outputDirectory, name~getObjectExtension(target));
             }
-            auto mapper = getFlagMapper(compiler.compiler);
-            if(b.arch) commands~= mapper(ValidDFlags.arch) ~ b.arch;
+            if(b.arch)
+                commands~= mapArch(compiler.compiler, b.arch);
             commands~= filterLinkFlags(b.dFlags);
         }
         if(targetType == TargetType.dynamicLibrary)
@@ -62,8 +62,8 @@ string[] parseLinkConfigurationMSVC(const BuildConfiguration b, OS target, Compi
         if(compiler.isDCompiler)
         {
             import redub.command_generators.d_compilers;
-            auto mapper = getFlagMapper(compiler.compiler);
-            if(b.arch) commands~= mapper(ValidDFlags.arch) ~ b.arch;
+            if(b.arch)
+                commands~= mapArch(compiler.compiler, b.arch);
             commands~= filterLinkFlags(b.dFlags);
         }
         if(targetType == TargetType.dynamicLibrary)
