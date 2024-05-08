@@ -15,7 +15,13 @@ string[] parseBuildConfiguration(AcceptedCompiler comp, const BuildConfiguration
     {
         commands~= dFlags;
         if(isDebug) commands~= "-debug";
-        if(b.arch) commands~= mapper(ValidDFlags.arch) ~ b.arch;
+
+        if(b.arch)
+        {
+            if(comp != AcceptedCompiler.ldc2)
+                throw new Error("Only ldc2 supports --arch flag");
+            commands~= mapArch(b.arch);
+        }
         commands = mapAppendPrefix(commands, versions, mapper(ValidDFlags.versions), false);
         commands = mapAppendPrefix(commands, importDirectories, mapper(ValidDFlags.importPaths), true);
 
@@ -106,6 +112,7 @@ string function(ValidDFlags) getFlagMapper(AcceptedCompiler comp)
     }
 }
 
+
 string dmdFlags(ValidDFlags flag)
 {
     final switch(flag) with (ValidDFlags)
@@ -136,6 +143,7 @@ string dmdFlags(ValidDFlags flag)
         case preserveNames: return "-op";
     }
 }
+
 string ldcFlags(ValidDFlags flag)
 {
     final switch(flag) with (ValidDFlags)
@@ -164,6 +172,20 @@ string ldcFlags(ValidDFlags flag)
         case compileOnly: return "-c";
         case arch: return "--mtriple=";
         case preserveNames: return "--oq";
+    }
+}
+
+string mapArch(string arch)
+{
+    switch (arch) 
+    {
+        case "": return null;
+        case "x86":  return "-march=x86";
+        case "x86_mscoff":  return "-march=x86";
+        case "x86_64":  return "-march=x86-64";
+        case "aarch64":  return "-march=aarch64";
+        case "powerpc64":  return "-march=powerpc64";
+        default: return "-mtriple="~arch;
     }
 }
 
