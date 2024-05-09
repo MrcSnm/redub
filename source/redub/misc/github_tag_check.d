@@ -7,15 +7,24 @@ private enum CreateIssueURL = "https://github.com/"~RedubUserRepository~"/issues
 
 void showNewerVersionMessage()
 {
+    import redub.buildapi;
+    import redub.logging;
     string ver = getLatestVersion();
     if(ver)
     {
-        import redub.logging;
-        warnTitle(
-            "Redub "~ ver~ " available. \n\t",
-            "Maybe try updating or running dub fetch redub@"~ver[1..$]~" if you think this compilation error is a redub bug."
-        );
+        if(ver != RedubVersionOnly)
+        {
+            warnTitle(
+                "Redub "~ ver~ " available. \n\t",
+                "Maybe try updating or running dub fetch redub@"~ver[1..$]~" if you think this compilation error is a redub bug."
+            );
+            return;
+        }
     }
+    warn(
+        "If you think this is a bug on redub, do test with dub, if it works, do file an issue at ",
+        CreateIssueURL
+    );
 }
 
 private string getLatestVersion()
