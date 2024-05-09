@@ -232,11 +232,13 @@ private void buildSucceeded(ProjectNode node, CompilationResult res)
 }
 private void buildFailed(const ProjectNode node, CompilationResult res, const Compiler compiler)
 {
+    import redub.misc.github_tag_check;
     errorTitle("Build Failure: '", node.name, " ",node.requirements.version_," [", node.requirements.targetConfiguration,"]' \n\t",
         RedubVersionShort, "\n\t", compiler.getCompilerWithVersion, "\n\tFailed with flags: \n\n\t",
         res.compilationCommand, 
         "\nFailed after ", res.msNeeded,"ms with message\n\t", res.message
     );
+    showNewerVersionMessage();
 }
 
 private bool doLink(ProjectNode root, OS os, Compiler compiler, string mainPackHash, immutable string[string] env)
@@ -250,10 +252,12 @@ private bool doLink(ProjectNode root, OS os, Compiler compiler, string mainPackH
         CompilationResult linkRes = link(root.requirements.cfg, os, compiler, env);
         if(linkRes.status)
         {
+            import redub.misc.github_tag_check;
             errorTitle("Linking Error at \"", root.name, "\". \n\t"~ RedubVersionShort~ "\n\t" ~ compiler.getCompilerWithVersion ~ "\n\tFailed with flags: \n\n\t",
                 linkRes.compilationCommand,"\n\t\t  :\n\t",
-                linkRes.message
+                linkRes.message,
             );
+            showNewerVersionMessage();
             return false;
         }
         else
