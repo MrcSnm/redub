@@ -183,15 +183,14 @@ void putSourceFiles(
     import std.exception;
 
     size_t length = output.length;
-    output.length+= files.length;
-    output[length..length+files.length] = files[];
-
     foreach(path; paths)
     {
-        foreach(DirEntry e; dirEntries(path, SpanMode.depth))
+        DirEntriesLoop: foreach(DirEntry e; dirEntries(path, SpanMode.depth))
         {
-            if(countUntil(excludeFiles, e.name) != -1)
-                continue;
+            import redub.misc.match_glob;
+            foreach(exclusion; excludeFiles)
+                if(e.name.matchesGlob(exclusion))
+                    continue DirEntriesLoop;
             foreach(ext; extensions) 
             {
                 if(e.name.endsWith(ext))
@@ -201,6 +200,19 @@ void putSourceFiles(
                 }
             }
         }
+    }
+    output.length+= files.length;
+    foreach(i, file; files)
+    {
+        if(output.countUntil(file) != -1)
+        {
+            import std.conv:to;
+            throw new Exception("\n\tFile was specified twice: "~ "File '"~file~
+                "' was specified in sourceFiles at directory '" ~ workingDir~"'. But it can already be found based on the current sourcePaths: "~
+                paths.to!string ~ ".  Either add this file to excludeSourceFiles or remove it from sourceFiles."
+            );
+        }
+        output[length+i] = file;
     }
 }
 

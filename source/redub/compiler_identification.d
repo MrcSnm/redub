@@ -272,7 +272,7 @@ assert(SemVer("2.106.1").satisfies(comp.frontendVersion));
 
 @"Test Compiler Inference" unittest
 {
-    assert(getCompiler("ldc2").compiler == AcceptedCompiler.ldc2);
-    assert(getCompiler("dmd").compiler == AcceptedCompiler.dmd);
-    assert(getCompiler("tcc").compiler == AcceptedCompiler.gcc);
+    assert(getCompiler("ldc2", null).compiler == AcceptedCompiler.ldc2);
+    assert(getCompiler("dmd", null).compiler == AcceptedCompiler.dmd);
+    assert(getCompiler("tcc", null).compiler == AcceptedCompiler.gcc);
 }
