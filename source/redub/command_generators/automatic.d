@@ -34,14 +34,14 @@ string getCompileCommands(const BuildConfiguration cfg, OS os, Compiler compiler
     return escapeShellCommand(compiler.binOrPath) ~ " " ~ flags.join(" ");
 }
 
-string getLinkCommands(const BuildConfiguration cfg, OS os, Compiler compiler)
+string getLinkCommands(const BuildRequirements req, OS os, Compiler compiler)
 {
     import std.array:join;
     import command_generators.linkers;
     string[] flags;
     
-    version(Windows) flags = parseLinkConfigurationMSVC(cfg, os, compiler);
-    else flags = parseLinkConfiguration(cfg, os, compiler);
+    version(Windows) flags = parseLinkConfigurationMSVC(req, os, compiler);
+    else flags = parseLinkConfiguration(req, os, compiler);
 
     if(compiler.compiler == AcceptedCompiler.invalid)
         throw new Error("Unsupported compiler '" ~ compiler.binOrPath~"'");

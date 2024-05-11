@@ -82,8 +82,16 @@ private void partiallyFinishBuildRequirements(ref BuildRequirements req)
     ];
 
     foreach(arr; toAbsolutize)
+    {
         foreach(ref string dir; *arr)
-            if(!isAbsolute(dir)) dir = buildNormalizedPath(req.cfg.workingDir, dir);
+        {
+            import redub.command_generators.commons : escapePath;
+            if(!isAbsolute(dir)) 
+                dir = buildNormalizedPath(req.cfg.workingDir, dir);
+            dir = escapePath(dir);
+        }
+
+    }
 
     req.cfg.importDirectories.exclusiveMerge(req.cfg.sourcePaths);
     if(!isAbsolute(req.cfg.sourceEntryPoint)) 

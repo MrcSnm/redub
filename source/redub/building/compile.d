@@ -89,7 +89,7 @@ void execCompilation(immutable BuildRequirements req, shared ProjectNode pack, O
 
             if(!isDCompiler(compiler) && !ret.status) //Always requires link.
             {
-                CompilationResult linkRes = link(cfg, os, compiler, env);
+                CompilationResult linkRes = link(req, os, compiler, env);
                 ret.status = linkRes.status;
                 ret.output~= linkRes.message;
                 res.compilationCommand~= linkRes.compilationCommand;
@@ -118,12 +118,12 @@ void execCompilation(immutable BuildRequirements req, shared ProjectNode pack, O
 }
 
 
-CompilationResult link(const BuildConfiguration cfg, OS os, Compiler compiler, immutable string[string] env)
+CompilationResult link(const BuildRequirements req, OS os, Compiler compiler, immutable string[string] env)
 {
     import std.process;
     CompilationResult ret;
 
-    ret.compilationCommand = getLinkCommands(cfg, os, compiler);
+    ret.compilationCommand = getLinkCommands(req, os, compiler);
 
     auto exec = executeShell(ret.compilationCommand);
     ret.status = exec.status;
@@ -132,8 +132,8 @@ CompilationResult link(const BuildConfiguration cfg, OS os, Compiler compiler, i
     if(exec.status != 0)
         return ret;
 
-    if(cfg.targetType.isLinkedSeparately)
-        executeCommands(cfg.postGenerateCommands, "postGenerateCommand", ret, cfg.workingDir, env);
+    if(req.cfg.targetType.isLinkedSeparately)
+        executeCommands(req.cfg.postGenerateCommands, "postGenerateCommand", ret, req.cfg.workingDir, env);
 
     return ret;
 }
@@ -249,7 +249,7 @@ private bool doLink(ProjectNode root, OS os, Compiler compiler, string mainPackH
 
     if(!shouldSkipLinking)
     {
-        CompilationResult linkRes = link(root.requirements.cfg, os, compiler, env);
+        CompilationResult linkRes = link(root.requirements, os, compiler, env);
         if(linkRes.status)
         {
             import redub.misc.github_tag_check;

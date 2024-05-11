@@ -5,11 +5,13 @@ public import std.system;
 import redub.command_generators.commons;
 
 
-string[] parseLinkConfiguration(const BuildConfiguration b, OS target, Compiler compiler)
+string[] parseLinkConfiguration(const BuildRequirements req, OS target, Compiler compiler)
 {
     import std.path;
     import std.array;
     string[] commands;
+
+    const BuildConfiguration b = req.cfg;
 
     with(b)
     {
@@ -31,6 +33,8 @@ string[] parseLinkConfiguration(const BuildConfiguration b, OS target, Compiler 
         
         if (targetType.isLinkedSeparately)
         {
+            ///Use library full path for the base file
+            commands = mapAppendReverse(commands, req.extra.librariesFullPath, (string l) => l~getLibraryExtension(target));
             commands = mapAppendPrefix(commands, linkFlags, "-L", false);
             commands = mapAppendPrefix(commands, libraryPaths, "-L-L", true);
             commands = mapAppendReverse(commands, libraries, (string l) => "-L-l"~l);
@@ -49,13 +53,15 @@ string[] parseLinkConfiguration(const BuildConfiguration b, OS target, Compiler 
     return commands;
 }
 
-string[] parseLinkConfigurationMSVC(const BuildConfiguration b, OS target, Compiler compiler)
+string[] parseLinkConfigurationMSVC(const BuildRequirements req, OS target, Compiler compiler)
 {
     import std.algorithm.iteration;
     import std.path;
     import std.array;
 
-    if(!target.isWindows) return parseLinkConfiguration(b, target, compiler);
+    const BuildConfiguration b = req.cfg;
+
+    if(!target.isWindows) return parseLinkConfiguration(req, target, compiler);
     string[] commands;
     with(b)
     {
@@ -68,6 +74,9 @@ string[] parseLinkConfigurationMSVC(const BuildConfiguration b, OS target, Compi
         }
         if(targetType == TargetType.dynamicLibrary)
             commands~= getTargetTypeFlag(targetType, compiler);
+        
+        commands = mapAppendReverse(commands, req.extra.librariesFullPath, (string l) => (l~getLibraryExtension(target)).escapePath);
+
         commands = mapAppendPrefix(commands, linkFlags, "-L", false);
 
         commands = mapAppendPrefix(commands, libraryPaths, "-L/LIBPATH:", true);
