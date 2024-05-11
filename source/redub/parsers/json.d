@@ -162,10 +162,8 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
                     if("optional" in value && value["optional"].boolean == true)
                     {
                         if(!("default" in value) || value["default"].boolean == false)
-                        {
-                            warn("redub does not handle optional dependencies.'"~req.cfg.name~"' uses optional for "~name~"dependency");
-                            continue;
-                        }
+                            warn("redub does not handle optional dependencies.'"~req.cfg.name~"' uses optional for dependency named '"~name~"'. It will be treated like a normal dependency.",
+                            "\n\tIf you wish a true optional dependency, just define a new configuration with this optional dependency");
                     }
 
                     path = either(path, depPath ? depPath.str : null, depVer ? redub.package_searching.dub.getPackagePath(name, depVer.str, req.cfg.name) : null);
