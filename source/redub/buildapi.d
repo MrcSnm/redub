@@ -702,8 +702,8 @@ class ProjectNode
                 case autodetect: throw new Error("Node should not be autodetect at this point");
                 case library, staticLibrary:
                         BuildConfiguration other = input.requirements.cfg.clone;
-                        // other.libraries~= other.name;
-                        // other.libraryPaths~= other.outputDirectory;
+                        other.libraries~= other.name;
+                        other.libraryPaths~= other.outputDirectory;
                         ///Use library full path for the 
                         target.requirements.extra.librariesFullPath.exclusiveMerge(
                             [buildNormalizedPath(other.outputDirectory, other.name)]

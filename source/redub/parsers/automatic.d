@@ -88,7 +88,7 @@ private void partiallyFinishBuildRequirements(ref BuildRequirements req)
             import redub.command_generators.commons : escapePath;
             if(!isAbsolute(dir)) 
                 dir = buildNormalizedPath(req.cfg.workingDir, dir);
-            dir = escapePath(dir);
+            // dir = escapePath(dir);
         }
 
     }
