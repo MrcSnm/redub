@@ -59,6 +59,89 @@ bool isDCompiler(immutable Compiler comp)
     return comp.compiler == AcceptedCompiler.dmd || comp.compiler == AcceptedCompiler.ldc2;
 }
 
+
+/** 
+ * Redub will try to search compilers in that order if the D compiler on getCompiler is not found.
+ */
+immutable string[] searchableCompilers = [
+    "dmd",
+    "ldc2"
+];
+
+
+/** 
+ * Tries to find in the local folder for an executable file with the name of compilerOrPath.
+ * They are only searched if the path is not absolute
+ * Params:
+ *   compilerOrPath = The base compiler name to search on the current directory.
+ * Returns: 
+ */
+private string tryGetCompilerOnCwd(string compilerOrPath)
+{
+    import std.path;
+    if(!isAbsolute(compilerOrPath))
+    {
+        import std.file;
+        string tempPath = buildNormalizedPath(getcwd(), compilerOrPath);
+        version(Windows) enum targetExtension = ".exe";
+        else enum targetExtension = cast(string)null;
+        //If it does not, simply assume global
+        if(exists(tempPath) && !isDir(tempPath) && tempPath.extension == targetExtension)
+        {
+            import redub.logging;
+            compilerOrPath = tempPath;
+            warn("Using compiler found on current directory: "~tempPath);
+        }
+    }
+    return compilerOrPath;
+}
+
+/** 
+ * Tries to find the compiler to use. If the preferred compiler is not on the user environment, it will
+ * warn and use it instead.
+ * Params:
+ *   preferredCompiler = The compiler that the user may have specified.
+ *   actualCompiler = Actual compiler. If no compiler is found on the searchable list, the program will exit.
+ * Returns: The output from executeShell. This will be processed for getting version information on the compiler.
+ */
+private string getActualCompilerToUse(string preferredCompiler, ref string actualCompiler)
+{
+    import std.exception;
+    import std.typecons;
+    import std.process;
+    import redub.logging;
+    Tuple!(int, "status", string, "output") compVersionRes;
+
+    bool preferredTested = false;
+    foreach(string searchable; preferredCompiler~searchableCompilers)
+    {
+        if(preferredTested && searchable == preferredCompiler)
+            continue;
+        if(searchable != preferredCompiler)
+        {
+            searchable = tryGetCompilerOnCwd(searchable);
+        }
+        else
+            preferredTested = true;
+        compVersionRes = executeShell(searchable ~ " --version");
+        if(compVersionRes.status == 0)
+        {
+            actualCompiler = searchable;
+            break;
+        }
+    }
+    enforce(compVersionRes.status == 0, preferredCompiler~ " --version returned a non zero code. "~
+        "In Addition, dmd and ldc2 were also tested and were not found. You may need to download or specify them before using redub."
+    );
+
+    if(actualCompiler != preferredCompiler)
+        warn("The compiler '"~preferredCompiler~"' that was specified in your system wasn't found. Redub found "~actualCompiler~" and it will use for this compilation.");
+
+    info("Using compiler: ", actualCompiler, " version str ", compVersionRes.output);
+    return compVersionRes.output;
+}
+
+
 /** 
  * Use this function to get extensive information about the Compiler to use.
  * Params:
@@ -70,19 +153,10 @@ Compiler getCompiler(string compilerOrPath, string compilerAssumption)
 {
     import std.process;
     import std.exception;
-    import std.path;
-    if(compilerOrPath == null) compilerOrPath = "dmd";
-    //Tries to find in the local folder for an executable file with the name of compilerOrPath
-    if(!isAbsolute(compilerOrPath))
-    {
-        import std.file;
-        string tempPath = buildNormalizedPath(getcwd(), compilerOrPath);
-        version(Windows) enum targetExtension = ".exe";
-        else enum targetExtension = cast(string)null;
-        //If it does not, simply assume global
-        if(exists(tempPath) && !isDir(tempPath) && tempPath.extension == targetExtension)
-            compilerOrPath = tempPath;
-    }
+    if(compilerOrPath == null) 
+        compilerOrPath = "dmd";
+    compilerOrPath = tryGetCompilerOnCwd(compilerOrPath);
+    
 
     immutable inference = [
         &tryInferDmd,
@@ -94,12 +168,11 @@ Compiler getCompiler(string compilerOrPath, string compilerAssumption)
     Compiler ret;
     if(compilerAssumption == null)
     {
-        auto compVersionRes = executeShell(compilerOrPath ~ " --version");
-        enforce(compVersionRes.status == 0, compilerOrPath~" --version returned a non zero code.");
-        string versionString = compVersionRes.output;
+        string actualCompiler;
+        string versionString = getActualCompilerToUse(compilerOrPath, actualCompiler);
         foreach(inf; inference)
         {
-            if(inf(compilerOrPath, versionString, ret))
+            if(inf(actualCompiler, versionString, ret))
                 return ret;
         }
     }
