@@ -137,7 +137,6 @@ private string getActualCompilerToUse(string preferredCompiler, ref string actua
     if(actualCompiler != preferredCompiler)
         warn("The compiler '"~preferredCompiler~"' that was specified in your system wasn't found. Redub found "~actualCompiler~" and it will use for this compilation.");
 
-    info("Using compiler: ", actualCompiler, " version str ", compVersionRes.output);
     return compVersionRes.output;
 }
 
