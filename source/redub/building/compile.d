@@ -243,7 +243,6 @@ private void buildFailed(const ProjectNode node, CompilationResult res, const Co
 
 private bool doLink(ProjectNode root, OS os, Compiler compiler, string mainPackHash, immutable string[string] env)
 {
-    import app;
     bool isUpToDate = root.isUpToDate;
     bool shouldSkipLinking = isUpToDate || (compiler.isDCompiler && root.requirements.cfg.targetType.isStaticLibrary);
 
