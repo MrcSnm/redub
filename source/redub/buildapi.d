@@ -5,7 +5,7 @@ public import std.system:OS;
 import redub.logging;
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.3.23";
+enum RedubVersionOnly = "v1.3.25";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -702,8 +702,8 @@ class ProjectNode
                 case autodetect: throw new Error("Node should not be autodetect at this point");
                 case library, staticLibrary:
                         BuildConfiguration other = input.requirements.cfg.clone;
-                        other.libraries~= other.name;
-                        other.libraryPaths~= other.outputDirectory;
+                        // other.libraries~= other.name;
+                        // other.libraryPaths~= other.outputDirectory;
                         ///Use library full path for the 
                         target.requirements.extra.librariesFullPath.exclusiveMerge(
                             [buildNormalizedPath(other.outputDirectory, other.name)]

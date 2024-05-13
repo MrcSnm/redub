@@ -229,6 +229,7 @@ struct AdvCacheFormula
 		}
 		foreach(file; files)
         {
+			//Check if the file was read already for taking the time it was modified.
 			if(cacheHolder !is null && file in cacheHolder.files)
 			{
 				ret.files[file] = cacheHolder.files[file];
@@ -295,6 +296,13 @@ struct AdvCacheFormula
 			const ref AdvFile[string] files, 
 			ref string[] diffs, size_t diffCount) @nogc
 		{
+			ptrdiff_t plainDiff = cast(ptrdiff_t)filesOther.length - cast(ptrdiff_t)files.length;
+			if(plainDiff != 0)
+			{
+				if(plainDiff < 0) plainDiff*= -1;
+				diffCount = cast(size_t)plainDiff;
+				return diffCount;
+			}
 			foreach(fileName, otherAdv; filesOther)
 			{
 				const(AdvFile)* advFile = fileName in files;
