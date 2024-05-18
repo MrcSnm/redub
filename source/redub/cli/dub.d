@@ -19,6 +19,13 @@ enum SkipRegistry
     all
 }
 
+enum IncrementalInfer
+{
+    auto_ = "auto",
+    off = "off",
+    on = "on"
+}
+
 enum Color
 {
     auto_ = "auto",
@@ -198,8 +205,10 @@ struct DubBuildArguments
     @("n|non-interactive")
     bool nonInteractive;
 
-    @("Build incrementally. Not recommended since on Windows, it has been profiled to be slower")
-    bool incremental;
+    @("Build incrementally. This usually works on a case basis, so for you case, disabling it might make it faster."~ 
+    "It is inferred to be incremental when dependencies count >= 3")
+    @("incremental")
+    IncrementalInfer incremental;
 
     @("Build all dependencies, even when main target is a static library.")
     bool deep;

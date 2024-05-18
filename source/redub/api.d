@@ -1,4 +1,5 @@
 module redub.api;
+import redub.cli.dub;
 import redub.logging;
 import redub.tree_generators.dub;
 import redub.parsers.automatic;
@@ -33,7 +34,7 @@ struct CompilationDetails
     ///Assumption to make dependency resolution slightly faster
     string assumption;
     ///Makes the build incremental or not
-    bool incremental;
+    IncrementalInfer incremental;
 }
 /** 
  * Project in which should be parsed.
@@ -125,7 +126,7 @@ ProjectDetails resolveDependencies(
     static import redub.parsers.build_type;
 
     StopWatch st = StopWatch(AutoStart.yes);
-    Compiler compiler = getCompiler(cDetails.compilerOrPath, cDetails.assumption, cDetails.incremental);
+    Compiler compiler = getCompiler(cDetails.compilerOrPath, cDetails.assumption);
 
     with(dubVars)
     {
@@ -151,7 +152,10 @@ ProjectDetails resolveDependencies(
     req.cfg = req.cfg.merge(redub.parsers.environment.parse());
     req.cfg = req.cfg.merge(redub.parsers.build_type.parse(buildType, compiler.compiler));
 
+
     ProjectNode tree = getProjectTree(req, CompilationInfo(compiler.getCompilerString, cDetails.arch, osFromArch(cDetails.arch)));
+
+    compiler.usesIncremental = isIncremental(cDetails.incremental, tree);
     redub.parsers.environment.setupEnvironmentVariablesForPackageTree(tree);
 
     if(invalidateCache)
@@ -162,4 +166,22 @@ ProjectDetails resolveDependencies(
     
     infos("Dependencies resolved ", "in ", (st.peek.total!"msecs"), " ms for \"", color(buildType, fg.magenta),"\" using ", compiler.binOrPath);
     return ProjectDetails(tree, compiler);
+}
+
+
+/** 
+ * 
+ * Params:
+ *   incremental = If auto, it will disable incremental when having more than 3 compilation units
+ *   tree = The tree to find compilation units 
+ * Returns: 
+ */
+bool isIncremental(IncrementalInfer incremental, ProjectNode tree)
+{
+    final switch(incremental)
+    {
+        case IncrementalInfer.auto_: return tree.collapse.length < 3;
+        case IncrementalInfer.on: return true;
+        case IncrementalInfer.off: return false;
+    }
 }

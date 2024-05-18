@@ -224,7 +224,6 @@ ProjectDetails resolveDependencies(string[] args)
         getInitialDubVariablesFromArguments(bArgs, DubBuildArguments.init, os, args),
         bt
     );
-
 }
 
 void updateVerbosity(DubCommonArguments a)
