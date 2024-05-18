@@ -72,6 +72,11 @@ string[] parseLinkConfigurationMSVC(const BuildRequirements req, OS target, Comp
                 commands~= mapArch(compiler.compiler, b.arch);
             commands~= filterLinkFlags(b.dFlags);
         }
+        if(!compiler.usesIncremental)
+        {
+            commands~= "-L/INCREMENTAL:NO";
+        }
+        
         if(targetType == TargetType.dynamicLibrary)
             commands~= getTargetTypeFlag(targetType, compiler);
         

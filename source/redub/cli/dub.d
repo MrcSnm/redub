@@ -198,6 +198,9 @@ struct DubBuildArguments
     @("n|non-interactive")
     bool nonInteractive;
 
+    @("Build incrementally. Not recommended since on Windows, it has been profiled to be slower")
+    bool incremental;
+
     @("Build all dependencies, even when main target is a static library.")
     bool deep;
 }

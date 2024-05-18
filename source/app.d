@@ -219,7 +219,7 @@ ProjectDetails resolveDependencies(string[] args)
     return redub.api.resolveDependencies(
         bArgs.build.force,
         os,
-        CompilationDetails(either(bArgs.compiler, "dmd"), bArgs.arch, bArgs.compilerAssumption),
+        CompilationDetails(either(bArgs.compiler, "dmd"), bArgs.arch, bArgs.compilerAssumption, bArgs.build.incremental),
         ProjectToParse(bArgs.config, workingDir, subPackage, recipe),
         getInitialDubVariablesFromArguments(bArgs, DubBuildArguments.init, os, args),
         bt

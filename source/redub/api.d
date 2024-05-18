@@ -32,6 +32,8 @@ struct CompilationDetails
     string arch;
     ///Assumption to make dependency resolution slightly faster
     string assumption;
+    ///Makes the build incremental or not
+    bool incremental;
 }
 /** 
  * Project in which should be parsed.
@@ -123,7 +125,7 @@ ProjectDetails resolveDependencies(
     static import redub.parsers.build_type;
 
     StopWatch st = StopWatch(AutoStart.yes);
-    Compiler compiler = getCompiler(cDetails.compilerOrPath, cDetails.assumption);
+    Compiler compiler = getCompiler(cDetails.compilerOrPath, cDetails.assumption, cDetails.incremental);
 
     with(dubVars)
     {
