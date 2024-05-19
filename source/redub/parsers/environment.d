@@ -274,7 +274,10 @@ BuildConfiguration parseEnvironment(BuildConfiguration cfg)
         importDirectories = arrParseEnv(importDirectories);
         sourcePaths = arrParseEnv(sourcePaths);
         sourceFiles = arrParseEnv(sourceFiles);
+        libraries = arrParseEnv(libraries);
+        libraryPaths = arrParseEnv(libraryPaths);
         dFlags = arrParseEnv(dFlags);
+        linkFlags = arrParseEnv(linkFlags);
         preGenerateCommands = arrParseEnv(preGenerateCommands);
         postGenerateCommands = arrParseEnv(postGenerateCommands);
         preBuildCommands = arrParseEnv(preBuildCommands);
