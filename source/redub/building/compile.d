@@ -38,7 +38,16 @@ private ExecutionResult executeCommands(const string[] commandsList, string list
     return ExecutionResult(0, "Success");
 }
 
-void execCompilation(immutable BuildRequirements req, shared ProjectNode pack, OS os, Compiler compiler, shared CompilationCache cache, immutable string[string] env)
+void execCompilationThread(immutable BuildRequirements req, shared ProjectNode pack, OS os, Compiler compiler, shared CompilationCache cache, immutable string[string] env)
+{
+    CompilationResult res = execCompilation(req, pack, os, compiler, cache, env);
+    scope(exit)
+    {
+        ownerTid.send(res);
+    }
+}
+
+CompilationResult execCompilation(immutable BuildRequirements req, shared ProjectNode pack, OS os, Compiler compiler, shared CompilationCache cache, immutable string[string] env)
 {
     import std.file;
     import std.process;
@@ -53,14 +62,13 @@ void execCompilation(immutable BuildRequirements req, shared ProjectNode pack, O
     {
         res.msNeeded = sw.peek.total!"msecs";
         res.cache.requirementCache = cache.requirementCache;
-        ownerTid.send(res);
     }
     try
     {
         if(pack.isUpToDate)
         {
             res.cache = cache;
-            return;
+            return res;
         }
         //Remove existing binary, since it won't be replaced by simply executing commands
         string outDir = getConfigurationOutputPath(cfg, os);
@@ -68,7 +76,7 @@ void execCompilation(immutable BuildRequirements req, shared ProjectNode pack, O
             remove(outDir);
         
         if(executeCommands(cfg.preBuildCommands, "preBuildCommand", res, cfg.workingDir, env).status)
-            return;
+            return res;
 
         ExecutionResult ret;
         if(isDCompiler(compiler) && std.system.os.isWindows)
@@ -103,11 +111,10 @@ void execCompilation(immutable BuildRequirements req, shared ProjectNode pack, O
         if(res.status == 0)
         {
             if(executeCommands(cfg.postBuildCommands, "postBuildCommand", res, cfg.workingDir, env).status)
-                return;
+                return res;
             if(!cfg.targetType.isLinkedSeparately && executeCommands(cfg.postGenerateCommands, "postGenerateCommand", res, cfg.workingDir, env).status)
-                return;
+                return res;
         }
-        
         // res.cache = cast(shared)CompilationCache.make(cache.requirementCache, req, os);
     }
     catch(Throwable e)
@@ -115,8 +122,8 @@ void execCompilation(immutable BuildRequirements req, shared ProjectNode pack, O
         res.status = 1;
         res.message = e.toString;
     }
+    return res;
 }
-
 
 CompilationResult link(const BuildRequirements req, OS os, Compiler compiler, immutable string[string] env)
 {
@@ -155,7 +162,7 @@ bool buildProjectParallelSimple(ProjectNode root, Compiler compiler, OS os)
             if(!(dep in spawned))
             {
                 spawned[dep] = true;
-                spawn(&execCompilation, 
+                spawn(&execCompilationThread, 
                     dep.requirements.idup, cast(shared)dep, os, 
                     compiler, cast(shared)CompilationCache.get(mainPackHash, dep.requirements, compiler),
                     env
@@ -192,7 +199,7 @@ bool buildProjectFullyParallelized(ProjectNode root, Compiler compiler, OS os)
     size_t i = 0;
     foreach(pack; root.collapse)
     {
-        spawn(&execCompilation, 
+        spawn(&execCompilationThread, 
             pack.requirements.idup, 
             cast(shared)pack, os, compiler, 
             cast(shared)cache[i++],
@@ -215,6 +222,48 @@ bool buildProjectFullyParallelized(ProjectNode root, Compiler compiler, OS os)
             // updateCache(mainPackHash, CompilationCache.make(res.cache.requirementCache, cast()res.node.requirements, os));
             buildSucceeded(finishedPackage, res);
         }
+    }
+    return doLink(root, os, compiler, mainPackHash, env);
+}
+
+/** 
+ * When wanting to do a single thread build, this function must be called.
+ * This function is also used when the project has no dependency.
+ * Params:
+ *   root = What is the project to build
+ *   compiler = Which compiler
+ *   os = Which OS
+ * Returns: Has succeeded
+ */
+bool buildProjectSingleThread(ProjectNode root, Compiler compiler, OS os)
+{
+    import std.process;
+    ProjectNode[] dependencyFreePackages = root.findLeavesNodes();
+    string mainPackHash = hashFrom(root.requirements, compiler);
+    immutable string[string] env = cast(immutable)(environment.toAA);
+    while(true)
+    {
+        ProjectNode finishedPackage;
+        foreach(dep; dependencyFreePackages)
+        {
+            CompilationResult res = execCompilation(dep.requirements.idup, cast(shared)dep, os, compiler,
+                cast(shared)CompilationCache.get(mainPackHash, dep.requirements, compiler), env
+            );
+            finishedPackage = cast()res.node;
+            if(res.status)
+            {
+                buildFailed(finishedPackage, res, compiler);
+                return false;
+            }
+            else
+            {
+                buildSucceeded(finishedPackage, res);
+                finishedPackage.becomeIndependent();
+                dependencyFreePackages = root.findLeavesNodes();
+            }
+        }
+        if(finishedPackage is root)
+            break;
     }
     return doLink(root, os, compiler, mainPackHash, env);
 }

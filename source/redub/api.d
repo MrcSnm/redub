@@ -82,7 +82,12 @@ ProjectDetails buildProject(ProjectDetails d)
     startHandlingConsoleControl();
     auto result = timed(()
     {
-        if(tree.isFullyParallelizable)
+        if(tree.collapse.length == 1)
+        {
+            info("Project ", tree.name," is single dependency, performing single threaded build");
+            return buildProjectSingleThread(tree, d.compiler, targetOS);
+        }
+        else if(tree.isFullyParallelizable)
         {
             info("Project ", tree.name," is fully parallelizable! Will build everything at the same time");
             return buildProjectFullyParallelized(tree, d.compiler, targetOS); 
