@@ -213,13 +213,14 @@ ProjectDetails resolveDependencies(string[] args)
     if(cArgs.recipe)
         recipe = cArgs.getRecipe(workingDir);
 
+
     BuildType bt = BuildType.debug_;
     if(bArgs.buildType) bt = buildTypeFromString(bArgs.buildType);
 
     return redub.api.resolveDependencies(
         bArgs.build.force,
         os,
-        CompilationDetails(either(bArgs.compiler, "dmd"), bArgs.arch, bArgs.compilerAssumption, bArgs.build.incremental),
+        CompilationDetails(either(bArgs.compiler, "dmd"), bArgs.arch, bArgs.compilerAssumption, bArgs.build.incremental, bArgs.build.combined),
         ProjectToParse(bArgs.config, workingDir, subPackage, recipe),
         getInitialDubVariablesFromArguments(bArgs, DubBuildArguments.init, os, args),
         bt

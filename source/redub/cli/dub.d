@@ -210,6 +210,9 @@ struct DubBuildArguments
     @("incremental")
     IncrementalInfer incremental;
 
+    @("Tries to build the whole project in a single compiler run")
+    bool combined;
+
     @("Build all dependencies, even when main target is a static library.")
     bool deep;
 }

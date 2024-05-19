@@ -35,6 +35,8 @@ struct CompilationDetails
     string assumption;
     ///Makes the build incremental or not
     IncrementalInfer incremental;
+    ///Whether the build should force single project
+    bool combinedBuild;
 }
 /** 
  * Project in which should be parsed.
@@ -159,7 +161,8 @@ ProjectDetails resolveDependencies(
 
 
     ProjectNode tree = getProjectTree(req, CompilationInfo(compiler.getCompilerString, cDetails.arch, osFromArch(cDetails.arch)));
-
+    if(cDetails.combinedBuild)
+        tree.combine();
     compiler.usesIncremental = isIncremental(cDetails.incremental, tree);
     redub.parsers.environment.setupEnvironmentVariablesForPackageTree(tree);
 

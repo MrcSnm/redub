@@ -5,7 +5,7 @@ public import std.system:OS;
 import redub.logging;
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.4.0";
+enum RedubVersionOnly = "v1.4.1";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -176,6 +176,16 @@ struct BuildConfiguration
         ret.libraries.exclusiveMerge(other.libraries);
         ret.libraryPaths.exclusiveMergePaths(other.libraryPaths);
         ret.linkFlags.exclusiveMerge(other.linkFlags);
+        return ret;
+    }
+
+    BuildConfiguration mergeCommands(BuildConfiguration other) const
+    {
+        BuildConfiguration ret = clone;
+        ret.preBuildCommands~= other.preBuildCommands;
+        ret.postBuildCommands~= other.postBuildCommands;
+        ret.preGenerateCommands~= other.preGenerateCommands;
+        ret.postGenerateCommands~= other.postGenerateCommands;
         return ret;
     }
     BuildConfiguration mergeLibraries(const BuildConfiguration other) const
@@ -878,6 +888,31 @@ class ProjectNode
                 visited[this] = true;
             }
         }
+    }
+
+    void combine()
+    {
+        ProjectNode[] leaves;
+
+        while(true)
+        {
+            leaves = findLeavesNodes();
+            if(leaves[0] is this)
+                break;
+            foreach(leaf; leaves)
+            {
+                foreach(ref leafParent; leaf.parent)
+                {
+                    ///Keep the old target type.
+                    TargetType oldTargetType = leafParent.requirements.cfg.targetType;
+                    leafParent.requirements.cfg = leafParent.requirements.cfg.merge(leaf.requirements.cfg);
+                    leafParent.requirements.cfg.targetType = oldTargetType;
+                }
+                leaf.parent[0].requirements.cfg = leaf.parent[0].requirements.cfg.mergeCommands(leaf.requirements.cfg);
+                leaf.becomeIndependent();
+            }
+        }
+        this.requirements.extra.librariesFullPath = null;
     }
 }
 

@@ -182,25 +182,27 @@ void putSourceFiles(
     import std.algorithm.searching;
     import std.exception;
 
-    size_t length = output.length;
     foreach(path; paths)
     {
-        DirEntriesLoop: foreach(DirEntry e; dirEntries(path, SpanMode.depth))
+        DirEntryLoop: foreach(DirEntry e; dirEntries(path, SpanMode.depth))
         {
             import redub.misc.match_glob;
             foreach(exclusion; excludeFiles)
                 if(e.name.matchesGlob(exclusion))
-                    continue DirEntriesLoop;
+                    continue DirEntryLoop;
             foreach(ext; extensions) 
             {
+                if(e.isDir)
+                    continue;
                 if(e.name.endsWith(ext))
                 {
-                    output~= escapePath(e.name);
+                    output~= e.name;
                     break;
                 }
             }
         }
     }
+    size_t length = output.length;
     output.length+= files.length;
     foreach(i, file; files)
     {

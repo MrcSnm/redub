@@ -35,8 +35,9 @@ string[] parseBuildConfiguration(AcceptedCompiler comp, const BuildConfiguration
 
         commands~= mapper(ValidDFlags.objectDir)~getObjectDir(b.workingDir).escapePath;
         commands~= mapper(ValidDFlags.outputFile) ~ getConfigurationOutputPath(b, target).escapePath;
-        
+    
         putSourceFiles(commands, workingDir, sourcePaths, sourceFiles, excludeSourceFiles, ".d");
+
     }
 
     return commands;
