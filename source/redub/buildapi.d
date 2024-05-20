@@ -5,7 +5,7 @@ public import std.system:OS;
 import redub.logging;
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.4.2";
+enum RedubVersionOnly = "v1.4.3";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description

@@ -167,6 +167,14 @@ string escapePath(string sourceFile)
     return sourceFile;
 }
 
+string unescapePath(string targetPath)
+{
+    if(targetPath.length >= 2 && ((targetPath[0] == '"' && targetPath[$-1] == '"') || (targetPath[0] == '\'' && targetPath[$-1] == '\'')))
+        return targetPath[1..$-1];
+    return targetPath;
+}
+
+
 void putSourceFiles(
     ref string[] output,
     const string workingDir,
@@ -184,7 +192,7 @@ void putSourceFiles(
 
     foreach(path; paths)
     {
-        DirEntryLoop: foreach(DirEntry e; dirEntries(path, SpanMode.depth))
+        DirEntryLoop: foreach(DirEntry e; dirEntries(unescapePath(path), SpanMode.depth))
         {
             import redub.misc.match_glob;
             foreach(exclusion; excludeFiles)
@@ -196,7 +204,7 @@ void putSourceFiles(
                     continue;
                 if(e.name.endsWith(ext))
                 {
-                    output~= e.name;
+                    output~= escapePath(e.name);
                     break;
                 }
             }
@@ -214,7 +222,7 @@ void putSourceFiles(
                 paths.to!string ~ ".  Either add this file to excludeSourceFiles or remove it from sourceFiles."
             );
         }
-        output[length+i] = file;
+        output[length+i] = escapePath(file);
     }
 }
 
