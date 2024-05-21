@@ -328,7 +328,7 @@ private bool doLink(ProjectNode root, OS os, Compiler compiler, string mainPackH
                 updateCache(mainPackHash, CompilationCache.make(existingCache.requirementCache, node.requirements, os, &existingFormula, &cache));
             }
         }
-        updateCacheOnDisk();
+        updateCacheOnDisk(mainPackHash);
     }
         
     return true;

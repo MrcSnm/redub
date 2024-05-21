@@ -58,13 +58,12 @@ struct CompilationCache
     static CompilationCache get(string rootHash, const BuildRequirements req, Compiler compiler)
     {
         import std.exception;
-        JSONValue c = *getCache();
+        JSONValue c = *getCache(rootHash);
         string reqCache = hashFrom(req, compiler);
-        JSONValue* root = rootHash in c;
-        if(!root)
+        if(c == JSONValue.emptyObject)
             return CompilationCache(reqCache);
-        enforce(root.type == JSONType.object, "Cache is corrupted, delete it.");
-        JSONValue* targetCache = reqCache in *root;
+        enforce(c.type == JSONType.object, "Cache is corrupted, delete it.");
+        JSONValue* targetCache = reqCache in c;
         if(!targetCache)
             return CompilationCache(reqCache);
         return CompilationCache(reqCache, AdvCacheFormula.deserialize(*targetCache));
@@ -192,39 +191,39 @@ AdvCacheFormula generateCache(const BuildRequirements req, OS target, const(AdvC
 
 string[] updateCache(string rootCache, const CompilationCache cache, bool writeToDisk = false)
 {
-    JSONValue* v = getCache();
-    if(!(rootCache in *v)) (*v)[rootCache] = JSONValue.emptyObject;
+    JSONValue* v = getCache(rootCache);
     JSONValue serializeTarget;
     cache.formula.serialize(serializeTarget);
-    (*v)[rootCache][cache.requirementCache] = serializeTarget;
+    (*v)[cache.requirementCache] = serializeTarget;
 
     if(writeToDisk)
-        updateCacheOnDisk();
+        updateCacheOnDisk(rootCache);
     return null;
 }
 
-void updateCacheOnDisk()
+void updateCacheOnDisk(string rootCache)
 {
-    std.file.write(getCacheFilePath, getCache().toString());
+    std.file.write(getCacheFilePath(rootCache), getCache(rootCache).toString());
 }
 
-private JSONValue* getCache()
+private JSONValue* getCache(string rootCache)
 {
-    static JSONValue cacheJson;
+    static JSONValue[string] cacheJson;
     string folder = getCacheFolder;
     if(!std.file.exists(folder)) std.file.mkdirRecurse(folder);
-    string file = getCacheFilePath;
+    string file = getCacheFilePath(rootCache);
     if(!std.file.exists(file)) std.file.write(file, "{}");
-    if(cacheJson == JSONValue.init)
+
+    if(!(rootCache in cacheJson))
     {
-        try cacheJson = parseJSON(std.file.readText(file));
+        try cacheJson[rootCache] = parseJSON(std.file.readText(file));
         catch(Exception e)
         {
             std.file.write(file, "{}");
-            cacheJson = JSONValue.emptyObject;
+            cacheJson[rootCache] = JSONValue.emptyObject;
         }
     }
-    return &cacheJson;
+    return &cacheJson[rootCache];
 }
 
 
@@ -234,7 +233,7 @@ private string getCacheFolder()
     return buildNormalizedPath(getDubWorkspacePath(), cacheFolder);
 }
 
-private string getCacheFilePath()
+private string getCacheFilePath(string rootCache)
 {
-    return buildNormalizedPath(getCacheFolder, cacheFile);
+    return buildNormalizedPath(getCacheFolder, rootCache~".json");
 }
