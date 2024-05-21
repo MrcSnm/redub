@@ -140,10 +140,12 @@ private string getPackageInJSON(JSONValue json, string packageName, string packa
     {
         const(JSONValue)* nameJson = "name" in v;
         const(JSONValue)* ver = "version" in v;
-        //TODO: Check packageVersion
         SemVer packageVer = SemVer(ver.str);
         if (nameJson && nameJson.str == packageName && packageVer.satisfies(requirement))
+        {
+            info("Using local package found at ", v["path"].str, " with version ", ver.str);
             return v["path"].str;
+        }
     }
     return null;
 }
