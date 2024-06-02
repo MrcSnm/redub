@@ -34,7 +34,7 @@ string[] parseLinkConfiguration(const BuildRequirements req, OS target, Compiler
         if (targetType.isLinkedSeparately)
         {
             ///Use library full path for the base file
-            commands = mapAppendReverse(commands, req.extra.librariesFullPath, (string l) => l~getLibraryExtension(target));
+            commands = mapAppendReverse(commands, req.extra.librariesFullPath, (string l) => getOutputName(TargetType.staticLibrary, l, target));
             commands = mapAppendPrefix(commands, linkFlags, "-L", false);
             commands = mapAppendPrefix(commands, libraryPaths, "-L-L", true);
             commands = mapAppendReverse(commands, libraries, (string l) => "-L-l"~l);

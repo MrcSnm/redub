@@ -15,6 +15,11 @@ string[] parseBuildConfiguration(AcceptedCompiler comp, const BuildConfiguration
     {
         commands~= dFlags;
         if(isDebug) commands~= "-debug";
+        if(comp == AcceptedCompiler.ldc2)
+        {
+            commands~= "--cache";
+            commands~= "--cache-retrieval=hardlink";
+        }
 
         if(b.arch)
         {
