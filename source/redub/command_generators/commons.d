@@ -156,13 +156,10 @@ string getOutputName(TargetType t, string name, OS os)
     if(os.isPosix && t.isAnyLibrary)
     {
         import std.path;
-        string dir = dirName(name);
-        string bName = baseName(name);
-        if(dir == bName)
-            outputName = "lib"~name;
-        else
-            outputName = dir~"lib"~bName;
-
+        import std.array;
+        string[] paths = name.pathSplitter.array;
+        paths[$-1] = "lib"~paths[$-1];
+        outputName = join(paths);
     }
     outputName~= t.getExtension(os);
     return outputName;
