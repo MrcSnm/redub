@@ -142,12 +142,29 @@ string getExtension(TargetType t, OS target)
     }
 }
 
+/** 
+ * 
+ * Params:
+ *   t = The target type
+ *   name = Base library name or path
+ *   os = Which OS is this running on   
+ * Returns: For a given library path (e.g: /some/path/a), will make it /some/path/a.[lib|dll] on Windows and /some/path/liba.[a|so] on POSIX
+ */
 string getOutputName(TargetType t, string name, OS os)
 {
-    string outputName;
+    string outputName = name;
     if(os.isPosix && t.isAnyLibrary)
-        outputName = "lib";
-    outputName~= name~t.getExtension(os);
+    {
+        import std.path;
+        string dir = dirName(name);
+        string bName = baseName(name);
+        if(dir == bName)
+            outputName = "lib"~name;
+        else
+            outputName = dir~"lib"~bName;
+
+    }
+    outputName~= t.getExtension(os);
     return outputName;
 }
 
