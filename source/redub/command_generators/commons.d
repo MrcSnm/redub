@@ -159,7 +159,7 @@ string getOutputName(TargetType t, string name, OS os)
         import std.array;
         string[] paths = name.pathSplitter.array;
         paths[$-1] = "lib"~paths[$-1];
-        outputName = join(paths);
+        outputName = buildPath(paths);
     }
     outputName~= t.getExtension(os);
     return outputName;
