@@ -206,7 +206,7 @@ string parseStringWithEnvironment(string str)
         size_t start, end;
     }
     VarPos[] variables;
-    size_t lengthToReduce;
+    ptrdiff_t diffLength;
     for(int i = 0; i < str.length; i++)
     {
         if(str[i] == '$')
@@ -215,18 +215,19 @@ string parseStringWithEnvironment(string str)
             size_t end = start;
             while(end < str.length && (str[end].isAlphaNum || str[end] == '_')) end++;
             variables~= VarPos(i, end);
-            lengthToReduce+= end - i;
             i = cast(int)end;
         }
     }
     if(variables.length == 0)
         return str;
+
     char[] ret;
-    size_t lengthToIncrease;
+    ///Count the difference length between input string and output string and remove inexisntet variables.
     for(int i = 0; i < variables.length; i++)
     {
         VarPos v = variables[i];
         string strVar = str[v.start+1..v.end];
+        diffLength-= 1+strVar.length; //$.length + (abcd).length
         if(strVar.length == 0) //$
             continue;
         else if(!(strVar in environment))
@@ -235,30 +236,50 @@ string parseStringWithEnvironment(string str)
             i--;
             continue;
         }
-        lengthToIncrease+= environment[strVar].length;
+        diffLength+= environment[strVar].length;
     }
 	if(variables.length == 0) return str;
 	
-    ret = new char[]((str.length+lengthToIncrease)-lengthToReduce);
-
+    ret = new char[](str.length+diffLength);
 	size_t outStart;
 	size_t srcStart;
+
+    void appendToRet(string what)
+    {
+        ret[outStart..outStart+what.length] = what[];
+        outStart+= what.length;
+    }
+
+    ///Starts appending text or variable depending on the variable positions
 	foreach(v; variables)
 	{
 		//Remove the $
 		string envVar = str[v.start+1..v.end];
-		envVar = envVar.length == 0 ? "$" : environment[envVar];
 
-		ret[outStart..outStart+(v.start-srcStart)] = str[srcStart..v.start];
-		outStart+= (v.start-srcStart);
-		ret[outStart..outStart+envVar.length] = envVar[];
-		outStart+= envVar.length;
+        ///Copy text up to the variable 
+        string leftText = str[srcStart..v.start];
+        appendToRet(leftText);
+
+        ///Insert the variable value
+        if(envVar.length)
+            appendToRet(environment[envVar]);
+
+        ///Move the start pointer past the variable
 		srcStart = v.end;
 	}
+
 	if(outStart != ret.length)
 		ret[outStart..$] = str[srcStart..$];
 
     return cast(string)ret;
+}
+
+unittest
+{
+    assert(parseStringWithEnvironment("$$ORIGIN") == "$ORIGIN");
+    environment["HOME"] = "test";
+    assert(parseStringWithEnvironment("$HOME") == "test");
+    assert(parseStringWithEnvironment("$HOME $$ORIGIN") == "test $ORIGIN");
 }
 
 /** 

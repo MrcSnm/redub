@@ -55,5 +55,5 @@ bool matchesGlob(string input, string glob)
 unittest
 {
     assert("source/app.d".matchesGlob("*.d"));
-    assert("source/app_v1.d".matchesGlob("*-app_v?.d"));
+    assert("source/app_v1.d".matchesGlob("*app_v?.d"));
 }

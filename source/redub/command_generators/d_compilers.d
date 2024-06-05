@@ -17,8 +17,9 @@ string[] parseBuildConfiguration(AcceptedCompiler comp, const BuildConfiguration
         if(isDebug) commands~= "-debug";
         if(comp == AcceptedCompiler.ldc2)
         {
-            commands~= "--cache";
-            commands~= "--cache-retrieval=hardlink";
+            ///commands~= "--cache-retrieval=hardlink"; // Doesn't work on Windows when using a multi drives projects
+            commands~= "--cache=.ldc2_cache";
+            commands~= "--cache-prune";
         }
 
         if(b.arch)

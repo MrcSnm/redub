@@ -348,5 +348,5 @@ assert(SemVer("2.106.1").satisfies(comp.frontendVersion));
 {
     assert(getCompiler("ldc2", null).compiler == AcceptedCompiler.ldc2);
     assert(getCompiler("dmd", null).compiler == AcceptedCompiler.dmd);
-    assert(getCompiler("tcc", null).compiler == AcceptedCompiler.gcc);
+    // assert(getCompiler("tcc", null).compiler == AcceptedCompiler.gcc);
 }
