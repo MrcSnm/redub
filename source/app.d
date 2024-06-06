@@ -203,7 +203,7 @@ ProjectDetails resolveDependencies(string[] args)
     {
         import std.stdio;
         writeln(RedubVersion);
-        return ProjectDetails(null, Compiler.init, true);
+        return ProjectDetails(null, Compiler.init, ParallelType.auto_,  true);
     }
     updateVerbosity(bArgs.cArgs);
     if(bArgs.arch) bArgs.compiler = "ldc2";
@@ -220,7 +220,7 @@ ProjectDetails resolveDependencies(string[] args)
     return redub.api.resolveDependencies(
         bArgs.build.force,
         os,
-        CompilationDetails(either(bArgs.compiler, "dmd"), bArgs.arch, bArgs.compilerAssumption, bArgs.build.incremental, bArgs.build.combined),
+        CompilationDetails(either(bArgs.compiler, "dmd"), bArgs.arch, bArgs.compilerAssumption, bArgs.build.incremental, bArgs.build.combined, bArgs.build.parallel),
         ProjectToParse(bArgs.config, workingDir, subPackage, recipe),
         getInitialDubVariablesFromArguments(bArgs, DubBuildArguments.init, os, args),
         bt

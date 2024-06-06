@@ -19,6 +19,14 @@ enum SkipRegistry
     all
 }
 
+enum ParallelType
+{
+    auto_ = "auto",
+    full = "full",
+    leaves = "leaves",
+    no = "no"
+}
+
 enum IncrementalInfer
 {
     auto_ = "auto",
@@ -206,9 +214,16 @@ struct DubBuildArguments
     bool nonInteractive;
 
     @("Build incrementally. This usually works on a case basis, so for you case, disabling it might make it faster."~ 
-    "It is inferred to be incremental when dependencies count >= 3")
+    "It is inferred to be incremental when dependencies count >= 3. Supports |auto|on|off|")
     @("incremental")
     IncrementalInfer incremental;
+
+    @("Build parallelization type. Supported options are |auto|full|leaves|no|. Default being auto. Full will attempt "~ 
+    " to build every dependency at the same time. Leaves will build in parallel the dependencies that has no dependency. No will "~
+    " build in single thread."
+    )
+    @("parallel")
+    ParallelType parallel;
 
     @("Tries to build the whole project in a single compiler run")
     bool combined;

@@ -13,6 +13,7 @@ struct ProjectDetails
 {
     ProjectNode tree;
     Compiler compiler;
+    ParallelType parallelType;
     ///Makes the return code 0 for when using print commands.
     bool printOnly;
 
@@ -37,6 +38,8 @@ struct CompilationDetails
     IncrementalInfer incremental;
     ///Whether the build should force single project
     bool combinedBuild;
+    ///Whether the build should be fully parallel, simple, no or inferred
+    ParallelType parallelType;
 }
 /** 
  * Project in which should be parsed.
@@ -69,6 +72,19 @@ auto timed(T)(scope T delegate() action)
     return ret;
 }
 
+ParallelType inferParallel(ProjectDetails d)
+{
+    if(d.parallelType == ParallelType.auto_)
+    {
+        if(d.tree.collapse.length == 1)
+            return ParallelType.no;
+        if(d.tree.isFullyParallelizable)
+            return ParallelType.full;
+        return ParallelType.leaves;
+    }
+    return d.parallelType;
+}
+
 
 ProjectDetails buildProject(ProjectDetails d)
 {
@@ -82,20 +98,27 @@ ProjectDetails buildProject(ProjectDetails d)
     ProjectNode tree = d.tree;
     OS targetOS = osFromArch(tree.requirements.cfg.arch);
     startHandlingConsoleControl();
+
+    ParallelType parallel = inferParallel(d);
+
     auto result = timed(()
     {
-        if(tree.collapse.length == 1)
+
+        switch(parallel)
         {
-            info("Project ", tree.name," is single dependency, performing single threaded build");
-            return buildProjectSingleThread(tree, d.compiler, targetOS);
+            case ParallelType.full:
+                info("Project ", tree.name," is fully parallelizable! Will build everything at the same time");
+                return buildProjectFullyParallelized(tree, d.compiler, targetOS); 
+            case ParallelType.leaves:
+                info("Project ", tree.name," will build with simple parallelization!");
+                return buildProjectParallelSimple(tree, d.compiler, targetOS); 
+            case ParallelType.no:
+                info("Project ", tree.name," is single dependency, performing single threaded build");
+                return buildProjectSingleThread(tree, d.compiler, targetOS);
+                break;
+            default: 
+                throw new Error(`Unsupported parallel type in this step.`);
         }
-        else if(tree.isFullyParallelizable)
-        {
-            info("Project ", tree.name," is fully parallelizable! Will build everything at the same time");
-            return buildProjectFullyParallelized(tree, d.compiler, targetOS); 
-        }
-        else
-            return buildProjectParallelSimple(tree, d.compiler, targetOS); 
     });
     bool buildSucceeded = result.value;
     if(!buildSucceeded)
@@ -173,7 +196,7 @@ ProjectDetails resolveDependencies(
     import redub.libs.colorize;
     
     infos("Dependencies resolved ", "in ", (st.peek.total!"msecs"), " ms for \"", color(buildType, fg.magenta),"\" using ", compiler.binOrPath);
-    return ProjectDetails(tree, compiler);
+    return ProjectDetails(tree, compiler, cDetails.parallelType);
 }
 
 
