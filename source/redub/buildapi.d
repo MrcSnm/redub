@@ -5,7 +5,7 @@ public import std.system:OS;
 import redub.logging;
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.4.12";
+enum RedubVersionOnly = "v1.4.13";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -583,6 +583,8 @@ class ProjectNode
         return null;
     }
 
+    bool isRoot() const shared { return this.parent.length == 0; }
+
     ProjectNode addDependency(ProjectNode dep)
     {
         import std.exception;
@@ -727,7 +729,15 @@ class ProjectNode
                     target.requirements.cfg = target.requirements.cfg.mergeSourcePaths(input.requirements.cfg);
                     target.requirements.cfg = target.requirements.cfg.mergeSourceFiles(input.requirements.cfg);
                     break;
-                case dynamicLibrary: throw new Error("Uninplemented support for shared libraries");
+                case dynamicLibrary: 
+                        BuildConfiguration other = input.requirements.cfg.clone;
+                        ///Use library full path for the 
+                        target.requirements.extra.librariesFullPath.exclusiveMerge(
+                            [buildNormalizedPath(other.outputDirectory, other.name)]
+                        );
+                        target.requirements.cfg = target.requirements.cfg.mergeLibraries(other);
+                        target.requirements.cfg = target.requirements.cfg.mergeLibPaths(other);
+                    break;
                 case executable: break;
                 case none: throw new Error("TargetTtype: none as a root project: nothing to do");
                     // if(input.parent.length == 0)

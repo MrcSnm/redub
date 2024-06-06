@@ -18,6 +18,7 @@ struct CompilationResult
 }
 
 import std.typecons;
+import core.sys.windows.stat;
 alias ExecutionResult = Tuple!(int, "status", string, "output");
 /**
 *   If any command has status, it will stop executing them and return
@@ -102,6 +103,15 @@ CompilationResult execCompilation(immutable BuildRequirements req, shared Projec
                 ret.output~= linkRes.message;
                 res.compilationCommand~= linkRes.compilationCommand;
             }
+        }
+
+        ///Shared Library(mostly?)
+        if(isDCompiler(compiler) && isLinkedSeparately(req.cfg.targetType) && !pack.isRoot)
+        {
+            CompilationResult linkRes = link(req, os, compiler, env);
+            ret.status = linkRes.status;
+            ret.output~= linkRes.message;
+            res.compilationCommand~= "\n\nLinking: \n\t"~ linkRes.compilationCommand;
         }
         
 
