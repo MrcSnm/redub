@@ -27,7 +27,7 @@ private ExecutionResult executeCommands(const string[] commandsList, string list
     import std.process;
     foreach(cmd; commandsList)
     {
-        auto execRes  = execute(cmd.escapeShellCommand, env, Config.none, size_t.max, workingDir);
+        auto execRes  = execute(cmd, env, Config.none, size_t.max, workingDir);
         if(execRes.status)
         {
             res.status = execRes.status;

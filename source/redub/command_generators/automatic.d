@@ -31,7 +31,7 @@ string getCompileCommands(const BuildConfiguration cfg, OS os, Compiler compiler
 {
     import std.array:join;
     string[] flags = getCompilationFlags(cfg,os,compiler);
-    return escapeShellCommand(compiler.binOrPath) ~ " " ~ flags.join(" ");
+    return escapeShellCommand(compiler.binOrPath) ~ " " ~ processFlags(flags);
 }
 
 string getLinkCommands(const BuildRequirements req, OS os, Compiler compiler)
@@ -47,6 +47,20 @@ string getLinkCommands(const BuildRequirements req, OS os, Compiler compiler)
         throw new Error("Unsupported compiler '" ~ compiler.binOrPath~"'");
 
     if(compiler.isDCompiler)
-        return escapeShellCommand(compiler.binOrPath) ~ " "~ flags.join(" ");
-    return escapeShellCommand(compiler.archiver) ~ " " ~ flags.join(" ");
+        return escapeShellCommand(compiler.binOrPath) ~ " "~ processFlags(flags);
+    return escapeShellCommand(compiler.archiver) ~ " " ~ processFlags(flags);
+}
+
+
+/** 
+ * Executes escaleShellCommand for fixing issues such as -rpath=$ORIGIN expanding to -rpath="" which may cause some issues
+ * this will guarantee that no command is expanded by the shell environment
+ * Params:
+ *   flags = The compiler or linker flags
+ */
+private auto processFlags(string[] flags)
+{
+    import std.algorithm.iteration;
+    import std.array:join;
+    return (map!((string v) => escapeShellCommand(v))(flags)).join(" ");
 }
