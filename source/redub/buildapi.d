@@ -5,7 +5,7 @@ public import std.system:OS;
 import redub.logging;
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.4.15";
+enum RedubVersionOnly = "v1.4.16";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -166,6 +166,7 @@ struct BuildConfiguration
         import std.algorithm.comparison:either;
         BuildConfiguration ret = clone;
         ret.targetType = either(other.targetType, ret.targetType);
+        ret.outputDirectory = either(other.outputDirectory, ret.outputDirectory);
         ret.stringImportPaths.exclusiveMergePaths(other.stringImportPaths);
         ret.sourceFiles.exclusiveMerge(other.sourceFiles);
         ret.excludeSourceFiles.exclusiveMerge(other.excludeSourceFiles);
