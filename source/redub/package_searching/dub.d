@@ -107,7 +107,7 @@ string getPackagePath(string packageName, string packageVersion, string required
     }
     if (dubHook_PackageManagerDownloadPackage(packageName, packageVersion, requiredBy))
         return getPackagePath(packageName, packageVersion, requiredBy);
-    throw new Error(
+    throw new Exception(
         "Could not find any package named " ~
             packageName ~ " with version " ~ requirement.toString ~
             " required by " ~ requiredBy ~ "\nFound versions:\n\t" ~

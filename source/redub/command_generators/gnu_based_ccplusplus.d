@@ -42,7 +42,7 @@ string getTargetTypeFlag(TargetType o)
 {
     final switch(o) with(TargetType)
     {
-        case none: throw new Error("Invalid targetType: none");
+        case none: throw new Exception("Invalid targetType: none");
         case autodetect, executable, sourceLibrary: return null;
         case dynamicLibrary: return "-shared";
         case staticLibrary, library: return "-c";

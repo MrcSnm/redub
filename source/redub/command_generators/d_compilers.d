@@ -57,7 +57,7 @@ string getTargetTypeFlag(TargetType t, AcceptedCompiler c)
         case executable, autodetect: return null;
         case library, staticLibrary: return mapper(ValidDFlags.buildAsLibrary);
         case dynamicLibrary: return mapper(ValidDFlags.buildAsShared);
-        default: throw new Error("Unsupported target type");
+        default: throw new Exception("Unsupported target type");
     }
 }
 
@@ -113,7 +113,7 @@ string function(ValidDFlags) getFlagMapper(AcceptedCompiler comp)
     {
         case AcceptedCompiler.dmd: return &dmdFlags;
         case AcceptedCompiler.ldc2: return &ldcFlags;
-        default: throw new Error("Compiler sent is not a D compiler.");
+        default: throw new Exception("Compiler sent is not a D compiler.");
     }
 }
 
@@ -144,7 +144,7 @@ string dmdFlags(ValidDFlags flag)
         case buildAsLibrary: return "-lib";
         case buildAsShared: return "-shared";
         case compileOnly: return "-c";
-        case arch: throw new Error("arch not supported by dmd.");
+        case arch: throw new Exception("arch not supported by dmd.");
         case preserveNames: return "-op";
     }
 }
@@ -183,7 +183,7 @@ string ldcFlags(ValidDFlags flag)
 string mapArch(AcceptedCompiler compiler, string arch)
 {
     if(compiler != AcceptedCompiler.ldc2)
-        throw new Error("Only ldc2 supports --arch flag");
+        throw new Exception("Only ldc2 supports --arch flag");
 
     switch (arch) 
     {

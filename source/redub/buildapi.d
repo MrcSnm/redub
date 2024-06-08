@@ -5,7 +5,7 @@ public import std.system:OS;
 import redub.logging;
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.5.1";
+enum RedubVersionOnly = "v1.5.2";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -48,7 +48,7 @@ BuildType buildTypeFromString(string bt)
         static foreach(member; __traits(allMembers, BuildType))
             case __traits(getMember, BuildType, member):
                 return __traits(getMember, BuildType, member);
-        default: throw new Error("Could not find build type for string "~bt);
+        default: throw new Exception("Could not find build type for string "~bt);
     }
 }
 
@@ -712,7 +712,7 @@ class ProjectNode
             );
             final switch(input.requirements.cfg.targetType) with(TargetType)
             {
-                case autodetect: throw new Error("Node should not be autodetect at this point");
+                case autodetect: throw new Exception("Node should not be autodetect at this point");
                 case library, staticLibrary:
                         BuildConfiguration other = input.requirements.cfg.clone;
                         // other.libraries~= other.name;
@@ -740,9 +740,9 @@ class ProjectNode
                         target.requirements.cfg = target.requirements.cfg.mergeLibPaths(other);
                     break;
                 case executable: break;
-                case none: throw new Error("TargetTtype: none as a root project: nothing to do");
+                case none: throw new Exception("TargetTtype: none as a root project: nothing to do");
                     // if(input.parent.length == 0)
-                    //     throw new Error("targetType: none as a root project: nothing to do");
+                    //     throw new Exception("targetType: none as a root project: nothing to do");
                     // else
                     // {
                     //     foreach(dep; input.dependencies)

@@ -43,7 +43,7 @@ private JSONValue parseJSONCached(string filePath)
     if(cached) return *cached;
     jsonCache[filePath] = parseJSON(std.file.readText(filePath));
     if(jsonCache[filePath].hasErrorOccurred)
-        throw new Error(jsonCache[filePath].error);
+        throw new Exception(jsonCache[filePath].error);
     return jsonCache[filePath];
 }
 
@@ -76,7 +76,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
                 import std.conv:to;
                 auto res = executeShell(cmd.str, null, Config.none, size_t.max, c.workingDir);
                 if(res.status)
-                    throw new Error("preGenerateCommand '"~cmd.str~"; exited with code "~res.status.to!string);
+                    throw new Exception("preGenerateCommand '"~cmd.str~"; exited with code "~res.status.to!string);
             }
         }
     ];
@@ -278,7 +278,7 @@ private void runHandlers(
             ///If the command is inside the host filters, it will use host OS instead.
             if(commandsWithHostFilters.countUntil(filtered.command) != -1) osToMatch = std.system.os;
 
-            mustExecuteHandler = filtered.matchesOS(osToMatch) && filtered.matchesCompiler(cfg.compiler) && filtered.matchesArch(cfg.isa) && fn;
+            mustExecuteHandler = filtered.matchesPlatform(osToMatch, cfg.isa, cfg.compiler) && fn;
         }
         if(mustExecuteHandler)
             (*fn)(buildRequirements, v, cfg);
@@ -328,7 +328,7 @@ private bool matchesArch(string archRep, ISA isa)
         case "arm":     return isa == arm;
         case "aarch64": return isa == aarch64;
         default:
-            throw new Error("No appropriate switch clause found for architecture '"~archRep~"'");
+            throw new Exception("No appropriate switch clause found for architecture '"~archRep~"'");
     }
 }
 private bool matchesOS(string osRep, OS os)
@@ -354,7 +354,7 @@ private bool matchesOS(string osRep, OS os)
         case "tvos": return os == tvOS;
         case "ios": return os == iOS;
         case "windows": return os == win32 || os == win64;
-        default: throw new Error("No appropriate switch clause found for the OS '"~osRep~"'");
+        default: throw new Exception("No appropriate switch clause found for the OS '"~osRep~"'");
     }
 }
 
@@ -368,10 +368,12 @@ struct PlatformFilter
     bool matchesCompiler(string compiler)
     {
         import std.string:startsWith;
-        if(this.compiler is null) return true;
+        if(compiler.length == 0 || this.compiler.length == 0) return true;
         if(this.compiler.startsWith("ldc")) return compiler.startsWith("ldc");
         return this.compiler == compiler;
     }
+
+    bool matchesPlatform(OS os, ISA isa, string compiler = null){return matchesOS(os) && matchesArch(isa) && matchesCompiler(compiler);}
 
 
     /** 
@@ -412,6 +414,8 @@ struct CommandWithFilter
     bool matchesArch(ISA isa){return filter.matchesArch(isa);}
     bool matchesOS(OS os){return filter.matchesOS(os);}
     bool matchesCompiler(string compiler){return filter.matchesCompiler(compiler);}
+    bool matchesPlatform(OS os, ISA isa, string compiler = null){return filter.matchesPlatform(os, isa, compiler);}
+
 
     /** 
      * Splits command-compiler-os-arch into a struct.
@@ -458,7 +462,7 @@ private bool platformMatches(JSONValue[] platforms, OS os, ISA isa)
         import std.string;
         PlatformFilter filter = PlatformFilter.fromKeys(p.str.split("-"));
 
-        if(filter.matchesOS(os) && filter.matchesArch(isa))
+        if(filter.matchesPlatform(os, isa))
             return true;
     }
     return false;

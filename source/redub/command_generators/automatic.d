@@ -22,7 +22,7 @@ string[] getCompilationFlags(const BuildConfiguration cfg, OS os, Compiler compi
             return redub.command_generators.dmd.parseBuildConfiguration(cfg, os);
         case ldc2:
             return redub.command_generators.ldc.parseBuildConfiguration(cfg, os);
-        default:throw new Error("Unsupported compiler '"~compiler.binOrPath~"'");
+        default:throw new Exception("Unsupported compiler '"~compiler.binOrPath~"'");
     }
 
 }
@@ -44,7 +44,7 @@ string getLinkCommands(const BuildRequirements req, OS os, Compiler compiler)
     else flags = parseLinkConfiguration(req, os, compiler);
 
     if(compiler.compiler == AcceptedCompiler.invalid)
-        throw new Error("Unsupported compiler '" ~ compiler.binOrPath~"'");
+        throw new Exception("Unsupported compiler '" ~ compiler.binOrPath~"'");
 
     if(compiler.isDCompiler)
         return escapeShellCommand(compiler.binOrPath) ~ " "~ processFlags(flags);

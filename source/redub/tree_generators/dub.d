@@ -48,7 +48,7 @@ void detectCycle(ProjectNode t)
 
     void impl(ProjectNode node)
     {
-        if(node in inStack) throw new Error("Found a cycle at "~node.name);
+        if(node in inStack) throw new Exception("Found a cycle at "~node.name);
         inStack[node] = true;
         visited[node] = true;
         
@@ -151,7 +151,7 @@ private BuildRequirements mergeDifferentSubConfigurations(BuildRequirements exis
 {
     if(existingReq.configuration.isDefault)
         return newReq;
-    throw new Error(
+    throw new Exception(
         "Error in project: '"~existingReq.name~"' Can't merge different subConfigurations at this " ~
         "moment: "~existingReq.targetConfiguration~ " vs " ~ newReq.targetConfiguration
     );

@@ -24,7 +24,7 @@ BuildConfiguration parse(BuildType buildType, AcceptedCompiler comp)
         case BuildType.unittest_cov:      b.dFlags = [m(unittests), m(coverage), m(debugMode), m(debugInfo)]; break;
         case BuildType.unittest_cov_ctfe: b.dFlags = [m(unittests), m(coverageCTFE), m(debugMode), m(debugInfo)]; break;
         case BuildType.syntax:            b.dFlags = [m(syntaxOnly)]; break;
-        default: throw new Error("Unknown build type "~buildType);
+        default: throw new Exception("Unknown build type "~buildType);
     }
     return b;
 }

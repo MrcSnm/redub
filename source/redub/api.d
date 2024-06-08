@@ -117,12 +117,12 @@ ProjectDetails buildProject(ProjectDetails d)
                 return buildProjectSingleThread(tree, d.compiler, targetOS);
                 break;
             default: 
-                throw new Error(`Unsupported parallel type in this step.`);
+                throw new Exception(`Unsupported parallel type in this step.`);
         }
     });
     bool buildSucceeded = result.value;
     if(!buildSucceeded)
-        throw new Error("Build failure");
+        throw new Exception("Build failure");
     info("Built project in ", result.msecs, " ms.");
 
     return d;

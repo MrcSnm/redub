@@ -36,7 +36,7 @@ BuildRequirements parseProject(
     import std.file;
     import redub.package_searching.entry;
     if(!std.file.exists(projectWorkingDir))
-        throw new Error("Directory "~projectWorkingDir~"' does not exists.");
+        throw new Exception("Directory "~projectWorkingDir~"' does not exists.");
     string projectFile = findEntryProjectFile(projectWorkingDir, recipe);
     BuildRequirements req;
 
@@ -46,7 +46,7 @@ BuildRequirements parseProject(
     {
         case ".sdl":   req = redub.parsers.sdl.parse(projectFile, projectWorkingDir, compiler, arch, null, subConfiguration, subPackage, targetOS, isa); break;
         case ".json":  req = redub.parsers.json.parse(projectFile, projectWorkingDir, compiler, arch, null, subConfiguration, subPackage, targetOS, isa); break;
-        default: throw new Error("Unsupported project type "~projectFile~" at dir "~projectWorkingDir);
+        default: throw new Exception("Unsupported project type "~projectFile~" at dir "~projectWorkingDir);
     }
     redub.parsers.environment.setupEnvironmentVariablesForPackage(cast(immutable)req);
     req.cfg = redub.parsers.environment.parseEnvironment(req.cfg);

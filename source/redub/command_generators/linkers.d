@@ -106,7 +106,7 @@ string getTargetTypeFlag(TargetType o, Compiler compiler)
         case dmd, ldc2: return redub.command_generators.d_compilers.getTargetTypeFlag(o, compiler.compiler);
         case gcc: return redub.command_generators.gnu_based.getTargetTypeFlag(o);
         case gxx: return redub.command_generators.gnu_based_ccplusplus.getTargetTypeFlag(o);
-        default: throw new Error("Unsupported compiler "~compiler.binOrPath);
+        default: throw new Exception("Unsupported compiler "~compiler.binOrPath);
     }
 }
 

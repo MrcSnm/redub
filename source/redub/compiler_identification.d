@@ -45,7 +45,7 @@ struct Compiler
             case ldc2: return "ldc";
             case gcc: return "gcc";
             case gxx: return "g++";
-            case invalid: throw new Error("Invalid compiler.");
+            case invalid: throw new Exception("Invalid compiler.");
         }
     }
 
@@ -181,7 +181,7 @@ Compiler getCompiler(string compilerOrPath, string compilerAssumption)
     {
         return assumeCompiler(compilerOrPath, compilerAssumption);
     }
-    throw new Error("Could not infer which compiler you're using from "~compilerOrPath);
+    throw new Exception("Could not infer which compiler you're using from "~compilerOrPath);
 }
 
 private Compiler assumeCompiler(string compilerOrPath, string compilerAssumption)
@@ -216,7 +216,7 @@ private Compiler assumeCompiler(string compilerOrPath, string compilerAssumption
             ret.version_ = SemVer(ldcVer);
             ret.frontendVersion = SemVer(feVer);
             break;
-        default: throw new Error("Can only assume dmd, ldc and ldc2 at this moment, received "~compilerAssumption);
+        default: throw new Exception("Can only assume dmd, ldc and ldc2 at this moment, received "~compilerAssumption);
     }
     return ret;
 }
