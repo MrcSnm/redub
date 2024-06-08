@@ -150,7 +150,8 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
                 string version_, path, visibility;
                 string out_mainPackage;
                 string subPackage = getSubPackageInfoRequiredBy(depName, req.cfg.name, out_mainPackage);
-                if(subPackage && out_mainPackage)
+                ///If the main package is the same as this dependency, then simply use the same json file.
+                if(subPackage && out_mainPackage == depName)
                     path = req.cfg.workingDir;
                 if(value.type == JSONType.object) ///Uses path style
                 {
