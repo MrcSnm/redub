@@ -17,6 +17,8 @@ import redub.command_generators.commons;
  *   subConfiguration = Sub configuration to use
  *   subPackage = Optional sub package
  *   recipe = Optional recipe to read. It's path is not used as root.
+ *   targetOS = Will be used to filter out some commands
+ *   isa = Instruction Set Architexture to use for filtering commands
  * Returns: The build requirements to the project. Not recursive.
  */
 BuildRequirements parseProject(
@@ -26,7 +28,8 @@ BuildRequirements parseProject(
     BuildRequirements.Configuration subConfiguration, 
     string subPackage, 
     string recipe,
-    OS targetOS
+    OS targetOS,
+    ISA isa
 )
 {
     import std.path;
@@ -41,8 +44,8 @@ BuildRequirements parseProject(
 
     switch(extension(projectFile))
     {
-        case ".sdl":   req = redub.parsers.sdl.parse(projectFile, projectWorkingDir, compiler, arch, null, subConfiguration, subPackage, targetOS); break;
-        case ".json":  req = redub.parsers.json.parse(projectFile, projectWorkingDir, compiler, arch, null, subConfiguration, subPackage, targetOS); break;
+        case ".sdl":   req = redub.parsers.sdl.parse(projectFile, projectWorkingDir, compiler, arch, null, subConfiguration, subPackage, targetOS, isa); break;
+        case ".json":  req = redub.parsers.json.parse(projectFile, projectWorkingDir, compiler, arch, null, subConfiguration, subPackage, targetOS, isa); break;
         default: throw new Error("Unsupported project type "~projectFile~" at dir "~projectWorkingDir);
     }
     redub.parsers.environment.setupEnvironmentVariablesForPackage(cast(immutable)req);

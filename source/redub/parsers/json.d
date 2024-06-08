@@ -6,7 +6,12 @@ import hipjson;
 // import std.json;
 import std.file;
 import redub.parsers.base;
+import redub.command_generators.commons;
 
+/** 
+ * Those commands are independent of the selected target OS.
+ * It will use the host OS instead of targetOS since they depend on the machine running them
+ */
 immutable string[] commandsWithHostFilters = [
     "preBuildCommands",
     "postBuildCommands",
@@ -21,11 +26,12 @@ BuildRequirements parse(string filePath,
     string version_, 
     BuildRequirements.Configuration subConfiguration,
     string subPackage,
-    OS targetOS
+    OS targetOS,
+    ISA isa
 )
 {
     import std.path;
-    ParseConfig c = ParseConfig(projectWorkingDir, subConfiguration, subPackage, version_, compiler, arch, targetOS);
+    ParseConfig c = ParseConfig(projectWorkingDir, subConfiguration, subPackage, version_, compiler, arch, targetOS, isa);
     return parse(parseJSONCached(filePath), c);
 }
 
@@ -213,7 +219,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
                 const(JSONValue)* name = "name" in p;
                 enforce(name, "All subPackages entries must contain a name.");
                 if(name.str == cfg.subPackage)
-                    return parse(p, ParseConfig(cfg.workingDir, cfg.subConfiguration, null, null, cfg.compiler, cfg.arch, cfg.targetOS, cfg.requiredBy, true, true));
+                    return parse(p, ParseConfig(cfg.workingDir, cfg.subConfiguration, null, null, cfg.compiler, cfg.arch, cfg.targetOS, cfg.isa, cfg.requiredBy, true, true));
             }
             else ///Subpackage is on other file
             {
@@ -230,7 +236,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
                 {
                     import redub.parsers.automatic;
                     isSubpackageInPackage = true;
-                    return parseProject(subPackagePath, cfg.compiler, cfg.arch, cfg.subConfiguration, null, null, cfg.targetOS);
+                    return parseProject(subPackagePath, cfg.compiler, cfg.arch, cfg.subConfiguration, null, null, cfg.targetOS, cfg.isa);
                 }
             } 
         }
@@ -269,9 +275,10 @@ private void runHandlers(
             fn = filtered.command in handler;
             
             OS osToMatch = cfg.targetOS;
+            ///If the command is inside the host filters, it will use host OS instead.
             if(commandsWithHostFilters.countUntil(filtered.command) != -1) osToMatch = std.system.os;
 
-            mustExecuteHandler = filtered.matchesOS(osToMatch) && filtered.matchesCompiler(cfg.compiler) && fn;
+            mustExecuteHandler = filtered.matchesOS(osToMatch) && filtered.matchesCompiler(cfg.compiler) && filtered.matchesArch(cfg.isa) && fn;
         }
         if(mustExecuteHandler)
             (*fn)(buildRequirements, v, cfg);
@@ -308,7 +315,7 @@ private bool isArch(string archRep)
 {
     switch(archRep)
     {
-        case "x86", "x84_64", "amd64", "x86_mscoff": return true;
+        case "x86", "x86_64", "amd64", "x86_mscoff", "arm", "aarch64": return true;
         default: return false;
     }
 }
@@ -316,7 +323,7 @@ private bool matchesArch(string archRep, ISA isa)
 {
     switch(archRep) with(ISA)
     {
-        case "x86":     return isa == x86;
+        case "x86", "x86_mscoff":     return isa == x86;
         case "x86_64":  return isa == x86_64;
         case "arm":     return isa == arm;
         case "aarch64": return isa == aarch64;
@@ -336,9 +343,17 @@ private bool matchesOS(string osRep, OS os)
                              os == otherPosix || 
                              "linux".matchesOS(os) || 
                              "osx".matchesOS(os);
+        case "freebsd": return os == freeBSD;
+        case "netbsd": return os == netBSD;
+        case "openbsd": return os == openBSD;
+        case "dragonflybsd": return os == dragonFlyBSD;
+        case "solaris": return os == solaris;
         case "linux": return os == linux || os == android;
         case "osx": return os == osx || os == iOS || os == tvOS || os == watchOS;
-        case "windows", "windows-x86_64", "windows-x86_mscoff": return os == win32 || os == win64;
+        case "watchos": return os == watchOS;
+        case "tvos": return os == tvOS;
+        case "ios": return os == iOS;
+        case "windows": return os == win32 || os == win64;
         default: throw new Error("No appropriate switch clause found for "~osRep);
     }
 }
@@ -348,7 +363,9 @@ struct CommandWithFilter
     string command;
     string compiler;
     string targetOS;
+    string targetArch;
 
+    bool matchesArch(ISA isa){return this.targetArch is null || redub.parsers.json.matchesArch(targetArch, isa);}
     bool matchesOS(OS os){return this.targetOS is null || redub.parsers.json.matchesOS(targetOS, os);}
     bool matchesCompiler(string compiler)
     {
@@ -359,7 +376,7 @@ struct CommandWithFilter
     }
 
     /** 
-     * Splits command-compiler-os into a struct.
+     * Splits command-compiler-os-arch into a struct.
      * Input examples:
      * - dflags-osx
      * - dflags-ldc-osx
@@ -378,9 +395,16 @@ struct CommandWithFilter
             return ret;
         ret.command = keys[0];
         ret.compiler = keys[1];
+        if(keys.length >= 3) ret.targetOS = keys[2];
+        if(keys.length >= 4) ret.targetArch = keys[3];
 
-        if(keys.length == 3) ret.targetOS = keys[2];
+
         if(isOS(ret.compiler)) swap(ret.compiler, ret.targetOS);
+        if(isArch(ret.compiler)) swap(ret.compiler, ret.targetArch);
+
+        if(isArch(ret.targetOS)) swap(ret.targetOS, ret.targetArch);
+        if(isOS(ret.targetArch)) swap(ret.targetArch, ret.targetOS);
+
         return ret;
     }
 }

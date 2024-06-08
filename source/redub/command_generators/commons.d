@@ -23,6 +23,20 @@ OS osFromArch(string arch)
     else return std.system.os;
 }
 
+ISA isaFromArch(string arch)
+{
+    switch(arch) with(ISA)
+    {
+        case "x86":     return x86;
+        case "x86_64":  return x86_64;
+        case "arm":     return arm;
+        case "aarch64": return aarch64;
+        default:
+            return std.system.instructionSetArchitecture;
+    }
+}
+
+
 string getObjectDir(string projWorkingDir)
 {
     import std.path;

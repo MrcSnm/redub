@@ -172,18 +172,19 @@ ProjectDetails resolveDependencies(
     BuildRequirements req = parseProject(
         proj.workingDir, 
         compiler.getCompilerString,
-        cDetails.arch, 
+        cDetails.arch,
         BuildRequirements.Configuration(proj.configuration, false), 
         proj.subPackage,
         proj.recipe,
-        osFromArch(cDetails.arch)
+        osFromArch(cDetails.arch),
+        isaFromArch(cDetails.arch)
     );
     redub.parsers.environment.setupEnvironmentVariablesForRootPackage(cast(immutable)req);
     req.cfg = req.cfg.merge(redub.parsers.environment.parse());
     req.cfg = req.cfg.merge(redub.parsers.build_type.parse(buildType, compiler.compiler));
 
 
-    ProjectNode tree = getProjectTree(req, CompilationInfo(compiler.getCompilerString, cDetails.arch, osFromArch(cDetails.arch)));
+    ProjectNode tree = getProjectTree(req, CompilationInfo(compiler.getCompilerString, cDetails.arch, osFromArch(cDetails.arch), isaFromArch(cDetails.arch)));
     if(cDetails.combinedBuild)
         tree.combine();
     compiler.usesIncremental = isIncremental(cDetails.incremental, tree);

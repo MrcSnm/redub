@@ -14,6 +14,7 @@ struct ParseConfig
     string compiler;
     string arch;
     OS targetOS;
+    ISA isa;
     string requiredBy;
     bool firstRun = true;
     bool preGenerateRun = true;

@@ -10,7 +10,8 @@ BuildRequirements parse(
     string version_, 
     BuildRequirements.Configuration subConfiguration, 
     string subPackage,
-    OS targetOS
+    OS targetOS,
+    ISA isa
 )
 {
     static import redub.parsers.json;
@@ -27,7 +28,7 @@ BuildRequirements parse(
     
     string tempFile = filePath~".json"; //.sdl.json
     std.file.write(tempFile, exec.output);
-    BuildRequirements ret = redub.parsers.json.parse(tempFile, workingDir, compiler, arch, version_, subConfiguration, subPackage, targetOS);
+    BuildRequirements ret = redub.parsers.json.parse(tempFile, workingDir, compiler, arch, version_, subConfiguration, subPackage, targetOS, isa);
     chdir(currDir);
     std.file.remove(tempFile);
     return ret;
