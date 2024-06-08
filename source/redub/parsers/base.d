@@ -93,8 +93,9 @@ private Dependency dependency(
     ///If subPackage was found, populate informations on it
     if(out_mainPackageName.length)
         name = out_mainPackageName;
-    ///Inside this same package
-    if(out_mainPackageName == requirementName && subPackage)
+    
+    ///Inside this same package (requirementName:subPackage or :subPackage)
+    if(subPackage && (out_mainPackageName == requirementName || out_mainPackageName.length == 0))
         path = workingDir;
 
     Visibility visibility = Visibility.public_;

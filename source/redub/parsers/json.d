@@ -147,8 +147,11 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
             
             foreach(string depName, JSONValue value; v.object)
             {
-                string name, version_, path, visibility;
-                name = depName;
+                string version_, path, visibility;
+                string out_mainPackage;
+                string subPackage = getSubPackageInfoRequiredBy(depName, req.cfg.name, out_mainPackage);
+                if(subPackage && out_mainPackage)
+                    path = req.cfg.workingDir;
                 if(value.type == JSONType.object) ///Uses path style
                 {
                     const(JSONValue)* depPath = "path" in value;
@@ -156,25 +159,25 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
                     const(JSONValue)* depRep = "repository" in value;
                     visibility = value.tryStr("visibility");
                     enforce(depPath || depVer, 
-                        "Dependency named "~ name ~ 
+                        "Dependency named "~ depName ~ 
                         " must contain at least a \"path\" or \"version\" property."
                     );
                     if("optional" in value && value["optional"].boolean == true)
                     {
                         if(!("default" in value) || value["default"].boolean == false)
-                            warn("redub does not handle optional dependencies.'"~req.cfg.name~"' uses optional for dependency named '"~name~"'. It will be treated like a normal dependency.",
+                            warn("redub does not handle optional dependencies.'"~req.cfg.name~"' uses optional for dependency named '"~depName~"'. It will be treated like a normal dependency.",
                             "\n\tIf you wish a true optional dependency, just define a new configuration with this optional dependency");
                     }
 
-                    path = either(path, depPath ? depPath.str : null, depVer ? redub.package_searching.dub.getPackagePath(name, depVer.str, req.cfg.name) : null);
+                    path = either(path, depPath ? depPath.str : null, depVer ? redub.package_searching.dub.getPackagePath(depName, depVer.str, req.cfg.name) : null);
                     version_ = either(version_, depVer ? depVer.str : null);
                 }
                 else if(value.type == JSONType.string) ///Version style
                 {
                     version_ = value.str;
-                    if(!path) path = redub.package_searching.dub.getPackagePath(name, value.str, c.requiredBy);
+                    if(!path) path = redub.package_searching.dub.getPackagePath(depName, version_, c.requiredBy);
                 }
-                addDependency(req, c, name, version_, BuildRequirements.Configuration.init, path, visibility);
+                addDependency(req, c, depName, version_, BuildRequirements.Configuration.init, path, visibility);
             }
         },
         "subConfigurations": (ref BuildRequirements req, JSONValue v, ParseConfig c)
