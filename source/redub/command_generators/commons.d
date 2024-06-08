@@ -207,7 +207,6 @@ string unescapePath(string targetPath)
     return targetPath;
 }
 
-
 void putSourceFiles(
     ref string[] output,
     const string workingDir,
@@ -222,6 +221,22 @@ void putSourceFiles(
     import std.string:endsWith;
     import std.algorithm.searching;
     import std.exception;
+    
+
+    static bool isFileHidden(DirEntry e)
+    {
+        version(Windows)
+        {
+            import core.sys.windows.winnt;
+            return (e.attributes & FILE_ATTRIBUTE_HIDDEN) != 0;
+        }
+        else
+        {
+            return e.name.length >= 0 && e.name[0] == '.';
+        }
+    }
+
+
 
     foreach(path; paths)
     {
@@ -231,10 +246,10 @@ void putSourceFiles(
             foreach(exclusion; excludeFiles)
                 if(e.name.matchesGlob(exclusion))
                     continue DirEntryLoop;
+            if(isFileHidden(e) || e.isDir)
+                continue;
             foreach(ext; extensions) 
             {
-                if(e.isDir)
-                    continue;
                 if(e.name.endsWith(ext))
                 {
                     output~= escapePath(e.name);
