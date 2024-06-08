@@ -25,15 +25,18 @@ OS osFromArch(string arch)
 
 ISA isaFromArch(string arch)
 {
-    switch(arch) with(ISA)
+    import std.string;
+    static bool contains(string a, string b){return a.indexOf(b) != -1;}
+
+    with(ISA)
     {
-        case "x86":     return x86;
-        case "x86_64":  return x86_64;
-        case "arm":     return arm;
-        case "aarch64": return aarch64;
-        default:
-            return std.system.instructionSetArchitecture;
+        if(contains(arch, "x86_64"))       return x86_64;
+        else if(contains(arch, "aarch64")) return aarch64;
+        else if(contains(arch, "wasm"))    return webAssembly;
+        else if(contains(arch, "arm"))     return arm;
+        else if(contains(arch, "x86"))     return x86;
     }
+    return std.system.instructionSetArchitecture;
 }
 
 
@@ -85,8 +88,10 @@ string getConfigurationOutputPath(const BuildConfiguration conf, OS os)
     }
 }
 
-string getExecutableExtension(OS os)
+string getExecutableExtension(OS os, ISA isa = std.system.instructionSetArchitecture)
 {
+    if(isa == ISA.webAssembly)
+        return ".wasm";
     if(os == OS.win32 || os == OS.win64)
         return ".exe";
     return null;
@@ -144,13 +149,13 @@ bool isPosix(OS os)
     return !(os == OS.win32 || os == OS.win64);
 }
 
-string getExtension(TargetType t, OS target)
+string getExtension(TargetType t, OS target, ISA isa)
 {
     final switch(t)
     {
         case TargetType.none: return null;
         case TargetType.autodetect, TargetType.sourceLibrary: return null;
-        case TargetType.executable: return target.getExecutableExtension;
+        case TargetType.executable: return target.getExecutableExtension(isa);
         case TargetType.library, TargetType.staticLibrary: return target.getLibraryExtension;
         case TargetType.dynamicLibrary: return target.getDynamicLibraryExtension;
     }
@@ -164,7 +169,7 @@ string getExtension(TargetType t, OS target)
  *   os = Which OS is this running on   
  * Returns: For a given library path (e.g: /some/path/a), will make it /some/path/a.[lib|dll] on Windows and /some/path/liba.[a|so] on POSIX
  */
-string getOutputName(TargetType t, string name, OS os)
+string getOutputName(TargetType t, string name, OS os, ISA isa = std.system.instructionSetArchitecture)
 {
     string outputName = name;
     if(os.isPosix && t.isAnyLibrary)
@@ -175,7 +180,7 @@ string getOutputName(TargetType t, string name, OS os)
         paths[$-1] = "lib"~paths[$-1];
         outputName = buildPath(paths);
     }
-    outputName~= t.getExtension(os);
+    outputName~= t.getExtension(os, isa);
     return outputName;
 }
 

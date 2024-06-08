@@ -36,7 +36,8 @@ ProjectNode getProjectTree(BuildRequirements req, CompilationInfo info)
     ProjectNode[] queue = [tree];
     getProjectTreeImpl(queue, info, subConfigs, visited);
     detectCycle(tree);
-    tree.finish(info.targetOS);
+    warn(info.isa);
+    tree.finish(info.targetOS, info.isa);
     return tree;
 }   
 

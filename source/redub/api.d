@@ -184,7 +184,8 @@ ProjectDetails resolveDependencies(
     req.cfg = req.cfg.merge(redub.parsers.build_type.parse(buildType, compiler.compiler));
 
 
-    ProjectNode tree = getProjectTree(req, CompilationInfo(compiler.getCompilerString, cDetails.arch, osFromArch(cDetails.arch), isaFromArch(cDetails.arch)));
+    CompilationInfo cInfo = CompilationInfo(compiler.getCompilerString, cDetails.arch, osFromArch(cDetails.arch), isaFromArch(cDetails.arch));
+    ProjectNode tree = getProjectTree(req, cInfo);
     if(cDetails.combinedBuild)
         tree.combine();
     compiler.usesIncremental = isIncremental(cDetails.incremental, tree);
@@ -194,9 +195,9 @@ ProjectDetails resolveDependencies(
         tree.invalidateCacheOnTree();
     else 
         invalidateCaches(tree, compiler, osFromArch(cDetails.arch));
-    import redub.libs.colorize;
-    
-    infos("Dependencies resolved ", "in ", (st.peek.total!"msecs"), " ms for \"", color(buildType, fg.magenta),"\" using ", compiler.binOrPath);
+
+    import redub.libs.colorize;    
+    infos("Dependencies resolved ", "in ", (st.peek.total!"msecs"), " ms for \"", color(buildType, fg.magenta),"\" using ", compiler.binOrPath, " [", cInfo.targetOS, "-", cInfo.isa, "]");
     return ProjectDetails(tree, compiler, cDetails.parallelType);
 }
 

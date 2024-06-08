@@ -1,7 +1,7 @@
 module redub.buildapi;
 
 import std.path;
-public import std.system:OS;
+public import std.system:OS, ISA;
 import redub.logging;
 
 ///vX.X.X
@@ -418,7 +418,7 @@ struct PendingMergeConfiguration
 struct ExtraInformation
 {
     string[] librariesFullPath;
-    string expectedArtifact;
+    string[] expectedArtifacts;
 
     immutable(ExtraInformation) idup() inout
     {
@@ -584,6 +584,7 @@ class ProjectNode
         return null;
     }
 
+    bool isRoot() const { return this.parent.length == 0; }
     bool isRoot() const shared { return this.parent.length == 0; }
 
     ProjectNode addDependency(ProjectNode dep)
@@ -632,7 +633,7 @@ class ProjectNode
      *
      * Also receives an argument containing the collapsed reference of its unique nodes.
      */
-    void finish(OS targetOS)
+    void finish(OS targetOS, ISA isa)
     {
         scope bool[ProjectNode] visitedBuffer;
         scope ProjectNode[] privatesToMerge;
@@ -671,7 +672,7 @@ class ProjectNode
             
         }
 
-        static void finishSelfRequirements(ProjectNode node, OS targetOS)
+        static void finishSelfRequirements(ProjectNode node, OS targetOS, ISA isa)
         {
             //Finish self requirements
             import std.string:replace;
@@ -692,12 +693,23 @@ class ProjectNode
             node.requirements.cfg = node.requirements.cfg.mergeVersions(toMerge);
 
             
-            ///Generates the name for the output file and save it somewhere
+            ///Adds the output to the expectedArtifact. Those files will be considered on the cache formula.
             import redub.command_generators.commons;
-            node.requirements.extra.expectedArtifact = buildNormalizedPath(
+
+            node.requirements.extra.expectedArtifacts~= buildNormalizedPath(
                 node.requirements.cfg.outputDirectory, 
-                getOutputName(node.requirements.cfg.targetType, node.requirements.cfg.name, targetOS)
+                getOutputName(node.requirements.cfg.targetType, node.requirements.cfg.name, targetOS, isa)
             );
+
+            ///When windows builds shared libraries and they aren't root, it also generates a static library (import library)
+            ///This library will enter on the cache formula
+            if(!node.isRoot && node.requirements.cfg.targetType == TargetType.dynamicLibrary && targetOS.isWindows)
+            {
+                node.requirements.extra.expectedArtifacts~= buildNormalizedPath(
+                    node.requirements.cfg.outputDirectory,
+                    getOutputName(TargetType.staticLibrary, node.requirements.cfg.name, targetOS, isa)
+                );
+            }
         }
         static void finishMerging(ProjectNode target, ProjectNode input)
         {
@@ -756,7 +768,7 @@ class ProjectNode
             }
         }
 
-        static void finishPublic(ProjectNode node, ref bool[ProjectNode] visited, ref ProjectNode[] privatesToMerge, ref ProjectNode[] dependenciesToRemove, OS targetOS)
+        static void finishPublic(ProjectNode node, ref bool[ProjectNode] visited, ref ProjectNode[] privatesToMerge, ref ProjectNode[] dependenciesToRemove, OS targetOS, ISA isa)
         {
             if(node in visited) return;
             ///Enters in the deepest node
@@ -764,10 +776,10 @@ class ProjectNode
             {
                 ProjectNode dep = node.dependencies[i];
                 if(!(node in visited))
-                    finishPublic(dep, visited, privatesToMerge, dependenciesToRemove, targetOS);
+                    finishPublic(dep, visited, privatesToMerge, dependenciesToRemove, targetOS, isa);
             }
             ///Finish defining its self requirements so they can be transferred to its parents
-            finishSelfRequirements(node, targetOS);
+            finishSelfRequirements(node, targetOS, isa);
             ///If this has a private relationship, no merge occurs with parent. 
             for(int i = 0; i < node.parent.length; i++)
             {
@@ -794,7 +806,7 @@ class ProjectNode
             }
         }
         transferNoneDependencies(this);
-        finishPublic(this, visitedBuffer, privatesToMerge, dependenciesToRemove, targetOS);
+        finishPublic(this, visitedBuffer, privatesToMerge, dependenciesToRemove, targetOS, isa);
         finishPrivate(privatesToMerge, dependenciesToRemove);
 
         visitedBuffer.clear();
