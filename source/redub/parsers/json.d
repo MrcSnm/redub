@@ -120,7 +120,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
                         enforce(platforms.type == JSONType.array, 
                             "'platforms' on configuration "~name.str~" at project "~req.name
                         );
-                        if(!platformMatches(platforms.array, os))
+                        if(!platformMatches(platforms.array, os, c.isa))
                             continue;
                     }
                     if(preferredConfiguration == -1)
@@ -328,7 +328,7 @@ private bool matchesArch(string archRep, ISA isa)
         case "arm":     return isa == arm;
         case "aarch64": return isa == aarch64;
         default:
-            throw new Error("No appropriate switch clause found for architecture "~archRep);
+            throw new Error("No appropriate switch clause found for architecture '"~archRep~"'");
     }
 }
 private bool matchesOS(string osRep, OS os)
@@ -354,17 +354,15 @@ private bool matchesOS(string osRep, OS os)
         case "tvos": return os == tvOS;
         case "ios": return os == iOS;
         case "windows": return os == win32 || os == win64;
-        default: throw new Error("No appropriate switch clause found for "~osRep);
+        default: throw new Error("No appropriate switch clause found for the OS '"~osRep~"'");
     }
 }
 
-struct CommandWithFilter
+struct PlatformFilter
 {
-    string command;
     string compiler;
     string targetOS;
     string targetArch;
-
     bool matchesArch(ISA isa){return this.targetArch is null || redub.parsers.json.matchesArch(targetArch, isa);}
     bool matchesOS(OS os){return this.targetOS is null || redub.parsers.json.matchesOS(targetOS, os);}
     bool matchesCompiler(string compiler)
@@ -374,6 +372,46 @@ struct CommandWithFilter
         if(this.compiler.startsWith("ldc")) return compiler.startsWith("ldc");
         return this.compiler == compiler;
     }
+
+
+    /** 
+     * Splits command-compiler-os-arch into a struct.
+     * Input examples:
+     * - dflags-osx
+     * - dflags-ldc-osx
+     * - dependencies-windows
+     * Params:
+     *   key = Any key matching input style
+     * Returns: 
+     */
+    static PlatformFilter fromKeys(string[] keys)
+    {
+        import std.string;
+        PlatformFilter ret;
+
+        ret.compiler = keys[0];
+        if(keys.length >= 2) ret.targetOS = keys[1];
+        if(keys.length >= 3) ret.targetArch = keys[2];
+
+
+        if(isOS(ret.compiler)) swap(ret.compiler, ret.targetOS);
+        if(isArch(ret.compiler)) swap(ret.compiler, ret.targetArch);
+
+        if(isArch(ret.targetOS)) swap(ret.targetOS, ret.targetArch);
+        if(isOS(ret.targetArch)) swap(ret.targetArch, ret.targetOS);
+
+        return ret;
+    }
+}
+
+struct CommandWithFilter
+{
+    string command;
+    PlatformFilter filter;
+
+    bool matchesArch(ISA isa){return filter.matchesArch(isa);}
+    bool matchesOS(OS os){return filter.matchesOS(os);}
+    bool matchesCompiler(string compiler){return filter.matchesCompiler(compiler);}
 
     /** 
      * Splits command-compiler-os-arch into a struct.
@@ -394,17 +432,7 @@ struct CommandWithFilter
         if(keys.length == 1)
             return ret;
         ret.command = keys[0];
-        ret.compiler = keys[1];
-        if(keys.length >= 3) ret.targetOS = keys[2];
-        if(keys.length >= 4) ret.targetArch = keys[3];
-
-
-        if(isOS(ret.compiler)) swap(ret.compiler, ret.targetOS);
-        if(isArch(ret.compiler)) swap(ret.compiler, ret.targetArch);
-
-        if(isArch(ret.targetOS)) swap(ret.targetOS, ret.targetArch);
-        if(isOS(ret.targetArch)) swap(ret.targetArch, ret.targetOS);
-
+        ret.filter = PlatformFilter.fromKeys(keys[1..$]);
         return ret;
     }
 }
@@ -423,11 +451,16 @@ private void swap(T)(ref T a, ref T b)
     a = temp;
 }
 
-private bool platformMatches(JSONValue[] platforms, OS os)
+private bool platformMatches(JSONValue[] platforms, OS os, ISA isa)
 {
     foreach(p; platforms)
-        if(matchesOS(p.str, os))
+    {
+        import std.string;
+        PlatformFilter filter = PlatformFilter.fromKeys(p.str.split("-"));
+
+        if(filter.matchesOS(os) && filter.matchesArch(isa))
             return true;
+    }
     return false;
 }
 
