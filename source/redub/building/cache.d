@@ -62,7 +62,7 @@ struct CompilationCache
         string reqCache = hashFrom(req, compiler);
         if(c == JSONValue.emptyObject)
             return CompilationCache(reqCache);
-        enforce(c.type == JSONType.object, "Cache is corrupted, delete it.");
+        enforce(c.type == JSONType.object, "Cache is corrupted, please delete it at "~getCacheFolder());
         JSONValue* targetCache = reqCache in c;
         if(!targetCache)
             return CompilationCache(reqCache);
@@ -182,7 +182,7 @@ AdvCacheFormula generateCache(const BuildRequirements req, OS target, const(AdvC
         //DO NOT use sourcePaths since importPaths is always custom + sourcePaths
         joinFlattened(req.cfg.importDirectories, req.cfg.stringImportPaths), ///This is causing problems when using subPackages without output path, they may clash after
         // the compilation is finished. Solving this would require hash calculation after linking
-        joinFlattened(req.cfg.sourceFiles, libs, req.extra.expectedArtifacts),
+        joinFlattened(req.cfg.sourceFiles, libs, req.extra.expectedArtifacts, req.cfg.filesToCopy,req.cfg.extraDependencyFiles),
         existing,
         preprocessed
     );

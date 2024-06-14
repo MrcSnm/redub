@@ -26,6 +26,7 @@ string[] parseBuildConfiguration(AcceptedCompiler comp, const BuildConfiguration
         {
             commands~= mapArch(comp, b.arch);
         }
+        commands = mapAppendPrefix(commands, debugVersions, mapper(ValidDFlags.debugVersions), false);
         commands = mapAppendPrefix(commands, versions, mapper(ValidDFlags.versions), false);
         commands = mapAppendPrefix(commands, importDirectories, mapper(ValidDFlags.importPaths), true);
 
@@ -138,6 +139,7 @@ string dmdFlags(ValidDFlags flag)
         case enableColor: return "-color=on";
         case stringImportPaths: return "-J=";
         case versions: return "-version=";
+        case debugVersions: return "-debug=";
         case importPaths: return "-I";
         case objectDir: return "-od";
         case outputFile: return "-of";
@@ -169,6 +171,7 @@ string ldcFlags(ValidDFlags flag)
         case enableColor: return "--enable-color=true";
         case stringImportPaths: return "-J=";
         case versions: return "--d-version=";
+        case debugVersions: return "--d-debug=";
         case importPaths: return "-I";
         case objectDir: return "--od=";
         case outputFile: return "--of=";
@@ -215,6 +218,7 @@ enum ValidDFlags
     enableColor,
     stringImportPaths,
     versions,
+    debugVersions,
     importPaths,
     objectDir,
     outputFile,

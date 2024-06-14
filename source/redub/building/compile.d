@@ -195,7 +195,7 @@ bool buildProjectParallelSimple(ProjectNode root, Compiler compiler, OS os)
                 break;
         }
     }
-    return doLink(root, os, compiler, mainPackHash, env);
+    return doLink(root, os, compiler, mainPackHash, env) && copyFiles(root);
 }
 
 
@@ -233,7 +233,7 @@ bool buildProjectFullyParallelized(ProjectNode root, Compiler compiler, OS os)
             buildSucceeded(finishedPackage, res);
         }
     }
-    return doLink(root, os, compiler, mainPackHash, env);
+    return doLink(root, os, compiler, mainPackHash, env) && copyFiles(root);
 }
 
 /** 
@@ -275,7 +275,7 @@ bool buildProjectSingleThread(ProjectNode root, Compiler compiler, OS os)
         if(finishedPackage is root)
             break;
     }
-    return doLink(root, os, compiler, mainPackHash, env);
+    return doLink(root, os, compiler, mainPackHash, env) && copyFiles(root);
 }
 
 private void buildSucceeded(ProjectNode node, CompilationResult res)
@@ -298,6 +298,98 @@ private void buildFailed(const ProjectNode node, CompilationResult res, const Co
         "\nFailed after ", res.msNeeded,"ms with message\n\t", res.message
     );
     showNewerVersionMessage();
+}
+
+
+version(Windows)
+extern(Windows) int CreateHardLinkW(const(wchar)* to, const(wchar)* from);
+
+private void hardLinkFile(string from, string to, bool overwrite = false)
+{
+    import std.exception;
+    import std.file;
+    import std.utf;
+	if (exists(to)) 
+    {
+		enforce(overwrite, "Destination file already exists.");
+        if(to == from)
+            return;
+	}
+    uint attr = DirEntry(from).attributes;
+    static bool isWritable(uint attributes)
+    {
+        version(Windows)
+        {
+            enum FILE_ATTRIBUTE_READONLY = 0x01;
+            return (attributes & FILE_ATTRIBUTE_READONLY) == 0;
+        }
+        else
+        {
+            import core.sys.posix.sys.stat : S_IWUSR, S_IWGRP, S_IWOTH;
+            return (attributes & (S_IWUSR | S_IWGRP | S_IWOTH)) == 0;
+        }
+    }
+
+	const writeAccessChangeRequired = overwrite && !isWritable(attr);
+	if (!writeAccessChangeRequired)
+	{
+        alias cstr = toUTFz!(const(wchar)*);
+		version (Windows)
+		{
+			if (CreateHardLinkW(cstr(to), cstr(from)))
+				return;
+		}
+		else
+		{
+			import core.sys.posix.unistd : link;
+			if (!link(cstr(from), cstr(to)))
+				return;
+		}
+	}
+	// fallback to copy
+	std.file.copy(from, to);
+}
+
+
+private bool copyFiles(ProjectNode root)
+{
+    static import std.file;
+    import std.path;
+    string outputDir = root.requirements.cfg.outputDirectory;
+    foreach(ProjectNode proj; root.collapse)
+    {
+        string[] files = proj.requirements.cfg.filesToCopy;
+        if(files.length)
+        {
+            info("\tCopying files for project ", proj.name);
+            foreach(f; files)
+            {
+                string inputPath;
+                string outputPath;
+                if(isAbsolute(f))
+                {
+                    inputPath = buildNormalizedPath(f);
+                    outputPath = buildNormalizedPath(outputDir, relativePath(f, proj.requirements.cfg.workingDir));
+                }
+                else
+                {
+                    inputPath = buildNormalizedPath(proj.requirements.cfg.workingDir, f);
+                    outputPath = buildNormalizedPath(outputDir, f);
+                }
+                vlog("\t\tCopying ", inputPath, " to ", outputPath);
+                try
+                {
+                    hardLinkFile(inputPath, outputPath, true);
+                }
+                catch(Exception e)
+                {
+                    errorTitle("Could not copy "~inputPath, " " , e.toString());
+                    return false;
+                }
+            }
+        }
+    }
+    return true;
 }
 
 private bool doLink(ProjectNode root, OS os, Compiler compiler, string mainPackHash, immutable string[string] env)

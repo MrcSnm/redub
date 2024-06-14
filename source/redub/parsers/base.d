@@ -34,6 +34,8 @@ void addImportPaths(ref BuildRequirements req, string[] paths, ParseConfig c)
     else req.cfg.importDirectories.exclusiveMerge(paths);
 }
 void addStringImportPaths(ref BuildRequirements req, string[] paths, ParseConfig c){req.cfg.stringImportPaths.exclusiveMergePaths(paths);}
+void addExtraDependencyFiles(ref BuildRequirements req, string[] files, ParseConfig c){req.cfg.extraDependencyFiles.exclusiveMerge(files);}
+void addFilesToCopy(ref BuildRequirements req, string[] files, ParseConfig c){req.cfg.filesToCopy~= files;}
 void addPreGenerateCommands(ref BuildRequirements req, string[] cmds, ParseConfig c){req.cfg.preGenerateCommands~= cmds;}
 void addPostGenerateCommands(ref BuildRequirements req, string[] cmds, ParseConfig c){req.cfg.postGenerateCommands~= cmds;}
 void addPreBuildCommands(ref BuildRequirements req, string[] cmds, ParseConfig c){req.cfg.preBuildCommands~= cmds;}
@@ -48,6 +50,7 @@ void addExcludedSourceFiles(ref BuildRequirements req, string[] files, ParseConf
 void addLibPaths(ref BuildRequirements req, string[] paths, ParseConfig c){req.cfg.libraryPaths.exclusiveMerge(paths);}
 void addLibs(ref BuildRequirements req, string[] libs, ParseConfig c){req.cfg.libraries.exclusiveMerge(libs);}
 void addVersions(ref BuildRequirements req, string[] vers, ParseConfig c){req.cfg.versions.exclusiveMerge(vers);}
+void addDebugVersions(ref BuildRequirements req, string[] vers, ParseConfig c){req.cfg.debugVersions.exclusiveMerge(vers);}
 void addLinkFlags(ref BuildRequirements req, string[] lFlags, ParseConfig c){req.cfg.linkFlags.exclusiveMerge(lFlags);}
 void addDflags(ref BuildRequirements req, string[] dFlags, ParseConfig c){req.cfg.dFlags.exclusiveMerge(dFlags);}
 void addDependency(

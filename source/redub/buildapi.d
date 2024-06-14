@@ -5,7 +5,7 @@ public import std.system:OS, ISA;
 import redub.logging;
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.5.3";
+enum RedubVersionOnly = "v1.5.4";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -89,6 +89,7 @@ struct BuildConfiguration
     bool isDebug;
     string name;
     string[] versions;
+    string[] debugVersions;
     string[] importDirectories;
     string[] libraryPaths;
     string[] stringImportPaths;
@@ -98,6 +99,8 @@ struct BuildConfiguration
     string[] sourcePaths;
     string[] sourceFiles;
     string[] excludeSourceFiles;
+    string[] extraDependencyFiles;
+    string[] filesToCopy;
     string[] preGenerateCommands;
     string[] postGenerateCommands;
     string[] preBuildCommands;
@@ -137,6 +140,7 @@ struct BuildConfiguration
             isDebug,
             name,
             versions.idup,
+            debugVersions.idup,
             importDirectories.idup,
             libraryPaths.idup,
             stringImportPaths.idup,
@@ -146,6 +150,8 @@ struct BuildConfiguration
             sourcePaths.idup,
             sourceFiles.idup,
             excludeSourceFiles.idup,
+            extraDependencyFiles.idup,
+            filesToCopy.idup,
             preGenerateCommands.idup,
             postGenerateCommands.idup,
             preBuildCommands.idup,
@@ -173,6 +179,7 @@ struct BuildConfiguration
         ret.sourcePaths.exclusiveMergePaths(other.sourcePaths);
         ret.importDirectories.exclusiveMergePaths(other.importDirectories);
         ret.versions.exclusiveMerge(other.versions);
+        ret.debugVersions.exclusiveMerge(other.debugVersions);
         ret.dFlags.exclusiveMerge(other.dFlags);
         ret.libraries.exclusiveMerge(other.libraries);
         ret.libraryPaths.exclusiveMergePaths(other.libraryPaths);
