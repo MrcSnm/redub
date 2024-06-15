@@ -5,7 +5,7 @@ public import std.system:OS, ISA;
 import redub.logging;
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.5.6";
+enum RedubVersionOnly = "v1.5.7";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -167,12 +167,22 @@ struct BuildConfiguration
 
     BuildConfiguration clone() const{return cast()this;}
 
+    /** 
+     * This function is mainly used to merge a default configuration + a subConfiguration.
+     * It does not execute a parent<-child merging, this step is done at the ProjectNode.
+     * So, almost every property should be merged with each other here.
+     * Params:
+     *   other = The other configuration to merge
+     * Returns: 
+     */
     BuildConfiguration merge(BuildConfiguration other) const
     {
         import std.algorithm.comparison:either;
         BuildConfiguration ret = clone;
         ret.targetType = either(other.targetType, ret.targetType);
         ret.outputDirectory = either(other.outputDirectory, ret.outputDirectory);
+        ret.extraDependencyFiles.exclusiveMergePaths(other.extraDependencyFiles);
+        ret.filesToCopy.exclusiveMergePaths(other.filesToCopy);
         ret.stringImportPaths.exclusiveMergePaths(other.stringImportPaths);
         ret.sourceFiles.exclusiveMerge(other.sourceFiles);
         ret.excludeSourceFiles.exclusiveMerge(other.excludeSourceFiles);
