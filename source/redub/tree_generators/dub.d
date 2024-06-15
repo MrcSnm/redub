@@ -113,6 +113,11 @@ private void getProjectTreeImpl(
         }
         else
         {
+            if(dep.isOptional)
+            {
+                warn("Dependency ", dep.fullName, " is optional. And since there is no dependency requesting for it before this optional, it won't be included.");
+                continue;
+            }
             depNode = new ProjectNode(parseProjectWithParent(dep, node.requirements, info));
             subConfigurations = depNode.requirements.mergeSubConfigurations(subConfigurations);
             visited[dep.fullName] = depNode;

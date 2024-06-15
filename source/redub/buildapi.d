@@ -5,7 +5,7 @@ public import std.system:OS, ISA;
 import redub.logging;
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.5.4";
+enum RedubVersionOnly = "v1.5.5";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -380,6 +380,7 @@ struct Dependency
     BuildRequirements.Configuration subConfiguration;
     string subPackage;
     Visibility visibility = Visibility.public_;
+    bool isOptional;
 
     bool isSameAs(string name, string subPackage) const
     {
@@ -920,6 +921,9 @@ class ProjectNode
         }
     }
 
+    /** 
+     * This function will try to build the entire project in a single compilation run
+     */
     void combine()
     {
         ProjectNode[] leaves;

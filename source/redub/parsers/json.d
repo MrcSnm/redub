@@ -159,6 +159,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
                 string version_, path, visibility;
                 string out_mainPackage;
                 string subPackage = getSubPackageInfoRequiredBy(depName, req.cfg.name, out_mainPackage);
+                bool isOptional = false;
                 ///If the main package is the same as this dependency, then simply use the same json file.
                 if(subPackage && out_mainPackage == depName)
                     path = req.cfg.workingDir;
@@ -175,8 +176,11 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
                     if("optional" in value && value["optional"].boolean == true)
                     {
                         if(!("default" in value) || value["default"].boolean == false)
-                            warn("redub does not handle optional dependencies.'"~req.cfg.name~"' uses optional for dependency named '"~depName~"'. It will be treated like a normal dependency.",
-                            "\n\tIf you wish a true optional dependency, just define a new configuration with this optional dependency");
+                        {
+                            warn("redub does not handle optional dependencies the same way as dub.'"~req.cfg.name~"' uses optional for dependency named '"~depName~"'.",
+                            "\n\tThe difference is that, for an optional dependency be included, it needs to show up in the dependency tree before it being optional.");
+                            isOptional = true;
+                        }
                     }
 
                     path = either(path, depPath ? depPath.str : null, depVer ? redub.package_searching.dub.getPackagePath(depName, depVer.str, req.cfg.name) : null);
@@ -187,7 +191,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
                     version_ = value.str;
                     if(!path) path = redub.package_searching.dub.getPackagePath(depName, version_, c.requiredBy);
                 }
-                addDependency(req, c, depName, version_, BuildRequirements.Configuration.init, path, visibility);
+                addDependency(req, c, depName, version_, BuildRequirements.Configuration.init, path, visibility, isOptional);
             }
         },
         "subConfigurations": (ref BuildRequirements req, JSONValue v, ParseConfig c)
@@ -310,7 +314,7 @@ private bool isOS(string osRep)
 {
     switch(osRep)
     {
-        case "posix", "linux", "osx", "windows": return true;
+        case "posix", "linux", "osx", "windows", "freebsd", "netbsd", "openbsd", "dragonflybsd", "solaris", "watchos", "tvos", "ios": return true;
         default: return false;
     }
 }

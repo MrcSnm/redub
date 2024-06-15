@@ -59,14 +59,15 @@ void addDependency(
     string name, string version_, 
     BuildRequirements.Configuration subConfiguration, 
     string path,
-    string visibility
+    string visibility,
+    bool isOptional
 )
 {
     import std.path;
     import std.algorithm.searching:countUntil;
     if(path.length && !isAbsolute(path)) 
         path = buildNormalizedPath(c.workingDir, path);
-    Dependency dep = dependency(name, path, version_, req.name, c.workingDir, subConfiguration, visibility);
+    Dependency dep = dependency(name, path, version_, req.name, c.workingDir, subConfiguration, visibility, isOptional);
     //If dependency already exists, use the existing one
     ptrdiff_t depIndex = countUntil!((a) => a.isSameAs(dep))(req.dependencies);
     if(depIndex == -1)
@@ -89,7 +90,8 @@ private Dependency dependency(
     string requirementName,
     string workingDir,
     BuildRequirements.Configuration subConfiguration,
-    string visibilityStr
+    string visibilityStr,
+    bool isOptional
 )
 {
     string out_mainPackageName;
@@ -105,7 +107,7 @@ private Dependency dependency(
     Visibility visibility = Visibility.public_;
     if(visibilityStr) visibility = VisibilityFrom(visibilityStr);
     
-    return Dependency(name, path, version_, subConfiguration, subPackage, visibility);
+    return Dependency(name, path, version_, subConfiguration, subPackage, visibility, isOptional);
 }
 
 void addSubConfiguration(
