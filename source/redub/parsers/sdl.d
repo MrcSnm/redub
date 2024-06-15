@@ -20,16 +20,19 @@ BuildRequirements parse(
     import std.path;
 
     string currDir = getcwd();
+    string tempFile = filePath~".redub_cache_json"; //.sdl.redub_cache_json
     chdir(workingDir);
-    auto exec = executeShell("dub convert -f json -s");
 
-    if(exec.status)
-        throw new Exception("dub could not convert file at path "~filePath~" to json: "~exec.output);
-    
-    string tempFile = filePath~".json"; //.sdl.json
-    std.file.write(tempFile, exec.output);
+    ///If the dub.sdl is newer than the json generated or if it does not exists.
+    if(!std.file.exists(tempFile) || timeLastModified(tempFile).stdTime < timeLastModified(filePath).stdTime)
+    {
+        auto exec = executeShell("dub convert -f json -s");
+
+        if(exec.status)
+            throw new Exception("dub could not convert file at path "~filePath~" to json: "~exec.output);
+        std.file.write(tempFile, exec.output);
+    }
     BuildRequirements ret = redub.parsers.json.parse(tempFile, workingDir, compiler, arch, version_, subConfiguration, subPackage, targetOS, isa);
     chdir(currDir);
-    std.file.remove(tempFile);
     return ret;
 }
