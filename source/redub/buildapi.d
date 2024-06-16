@@ -5,7 +5,7 @@ public import std.system:OS, ISA;
 import redub.logging;
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.5.7";
+enum RedubVersionOnly = "v1.5.8";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -116,7 +116,9 @@ struct BuildConfiguration
         import std.path;
         import std.file;
         static immutable inferredSourceFolder = ["source", "src"];
+        static immutable inferredStringImportFolder = ["views"];
         string initialSource;
+        string initialStringImport;
         foreach(sourceFolder; inferredSourceFolder)
         {
             if(exists(buildNormalizedPath(workingDir, sourceFolder)))
@@ -125,9 +127,20 @@ struct BuildConfiguration
                 break;
             }
         }
+
+        foreach(striFolder; inferredStringImportFolder)
+        {
+            if(exists(buildNormalizedPath(workingDir, striFolder)))
+            {
+                initialStringImport = striFolder;
+                break;
+            }
+        }
+
         
         BuildConfiguration ret;
         if(initialSource) ret.sourcePaths = [initialSource];
+        if(initialStringImport) ret.stringImportPaths = [initialStringImport];
         ret.targetType = TargetType.autodetect;
         ret.sourceEntryPoint = "source/app.d";
         ret.outputDirectory = ".";
@@ -181,6 +194,7 @@ struct BuildConfiguration
         BuildConfiguration ret = clone;
         ret.targetType = either(other.targetType, ret.targetType);
         ret.outputDirectory = either(other.outputDirectory, ret.outputDirectory);
+        ret = ret.mergeCommands(other);
         ret.extraDependencyFiles.exclusiveMergePaths(other.extraDependencyFiles);
         ret.filesToCopy.exclusiveMergePaths(other.filesToCopy);
         ret.stringImportPaths.exclusiveMergePaths(other.stringImportPaths);
@@ -243,6 +257,13 @@ struct BuildConfiguration
     {
         BuildConfiguration ret = clone;
         ret.versions.exclusiveMerge(other.versions);
+        return ret;
+    }
+
+    BuildConfiguration mergeDebugVersions(const BuildConfiguration other) const
+    {
+        BuildConfiguration ret = clone;
+        ret.debugVersions.exclusiveMerge(other.debugVersions);
         return ret;
     }
     BuildConfiguration mergeSourceFiles(const BuildConfiguration other) const
@@ -586,13 +607,18 @@ class ProjectNode
     ProjectNode[] dependencies;
     private bool shouldRebuild = false;
     private ProjectNode[] collapsedRef;
+    private bool _isOptional = false;
 
     string name() const { return requirements.name; }
 
-    this(BuildRequirements req)
+    this(BuildRequirements req, bool isOptional)
     {
         this.requirements = req;
+        this._isOptional = isOptional;
     }
+
+    bool isOptional() const { return this._isOptional; }
+    void makeRequired(){this._isOptional = false;}
 
     ProjectNode debugFindDep(string depName)
     {
@@ -670,11 +696,20 @@ class ProjectNode
             return false;
         }
 
-        static void transferNoneDependencies(ProjectNode node)
+        static void transferNoneDependenciesAndClearOptional(ProjectNode node)
         {
             ///Enters in the deepest node
             for(int i = 0; i < node.dependencies.length; i++)
-                transferNoneDependencies(node.dependencies[i]);
+            {
+                if(node.dependencies[i].isOptional)
+                {
+                    warn("Dependency ", node.dependencies[i].name, " is optional. And since there is no dependency requesting for it before this optional, it won't be included.");
+                    node.dependencies[i].becomeIndependent();
+                    i--;
+                    continue;
+                }
+                transferNoneDependenciesAndClearOptional(node.dependencies[i]);
+            }
             ///If the node is none, transfer all of its dependencies to all of its parents
             if(node.requirements.cfg.targetType == TargetType.none)
             {
@@ -823,7 +858,7 @@ class ProjectNode
                 node.becomeIndependent();
             }
         }
-        transferNoneDependencies(this);
+        transferNoneDependenciesAndClearOptional(this);
         finishPublic(this, visitedBuffer, privatesToMerge, dependenciesToRemove, targetOS, isa);
         finishPrivate(privatesToMerge, dependenciesToRemove);
 

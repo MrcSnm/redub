@@ -30,7 +30,7 @@ struct CompilationInfo
  */
 ProjectNode getProjectTree(BuildRequirements req, CompilationInfo info)
 {
-    ProjectNode tree = new ProjectNode(req);
+    ProjectNode tree = new ProjectNode(req, false);
     string[string] subConfigs = req.getSubConfigurations;
     ProjectNode[string] visited;
     ProjectNode[] queue = [tree];
@@ -96,6 +96,12 @@ private void getProjectTreeImpl(
         if(visitedDep)
         {
             depNode = *visitedDep;
+
+            if(!dep.isOptional && depNode.isOptional)
+            {
+                depNode.makeRequired();
+                infos("Optional Included: ", dep.fullName);
+            }
             ///When found 2 different packages requiring a different dependency subConfiguration
             /// and the new is a default one.
             if(visitedDep.requirements.configuration != dep.subConfiguration && !dep.subConfiguration.isDefault)
@@ -113,12 +119,7 @@ private void getProjectTreeImpl(
         }
         else
         {
-            if(dep.isOptional)
-            {
-                warn("Dependency ", dep.fullName, " is optional. And since there is no dependency requesting for it before this optional, it won't be included.");
-                continue;
-            }
-            depNode = new ProjectNode(parseProjectWithParent(dep, node.requirements, info));
+            depNode = new ProjectNode(parseProjectWithParent(dep, node.requirements, info), dep.isOptional);
             subConfigurations = depNode.requirements.mergeSubConfigurations(subConfigurations);
             visited[dep.fullName] = depNode;
             queue~= depNode;
@@ -149,7 +150,8 @@ private BuildRequirements mergeProjectWithParent(BuildRequirements base, BuildRe
 {
     base.cfg = base.cfg
                 .mergeDFlags(parent.cfg)
-                .mergeVersions(parent.cfg);
+                .mergeVersions(parent.cfg)
+                .mergeDebugVersions(parent.cfg);
     return base;
 }
 
