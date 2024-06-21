@@ -333,14 +333,15 @@ private void hardLinkFile(string from, string to, bool overwrite = false)
 	const writeAccessChangeRequired = overwrite && !isWritable(attr);
 	if (!writeAccessChangeRequired)
 	{
-        alias cstr = toUTFz!(const(wchar)*);
 		version (Windows)
 		{
+            alias cstr = toUTFz!(const(wchar)*);
 			if (CreateHardLinkW(cstr(to), cstr(from)))
 				return;
 		}
 		else
 		{
+            alias cstr = toUTFz!(const(char)*);
 			import core.sys.posix.unistd : link;
 			if (!link(cstr(from), cstr(to)))
 				return;
