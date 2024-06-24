@@ -305,6 +305,25 @@ private void buildFailed(const ProjectNode node, CompilationResult res, const Co
 version(Windows)
 extern(Windows) int CreateHardLinkW(const(wchar)* to, const(wchar)* from, void* secAttributes);
 
+private bool isSameFile(string a, string b)
+{
+    import std.file;
+    DirEntry aDir = DirEntry(a);
+    DirEntry bDir = DirEntry(b);
+    version(Posix)
+    {
+		return aDir.statBuf == bDir.statBuf;
+    }
+    else
+    {
+        return aDir.isDir == bDir.isDir &&
+                aDir.timeLastModified == bDir.timeLastModified &&
+                aDir.size == bDir.size &&
+                aDir.isSymlink == bDir.isSymlink;
+    }
+}
+
+
 private bool hardLinkFile(string from, string to, bool overwrite = false)
 {
     import std.exception;
@@ -321,7 +340,7 @@ private bool hardLinkFile(string from, string to, bool overwrite = false)
 	if (exists(to)) 
     {
 		enforce(overwrite, "Destination file already exists.");
-        if(to == from)
+        if(isSameFile(from, to))
             return true;
 	}
     uint attr = DirEntry(from).attributes;
