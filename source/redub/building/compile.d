@@ -19,6 +19,7 @@ struct CompilationResult
 
 import std.typecons;
 import core.sys.windows.stat;
+import redub.api;
 alias ExecutionResult = Tuple!(int, "status", string, "output");
 /**
 *   If any command has status, it will stop executing them and return
@@ -302,18 +303,26 @@ private void buildFailed(const ProjectNode node, CompilationResult res, const Co
 
 
 version(Windows)
-extern(Windows) int CreateHardLinkW(const(wchar)* to, const(wchar)* from);
+extern(Windows) int CreateHardLinkW(const(wchar)* to, const(wchar)* from, void* secAttributes);
 
-private void hardLinkFile(string from, string to, bool overwrite = false)
+private bool hardLinkFile(string from, string to, bool overwrite = false)
 {
     import std.exception;
     import std.file;
+    import std.path;
     import std.utf;
+    if(!exists(from))
+        throw new Exception("File "~from~ " does not exists. ");
+    string toDir = dirName(to);
+    if(!exists(toDir))
+    {
+        throw new Exception("The output directory '"~toDir~"' from the copy operation with input file '"~from~"' does not exists.");
+    }
 	if (exists(to)) 
     {
 		enforce(overwrite, "Destination file already exists.");
         if(to == from)
-            return;
+            return true;
 	}
     uint attr = DirEntry(from).attributes;
     static bool isWritable(uint attributes)
@@ -336,19 +345,28 @@ private void hardLinkFile(string from, string to, bool overwrite = false)
 		version (Windows)
 		{
             alias cstr = toUTFz!(const(wchar)*);
-			if (CreateHardLinkW(cstr(to), cstr(from)))
-				return;
+			if(CreateHardLinkW(cstr(to), cstr(from), null) != 0)
+                return true;
 		}
 		else
 		{
             alias cstr = toUTFz!(const(char)*);
 			import core.sys.posix.unistd : link;
-			if (!link(cstr(from), cstr(to)))
-				return;
+            if(link(cstr(from), cstr(to)) == 0)
+                return true;
 		}
 	}
 	// fallback to copy
-	std.file.copy(from, to);
+    try
+    {
+	    std.file.copy(from, to);        
+    }
+    catch(Exception e)
+    {
+        errorTitle("Could not copy "~from, " " , e.toString());
+        return false;
+    }
+    return true;
 }
 
 
@@ -370,7 +388,7 @@ private bool copyFiles(ProjectNode root)
                 if(isAbsolute(f))
                 {
                     inputPath = buildNormalizedPath(f);
-                    outputPath = buildNormalizedPath(outputDir, relativePath(f, proj.requirements.cfg.workingDir));
+                    outputPath = buildNormalizedPath(outputDir, f.baseName);
                 }
                 else
                 {
@@ -378,13 +396,9 @@ private bool copyFiles(ProjectNode root)
                     outputPath = buildNormalizedPath(outputDir, f);
                 }
                 vlog("\t\tCopying ", inputPath, " to ", outputPath);
-                try
+                if(!hardLinkFile(inputPath, outputPath, true))
                 {
-                    hardLinkFile(inputPath, outputPath, true);
-                }
-                catch(Exception e)
-                {
-                    errorTitle("Could not copy "~inputPath, " " , e.toString());
+                    error("Could not copy file ", inputPath);
                     return false;
                 }
             }
@@ -400,7 +414,11 @@ private bool doLink(ProjectNode root, OS os, Compiler compiler, string mainPackH
 
     if(!shouldSkipLinking)
     {
-        CompilationResult linkRes = link(root.requirements, os, compiler, env);
+        CompilationResult linkRes;
+        auto result = timed(() {
+             linkRes = link(root.requirements, os, compiler, env);
+             return true;
+        });
         if(linkRes.status)
         {
             import redub.misc.github_tag_check;
@@ -413,25 +431,32 @@ private bool doLink(ProjectNode root, OS os, Compiler compiler, string mainPackH
         }
         else
         {
-            infos("Linked: ", root.name, " finished!");
+            infos("Linked: ", root.name, " finished in ", result.msecs, "ms!");
             vlog("\n\t", linkRes.compilationCommand, " \n");
         }
+
+        
     }
     if(isUpToDate)
         infos("Up-to-Date: ", root.name, ", skipping linking");
     else 
     {
         AdvCacheFormula cache;
-        foreach(node; root.collapse)
+        auto result = timed(()
         {
-            if(!node.isUpToDate)
+            foreach(node; root.collapse)
             {
-                CompilationCache existingCache = CompilationCache.get(mainPackHash, node.requirements, compiler);
-                const AdvCacheFormula existingFormula = existingCache.getFormula();
-                updateCache(mainPackHash, CompilationCache.make(existingCache.requirementCache, node.requirements, os, &existingFormula, &cache));
+                if(!node.isUpToDate)
+                {
+                    CompilationCache existingCache = CompilationCache.get(mainPackHash, node.requirements, compiler);
+                    const AdvCacheFormula existingFormula = existingCache.getFormula();
+                    updateCache(mainPackHash, CompilationCache.make(existingCache.requirementCache, node.requirements, os, &existingFormula, &cache));
+                }
             }
-        }
-        updateCacheOnDisk(mainPackHash);
+            updateCacheOnDisk(mainPackHash);
+            return true;
+        });
+        info("Wrote cache in ", result.msecs, "ms");
     }
         
     return true;

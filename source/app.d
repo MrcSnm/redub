@@ -15,6 +15,9 @@ import redub.cli.dub;
 import redub.command_generators.commons;
 
 
+extern(C) __gshared string[] rt_options = [ "gcopt=initReserve:200" ];
+
+
 
 
 string formatError(string err)
