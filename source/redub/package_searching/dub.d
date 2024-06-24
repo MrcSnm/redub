@@ -27,6 +27,71 @@ bool dubHook_PackageManagerDownloadPackage(string packageName, string packageVer
     // return false;
 }
 
+struct PackageInfo
+{
+    string packageName;
+    string subPackage;
+    string requiredVersion;
+    string bestVersion;
+    string path;
+    string requiredBy;
+}
+
+private struct ReducedPackageInfo
+{
+    string bestVersion;
+    string bestVersionPath;
+    SemVer[] foundVersions;
+}
+
+/** 
+ * Gets the best matching version on the specified folder
+ * Params:
+ *   folder = The folder containing the packageName versionentries
+ *   packageName = Used to build the path
+ *   subPackage = Currently used only for warning
+ *   packageVersion = The version required (SemVer)
+ * Returns: 
+ */
+private ReducedPackageInfo getPackageInFolder(string folder, string packageName, string subPackage, string packageVersion)
+{
+    import std.path;
+    import std.file;
+    import std.algorithm.sorting;
+    import std.algorithm.iteration;
+    import std.array;
+    SemVer requirement = SemVer(packageVersion);
+    if (requirement.isInvalid)
+    {
+        if (isGitStyle(requirement.toString))
+        {
+            warn("Using git package version requirement ", requirement, " for ", packageName ~ (subPackage ? (
+                    ":" ~ subPackage) : ""));
+            foreach (DirEntry e; dirEntries(folder, SpanMode.shallow))
+            {
+                string fileName = e.name.baseName;
+                if (fileName == requirement.toString)
+                    return ReducedPackageInfo(fileName, buildNormalizedPath(folder, requirement.toString, packageName));
+            }
+        }
+        error("Invalid package version requirement ", requirement);
+    }
+    else
+    {
+        SemVer[] semVers = dirEntries(folder, SpanMode.shallow)
+            .map!((DirEntry e) => e.name.baseName)
+            .filter!((string name) => name.length && name[0] != '.') //Remove invisible files
+            .map!((string name) => SemVer(name))
+            .array;
+        foreach_reverse (SemVer v; sort(semVers)) ///Sorts version from the highest to lowest
+        {
+            if (v.satisfies(requirement))
+                return ReducedPackageInfo(v.toString, buildNormalizedPath(folder, v.toString, packageName), semVers);
+        }
+    }
+    return ReducedPackageInfo.init;
+}
+
 /** 
  * Lookups inside 
  * - $HOME/.dub/packages/local-packages.json
@@ -34,16 +99,16 @@ bool dubHook_PackageManagerDownloadPackage(string packageName, string packageVer
  *
  * Params:
  *   packageName = "name" inside dub.json
- *   packageVersion = "version" inside dub.json. Only full matches are accepted at the moment
+ *   packageVersion = "version" inside dub.json. SemVer matches are also accepted
  * Returns: The package path when found. null when not.
  */
 string getPackagePath(string packageName, string packageVersion, string requiredBy)
 {
     import std.file;
     import std.path;
+    import std.algorithm;
+    import std.array;
 
-    string lookupPath = getDefaultLookupPathForPackages();
-    string locPackages = buildNormalizedPath(lookupPath, "local-packages.json");
     string mainPackageName;
     string subPackage = getSubPackageInfo(packageName, mainPackageName);
     if (subPackage)
@@ -52,19 +117,15 @@ string getPackagePath(string packageName, string packageVersion, string required
             packageName = mainPackageName;
         else
             packageName = requiredBy;
-    }
-
+    } 
     vlog("Getting package ", packageName, ":", subPackage, "@", packageVersion);
 
-    string packagePath;
-    if (std.file.exists(locPackages))
-    {
-        JSONValue localPackagesJSON = parseJSON(std.file.readText(locPackages));
-        packagePath = getPackageInJSON(localPackagesJSON, packageName, packageVersion);
-        if (packagePath)
-            return packagePath;
-    }
-    string downloadedPackagePath = buildNormalizedPath(lookupPath, packageName);
+    ReducedPackageInfo localPackage = getPackageInLocalPackages(packageName, packageVersion);
+    if (localPackage != ReducedPackageInfo.init)
+        return localPackage.bestVersionPath;
+    
+    ///If no version was downloaded yet, download before looking
+    string downloadedPackagePath = buildNormalizedPath(getDefaultLookupPathForPackages(), packageName);
     if (!std.file.exists(downloadedPackagePath))
     {
         if (!dubHook_PackageManagerDownloadPackage(packageName, packageVersion, requiredBy))
@@ -73,48 +134,24 @@ string getPackagePath(string packageName, string packageVersion, string required
             return null;
         }
     }
+    ReducedPackageInfo info = getPackageInFolder(downloadedPackagePath, packageName, subPackage, packageVersion);
+    if(info != ReducedPackageInfo.init)
+        return info.bestVersionPath;
 
-    import std.algorithm.sorting;
-    import std.algorithm.iteration;
-    import std.array;
-
-    SemVer[] semVers = dirEntries(downloadedPackagePath, SpanMode.shallow)
-        .map!((DirEntry e) => e.name.baseName)
-        .filter!((string name) => name.length && name[0] != '.') //Remove invisible files
-        .map!((string name) => SemVer(name))
-        .array;
-    SemVer requirement = SemVer(packageVersion);
-
-    if (requirement.isInvalid)
-    {
-        if (isGitStyle(requirement.toString))
-        {
-            warn("Using git package version requirement ", requirement, " for ", packageName ~ (subPackage ? (
-                    ":" ~ subPackage) : ""));
-            foreach (DirEntry e; dirEntries(downloadedPackagePath, SpanMode.shallow))
-            {
-                if (e.name.baseName == requirement.toString)
-                    return buildNormalizedPath(downloadedPackagePath, requirement.toString, packageName);
-            }
-        }
-        error("Invalid package version requirement ", requirement);
-        return null;
-    }
-    foreach_reverse (SemVer v; sort(semVers))
-    {
-        if (v.satisfies(requirement))
-            return buildNormalizedPath(downloadedPackagePath, v.toString, packageName);
-    }
+    ///If no matching version was found, try downloading it.
     if (dubHook_PackageManagerDownloadPackage(packageName, packageVersion, requiredBy))
         return getPackagePath(packageName, packageVersion, requiredBy);
     throw new Exception(
         "Could not find any package named " ~
-            packageName ~ " with version " ~ requirement.toString ~
+            packageName ~ " with version " ~ packageVersion ~
             " required by " ~ requiredBy ~ "\nFound versions:\n\t" ~
-            semVers.map!(
+            info.foundVersions.map!(
                 (sv) => sv.toString).join("\n\t")
     );
 }
+
+
+
 
 /** 
  * Separates the subpackage name from the entire dependency name.
@@ -161,7 +198,7 @@ string getDubWorkspacePath()
         return buildNormalizedPath(environment["HOME"], ".dub");
 }
 
-private string getPackageInJSON(JSONValue json, string packageName, string packageVersion)
+private ReducedPackageInfo getPackageInJSON(JSONValue json, string packageName, string packageVersion)
 {
     SemVer requirement = SemVer(packageVersion);
     foreach (v; json.array)
@@ -172,16 +209,43 @@ private string getPackageInJSON(JSONValue json, string packageName, string packa
         if (nameJson && nameJson.str == packageName && packageVer.satisfies(requirement))
         {
             info("Using local package found at ", v["path"].str, " with version ", ver.str);
-            return v["path"].str;
+            return ReducedPackageInfo(ver.str, v["path"].str);
         }
     }
-    return null;
+    return ReducedPackageInfo.init;
+}
+
+/** 
+ * Use this version instead of getPackageInJSON since this one will cache the local packages instead.
+ * Params:
+ *   packageName = The package name to get
+ *   packageVersion = The package version to get
+ * Returns: Best version with its path
+ */
+private ReducedPackageInfo getPackageInLocalPackages(string packageName, string packageVersion)
+{
+    import std.path;
+    static import std.file;
+
+    static JSONValue localCache;
+    static bool isCached = false;
+
+    if(isCached)
+    {
+        if(localCache == JSONValue.init)
+            return ReducedPackageInfo.init;
+        return getPackageInJSON(localCache, packageName, packageVersion);
+    }
+    isCached = true;
+    string locPackages = buildNormalizedPath(getDefaultLookupPathForPackages(), "local-packages.json");
+    if(std.file.exists(locPackages))
+        localCache = parseJSON(std.file.readText(locPackages));
+    return getPackageInLocalPackages(packageName, packageVersion);
 }
 
 private string getDefaultLookupPathForPackages()
 {
     import std.path;
-
     return buildNormalizedPath(getDubWorkspacePath, "packages");
 }
 
