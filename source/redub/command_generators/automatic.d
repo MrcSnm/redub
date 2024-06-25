@@ -29,14 +29,12 @@ string[] getCompilationFlags(const BuildConfiguration cfg, OS os, Compiler compi
 
 string getCompileCommands(const BuildConfiguration cfg, OS os, Compiler compiler)
 {
-    import std.array:join;
     string[] flags = getCompilationFlags(cfg,os,compiler);
     return escapeShellCommand(compiler.binOrPath) ~ " " ~ processFlags(flags);
 }
 
 string getLinkCommands(const BuildRequirements req, OS os, Compiler compiler)
 {
-    import std.array:join;
     import command_generators.linkers;
     string[] flags;
     

@@ -9,7 +9,6 @@ import redub.logging;
 string[] parseBuildConfiguration(const BuildConfiguration b, OS os)
 {
     import std.algorithm.iteration:map;
-    import std.array:array;
     import std.path;
     
     string[] commands;
@@ -18,10 +17,10 @@ string[] parseBuildConfiguration(const BuildConfiguration b, OS os)
     {
         if(isDebug) commands~= "-g";
 
-        commands~= versions.map!((v) => "-D"~v~"=1").array;
+        commands = commands.append(versions.map!((v) => "-D"~v~"=1"));
         commands~= dFlags;
         commands~="-v";
-        commands~= importDirectories.map!((i) => "-I"~i).array;
+        commands = commands.append(importDirectories.map!((i) => "-I"~i));
 
         putSourceFiles(commands, workingDir, sourcePaths, sourceFiles, excludeSourceFiles, ".c", ".cpp", ".cc", ".i", ".cxx", ".c++");
 

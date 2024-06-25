@@ -5,7 +5,7 @@ public import std.system:OS, ISA;
 import redub.logging;
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.5.11";
+enum RedubVersionOnly = "v1.5.12";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -289,13 +289,24 @@ struct BuildConfiguration
     }
 }
 
+
+
+private auto save(TRange)(TRange input)
+{
+    import std.traits:isArray;
+    static if(isArray!TRange)
+        return input;
+    else
+        return input.save;
+}
+
 /**
 *   Optimized for direct memory allocation.
 */
-ref string[] exclusiveMerge (return scope ref string[] a, const scope string[] b)
+ref string[] exclusiveMerge(StringRange)(return scope ref string[] a, StringRange b)
 {
     size_t notFoundCount;
-    foreach(bV; b)
+    foreach(bV; save(b))
     {
         bool found = false;
         if(bV.length == 0) continue;
@@ -315,7 +326,7 @@ ref string[] exclusiveMerge (return scope ref string[] a, const scope string[] b
         size_t length = a.length;
         size_t index = length;
         a.length+= notFoundCount;
-        foreach(bV; b)
+        foreach(bV; save(b))
         {
             bool found = false;
             if(bV.length == 0) continue;
@@ -338,7 +349,7 @@ ref string[] exclusiveMerge (return scope ref string[] a, const scope string[] b
  * Used when dealing with paths. It normalizes them for not getting the same path twice.
  * This function has been optimized for less memory allocation
  */
-ref string[] exclusiveMergePaths(return scope ref string[] a, const string[] b)
+ref string[] exclusiveMergePaths(StringRange)(return scope ref string[] a, StringRange b)
 {
     static string noTrailingSlash(string input)
     {
@@ -355,7 +366,7 @@ ref string[] exclusiveMergePaths(return scope ref string[] a, const string[] b)
         return noTrailingSlash(noInitialDot(input));
     }
     size_t countToMerge;
-    foreach(bPath; b)
+    foreach(bPath; save(b))
     {
         bool found;
         foreach(aPath; a)
@@ -371,7 +382,7 @@ ref string[] exclusiveMergePaths(return scope ref string[] a, const string[] b)
     {
         size_t putStart = a.length, length = a.length ;
         a.length+= countToMerge;
-        foreach(bPath; b) 
+        foreach(bPath; save(b) )
         {
             bool found;
             foreach(i; 0..length)
@@ -1001,7 +1012,6 @@ void putLinkerFiles(const ProjectNode tree, out string[] dataContainer)
     import redub.command_generators.commons;
     import std.range;
     import std.path;
-    import std.array;
     
     if(tree.requirements.cfg.targetType.isStaticLibrary)
         dataContainer~= buildNormalizedPath(
@@ -1011,10 +1021,10 @@ void putLinkerFiles(const ProjectNode tree, out string[] dataContainer)
                 tree.requirements.cfg.name, 
                 os));
 
-    dataContainer~= tree.requirements.extra.librariesFullPath.map!((string libPath)
+    dataContainer = dataContainer.append(tree.requirements.extra.librariesFullPath.map!((string libPath)
     {
         return buildNormalizedPath(dirName(libPath), getOutputName(TargetType.staticLibrary, baseName(libPath), os));
-    }).retro.array;
+    }).retro);
 }
 
 void putSourceFiles(const ProjectNode tree, out string[] dataContainer)

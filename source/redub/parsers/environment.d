@@ -13,7 +13,6 @@ BuildConfiguration parse()
 {
     import std.process;
     import std.string;
-    import std.array;
     BuildConfiguration ret;
     static string[] getArgs(string v){return std.string.split(v, " ");}
     static immutable handlers = [

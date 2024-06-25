@@ -231,14 +231,14 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
             else ///Subpackage is on other file
             {
                 import std.path;
-                import std.array;
+                import std.range:back;
                 string subPackagePath = p.str;
                 if(!std.path.isAbsolute(subPackagePath))
                     subPackagePath = buildNormalizedPath(cfg.workingDir, subPackagePath);
                 enforce(std.file.isDir(subPackagePath), 
                     "subPackage path '"~subPackagePath~"' must be a directory "
                 );
-                string subPackageName = pathSplitter(subPackagePath).array[$-1];
+                string subPackageName = pathSplitter(subPackagePath).back;
                 if(subPackageName == cfg.subPackage)
                 {
                     import redub.parsers.automatic;
@@ -294,20 +294,30 @@ private void runHandlers(
     }
 }
 
-private string[] strArr(JSONValue target)
+struct JSONStringArray
 {
-    JSONValue[] arr = target.array;
-    string[] ret = new string[](arr.length);
-    foreach(i, JSONValue v; arr) 
-        ret[i] = v.str;
-    return ret;
+    JSONValue[] input;
+    size_t i;
+
+    const(string) front() const {return input[i].str;}
+    void popFront(){i++;}
+    bool empty(){ return i >= input.length; }
+    size_t length() { return input.length; }
+
+    JSONStringArray save() { return JSONStringArray(input, i); }
+
 }
 
-private string[] strArr(JSONValue target, string prop)
+private JSONStringArray strArr(JSONValue target)
+{
+    return JSONStringArray(target.array);
+}
+
+private JSONStringArray strArr(JSONValue target, string prop)
 {
     if(prop in target)
         return strArr(target[prop]);
-    return [];
+    return JSONStringArray();
 }
 
 private bool isOS(string osRep)

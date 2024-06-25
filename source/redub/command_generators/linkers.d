@@ -8,7 +8,6 @@ import redub.command_generators.commons;
 string[] parseLinkConfiguration(const BuildRequirements req, OS target, Compiler compiler)
 {
     import std.path;
-    import std.array;
     string[] commands;
 
     const BuildConfiguration b = req.cfg;
@@ -57,7 +56,6 @@ string[] parseLinkConfigurationMSVC(const BuildRequirements req, OS target, Comp
 {
     import std.algorithm.iteration;
     import std.path;
-    import std.array;
 
     const BuildConfiguration b = req.cfg;
 

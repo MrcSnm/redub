@@ -1,8 +1,10 @@
 module redub.parsers.base;
 import std.system;
+import redub.command_generators.commons;
 import redub.logging;
 import redub.buildapi;
 import redub.package_searching.dub;
+import redub.parsers.json;
 
 
 struct ParseConfig
@@ -28,31 +30,33 @@ void setName(ref BuildRequirements req, string name, ParseConfig c)
 }
 void setTargetPath(ref BuildRequirements req, string path, ParseConfig c){req.cfg.outputDirectory = path;}
 void setTargetType(ref BuildRequirements req, string targetType, ParseConfig c){req.cfg.targetType = targetFrom(targetType);}
-void addImportPaths(ref BuildRequirements req, string[] paths, ParseConfig c)
+void addImportPaths(ref BuildRequirements req, JSONStringArray paths, ParseConfig c)
 {
-    if(c.firstRun) req.cfg.importDirectories = paths;
+    import std.array;
+    if(c.firstRun) req.cfg.importDirectories = cast(string[])paths.array;
     else req.cfg.importDirectories.exclusiveMerge(paths);
 }
-void addStringImportPaths(ref BuildRequirements req, string[] paths, ParseConfig c){req.cfg.stringImportPaths.exclusiveMergePaths(paths);}
-void addExtraDependencyFiles(ref BuildRequirements req, string[] files, ParseConfig c){req.cfg.extraDependencyFiles.exclusiveMerge(files);}
-void addFilesToCopy(ref BuildRequirements req, string[] files, ParseConfig c){req.cfg.filesToCopy~= files;}
-void addPreGenerateCommands(ref BuildRequirements req, string[] cmds, ParseConfig c){req.cfg.preGenerateCommands~= cmds;}
-void addPostGenerateCommands(ref BuildRequirements req, string[] cmds, ParseConfig c){req.cfg.postGenerateCommands~= cmds;}
-void addPreBuildCommands(ref BuildRequirements req, string[] cmds, ParseConfig c){req.cfg.preBuildCommands~= cmds;}
-void addPostBuildCommands(ref BuildRequirements req, string[] cmds, ParseConfig c){req.cfg.postBuildCommands~= cmds;}
-void addSourcePaths(ref BuildRequirements req, string[] paths, ParseConfig c)
+void addStringImportPaths(ref BuildRequirements req, JSONStringArray paths, ParseConfig c){req.cfg.stringImportPaths.exclusiveMergePaths(paths);}
+void addExtraDependencyFiles(ref BuildRequirements req, JSONStringArray files, ParseConfig c){req.cfg.extraDependencyFiles.exclusiveMerge(files);}
+void addFilesToCopy(ref BuildRequirements req, JSONStringArray files, ParseConfig c){req.cfg.filesToCopy = req.cfg.filesToCopy.append(files);}
+void addPreGenerateCommands(ref BuildRequirements req, JSONStringArray cmds, ParseConfig c){req.cfg.preGenerateCommands = req.cfg.preGenerateCommands.append(cmds);}
+void addPostGenerateCommands(ref BuildRequirements req, JSONStringArray cmds, ParseConfig c){req.cfg.postGenerateCommands = req.cfg.postGenerateCommands.append(cmds);}
+void addPreBuildCommands(ref BuildRequirements req, JSONStringArray cmds, ParseConfig c){req.cfg.preBuildCommands = req.cfg.preBuildCommands.append(cmds);}
+void addPostBuildCommands(ref BuildRequirements req, JSONStringArray cmds, ParseConfig c){req.cfg.postBuildCommands = req.cfg.postBuildCommands.append(cmds);}
+void addSourcePaths(ref BuildRequirements req, JSONStringArray paths, ParseConfig c)
 {
-    if(c.firstRun) req.cfg.sourcePaths = paths;
+    import std.array;
+    if(c.firstRun) req.cfg.sourcePaths = cast(string[])paths.array;
     else req.cfg.sourcePaths.exclusiveMergePaths(paths);
 }
-void addSourceFiles(ref BuildRequirements req, string[] files, ParseConfig c){req.cfg.sourceFiles.exclusiveMerge(files);}
-void addExcludedSourceFiles(ref BuildRequirements req, string[] files, ParseConfig c){req.cfg.excludeSourceFiles.exclusiveMerge(files);}
-void addLibPaths(ref BuildRequirements req, string[] paths, ParseConfig c){req.cfg.libraryPaths.exclusiveMerge(paths);}
-void addLibs(ref BuildRequirements req, string[] libs, ParseConfig c){req.cfg.libraries.exclusiveMerge(libs);}
-void addVersions(ref BuildRequirements req, string[] vers, ParseConfig c){req.cfg.versions.exclusiveMerge(vers);}
-void addDebugVersions(ref BuildRequirements req, string[] vers, ParseConfig c){req.cfg.debugVersions.exclusiveMerge(vers);}
-void addLinkFlags(ref BuildRequirements req, string[] lFlags, ParseConfig c){req.cfg.linkFlags.exclusiveMerge(lFlags);}
-void addDflags(ref BuildRequirements req, string[] dFlags, ParseConfig c){req.cfg.dFlags.exclusiveMerge(dFlags);}
+void addSourceFiles(ref BuildRequirements req, JSONStringArray files, ParseConfig c){req.cfg.sourceFiles.exclusiveMerge(files);}
+void addExcludedSourceFiles(ref BuildRequirements req, JSONStringArray files, ParseConfig c){req.cfg.excludeSourceFiles.exclusiveMerge(files);}
+void addLibPaths(ref BuildRequirements req, JSONStringArray paths, ParseConfig c){req.cfg.libraryPaths.exclusiveMerge(paths);}
+void addLibs(ref BuildRequirements req, JSONStringArray libs, ParseConfig c){req.cfg.libraries.exclusiveMerge(libs);}
+void addVersions(ref BuildRequirements req, JSONStringArray vers, ParseConfig c){req.cfg.versions.exclusiveMerge(vers);}
+void addDebugVersions(ref BuildRequirements req, JSONStringArray vers, ParseConfig c){req.cfg.debugVersions.exclusiveMerge(vers);}
+void addLinkFlags(ref BuildRequirements req, JSONStringArray lFlags, ParseConfig c){req.cfg.linkFlags.exclusiveMerge(lFlags);}
+void addDflags(ref BuildRequirements req, JSONStringArray dFlags, ParseConfig c){req.cfg.dFlags.exclusiveMerge(dFlags);}
 void addDependency(
     ref BuildRequirements req, 
     ParseConfig c,
@@ -124,6 +128,4 @@ void addSubConfiguration(
         req.dependencies~= Dependency(dependencyName, null, null, BuildRequirements.Configuration(subConfigurationName, false), null);
     else
         req.dependencies[depIndex].subConfiguration = BuildRequirements.Configuration(subConfigurationName, false);
-    
-    
 }

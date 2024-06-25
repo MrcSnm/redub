@@ -280,7 +280,25 @@ string[] getLinkFiles(const string[] filesToLink)
     import std.path;
     import std.array;
     import std.algorithm.iteration;
-    return filesToLink.filter!((name) => name.extension.isLinkerValidExtension).array.dup;
+    return cast(string[])filesToLink.filter!((name) => name.extension.isLinkerValidExtension).array; //Array already guarantee nothing is modified.
+}
+
+
+ref T[] append(T, TRange)(ref T[] theArray, TRange theRange)
+{
+    static if(__traits(hasMember, theRange, "length"))
+    {
+        size_t curr = theArray.length;
+        theArray.length+= theRange.length;
+        foreach(elem; theRange)
+            theArray[curr++] = elem;
+    }
+    else
+    {
+        foreach(elem; theRange)
+            theArray~= elem;
+    }
+    return theArray;
 }
 
 T[] reverseArray(Q, T = typeof(Q.front))(Q range)
