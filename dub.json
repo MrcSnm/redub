@@ -21,10 +21,10 @@
     ],
     "license": "MIT",
     "dependencies": {
-        "semver": {"path": "semver"},
-        "colorize": {"path": "colorize"},
-        "adv_diff": {"path": "adv_diff"},
-        "hipjson": {"path": "hipjson"},
+        "semver": {"path": "semver", "version": "*"},
+        "colorize": {"path": "colorize", "version": "*"},
+        "adv_diff": {"path": "adv_diff", "version": "*"},
+        "hipjson": {"path": "hipjson", "version": "*"},
         "xxhash3": "~>0.0.5"
     }
 
