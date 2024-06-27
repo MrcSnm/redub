@@ -11,7 +11,8 @@ BuildRequirements parse(
     BuildRequirements.Configuration subConfiguration, 
     string subPackage,
     OS targetOS,
-    ISA isa
+    ISA isa,
+    bool isRoot = false
 )
 {
     static import redub.parsers.json;
@@ -32,7 +33,7 @@ BuildRequirements parse(
             throw new Exception("dub could not convert file at path "~filePath~" to json: "~exec.output);
         std.file.write(tempFile, exec.output);
     }
-    BuildRequirements ret = redub.parsers.json.parse(tempFile, workingDir, compiler, arch, version_, subConfiguration, subPackage, targetOS, isa);
+    BuildRequirements ret = redub.parsers.json.parse(tempFile, workingDir, compiler, arch, version_, subConfiguration, subPackage, targetOS, isa, isRoot);
     chdir(currDir);
     return ret;
 }

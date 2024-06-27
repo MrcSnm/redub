@@ -177,7 +177,8 @@ ProjectDetails resolveDependencies(
         proj.subPackage,
         proj.recipe,
         osFromArch(cDetails.arch),
-        isaFromArch(cDetails.arch)
+        isaFromArch(cDetails.arch),
+        true
     );
     redub.parsers.environment.setupEnvironmentVariablesForRootPackage(cast(immutable)req);
     req.cfg = req.cfg.merge(redub.parsers.environment.parse());

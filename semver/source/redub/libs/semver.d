@@ -1,9 +1,9 @@
 module redub.libs.semver;
+import redub.libs.version_parser;
 
 import std.typecons;
 import std.conv:to;
 
-private alias nint = Nullable!int;
 
 struct SemVer 
 {
@@ -30,7 +30,7 @@ struct SemVer
         {
             if(major != other.major) return cmp(major, other.major);
             if(minor != other.minor) return cmp(minor, other.minor);
-            return cmp(major, other.major);
+            return cmp(patch, other.patch);
         }
 
         int opCmp(const RawVersion other) const @nogc nothrow
@@ -47,7 +47,6 @@ struct SemVer
         string toString() const
         {
             import std.conv;
-            import std.array:join;
             if(major.isNull) return null;
             if(minor.isNull) return major.get.to!string;
             
@@ -107,21 +106,10 @@ struct SemVer
         import std.algorithm.searching;
         if(v == null) v = "*";
         versionStringRepresentation = v;
-        ///Take metadata out
-        ptrdiff_t metadataSeparator = std.string.indexOf(v, "+");
-        if(metadataSeparator != -1)
-        {
-            metadata = v[metadataSeparator+1..$];
-            v = v[0..metadataSeparator];
-        }
-        //Take out build part
-        ptrdiff_t buildSeparator = std.string.indexOf(v, "-");
-        if(buildSeparator != -1)
-        {
-            buildPart = v[buildSeparator+1..$];
-            v = v[0..buildSeparator];
-        }
-        ///Take modifiers out
+        v = strip(v);
+
+        
+        ///Take modifiers out (operators), e.g: ['*', '>=', '<=', '>', '<', '=', '~']
         ptrdiff_t modifierSeparator = v.indexOfFirstMatching(c => isDigit(c));
         string op;
         if(modifierSeparator != 0)
@@ -129,48 +117,54 @@ struct SemVer
             if(modifierSeparator == -1)
                 op = v, v = null;
             else
-                op = v[0..modifierSeparator], v = v[modifierSeparator..$];
+            {
+                op = strip(v[0..modifierSeparator]);
+                v = strip(v[modifierSeparator..$]);
+            }
         }
-        ///Take ranges out
-        ptrdiff_t rangesSeparator = v.indexOfFirstMatching(c => c == ' ');
+        ptrdiff_t afterVer;
+        nint[3] versions = parseVersion(v, afterVer);
+        if(op.length && !parseOperator(this, op, versionsCount(versions)))
+        {
+            setInvalid("Invalid operator");
+            return;
+        }
+        if(versions[0].isNull) comparison[0] = ComparisonResult.any;
+        if(versions[1].isNull) comparison[1] = ComparisonResult.any;
+        if(versions[2].isNull) comparison[2] = ComparisonResult.any;
+        ver = RawVersion(versions[0], versions[1], versions[2]);
+        v = v[afterVer..$];
+
+        //Take out build part, e.g: 1.9.2-alpha
+        if(v.length > 0 && v[0] == '-')
+        {
+            ptrdiff_t lastIndex = std.string.indexOfAny(v, [' ', '<', '>', '+', '=']);
+            if(lastIndex == -1)
+                lastIndex = v.length;
+            buildPart = v[1..lastIndex];
+            v = v[lastIndex..$];
+        }
+        
+        ///Take metadata out, e.g: 1.9.2+some_data
+        if(v.length > 0 && v[0] == '+')
+        {
+            ptrdiff_t lastIndex = std.string.indexOfAny(v, [' ', '<', '>', '=']);
+            if(lastIndex == -1)
+                lastIndex = v.length;
+            metadata = v[1..lastIndex];
+            v = v[lastIndex..$];
+        }
+
+
+        
+        ///Take ranges out, e.g: '>=1.9.2 < 2.0.0'
+        ptrdiff_t rangesSeparator = v.indexOfFirstMatching(c => !isDigit(c) && c != '.' && c != '*' && c != 'x');
         if(rangesSeparator != -1)
         {
             isUsingRange = true;
-            rangeMax = v[rangesSeparator+1..$];
+            rangeMax = v[rangesSeparator..$];
             v = v[0..rangesSeparator];
         }
-        nint major, minor, patch;
-        auto parts = v.split(".");
-        if(op.length && !parseOperator(this, op, parts.length))
-        {
-            setInvalid("Error parsing operator"); 
-            return;
-        }
-
-        static void handlePart(string part, ref nint output, ref ComparisonResult compareTo)
-        {
-            if(part == "*" || part == "x")
-                compareTo = ComparisonResult.any;
-            else 
-            {
-                output = to!int(part);
-            }
-        }
-
-        try
-        {
-            if(parts.length > 0) handlePart(parts[0], major, comparison[0]);
-            if(parts.length > 1) handlePart(parts[1], minor, comparison[1]);
-            if(parts.length > 2) handlePart(parts[2], patch, comparison[2]);
-        }
-        catch(Exception e)
-        {
-            setInvalid("Version received is not a valid SemVer.");
-            return;
-        }
-
-
-        ver = RawVersion(major, minor, patch);
     }
 
     /** 
@@ -205,12 +199,14 @@ struct SemVer
     {
         if(comparison == ComparisonTypes.any) return true;
         if(invalid) return false;
-        if(isUsingRange)
+
+        if(requirement.isUsingRange)
         {
-            SemVer copy = cast()this;
+            SemVer copy = cast()requirement;
             copy.isUsingRange = false;
-            return copy.satisfies(requirement) && copy.satisfies(SemVer(requirement.rangeMax));
+            return this.satisfies(copy) && this.satisfies(SemVer(requirement.rangeMax));
         }
+
         if(requirement.comparison[0] == ComparisonResult.atOnce)
             return (requirement.comparison[1] & ver.compareAtOnce(requirement.ver)) != 0;
         else if(requirement.comparison[1] == ComparisonResult.atOnce)
@@ -229,6 +225,8 @@ struct SemVer
         return versionStringRepresentation;
     }
 }
+
+
 
 private alias cr = ComparisonResult;
 enum ComparisonTypes : ComparisonResult[3] 
@@ -380,8 +378,23 @@ unittest
     assert(SemVer("99.55.9").satisfies(SemVer("*")));
 }
 
+@("Compare using <")
+unittest
+{
+    assert(!SemVer("0.10.0").satisfies(SemVer("<0.10.0")));
+    assert(SemVer("2.0.5").satisfies(SemVer("<3.0.0")));
+}
+
+@("Compare using >")
+unittest
+{
+    assert(SemVer("0.10.1").satisfies(SemVer(">0.10.0")));
+}
+
 @("Compare using Ranges")
 unittest
 {
-    assert(SemVer("2.0.5").satisfies(SemVer(">=2.0.5 <3.0.0")));
+    assert(SemVer("2.0.5").satisfies(SemVer(">=2.0.5 < 3.0.0")));
+    assert(!SemVer("0.10.0").satisfies(SemVer(">=0.9.7-alpha.3 < 0.10.0")));
+    assert(SemVer("0.9.8").satisfies(SemVer(">=0.9.0 <0.10.0")));
 }

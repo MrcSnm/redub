@@ -19,6 +19,7 @@ import redub.command_generators.commons;
  *   recipe = Optional recipe to read. It's path is not used as root.
  *   targetOS = Will be used to filter out some commands
  *   isa = Instruction Set Architexture to use for filtering commands
+ *   isRoot = When the package is root, it is added to the package searching cache automatically with version 0.0.0
  * Returns: The build requirements to the project. Not recursive.
  */
 BuildRequirements parseProject(
@@ -29,7 +30,8 @@ BuildRequirements parseProject(
     string subPackage, 
     string recipe,
     OS targetOS,
-    ISA isa
+    ISA isa,
+    bool isRoot = false
 )
 {
     import std.path;
@@ -44,10 +46,11 @@ BuildRequirements parseProject(
 
     switch(extension(projectFile))
     {
-        case ".sdl":   req = redub.parsers.sdl.parse(projectFile, projectWorkingDir, compiler, arch, null, subConfiguration, subPackage, targetOS, isa); break;
-        case ".json":  req = redub.parsers.json.parse(projectFile, projectWorkingDir, compiler, arch, null, subConfiguration, subPackage, targetOS, isa); break;
+        case ".sdl":   req = redub.parsers.sdl.parse(projectFile, projectWorkingDir, compiler, arch, null, subConfiguration, subPackage, targetOS, isa, isRoot); break;
+        case ".json":  req = redub.parsers.json.parse(projectFile, projectWorkingDir, compiler, arch, null, subConfiguration, subPackage, targetOS, isa, isRoot); break;
         default: throw new Exception("Unsupported project type "~projectFile~" at dir "~projectWorkingDir);
     }
+
     redub.parsers.environment.setupEnvironmentVariablesForPackage(cast(immutable)req);
     req.cfg = redub.parsers.environment.parseEnvironment(req.cfg);
     req.cfg.arch = arch;

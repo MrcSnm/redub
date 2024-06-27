@@ -1,9 +1,7 @@
 module redub.package_searching.dub;
+import redub.package_searching.api;
 import redub.logging;
 import hipjson;
-
-// import std.json;
-import redub.libs.semver;
 
 bool dubHook_PackageManagerDownloadPackage(string packageName, string packageVersion, string requiredBy = "")
 {
@@ -25,23 +23,6 @@ bool dubHook_PackageManagerDownloadPackage(string packageName, string packageVer
     // "required by '", requiredBy, "' is not implemented yet.");
     return wait(spawnShell(cmd)) == 0;
     // return false;
-}
-
-struct PackageInfo
-{
-    string packageName;
-    string subPackage;
-    string requiredVersion;
-    string bestVersion;
-    string path;
-    string requiredBy;
-}
-
-private struct ReducedPackageInfo
-{
-    string bestVersion;
-    string bestVersionPath;
-    SemVer[] foundVersions;
 }
 
 /** 
@@ -102,7 +83,7 @@ private ReducedPackageInfo getPackageInFolder(string folder, string packageName,
  *   packageVersion = "version" inside dub.json. SemVer matches are also accepted
  * Returns: The package path when found. null when not.
  */
-string getPackagePath(string packageName, string packageVersion, string requiredBy)
+PackageInfo getPackage(string packageName, string packageVersion, string requiredBy)
 {
     import std.file;
     import std.path;
@@ -111,6 +92,12 @@ string getPackagePath(string packageName, string packageVersion, string required
 
     string mainPackageName;
     string subPackage = getSubPackageInfo(packageName, mainPackageName);
+
+    PackageInfo pack;
+    pack.packageName = packageName;
+    pack.requiredBy = requiredBy;
+    pack.subPackage = subPackage;
+    pack.requiredVersion = SemVer(packageVersion);
     if (subPackage)
     {
         if(mainPackageName.length)
@@ -122,7 +109,11 @@ string getPackagePath(string packageName, string packageVersion, string required
 
     ReducedPackageInfo localPackage = getPackageInLocalPackages(packageName, packageVersion);
     if (localPackage != ReducedPackageInfo.init)
-        return localPackage.bestVersionPath;
+    {
+        pack.bestVersion = SemVer(localPackage.bestVersion);
+        pack.path = localPackage.bestVersionPath;
+        return pack;
+    }
     
     ///If no version was downloaded yet, download before looking
     string downloadedPackagePath = buildNormalizedPath(getDefaultLookupPathForPackages(), packageName);
@@ -131,16 +122,20 @@ string getPackagePath(string packageName, string packageVersion, string required
         if (!dubHook_PackageManagerDownloadPackage(packageName, packageVersion, requiredBy))
         {
             errorTitle("Dub Fetch Error: ", "Could not fetch ", packageName, "@\"", packageVersion, "\" required by ", requiredBy);
-            return null;
+            return PackageInfo.init;
         }
     }
     ReducedPackageInfo info = getPackageInFolder(downloadedPackagePath, packageName, subPackage, packageVersion);
     if(info != ReducedPackageInfo.init)
-        return info.bestVersionPath;
+    {
+        pack.bestVersion = SemVer(info.bestVersion);
+        pack.path = info.bestVersionPath;
+        return pack;
+    }
 
     ///If no matching version was found, try downloading it.
     if (dubHook_PackageManagerDownloadPackage(packageName, packageVersion, requiredBy))
-        return getPackagePath(packageName, packageVersion, requiredBy);
+        return getPackage(packageName, packageVersion, requiredBy);
     throw new Exception(
         "Could not find any package named " ~
             packageName ~ " with version " ~ packageVersion ~
@@ -148,6 +143,14 @@ string getPackagePath(string packageName, string packageVersion, string required
             info.foundVersions.map!(
                 (sv) => sv.toString).join("\n\t")
     );
+}
+
+
+
+
+string getPackagePath(string packageName, string packageVersion, string requiredBy)
+{
+    return getPackage(packageName, packageVersion, requiredBy).path;
 }
 
 

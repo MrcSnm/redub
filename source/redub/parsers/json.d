@@ -27,12 +27,13 @@ BuildRequirements parse(string filePath,
     BuildRequirements.Configuration subConfiguration,
     string subPackage,
     OS targetOS,
-    ISA isa
+    ISA isa,
+    bool isRoot = false
 )
 {
     import std.path;
     ParseConfig c = ParseConfig(projectWorkingDir, subConfiguration, subPackage, version_, compiler, arch, targetOS, isa);
-    return parse(parseJSONCached(filePath), c);
+    return parse(parseJSONCached(filePath), c, isRoot);
 }
 
 private JSONValue[string] jsonCache;
@@ -54,7 +55,7 @@ private JSONValue parseJSONCached(string filePath)
  *   json = A dub.json equivalent
  * Returns: 
  */
-BuildRequirements parse(JSONValue json, ParseConfig cfg)
+BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
 {
     import std.exception;
     ///Setup base of configuration before finding anything
@@ -64,6 +65,12 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
         cfg.requiredBy = json["name"].str;
         if("version" in json)
             cfg.version_ = json["version"].str;
+    }
+    if(isRoot)
+    {
+        import redub.package_searching.cache;
+        putRootPackageInCache(cfg.requiredBy, cfg.workingDir);
+        vlog("Added project ", cfg.requiredBy, " to memory cache.");
     }
     BuildRequirements buildRequirements = getDefaultBuildRequirement(cfg);
 
@@ -153,6 +160,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
             import std.exception;
             import std.algorithm.comparison;
             import redub.package_searching.dub;
+            import redub.package_searching.cache;
             
             foreach(string depName, JSONValue value; v.object)
             {
@@ -183,13 +191,13 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg)
                         }
                     }
 
-                    path = either(path, depPath ? depPath.str : null, depVer ? redub.package_searching.dub.getPackagePath(depName, depVer.str, req.cfg.name) : null);
+                    path = either(path, depPath ? depPath.str : null, depVer ? redub.package_searching.cache.getPackagePath(depName, depVer.str, req.cfg.name) : null);
                     version_ = either(version_, depVer ? depVer.str : null);
                 }
                 else if(value.type == JSONType.string) ///Version style
                 {
                     version_ = value.str;
-                    if(!path) path = redub.package_searching.dub.getPackagePath(depName, version_, c.requiredBy);
+                    if(!path) path = redub.package_searching.cache.getPackagePath(depName, version_, c.requiredBy);
                 }
                 addDependency(req, c, depName, version_, BuildRequirements.Configuration.init, path, visibility, isOptional);
             }
