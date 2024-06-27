@@ -146,16 +146,27 @@ ubyte[] hashFunction(const char[] input, ref ubyte[] output)
 string hashFrom(const BuildRequirements req, Compiler compiler)
 {
     import std.conv:to;
-    import std.array:join;
+    import xxhash3;
     import std.digest;
-    string[] inputHash = [compiler.versionString, req.targetConfiguration, req.version_];
+
+    XXH_64 xxh;
+    xxh.start();
+    xxh.put(cast(ubyte[])compiler.versionString);
+    xxh.put(cast(ubyte[])req.targetConfiguration);
+    xxh.put(cast(ubyte[])req.version_);
+
     static foreach(i, v; BuildConfiguration.tupleof)
     {
-        static if(is(typeof(v) == string)) inputHash~= req.cfg.tupleof[i];
-        else inputHash~= req.cfg.tupleof[i].to!string;
+        static if(is(typeof(v) == string)) xxh.put(cast(ubyte[])req.cfg.tupleof[i]);
+        else static if(is(typeof(v) == string[]))
+        {
+            foreach(v; req.cfg.tupleof[i])
+                xxh.put(cast(ubyte[])v);
+        }
+        else
+            xxh.put(cast(ubyte[])req.cfg.tupleof[i].to!string);
     }
-    ubyte[] output;
-    return hashFunction(inputHash.join, output).toHexString.idup;
+    return xxh.finish().toHexString.idup;
 }
 
 /** 
@@ -180,9 +191,9 @@ AdvCacheFormula generateCache(const BuildRequirements req, OS target, const(AdvC
     return AdvCacheFormula.make(
         contentHasher, 
         //DO NOT use sourcePaths since importPaths is always custom + sourcePaths
-        joinFlattened(req.cfg.importDirectories, req.cfg.stringImportPaths), ///This is causing problems when using subPackages without output path, they may clash after
+        joiner([req.cfg.importDirectories, req.cfg.stringImportPaths]), ///This is causing problems when using subPackages without output path, they may clash after
         // the compilation is finished. Solving this would require hash calculation after linking
-        joinFlattened(req.cfg.sourceFiles, libs, req.extra.expectedArtifacts, req.cfg.filesToCopy,req.cfg.extraDependencyFiles),
+        joiner([req.cfg.sourceFiles, libs, req.extra.expectedArtifacts, req.cfg.filesToCopy,req.cfg.extraDependencyFiles]),
         existing,
         preprocessed
     );
@@ -230,10 +241,14 @@ private JSONValue* getCache(string rootCache)
 
 private string getCacheFolder()
 {
-    return buildNormalizedPath(getDubWorkspacePath(), cacheFolder);
+    static string cacheFolder;
+    if(!cacheFolder) cacheFolder = buildNormalizedPath(getDubWorkspacePath(), cacheFolder);
+    return cacheFolder;
 }
 
 private string getCacheFilePath(string rootCache)
 {
-    return buildNormalizedPath(getCacheFolder, rootCache~".json");
+    static string cacheFilePath;
+    if(!cacheFilePath) cacheFilePath = buildNormalizedPath(getCacheFolder, rootCache~".json");
+    return cacheFilePath;
 }

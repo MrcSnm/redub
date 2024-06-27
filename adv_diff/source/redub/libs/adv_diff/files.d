@@ -150,19 +150,22 @@ struct AdvCacheFormula
 	 *   cacheHolder = Optional. If this is given, instead of looking into file system, it will use this cache holder instead. If no input is found on this cache holder, it will be populated with the new content.
 	 * Returns: A completely new AdvCacheFormula which may reference or not the cacheHolder fields.
 	 */
-	static AdvCacheFormula make(
+	static AdvCacheFormula make(DirRange, FileRange)(
 		ubyte[] function(ubyte[], ref ubyte[] output) contentHasher, 
-		scope const string[] directories, 
-		scope const string[] files = null, 
+		DirRange directories, 
+		FileRange files, 
 		const(AdvCacheFormula)* existing = null, 
 		AdvCacheFormula* cacheHolder = null
 	)
 	{
 		import std.file;
 		import std.stdio;
+		import std.array;
 		AdvCacheFormula ret;
 		Int128 totalTime;
-		ubyte[] fileBuffer;
+		static ubyte[] fileBuffer;
+		if(fileBuffer.length == 0)
+			fileBuffer = uninitializedArray!(ubyte[])(1_000_000);
 		ubyte[] hashedContent;
 
 		static bool hashContent(string url, ref ubyte[] buffer, ref ubyte[] outputHash, ubyte[] function(ubyte[], ref ubyte[] output) contentHasher)
@@ -178,7 +181,12 @@ struct AdvCacheFormula
 					return false; 
 				}
 				fSize = f.size;
-				if(fSize > buffer.length) buffer.length = fSize;
+				if(fSize > buffer.length)
+				{
+					import core.memory;
+					GC.free(buffer.ptr);
+					buffer = uninitializedArray!(ubyte[])(fSize);
+				}
 				f.rawRead(buffer[0..fSize]);
 				contentHasher(buffer[0..fSize], outputHash);
 			}
@@ -258,7 +266,6 @@ struct AdvCacheFormula
 				cacheHolder.files[file] = ret.files[file];
         }
 		ret.total = totalTime;
-		fileBuffer = null;
 		return ret;
 	}
 
