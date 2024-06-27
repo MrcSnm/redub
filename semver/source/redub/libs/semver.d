@@ -338,6 +338,8 @@ unittest
     assert(SemVer("1.2.10").satisfies(gtPatches));
     assert(!SemVer("1.0.10").satisfies(gtPatches));
 
+    assert(!SemVer("0.10.0").satisfies(SemVer("~>0.9.0")));
+
     // assert(SemVer("~5").satisfies("5.0.0"));
 }
 

@@ -5,7 +5,7 @@ public import std.system:OS, ISA;
 import redub.logging;
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.6.1";
+enum RedubVersionOnly = "v1.6.2";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -264,7 +264,7 @@ struct BuildConfiguration
         ];
 
         BuildConfiguration ret = clone;
-        ret.dFlags.exclusiveMerge(other.dFlags);
+        ret.dFlags.exclusiveMerge(other.dFlags, filterDflags);
         return ret;
     }
     
@@ -327,9 +327,10 @@ ref string[] exclusiveMerge(StringRange)(return scope ref string[] a, StringRang
     {
         bool found = false;
         if(bV.length == 0) continue;
+        if(countUntil(excludeFromMerge, bV) != -1) continue;
         foreach(aV; a)
         {
-            if(aV == bV || countUntil(excludeFromMerge, aV) == -1)
+            if(aV == bV)
             {
                 found = true;
                 break;
@@ -347,9 +348,10 @@ ref string[] exclusiveMerge(StringRange)(return scope ref string[] a, StringRang
         {
             bool found = false;
             if(bV.length == 0) continue;
+            if(countUntil(excludeFromMerge, bV) != -1) continue;
             foreach(i; 0..length)
             {
-                if(a[i] == bV || countUntil(excludeFromMerge, bV) == -1)
+                if(a[i] == bV)
                 {
                     found = true;
                     break;

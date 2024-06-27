@@ -211,7 +211,7 @@ private ReducedPackageInfo getPackageInJSON(JSONValue json, string packageName, 
         SemVer packageVer = SemVer(ver.str);
         if (nameJson && nameJson.str == packageName && packageVer.satisfies(requirement))
         {
-            info("Using local package found at ", v["path"].str, " with version ", ver.str);
+            vlog("Using local package found at ", v["path"].str, " with version ", ver.str);
             return ReducedPackageInfo(ver.str, v["path"].str);
         }
     }
