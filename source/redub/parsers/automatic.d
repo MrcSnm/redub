@@ -99,8 +99,6 @@ private void partiallyFinishBuildRequirements(ref BuildRequirements req)
         }
 
     }
-
-    req.cfg.importDirectories.exclusiveMerge(req.cfg.sourcePaths);
     if(!isAbsolute(req.cfg.sourceEntryPoint)) 
         req.cfg.sourceEntryPoint = buildNormalizedPath(req.cfg.workingDir, req.cfg.sourceEntryPoint);
 

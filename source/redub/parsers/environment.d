@@ -303,6 +303,7 @@ BuildConfiguration parseEnvironment(BuildConfiguration cfg)
         preBuildCommands = arrParseEnv(preBuildCommands);
         postBuildCommands = arrParseEnv(postBuildCommands);
         stringImportPaths = arrParseEnv(stringImportPaths);
+        filesToCopy = arrParseEnv(filesToCopy);
     }
     return cfg;
 }

@@ -5,7 +5,7 @@ public import std.system:OS, ISA;
 import redub.logging;
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.6.0";
+enum RedubVersionOnly = "v1.6.1";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -139,7 +139,11 @@ struct BuildConfiguration
 
         
         BuildConfiguration ret;
-        if(initialSource) ret.sourcePaths = [initialSource];
+        if(initialSource)
+        {
+            ret.sourcePaths = [initialSource];
+            ret.importDirectories = [initialSource];
+        }
         if(initialStringImport) ret.stringImportPaths = [initialStringImport];
         ret.targetType = TargetType.autodetect;
         ret.sourceEntryPoint = "source/app.d";
@@ -252,6 +256,17 @@ struct BuildConfiguration
         ret.dFlags.exclusiveMerge(other.dFlags);
         return ret;
     }
+
+    BuildConfiguration mergeFilteredDflags(const BuildConfiguration other) const
+    {
+        immutable string[] filterDflags = [
+            "-betterC"
+        ];
+
+        BuildConfiguration ret = clone;
+        ret.dFlags.exclusiveMerge(other.dFlags);
+        return ret;
+    }
     
     BuildConfiguration mergeVersions(const BuildConfiguration other) const
     {
@@ -303,8 +318,10 @@ private auto save(TRange)(TRange input)
 /**
 *   Optimized for direct memory allocation.
 */
-ref string[] exclusiveMerge(StringRange)(return scope ref string[] a, StringRange b)
+ref string[] exclusiveMerge(StringRange)(return scope ref string[] a, StringRange b, scope const string[] excludeFromMerge = null)
 {
+    import std.algorithm.searching:countUntil;
+
     size_t notFoundCount;
     foreach(bV; save(b))
     {
@@ -312,7 +329,7 @@ ref string[] exclusiveMerge(StringRange)(return scope ref string[] a, StringRang
         if(bV.length == 0) continue;
         foreach(aV; a)
         {
-            if(aV == bV) 
+            if(aV == bV || countUntil(excludeFromMerge, aV) == -1)
             {
                 found = true;
                 break;
@@ -332,7 +349,7 @@ ref string[] exclusiveMerge(StringRange)(return scope ref string[] a, StringRang
             if(bV.length == 0) continue;
             foreach(i; 0..length)
             {
-                if(a[i] == bV)
+                if(a[i] == bV || countUntil(excludeFromMerge, bV) == -1)
                 {
                     found = true;
                     break;
@@ -781,7 +798,7 @@ class ProjectNode
             target.requirements.cfg = target.requirements.cfg.mergeImport(input.requirements.cfg);
             target.requirements.cfg = target.requirements.cfg.mergeStringImport(input.requirements.cfg);
             target.requirements.cfg = target.requirements.cfg.mergeVersions(input.requirements.cfg);
-            target.requirements.cfg = target.requirements.cfg.mergeDFlags(input.requirements.cfg);
+            target.requirements.cfg = target.requirements.cfg.mergeFilteredDflags(input.requirements.cfg);
             target.requirements.cfg = target.requirements.cfg.mergeLinkFilesFromSource(input.requirements.cfg);
             target.requirements.extra.librariesFullPath.exclusiveMerge(
                 input.requirements.extra.librariesFullPath
