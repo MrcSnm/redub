@@ -10,26 +10,49 @@ import redub.package_searching.api;
 private __gshared PackageInfo[string] packagesCache;
 
 
-PackageInfo findPackage(string packageName, string packageVersion, string requiredBy)
+PackageInfo* findPackage(string packageName, string packageVersion, string requiredBy, string path)
 {
+    PackageInfo* pkg = packageName in packagesCache;
+    if(pkg) return pkg;
+    if(path.length == 0) return findPackage(packageName, packageVersion, requiredBy);
+
+    PackageInfo localPackage = basePackage(packageName, packageVersion, requiredBy);
+    localPackage.path = path;
+    packagesCache[packageName] = localPackage;
+    return packageName in packagesCache;
+}
+
+PackageInfo* findPackage(string packageName, string packageVersion, string requiredBy)
+{
+    import redub.package_searching.dub;
     PackageInfo* pkg = packageName in packagesCache;
     if(!pkg)
     {
-        import redub.package_searching.dub;
         PackageInfo info = getPackage(packageName, packageVersion, requiredBy);
         packagesCache[packageName] = info;
     }
     else
     {
-        if(!pkg.bestVersion.satisfies(SemVer(packageVersion)))
-            throw new Exception("Package "~packageName~" with first version found '"~pkg.bestVersion.toString~"' is not compatible with the new requirement: "~packageVersion);
+        SemVer newPkg = SemVer(packageVersion);
+        if(!pkg.bestVersion.satisfies(newPkg))
+        {
+            if(newPkg.satisfies(pkg.requiredVersion))
+            {
+                PackageInfo newPkgInfo = getPackage(packageName, packageVersion, requiredBy);
+                pkg.bestVersion = newPkgInfo.bestVersion;
+                pkg.path = newPkgInfo.path;
+            }
+            else
+                throw new Exception("Package "~packageName~" with first requirement found '"~pkg.requiredVersion.toString~"' is not compatible with the new requirement: "~packageVersion);
+        }
 
         import redub.logging;
         info("Using ", packageName, " with version: ", pkg.bestVersion, ". Initial requirement was '", pkg.requiredVersion, ". Current is ", packageVersion);
-        return *pkg;
+        return pkg;
     }
-    return packagesCache[packageName];
+    return packageName in packagesCache;
 }
+
 
 /** 
  * 
