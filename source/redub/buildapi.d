@@ -5,7 +5,7 @@ public import std.system:OS, ISA;
 import redub.logging;
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.6.3";
+enum RedubVersionOnly = "v1.6.4";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -920,7 +920,8 @@ class ProjectNode
      */
     void becomeIndependent()
     {
-        assert(dependencies.length == 0, "Can't be independent when having dependencies.");
+        import std.exception;
+        enforce(dependencies.length == 0 || this.isOptional, "Dependency "~this.name~" can't be independent when having dependencies.");
 
         foreach(p; parent)
             for(int i = 0; i < p.dependencies.length; i++)
