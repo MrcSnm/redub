@@ -124,7 +124,7 @@ void invalidateCaches(ProjectNode root, Compiler compiler, OS target)
         if(!cacheStatus[i].isUpToDate(n.requirements, compiler, target, &preprocessed))
         {
             import redub.logging;
-            info("Project ", n.name," requires rebuild.");
+            vlog("Project ", n.name," requires rebuild.");
             n.invalidateCache();
         }
     }

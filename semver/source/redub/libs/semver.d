@@ -44,6 +44,11 @@ struct SemVer
             }
         }
 
+        bool isZero() const
+        {
+            return major == 0 && minor == 0 && patch == 0;
+        }
+
         string toString() const
         {
             import std.conv;
@@ -179,6 +184,13 @@ struct SemVer
         ret.comparison = ComparisonTypes.any;
         return ret;
     }
+
+    bool isMatchAll() const
+    {
+        if(comparison == ComparisonTypes.greaterEqual || comparison == ComparisonTypes.greater)
+            return ver.isZero();
+        return comparison == ComparisonTypes.any;
+    }
     
     bool isInvalid(){return invalid;}
     private void setInvalid(string errMessage)
@@ -237,6 +249,10 @@ enum ComparisonTypes : ComparisonResult[3]
     greaterPatchesOnly = [cr.equal, cr.equal, cr.gtEqual],
     /// Implementation when using `*`
     any = [cr.any, cr.any, cr.any],
+    ///Implementation when using '>='
+    greaterEqual = [cr.atOnce, cr.gtEqual, cr.gtEqual],
+    greater = [cr.atOnce, cr.greaterThan, cr.greaterThan]
+
 }
 
 

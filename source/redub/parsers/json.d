@@ -168,9 +168,13 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
                 string out_mainPackage;
                 string subPackage = getSubPackageInfoRequiredBy(depName, req.cfg.name, out_mainPackage);
                 bool isOptional = false;
+                bool isSubpackageDependency = false;
                 ///If the main package is the same as this dependency, then simply use the same json file.
-                if(subPackage && out_mainPackage == depName)
+                if(subPackage && out_mainPackage == req.cfg.name)
+                {
                     path = req.cfg.workingDir;
+                    isSubpackageDependency = true;
+                }
                 if(value.type == JSONType.object) ///Uses path style
                 {
                     const(JSONValue)* depPath = "path" in value;
@@ -190,15 +194,28 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
                             isOptional = true;
                         }
                     }
-
-                    path = either(path, depPath ? depPath.str : null, depVer ? redub.package_searching.cache.getPackagePath(depName, depVer.str, req.cfg.name) : null);
+                    path = either(path, depPath ? depPath.str : null);
                     version_ = either(version_, depVer ? depVer.str : null);
                 }
                 else if(value.type == JSONType.string) ///Version style
-                {
                     version_ = value.str;
-                    if(!path) path = redub.package_searching.cache.getPackagePath(depName, version_, c.requiredBy);
+                if(isSubpackageDependency)
+                {
+                    ///Match all dependencies which are subpackages should have the same version as the parent project.
+                    if(SemVer(version_).isMatchAll())
+                    {
+                        version_ = c.version_;
+                        redub.package_searching.cache.putPackageInCache(depName, version_, path);
+                    }
                 }
+                if(!path)
+                {
+                    import redub.package_searching.api;
+                    PackageInfo* info = redub.package_searching.cache.findPackage(depName, version_, c.requiredBy);
+                    path = info.path;
+                    version_ = info.bestVersion.toString;
+                }
+
                 addDependency(req, c, depName, version_, BuildRequirements.Configuration.init, path, visibility, isOptional);
             }
         },
@@ -234,7 +251,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
                 const(JSONValue)* name = "name" in p;
                 enforce(name, "All subPackages entries must contain a name.");
                 if(name.str == cfg.subPackage)
-                    return parse(p, ParseConfig(cfg.workingDir, cfg.subConfiguration, null, null, cfg.compiler, cfg.arch, cfg.targetOS, cfg.isa, cfg.requiredBy, true, true));
+                    return parse(p, ParseConfig(cfg.workingDir, cfg.subConfiguration, null, cfg.version_, cfg.compiler, cfg.arch, cfg.targetOS, cfg.isa, cfg.requiredBy, true, true));
             }
             else ///Subpackage is on other file
             {
@@ -251,7 +268,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
                 {
                     import redub.parsers.automatic;
                     isSubpackageInPackage = true;
-                    return parseProject(subPackagePath, cfg.compiler, cfg.arch, cfg.subConfiguration, null, null, cfg.targetOS, cfg.isa);
+                    return parseProject(subPackagePath, cfg.compiler, cfg.arch, cfg.subConfiguration, null, null, cfg.targetOS, cfg.isa, false, cfg.version_);
                 }
             } 
         }

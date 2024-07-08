@@ -31,7 +31,8 @@ BuildRequirements parseProject(
     string recipe,
     OS targetOS,
     ISA isa,
-    bool isRoot = false
+    bool isRoot = false,
+    string version_ = null
 )
 {
     import std.path;
@@ -46,8 +47,8 @@ BuildRequirements parseProject(
 
     switch(extension(projectFile))
     {
-        case ".sdl":   req = redub.parsers.sdl.parse(projectFile, projectWorkingDir, compiler, arch, null, subConfiguration, subPackage, targetOS, isa, isRoot); break;
-        case ".json":  req = redub.parsers.json.parse(projectFile, projectWorkingDir, compiler, arch, null, subConfiguration, subPackage, targetOS, isa, isRoot); break;
+        case ".sdl":   req = redub.parsers.sdl.parse(projectFile, projectWorkingDir, compiler, arch, version_, subConfiguration, subPackage, targetOS, isa, isRoot); break;
+        case ".json":  req = redub.parsers.json.parse(projectFile, projectWorkingDir, compiler, arch, version_, subConfiguration, subPackage, targetOS, isa, isRoot); break;
         default: throw new Exception("Unsupported project type "~projectFile~" at dir "~projectWorkingDir);
     }
 

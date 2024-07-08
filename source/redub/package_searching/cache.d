@@ -33,6 +33,7 @@ PackageInfo* findPackage(string packageName, string packageVersion, string requi
     }
     else
     {
+        import redub.logging;
         SemVer newPkg = SemVer(packageVersion);
         if(!pkg.bestVersion.satisfies(newPkg))
         {
@@ -45,9 +46,7 @@ PackageInfo* findPackage(string packageName, string packageVersion, string requi
             else
                 throw new Exception("Package "~packageName~" with first requirement found '"~pkg.requiredVersion.toString~"' is not compatible with the new requirement: "~packageVersion);
         }
-
-        import redub.logging;
-        info("Using ", packageName, " with version: ", pkg.bestVersion, ". Initial requirement was '", pkg.requiredVersion, ". Current is ", packageVersion);
+        vlog("Using ", packageName, " with version: ", pkg.bestVersion, ". Initial requirement was '", pkg.requiredVersion, ". Current is ", packageVersion);
         return pkg;
     }
     return packageName in packagesCache;
@@ -63,6 +62,11 @@ PackageInfo* findPackage(string packageName, string packageVersion, string requi
 void putRootPackageInCache(string packageName, string path)
 {
     packagesCache[packageName] = PackageInfo(packageName, null, SemVer(0,0,0), SemVer(0,0,0), path, null);
+}
+
+void putPackageInCache(string packageName, string version_, string path)
+{
+    packagesCache[packageName] = PackageInfo(packageName, null, SemVer(version_), SemVer(version_), path, null);
 }
 
 string getPackagePath(string packageName, string packageVersion, string requiredBy)
