@@ -5,13 +5,12 @@ public import std.system;
 import redub.command_generators.commons;
 
 
-string[] parseLinkConfiguration(const BuildRequirements req, OS target, Compiler compiler)
+string[] parseLinkConfiguration(const ThreadBuildData data, OS target, Compiler compiler)
 {
     import std.path;
     string[] commands;
 
-    const BuildConfiguration b = req.cfg;
-
+    const BuildConfiguration b = data.cfg;
     with(b)
     {
         if(compiler.isDCompiler)
@@ -33,7 +32,7 @@ string[] parseLinkConfiguration(const BuildRequirements req, OS target, Compiler
         if (targetType.isLinkedSeparately)
         {
             ///Use library full path for the base file
-            commands = mapAppendReverse(commands, req.extra.librariesFullPath, (string l) => getOutputName(TargetType.staticLibrary, l, target));
+            commands = mapAppendReverse(commands, data.extra.librariesFullPath, (string l) => getOutputName(TargetType.staticLibrary, l, target));
             commands = mapAppendPrefix(commands, linkFlags, "-L", false);
             commands = mapAppendPrefix(commands, libraryPaths, "-L-L", true);
             commands = mapAppendReverse(commands, libraries, (string l) => "-L-l"~l);
@@ -52,15 +51,15 @@ string[] parseLinkConfiguration(const BuildRequirements req, OS target, Compiler
     return commands;
 }
 
-string[] parseLinkConfigurationMSVC(const BuildRequirements req, OS target, Compiler compiler)
+string[] parseLinkConfigurationMSVC(const ThreadBuildData data, OS target, Compiler compiler)
 {
     import std.algorithm.iteration;
     import std.path;
 
-    const BuildConfiguration b = req.cfg;
 
-    if(!target.isWindows) return parseLinkConfiguration(req, target, compiler);
+    if(!target.isWindows) return parseLinkConfiguration(data, target, compiler);
     string[] commands;
+    const BuildConfiguration b = data.cfg;
     with(b)
     {
         if(compiler.isDCompiler)
@@ -78,7 +77,7 @@ string[] parseLinkConfigurationMSVC(const BuildRequirements req, OS target, Comp
         if(targetType == TargetType.dynamicLibrary)
             commands~= getTargetTypeFlag(targetType, compiler);
         
-        commands = mapAppendReverse(commands, req.extra.librariesFullPath, (string l) => (l~getLibraryExtension(target)).escapePath);
+        commands = mapAppendReverse(commands, data.extra.librariesFullPath, (string l) => (l~getLibraryExtension(target)).escapePath);
 
         commands = mapAppendPrefix(commands, linkFlags, "-L", false);
 

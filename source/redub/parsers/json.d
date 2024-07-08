@@ -159,7 +159,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
             import std.path;
             import std.exception;
             import std.algorithm.comparison;
-            import redub.package_searching.dub;
+            import redub.package_searching.api;
             import redub.package_searching.cache;
             
             foreach(string depName, JSONValue value; v.object)
@@ -194,8 +194,9 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
                             isOptional = true;
                         }
                     }
-                    path = either(path, depPath ? depPath.str : null);
-                    version_ = either(version_, depVer ? depVer.str : null);
+                    if(depPath)
+                        path = isAbsolute(depPath.str) ? depPath.str : buildNormalizedPath(req.cfg.workingDir, depPath.str);
+                    version_ = depVer ? depVer.str : null;
                 }
                 else if(value.type == JSONType.string) ///Version style
                     version_ = value.str;
@@ -216,7 +217,8 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
                     version_ = info.bestVersion.toString;
                 }
 
-                addDependency(req, c, depName, version_, BuildRequirements.Configuration.init, path, visibility, isOptional);
+                PackageInfo* info = findPackage(depName, version_, c.requiredBy, path);
+                addDependency(req, c, depName, version_, BuildRequirements.Configuration.init, path, visibility, info, isOptional);
             }
         },
         "subConfigurations": (ref BuildRequirements req, JSONValue v, ParseConfig c)

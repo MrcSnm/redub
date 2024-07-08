@@ -34,7 +34,10 @@ string getSubPackageInfo(string packageName, out string mainPackageName)
 
     ptrdiff_t ind = packageName.indexOf(":");
     if (ind == -1)
+    {
+        mainPackageName = packageName;
         return null;
+    }
     mainPackageName = packageName[0 .. ind];
     return packageName[ind + 1 .. $];
 }
@@ -60,7 +63,7 @@ string getSubPackageInfoRequiredBy(string packageName, string requiredBy, out st
 PackageInfo basePackage(string packageName, string packageVersion, string requiredBy)
 {
     PackageInfo pack;
-    pack.subPackage = getSubPackageInfoRequiredBy(packageName, requiredBy, pack.packageName);
+    pack.subPackage =  getSubPackageInfoRequiredBy(packageName, requiredBy, pack.packageName);
     pack.requiredBy = requiredBy;
     pack.requiredVersion = SemVer(packageVersion);
     return pack;

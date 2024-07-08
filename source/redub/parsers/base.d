@@ -3,7 +3,7 @@ import std.system;
 import redub.command_generators.commons;
 import redub.logging;
 import redub.buildapi;
-import redub.package_searching.dub;
+import redub.package_searching.api;
 import redub.parsers.json;
 
 
@@ -64,6 +64,7 @@ void addDependency(
     BuildRequirements.Configuration subConfiguration, 
     string path,
     string visibility,
+    PackageInfo* info,
     bool isOptional
 )
 {
@@ -71,7 +72,7 @@ void addDependency(
     import std.algorithm.searching:countUntil;
     if(path.length && !isAbsolute(path)) 
         path = buildNormalizedPath(c.workingDir, path);
-    Dependency dep = dependency(name, path, version_, req.name, c.workingDir, subConfiguration, visibility, isOptional);
+    Dependency dep = dependency(name, path, version_, req.name, c.workingDir, subConfiguration, visibility, info, isOptional);
     //If dependency already exists, use the existing one
     ptrdiff_t depIndex = countUntil!((a) => a.isSameAs(dep))(req.dependencies);
     if(depIndex == -1)
@@ -95,6 +96,7 @@ private Dependency dependency(
     string workingDir,
     BuildRequirements.Configuration subConfiguration,
     string visibilityStr,
+    PackageInfo* info,
     bool isOptional
 )
 {
@@ -111,7 +113,7 @@ private Dependency dependency(
     Visibility visibility = Visibility.public_;
     if(visibilityStr) visibility = VisibilityFrom(visibilityStr);
     
-    return Dependency(name, path, version_, subConfiguration, subPackage, visibility, isOptional);
+    return Dependency(name, path, version_, subConfiguration, subPackage, visibility, info, isOptional);
 }
 
 void addSubConfiguration(

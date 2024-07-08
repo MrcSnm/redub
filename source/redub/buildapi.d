@@ -3,6 +3,7 @@ module redub.buildapi;
 import std.path;
 public import std.system:OS, ISA;
 import redub.logging;
+import redub.package_searching.api;
 
 ///vX.X.X
 enum RedubVersionOnly = "v1.6.4";
@@ -441,6 +442,8 @@ struct Dependency
     BuildRequirements.Configuration subConfiguration;
     string subPackage;
     Visibility visibility = Visibility.public_;
+    ///This package info is used internally for keeping all the required versions in sync, so an additional pass for changing their versions isn't needed.
+    PackageInfo* pkgInfo;
     bool isOptional;
 
     bool isSameAs(string name, string subPackage) const
@@ -577,14 +580,10 @@ struct BuildRequirements
         return output;
     }
 
-    immutable(BuildRequirements) idup() inout
+    immutable(ThreadBuildData) buildData() inout
     {
-        return immutable BuildRequirements(
+        return immutable ThreadBuildData(
             cfg.idup,
-            dependencies.idup,
-            version_,
-            configuration,
-            pending.idup,
             extra.idup
         );
     }
@@ -628,6 +627,18 @@ struct BuildRequirements
     }
 
     string name() const {return cfg.name;}
+}
+
+
+/**
+ * Used as a final piece of information that the Threads will use.
+ * It uses build configuration and has all the extra data needed here.
+ * Since the requirement needs to be immutable, it can't have any pointers (Dependency).PackageInfo
+ */
+struct ThreadBuildData
+{
+    BuildConfiguration cfg;
+    ExtraInformation extra;
 }
 
 class ProjectNode
@@ -835,7 +846,7 @@ class ProjectNode
                         target.requirements.cfg = target.requirements.cfg.mergeLibPaths(other);
                     break;
                 case executable: break;
-                case none: throw new Exception("TargetTtype: none as a root project: nothing to do");
+                case none: throw new Exception("TargetType: none as a root project: nothing to do");
                     // if(input.parent.length == 0)
                     //     throw new Exception("targetType: none as a root project: nothing to do");
                     // else

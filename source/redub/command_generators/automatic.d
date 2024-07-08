@@ -33,13 +33,13 @@ string getCompileCommands(const BuildConfiguration cfg, OS os, Compiler compiler
     return escapeShellCommand(compiler.binOrPath) ~ " " ~ processFlags(flags);
 }
 
-string getLinkCommands(const BuildRequirements req, OS os, Compiler compiler)
+string getLinkCommands(const ThreadBuildData data, OS os, Compiler compiler)
 {
     import command_generators.linkers;
     string[] flags;
     
-    version(Windows) flags = parseLinkConfigurationMSVC(req, os, compiler);
-    else flags = parseLinkConfiguration(req, os, compiler);
+    version(Windows) flags = parseLinkConfigurationMSVC(data, os, compiler);
+    else flags = parseLinkConfiguration(data, os, compiler);
 
     if(compiler.compiler == AcceptedCompiler.invalid)
         throw new Exception("Unsupported compiler '" ~ compiler.binOrPath~"'");

@@ -40,16 +40,16 @@ private ExecutionResult executeCommands(const string[] commandsList, string list
     return ExecutionResult(0, "Success");
 }
 
-void execCompilationThread(immutable BuildRequirements req, shared ProjectNode pack, OS os, Compiler compiler, shared CompilationCache cache, immutable string[string] env)
+void execCompilationThread(immutable ThreadBuildData data, shared ProjectNode pack, OS os, Compiler compiler, shared CompilationCache cache, immutable string[string] env)
 {
-    CompilationResult res = execCompilation(req, pack, os, compiler, cache, env);
+    CompilationResult res = execCompilation(data, pack, os, compiler, cache, env);
     scope(exit)
     {
         ownerTid.send(res);
     }
 }
 
-CompilationResult execCompilation(immutable BuildRequirements req, shared ProjectNode pack, OS os, Compiler compiler, shared CompilationCache cache, immutable string[string] env)
+CompilationResult execCompilation(immutable ThreadBuildData data, shared ProjectNode pack, OS os, Compiler compiler, shared CompilationCache cache, immutable string[string] env)
 {
     import std.file;
     import std.process;
@@ -59,7 +59,6 @@ CompilationResult execCompilation(immutable BuildRequirements req, shared Projec
     CompilationResult res;
     res.node = pack;
     StopWatch sw = StopWatch(AutoStart.yes);
-    immutable BuildConfiguration cfg = req.cfg;
     scope(exit)
     {
         res.msNeeded = sw.peek.total!"msecs";
@@ -72,6 +71,8 @@ CompilationResult execCompilation(immutable BuildRequirements req, shared Projec
             res.cache = cache;
             return res;
         }
+
+        immutable BuildConfiguration cfg = data.cfg;
         //Remove existing binary, since it won't be replaced by simply executing commands
         string outDir = getConfigurationOutputPath(cfg, os);
         if(exists(outDir))
@@ -99,7 +100,7 @@ CompilationResult execCompilation(immutable BuildRequirements req, shared Projec
 
             if(!isDCompiler(compiler) && !ret.status) //Always requires link.
             {
-                CompilationResult linkRes = link(req, os, compiler, env);
+                CompilationResult linkRes = link(data, os, compiler, env);
                 ret.status = linkRes.status;
                 ret.output~= linkRes.message;
                 res.compilationCommand~= linkRes.compilationCommand;
@@ -107,9 +108,9 @@ CompilationResult execCompilation(immutable BuildRequirements req, shared Projec
         }
 
         ///Shared Library(mostly?)
-        if(isDCompiler(compiler) && isLinkedSeparately(req.cfg.targetType) && !pack.isRoot)
+        if(isDCompiler(compiler) && isLinkedSeparately(data.cfg.targetType) && !pack.isRoot)
         {
-            CompilationResult linkRes = link(req, os, compiler, env);
+            CompilationResult linkRes = link(data, os, compiler, env);
             ret.status = linkRes.status;
             ret.output~= linkRes.message;
             res.compilationCommand~= "\n\nLinking: \n\t"~ linkRes.compilationCommand;
@@ -136,12 +137,12 @@ CompilationResult execCompilation(immutable BuildRequirements req, shared Projec
     return res;
 }
 
-CompilationResult link(const BuildRequirements req, OS os, Compiler compiler, immutable string[string] env)
+CompilationResult link(const ThreadBuildData data, OS os, Compiler compiler, immutable string[string] env)
 {
     import std.process;
     CompilationResult ret;
 
-    ret.compilationCommand = getLinkCommands(req, os, compiler);
+    ret.compilationCommand = getLinkCommands(data, os, compiler);
 
     auto exec = executeShell(ret.compilationCommand);
     ret.status = exec.status;
@@ -150,8 +151,8 @@ CompilationResult link(const BuildRequirements req, OS os, Compiler compiler, im
     if(exec.status != 0)
         return ret;
 
-    if(req.cfg.targetType.isLinkedSeparately)
-        executeCommands(req.cfg.postGenerateCommands, "postGenerateCommand", ret, req.cfg.workingDir, env);
+    if(data.cfg.targetType.isLinkedSeparately)
+        executeCommands(data.cfg.postGenerateCommands, "postGenerateCommand", ret, data.cfg.workingDir, env);
 
     return ret;
 }
@@ -174,7 +175,7 @@ bool buildProjectParallelSimple(ProjectNode root, Compiler compiler, OS os)
             {
                 spawned[dep] = true;
                 spawn(&execCompilationThread, 
-                    dep.requirements.idup, cast(shared)dep, os, 
+                    dep.requirements.buildData, cast(shared)dep, os,
                     compiler, cast(shared)CompilationCache.get(mainPackHash, dep.requirements, compiler),
                     env
                 );
@@ -211,7 +212,7 @@ bool buildProjectFullyParallelized(ProjectNode root, Compiler compiler, OS os)
     foreach(pack; root.collapse)
     {
         spawn(&execCompilationThread, 
-            pack.requirements.idup, 
+            pack.requirements.buildData,
             cast(shared)pack, os, compiler, 
             cast(shared)cache[i++],
             env
@@ -257,7 +258,7 @@ bool buildProjectSingleThread(ProjectNode root, Compiler compiler, OS os)
         ProjectNode finishedPackage;
         foreach(dep; dependencyFreePackages)
         {
-            CompilationResult res = execCompilation(dep.requirements.idup, cast(shared)dep, os, compiler,
+            CompilationResult res = execCompilation(dep.requirements.buildData, cast(shared)dep, os, compiler,
                 cast(shared)CompilationCache.get(mainPackHash, dep.requirements, compiler), env
             );
             finishedPackage = cast()res.node;
@@ -435,7 +436,7 @@ private bool doLink(ProjectNode root, OS os, Compiler compiler, string mainPackH
     {
         CompilationResult linkRes;
         auto result = timed(() {
-             linkRes = link(root.requirements, os, compiler, env);
+             linkRes = link(root.requirements.buildData, os, compiler, env);
              return true;
         });
         if(linkRes.status)
