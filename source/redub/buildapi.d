@@ -6,7 +6,7 @@ import redub.logging;
 import redub.package_searching.api;
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.7.0";
+enum RedubVersionOnly = "v1.7.1";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -825,7 +825,9 @@ class ProjectNode
             target.requirements.cfg = target.requirements.cfg.mergeStringImport(input.requirements.cfg);
             target.requirements.cfg = target.requirements.cfg.mergeVersions(input.requirements.cfg);
             target.requirements.cfg = target.requirements.cfg.mergeFilteredDflags(input.requirements.cfg);
-            target.requirements.cfg = target.requirements.cfg.mergeLinkFilesFromSource(input.requirements.cfg);
+            // if(target.requirements.cfg.targetType.isLinkedSeparately)
+            //     target.requirements.cfg = target.requirements.cfg.mergeLinkFilesFromSource(input.requirements.cfg);
+
             target.requirements.extra.librariesFullPath.exclusiveMerge(
                 input.requirements.extra.librariesFullPath
             );
@@ -834,8 +836,6 @@ class ProjectNode
                 case autodetect: throw new Exception("Node should not be autodetect at this point");
                 case library, staticLibrary:
                         BuildConfiguration other = input.requirements.cfg.clone;
-                        // other.libraries~= other.name;
-                        // other.libraryPaths~= other.outputDirectory;
                         ///Use library full path for the 
                         target.requirements.extra.librariesFullPath.exclusiveMerge(
                             [buildNormalizedPath(other.outputDirectory, other.name)]

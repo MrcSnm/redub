@@ -283,6 +283,14 @@ string[] getLinkFiles(const string[] filesToLink)
     return cast(string[])filesToLink.filter!((name) => name.extension.isLinkerValidExtension).array; //Array already guarantee nothing is modified.
 }
 
+string[] getLibFiles(const string[] filesToLink)
+{
+    import std.path;
+    import std.array;
+    import std.algorithm.iteration;
+    return cast(string[])filesToLink.filter!((name) => name.extension.isLibraryExtension).array; //Array already guarantee nothing is modified.
+}
+
 
 ref T[] append(T, TRange)(ref T[] theArray, TRange theRange)
 {

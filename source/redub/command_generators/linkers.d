@@ -36,7 +36,7 @@ string[] parseLinkConfiguration(const ThreadBuildData data, OS target, Compiler 
             commands = mapAppendReverse(commands, data.extra.librariesFullPath, (string l) => getOutputName(TargetType.staticLibrary, l, target));
             commands = mapAppendPrefix(commands, linkFlags, "-L", false);
             commands = mapAppendPrefix(commands, libraryPaths, "-L-L", true);
-            commands = mapAppendReverse(commands, libraries, (string l) => "-L-l"~l);
+            commands = mapAppendReverse(commands, libraries, (string l) => "-L-l"~stripExtension(l));
             commands~= getLinkFiles(b.sourceFiles);
             
         }
@@ -56,6 +56,7 @@ string[] parseLinkConfigurationMSVC(const ThreadBuildData data, OS target, Compi
 {
     import std.algorithm.iteration;
     import std.path;
+    import std.string;
 
 
     if(!target.isWindows) return parseLinkConfiguration(data, target, compiler);
@@ -85,7 +86,7 @@ string[] parseLinkConfigurationMSVC(const ThreadBuildData data, OS target, Compi
 
         commands = mapAppendPrefix(commands, libraryPaths, "-L/LIBPATH:", true);
         commands~= getLinkFiles(b.sourceFiles);
-        commands = mapAppend(commands, libraries, (string l) => "-L"~l~".lib");
+        commands = mapAppend(commands, libraries, (string l) => "-L"~stripExtension(l)~".lib");
         
         commands~= buildNormalizedPath(outputDirectory, name~getObjectExtension(target)).escapePath;
         commands~= "-of"~buildNormalizedPath(outputDirectory, getOutputName(targetType, name, target)).escapePath;

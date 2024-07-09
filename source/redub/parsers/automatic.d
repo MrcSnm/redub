@@ -65,6 +65,7 @@ BuildRequirements parseProject(
  * This function finishes some parts of the build requirement:
  * - Merge pending configuration (this guarantees the order is always correct.)
  * - Transforms relative paths into absolute paths
+ * - Remove libraries from sourceFiles and put them onto libraries
  * - If no import directory exists, it will be reflected by source paths.
  * After that, it makes possible to merge with other build requirements. But, it is not completely
  * finished. It still has to become a tree.
@@ -98,8 +99,18 @@ private void partiallyFinishBuildRequirements(ref BuildRequirements req)
                 dir = buildNormalizedPath(req.cfg.workingDir, dir);
             // dir = escapePath(dir);
         }
-
     }
+
+
+    import std.algorithm.iteration;
+    auto libraries = req.cfg.sourceFiles.filter!((name) => name.extension.isLibraryExtension);
+    req.cfg.libraries.exclusiveMergePaths(libraries);
+
+    import std.array;
+    ///Remove libraries from the sourceFiles.
+    req.cfg.sourceFiles = req.cfg.sourceFiles.filter!((name) => !name.extension.isLibraryExtension).array;
+
+
     if(!isAbsolute(req.cfg.sourceEntryPoint)) 
         req.cfg.sourceEntryPoint = buildNormalizedPath(req.cfg.workingDir, req.cfg.sourceEntryPoint);
 
