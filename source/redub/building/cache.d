@@ -11,8 +11,7 @@ import hipjson;
 import redub.command_generators.commons;
 
 
-enum cacheFolder = ".redub";
-enum cacheFile = "redub_cache.json";
+enum CACHE_FOLDER_NAME = ".redub";
 
 Int128 toInt128(string input)
 {
@@ -242,7 +241,7 @@ private JSONValue* getCache(string rootCache)
 private string getCacheFolder()
 {
     static string cacheFolder;
-    if(!cacheFolder) cacheFolder = buildNormalizedPath(getDubWorkspacePath(), cacheFolder);
+    if(!cacheFolder) cacheFolder = buildNormalizedPath(getDubWorkspacePath(), CACHE_FOLDER_NAME);
     return cacheFolder;
 }
 

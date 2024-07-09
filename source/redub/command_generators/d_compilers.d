@@ -22,10 +22,9 @@ string[] parseBuildConfiguration(AcceptedCompiler comp, const BuildConfiguration
             commands~= "--cache-prune";
         }
 
-        if(b.arch)
-        {
-            commands~= mapArch(comp, b.arch);
-        }
+        string arch = mapArch(comp, b.arch);
+        if(arch)
+            commands~= arch;
         commands = mapAppendPrefix(commands, debugVersions, mapper(ValidDFlags.debugVersions), false);
         commands = mapAppendPrefix(commands, versions, mapper(ValidDFlags.versions), false);
         commands = mapAppendPrefix(commands, importDirectories, mapper(ValidDFlags.importPaths), true);
@@ -183,21 +182,61 @@ string ldcFlags(ValidDFlags flag)
     }
 }
 
+// Determines whether the specified process is running under WOW64 or an Intel64 of x64 processor.
+version (Windows)
+private bool isWow64() {
+	// See also: https://docs.microsoft.com/de-de/windows/desktop/api/sysinfoapi/nf-sysinfoapi-getnativesysteminfo
+	import core.sys.windows.winbase : GetNativeSystemInfo, SYSTEM_INFO;
+	import core.sys.windows.winnt : PROCESSOR_ARCHITECTURE_AMD64;
+
+	static bool result;
+    static bool hasLoadedResult = false;
+
+	// A process's architecture won't change over while the process is in memory
+	// Return the cached result
+    if(!hasLoadedResult)
+    {
+        SYSTEM_INFO systemInfo;
+        GetNativeSystemInfo(&systemInfo);
+        result = systemInfo.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64;
+        hasLoadedResult = true;
+    }
+
+	return result;
+}
+
 string mapArch(AcceptedCompiler compiler, string arch)
 {
-    if(compiler != AcceptedCompiler.ldc2)
-        throw new Exception("Only ldc2 supports --arch flag");
-
-    switch (arch) 
+    if(compiler == AcceptedCompiler.ldc2)
     {
-        case "": return null;
-        case "x86":  return "-march=x86";
-        case "x86_mscoff":  return "-march=x86";
-        case "x86_64":  return "-march=x86-64";
-        case "aarch64":  return "-march=aarch64";
-        case "powerpc64":  return "-march=powerpc64";
-        default: return "-mtriple="~arch;
+        switch (arch)
+        {
+            case "": return null;
+            case "x86": return "-march=x86";
+            case "x86_mscoff":  return "-march=x86";
+            case "x86_64":  return "-march=x86-64";
+            case "aarch64":  return "-march=aarch64";
+            case "powerpc64":  return "-march=powerpc64";
+            default: return "-mtriple="~arch;
+        }
     }
+    else if(compiler == AcceptedCompiler.dmd)
+    {
+        switch(arch)
+        {
+            case "x86", "x86_omf", "x86_mscoff": return "-m32";
+            case "x64", "x86_64": return "-m64";
+            default:
+            {
+                version(Windows)
+                {
+                    return isWow64() ? "-m64": "-m32";
+                }
+                else  return null;
+            }
+        }
+    }
+    else throw new Exception("Unsupported compiler for mapping arch.");
 }
 
 enum ValidDFlags

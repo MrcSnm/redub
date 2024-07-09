@@ -16,14 +16,15 @@ string[] parseLinkConfiguration(const ThreadBuildData data, OS target, Compiler 
         if(compiler.isDCompiler)
         {
             import redub.command_generators.d_compilers;
-                    
+
             if (targetType.isLinkedSeparately)
             {
                 commands~= "-of"~buildNormalizedPath(outputDirectory, getOutputName(b, target));
                 commands~= buildNormalizedPath(outputDirectory, name~getObjectExtension(target));
             }
-            if(b.arch)
-                commands~= mapArch(compiler.compiler, b.arch);
+            string arch = mapArch(compiler.compiler, b.arch);
+            if(arch)
+                commands~= arch;
             commands~= filterLinkFlags(b.dFlags);
         }
         if(targetType == TargetType.dynamicLibrary)
@@ -65,8 +66,9 @@ string[] parseLinkConfigurationMSVC(const ThreadBuildData data, OS target, Compi
         if(compiler.isDCompiler)
         {
             import redub.command_generators.d_compilers;
-            if(b.arch)
-                commands~= mapArch(compiler.compiler, b.arch);
+            string arch = mapArch(compiler.compiler, b.arch);
+            if(arch)
+                commands~= arch;
             commands~= filterLinkFlags(b.dFlags);
         }
         if(!compiler.usesIncremental)

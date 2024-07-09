@@ -140,8 +140,9 @@ private void getProjectTreeImpl(
  */
 private BuildRequirements parseProjectWithParent(Dependency dep, BuildRequirements parent, CompilationInfo info)
 {
+    import redub.package_searching.cache;
     vvlog("Parsing dependency ", dep.name, " with parent ", parent.name);
-    BuildRequirements depReq = parseProject(dep.path, info.compiler, info.arch, dep.subConfiguration, dep.subPackage, null, info.targetOS, info.isa);
+    BuildRequirements depReq = parseProject(dep.pkgInfo.path, info.compiler, info.arch, dep.subConfiguration, dep.subPackage, null, info.targetOS, info.isa);
     depReq.cfg.name = dep.fullName;
     return mergeProjectWithParent(depReq, parent);
 }

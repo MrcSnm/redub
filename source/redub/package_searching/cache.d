@@ -1,5 +1,5 @@
 module redub.package_searching.cache;
-import redub.package_searching.api;
+public import redub.package_searching.api;
 
 
 /** 
@@ -42,6 +42,8 @@ PackageInfo* findPackage(string packageName, string packageVersion, string requi
                 PackageInfo newPkgInfo = getPackage(packageName, packageVersion, requiredBy);
                 pkg.bestVersion = newPkgInfo.bestVersion;
                 pkg.path = newPkgInfo.path;
+                import redub.logging;
+                error("Using ", pkg.path, " for package ", pkg.packageName);
             }
             else
                 throw new Exception("Package "~packageName~" with first requirement found '"~pkg.requiredVersion.toString~"' is not compatible with the new requirement: "~packageVersion);

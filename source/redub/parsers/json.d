@@ -209,15 +209,15 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
                         redub.package_searching.cache.putPackageInCache(depName, version_, path);
                     }
                 }
+                PackageInfo* info;
                 if(!path)
                 {
-                    import redub.package_searching.api;
-                    PackageInfo* info = redub.package_searching.cache.findPackage(depName, version_, c.requiredBy);
+                    info = redub.package_searching.cache.findPackage(depName, version_, c.requiredBy);
                     path = info.path;
                     version_ = info.bestVersion.toString;
                 }
-
-                PackageInfo* info = findPackage(depName, version_, c.requiredBy, path);
+                else
+                    info = findPackage(depName, version_, c.requiredBy, path);
                 addDependency(req, c, depName, version_, BuildRequirements.Configuration.init, path, visibility, info, isOptional);
             }
         },
