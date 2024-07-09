@@ -80,6 +80,7 @@ void addDependency(
     else
     {
         dep.subConfiguration = req.dependencies[depIndex].subConfiguration;
+        // if(!req.dependencies[depIndex].isOptional) dep.isOptional = false;
         req.dependencies[depIndex] = dep;
     }
 }
@@ -127,7 +128,7 @@ void addSubConfiguration(
     import std.algorithm.searching:countUntil;
     ptrdiff_t depIndex = countUntil!((dep) => dep.name == dependencyName)(req.dependencies);
     if(depIndex == -1)
-        req.dependencies~= Dependency(dependencyName, null, null, BuildRequirements.Configuration(subConfigurationName, false), null);
+        req.dependencies~= dependency(dependencyName, null, null, req.name, c.workingDir, BuildRequirements.Configuration(subConfigurationName, false), null, null, false);
     else
         req.dependencies[depIndex].subConfiguration = BuildRequirements.Configuration(subConfigurationName, false);
 }

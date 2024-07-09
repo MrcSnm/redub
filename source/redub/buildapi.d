@@ -6,7 +6,7 @@ import redub.logging;
 import redub.package_searching.api;
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.6.5";
+enum RedubVersionOnly = "v1.7.0";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -726,6 +726,19 @@ class ProjectNode
         privatesToMerge.reserve(128);
         dependenciesToRemove.reserve(64);
 
+        static void mergeParentInDependencies(ProjectNode root)
+        {
+            foreach(dep; root.dependencies)
+            {
+                dep.requirements.cfg = dep.requirements.cfg.mergeDFlags(root.requirements.cfg)
+                    .mergeVersions(root.requirements.cfg)
+                    .mergeDebugVersions(root.requirements.cfg);
+            }
+            foreach(dep; root.dependencies)
+                mergeParentInDependencies(dep);
+        }
+
+
         
         static bool hasPrivateRelationship(const ProjectNode parent, const ProjectNode child)
         {
@@ -899,6 +912,7 @@ class ProjectNode
                 node.becomeIndependent();
             }
         }
+        mergeParentInDependencies(this);
         transferNoneDependenciesAndClearOptional(this);
         finishPublic(this, visitedBuffer, privatesToMerge, dependenciesToRemove, targetOS, isa);
         finishPrivate(privatesToMerge, dependenciesToRemove);

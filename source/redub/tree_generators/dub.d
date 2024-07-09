@@ -36,7 +36,6 @@ ProjectNode getProjectTree(BuildRequirements req, CompilationInfo info)
     ProjectNode[] queue = [tree];
     getProjectTreeImpl(queue, info, subConfigs, visited);
     detectCycle(tree);
-    warn(info.isa);
     tree.finish(info.targetOS, info.isa);
     return tree;
 }   
@@ -106,7 +105,7 @@ private void getProjectTreeImpl(
             /// and the new is a default one.
             if(visitedDep.requirements.configuration != dep.subConfiguration && !dep.subConfiguration.isDefault)
             {
-                BuildRequirements depConfig = parseProjectWithParent(dep, node.requirements, info);
+                BuildRequirements depConfig = parseDependency(dep, node.requirements, info);
                 if(visitedDep.requirements.targetConfiguration != depConfig.targetConfiguration)
                 {
                     //Print merging different subConfigs?
@@ -116,45 +115,32 @@ private void getProjectTreeImpl(
                     );
                 }
             }
+
         }
         else
         {
-            depNode = new ProjectNode(parseProjectWithParent(dep, node.requirements, info), dep.isOptional);
+            depNode = new ProjectNode(parseDependency(dep, node.requirements, info), dep.isOptional);
             subConfigurations = depNode.requirements.mergeSubConfigurations(subConfigurations);
             visited[dep.fullName] = depNode;
             queue~= depNode;
         }
         node.addDependency(depNode);
     }
+
     queue = queue[1..$];
     getProjectTreeImpl(queue, info, subConfigurations, visited);
 }
 
-/** 
- * Parses the project and merges its compilation flags with the parent requirement.
- * Params:
- *   projectPath = 
- *   parent = 
- *   subConfiguration = 
- * Returns: 
- */
-private BuildRequirements parseProjectWithParent(Dependency dep, BuildRequirements parent, CompilationInfo info)
+
+private BuildRequirements parseDependency(Dependency dep, BuildRequirements parent, CompilationInfo info)
 {
     import redub.package_searching.cache;
     vvlog("Parsing dependency ", dep.name, " with parent ", parent.name);
     BuildRequirements depReq = parseProject(dep.pkgInfo.path, info.compiler, info.arch, dep.subConfiguration, dep.subPackage, null, info.targetOS, info.isa);
     depReq.cfg.name = dep.fullName;
-    return mergeProjectWithParent(depReq, parent);
+    return depReq;
 }
 
-private BuildRequirements mergeProjectWithParent(BuildRequirements base, BuildRequirements parent)
-{
-    base.cfg = base.cfg
-                .mergeDFlags(parent.cfg)
-                .mergeVersions(parent.cfg)
-                .mergeDebugVersions(parent.cfg);
-    return base;
-}
 
 private BuildRequirements mergeDifferentSubConfigurations(BuildRequirements existingReq, BuildRequirements newReq)
 {
@@ -166,13 +152,21 @@ private BuildRequirements mergeDifferentSubConfigurations(BuildRequirements exis
     );
 }
 
-void printProjectTree(ProjectNode node, int depth = 0)
+void printProjectTree(ProjectNode root)
 {
-    info("-".repeat(depth*2), node.name);
-    foreach(dep; node.dependencies)
+    bool[ProjectNode] visit;
+    void printProjectTreeImpl(ProjectNode node, int depth, ref bool[ProjectNode] visited)
     {
-        printProjectTree(dep, depth+1);
+        info("\t".repeat(depth), node.name, " [", node.requirements.configuration.name, "] ", node.requirements.version_);
+        if(!(node in visited))
+        {
+            foreach(dep; node.dependencies)
+                printProjectTreeImpl(dep, depth+1, visited);
+        }
+        visited[node] = true;
     }
+
+    printProjectTreeImpl(root, 0, visit);
 }
 
 string repeat(string v, int n)

@@ -59,6 +59,9 @@ int main(string[] args)
         case "describe":
             args = args[0] ~ args[2..$];
             return describeMain(args);
+        case "deps":
+            args = args[0] ~ args[2..$];
+            return depsMain(args);
         case "run":
             args = args[0] ~ args[2..$];
             goto default;
@@ -145,6 +148,16 @@ int describeMain(string[] args)
         import std.stdio;
         writeln(escapeShellCommand(data));
     }
+    return 0;
+}
+
+
+int depsMain(string[] args)
+{
+    ProjectDetails d = resolveDependencies(args);
+    if(!d.tree)
+        return 1;
+    printProjectTree(d.tree);
     return 0;
 }
 

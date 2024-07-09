@@ -22,27 +22,30 @@ string[] parseBuildConfiguration(AcceptedCompiler comp, const BuildConfiguration
             commands~= "--cache-prune";
         }
 
-        string arch = mapArch(comp, b.arch);
-        if(arch)
-            commands~= arch;
         commands = mapAppendPrefix(commands, debugVersions, mapper(ValidDFlags.debugVersions), false);
         commands = mapAppendPrefix(commands, versions, mapper(ValidDFlags.versions), false);
         commands = mapAppendPrefix(commands, importDirectories, mapper(ValidDFlags.importPaths), true);
 
-        if(targetType.isLinkedSeparately)
-            commands~= mapper(ValidDFlags.compileOnly);
         commands = mapAppendPrefix(commands, stringImportPaths, mapper(ValidDFlags.stringImportPaths), true);
 
+        putSourceFiles(commands, workingDir, sourcePaths, sourceFiles, excludeSourceFiles, ".d");
 
+        string arch = mapArch(comp, b.arch);
+        if(arch)
+            commands~= arch;
+
+        if(targetType.isLinkedSeparately)
+            commands~= mapper(ValidDFlags.compileOnly);
         if(targetType.isStaticLibrary)
             commands~= mapper(ValidDFlags.buildAsLibrary);
         else if(targetType == TargetType.dynamicLibrary)
             commands~= mapper(ValidDFlags.buildAsShared);
 
+
+
         commands~= mapper(ValidDFlags.objectDir)~getObjectDir(b.workingDir).escapePath;
         commands~= mapper(ValidDFlags.outputFile) ~ getConfigurationOutputPath(b, target).escapePath;
     
-        putSourceFiles(commands, workingDir, sourcePaths, sourceFiles, excludeSourceFiles, ".d");
 
     }
 
