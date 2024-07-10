@@ -62,7 +62,7 @@ Have you ever wondered why [dub](https://github.com/dlang/dub) was slow? I tried
 - Separate build system from package manager.
 - Have total backward compatibility on dub for initial versions.
 - On initial versions, develop using phobos only
-- Make it less stateful. 
+- Make it less stateful.
 - Achieve at least 90% of what dub does.
 - Isolate each process. This will make easier for adding and future contributors
 
@@ -99,7 +99,7 @@ Right now, it has been tested with
 
 ### Working examples
 Those projects were fairly tested while building this one
-- dub 
+- dub
 - glui
 - dplug
 - arsd-official
