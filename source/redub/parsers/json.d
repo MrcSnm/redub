@@ -7,6 +7,7 @@ import hipjson;
 import std.file;
 import redub.parsers.base;
 import redub.command_generators.commons;
+import core.runtime;
 
 /** 
  * Those commands are independent of the selected target OS.
@@ -77,13 +78,19 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
     immutable static preGenerateRun = [
         "preGenerateCommands": (ref BuildRequirements req, JSONValue v, ParseConfig c)
         {
+            info("Running preGenerateCommands for ", req.name);
             foreach(JSONValue cmd; v.array)
             {
                 import std.process;
+                import std.stdio;
                 import std.conv:to;
-                auto res = executeShell(cmd.str, null, Config.none, size_t.max, c.workingDir);
-                if(res.status)
-                    throw new Exception("preGenerateCommand '"~cmd.str~"; exited with code "~res.status.to!string);
+
+                if(hasLogLevel(LogLevel.verbose))
+                    vlog("Executing: ", executeShell("echo "~cmd.str, environment.toAA).output);
+
+                auto status = wait(spawnShell(cmd.str, stdin, stdout, stderr, environment.toAA, Config.none, c.workingDir));
+                if(status)
+                    throw new Exception("preGenerateCommand '"~cmd.str~"' exited with code "~status.to!string);
             }
         }
     ];
@@ -281,8 +288,10 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
         );
     }
     string[] unusedKeys;
+
     if(cfg.preGenerateRun)
     {
+        setName(buildRequirements, json["name"].str, cfg);
         runHandlers(preGenerateRun, buildRequirements, cfg, json, false, unusedKeys);
         cfg.preGenerateRun = false;
     }

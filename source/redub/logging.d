@@ -10,6 +10,11 @@ enum LogLevel
     vverbose
 }
 private LogLevel level;
+
+bool hasLogLevel(LogLevel lvl)
+{
+    return level >= lvl;
+}
 void setLogLevel(LogLevel lvl){ level = lvl; }
 void info(T...)(T args){if(level >= LogLevel.info) cwriteln(args);}
 ///Short for info success

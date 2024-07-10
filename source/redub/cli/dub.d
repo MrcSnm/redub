@@ -175,7 +175,7 @@ struct DubArguments
     @("build-mode")
     string buildMode;
 
-    @("Treats the package name as a filename. The file must contain a package recipe comment.")
+    @("Treats the package name as a filename. The file must contain a package recipe comment. On Redub, it will forward to dub since it cannot handle at the moment.")
     bool single;
 
     @("Shows redub version")

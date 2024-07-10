@@ -74,12 +74,8 @@ int main(string[] args)
 int runMain(string[] args)
 {
     ProjectDetails d = buildProject(resolveDependencies(args));
-    if(!d.tree)
-    {
-        if(d.printOnly)
-            return 0;
-        return 1;
-    }
+    if(!d.tree || d.usesExternalErrorCode)
+        return d.getReturnCode;
     if(d.tree.requirements.cfg.targetType != TargetType.executable)
         return 1;
 
@@ -165,7 +161,7 @@ int cleanMain(string[] args)
 {
     ProjectDetails d = resolveDependencies(args);
     if(!d.tree)
-        return 1;
+        return d.getReturnCode;
     
     auto res = timed(()
     {
@@ -193,9 +189,24 @@ int cleanMain(string[] args)
 
 int buildMain(string[] args)
 {
-    if(!buildProject(resolveDependencies(args)).tree)
-        return 1;
-    return 0;
+    return buildProject(resolveDependencies(args)).getReturnCode;
+}
+
+string findProgramPath(string program)
+{
+	import std.algorithm:countUntil;
+	import std.process;
+	string searcher;
+	version(Windows) searcher = "where";
+	else version(Posix) searcher = "which";
+	else static assert(false, "No searcher program found in this OS.");
+	auto shellRes = executeShell(searcher ~" " ~ program,
+	[
+		"PATH": environment["PATH"]
+	]);
+    if(shellRes.status == 0)
+		return shellRes.output[0..shellRes.output.countUntil("\n")];
+   	return null;
 }
 
 
@@ -208,7 +219,9 @@ ProjectDetails resolveDependencies(string[] args)
     string recipe;
 
     DubArguments bArgs;
+    string[] unmodArgs = args.dup;
     GetoptResult res = betterGetopt(args, bArgs);
+    updateVerbosity(bArgs.cArgs);
     if(res.helpWanted)
     {
         import std.getopt;
@@ -221,7 +234,19 @@ ProjectDetails resolveDependencies(string[] args)
         writeln(RedubVersion);
         return ProjectDetails(null, Compiler.init, ParallelType.auto_,  true);
     }
-    updateVerbosity(bArgs.cArgs);
+    if(bArgs.single)
+    {
+        import std.process;
+        import std.stdio;
+        string dubCommand = "dub "~join(unmodArgs[1..$], " ");
+        environment["DUB_EXE"] = environment["DUB"] = "dub";
+        string cwd = getcwd;
+        warn(RedubVersionShort~ " does not handle --single. Forwarding '"~dubCommand~"' to dub with working dir "~cwd);
+
+        int status = wait(spawnShell(dubCommand, stdin, stdout, stderr, environment.toAA, Config.none, cwd));
+        return ProjectDetails(null, Compiler.init, ParallelType.auto_, true, status);
+    }
+
     if(bArgs.arch) bArgs.compiler = "ldc2";
     DubCommonArguments cArgs = bArgs.cArgs;
     if(cArgs.root)

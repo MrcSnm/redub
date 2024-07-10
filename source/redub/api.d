@@ -17,7 +17,18 @@ struct ProjectDetails
     ///Makes the return code 0 for when using print commands.
     bool printOnly;
 
+    int externalErrorCode = int.min;
+
     bool error() const {return this == ProjectDetails.init; }
+
+    bool usesExternalErrorCode() const { return this.printOnly && externalErrorCode != int.min; }
+
+    int getReturnCode()
+    {
+        if(error) return 1;
+        else if(usesExternalErrorCode) return externalErrorCode;
+        return 0;
+    }
 
     void getLinkerFiles(out string[] output) const {putLinkerFiles(tree, output);}
     void getSourceFiles(out string[] output) const {putSourceFiles(tree, output);}
@@ -160,15 +171,22 @@ ProjectDetails resolveDependencies(
 
     with(dubVars)
     {
+        import std.conv:to;
         DUB = either(DUB, "redub");
+        DUB_EXE = DUB;
         DUB_CONFIG = either(DUB_CONFIG, proj.configuration);
+        DUB_BUILD_TYPE = buildType;
+
+        DUB_COMBINED = redub.parsers.environment.str(cDetails.combinedBuild);
+        DC = either(DC, compiler.binOrPath);
         DC_BASE = either(DC_BASE, compiler.binOrPath);
-        DUB_ARCH = either(DUB_ARCH, cDetails.arch);
+        DUB_ARCH = either(DUB_ARCH, cDetails.arch, isaFromArch(cDetails.arch).to!string);
         DUB_PLATFORM = either(DUB_PLATFORM, redub.parsers.environment.str(os));
         DUB_FORCE = either(DUB_FORCE, redub.parsers.environment.str(invalidateCache));
     }
 
     redub.parsers.environment.setupBuildEnvironmentVariables(dubVars);
+
     BuildRequirements req = parseProject(
         proj.workingDir, 
         compiler.getCompilerString,

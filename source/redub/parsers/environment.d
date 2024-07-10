@@ -50,7 +50,7 @@ struct InitialDubVariables
     ///Version of the package
     string DUB_PACKAGE_VERSION ;
     ///Compiler binary name (e.g. "../dmd" or "ldc2")
-    string DC ;
+    string DC;
     ///Canonical name of the compiler (e.g. "dmd" or "ldc")
     string DC_BASE ;
 
@@ -59,7 +59,7 @@ struct InitialDubVariables
     ///Name of the selected build type (e.g. "debug" or "unittest")
     string DUB_BUILD_TYPE ;
     ///Name of the selected build mode (e.g. "separate" or "singleFile")
-    string DUB_BUILD_MODE ;
+    string DUB_BUILD_MODE = "separate";
     ///Absolute path in which the package was compiled (defined for "postBuildCommands" only)
     string DUB_BUILD_PATH ;
     ///"TRUE" if the --combined flag was used, empty otherwise
@@ -94,6 +94,8 @@ struct RootPackageDubVariables
 {
     ///Name of the root package that is being built
     string DUB_ROOT_PACKAGE ;
+    ///Directory of the root package that is being built
+    string DUB_ROOT_PACKAGE_DIR ;
     ///Contents of the "targetType" field of the root package as defined by the package recipe
     string DUB_ROOT_PACKAGE_TARGET_TYPE ;
     ///Contents of the "targetPath" field of the root package as defined by the package recipe
@@ -123,7 +125,9 @@ struct PackageDubVariables
 void setupBuildEnvironmentVariables(InitialDubVariables dubVars)
 {
     static foreach(member; __traits(allMembers, InitialDubVariables))
+    {
         environment[member] = mixin("dubVars.",member);
+    }
 }
 
 
@@ -131,16 +135,17 @@ InitialDubVariables getInitialDubVariablesFromArguments(DubArguments args, DubBu
 {
     import std.file;
     InitialDubVariables dubVars;
-    dubVars.DUB = rawArgs[0];
-    dubVars.DUB_BUILD_TYPE = args.buildType;
-    dubVars.DUB_CONFIG = args.config;
-    dubVars.DC_BASE = args.compiler;
-    dubVars.DUB_ARCH = args.arch;
-    dubVars.DUB_PLATFORM = os.str;
-    dubVars.DUB_TEMP_BUILD = bArgs.tempBuild.str;
-    dubVars.DUB_RDMD = bArgs.rdmd.str;
-    dubVars.DUB_FORCE = bArgs.force.str;
-    dubVars.DUB_RUN_ARGS = escapeShellCommand(rawArgs[1..$]);
+    dubVars.DUB                 = rawArgs[0];
+    dubVars.DUB_BUILD_TYPE      = args.buildType;
+    dubVars.DUB_CONFIG          = args.config;
+    dubVars.DC_BASE             = args.compiler;
+    dubVars.DUB_ARCH            = args.arch;
+    dubVars.DUB_PLATFORM        = os.str;
+    dubVars.DUB_TEMP_BUILD      = bArgs.tempBuild.str;
+    dubVars.DUB_RDMD            = bArgs.rdmd.str;
+    dubVars.DUB_FORCE           = bArgs.force.str;
+    dubVars.DUB_PARALLEL_BUILD  = str(bArgs.parallel == ParallelType.no);
+    dubVars.DUB_RUN_ARGS        = escapeShellCommand(rawArgs[1..$]);
     dubVars.DUB_WORKING_DIRECTORY = args.cArgs.getRoot(std.file.getcwd());
     return dubVars;
 }
@@ -148,6 +153,7 @@ InitialDubVariables getInitialDubVariablesFromArguments(DubArguments args, DubBu
 /** 
  * This, setups on environment the following variables:
  * - DUB_ROOT_PACKAGE
+ * - DUB_ROOT_PACKAGE_DIR
  * - DUB_ROOT_PACKAGE_TARGET_TYPE
  * - DUB_ROOT_TARGET_PATH
  * - DUB_ROOT_PACKAGE_TARGET_NAME
@@ -158,6 +164,7 @@ void setupEnvironmentVariablesForRootPackage(immutable BuildRequirements root)
 {
     import std.conv:to;
     environment["DUB_ROOT_PACKAGE"] = root.name;
+    environment["DUB_ROOT_PACKAGE_DIR"] = root.cfg.workingDir;
     environment["DUB_ROOT_PACKAGE_TARGET_TYPE"] = root.cfg.targetType.to!string;
     environment["DUB_ROOT_PACKAGE_TARGET_PATH"] = root.cfg.outputDirectory;
     environment["DUB_ROOT_PACKAGE_TARGET_NAME"] = root.cfg.name;
@@ -340,4 +347,4 @@ string str(OS os)
         default: return "posix";
     }
 }
-string str(bool b){return b ? "TRUE" : "FALSE";}
+string str(bool b){return b ? "TRUE" : null;}
