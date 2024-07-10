@@ -7,7 +7,7 @@
 
 ## Building redub
 - Enter in terminal and execute `dub`
-- Highly recommended that you build it with `dub -b release-debug --compiler=ldc2` since this will also improve its speed on dependency resolution
+- Highly recommended that you build it with `dub build -b release-debug --compiler=ldc2` since this will also improve its speed on dependency resolution
 - I would also add redub/bin to the environment variables, with that, you'll be able to simply execute `redub` in the folder you're in and get your project built and running
 
 ## Using its library API
