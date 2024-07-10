@@ -7,7 +7,7 @@
 
 ## Building redub
 - Enter in terminal and execute `dub`
-- Highly recommended that you build it with `dub -b release-debug --compiler=ldc2` since this will also improve its speed on dependency resolution
+- Highly recommended that you build it with `dub build -b release-debug --compiler=ldc2` since this will also improve its speed on dependency resolution
 - I would also add redub/bin to the environment variables, with that, you'll be able to simply execute `redub` in the folder you're in and get your project built and running
 
 ## Using its library API
@@ -62,7 +62,7 @@ Have you ever wondered why [dub](https://github.com/dlang/dub) was slow? I tried
 - Separate build system from package manager.
 - Have total backward compatibility on dub for initial versions.
 - On initial versions, develop using phobos only
-- Make it less stateful. 
+- Make it less stateful.
 - Achieve at least 90% of what dub does.
 - Isolate each process. This will make easier for adding and future contributors
 
@@ -99,7 +99,7 @@ Right now, it has been tested with
 
 ### Working examples
 Those projects were fairly tested while building this one
-- dub 
+- dub
 - glui
 - dplug
 - arsd-official
