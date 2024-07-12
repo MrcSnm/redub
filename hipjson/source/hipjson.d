@@ -172,7 +172,7 @@ struct JSONValue
 			data.object = null;
 			type = JSONType.null_;
 		}
-		else static assert(false, "Unsupported type ", T);
+		else static assert(false, "Unsupported type ", T.stringof);
 	}
 
     int integer() const {return get!int;}
