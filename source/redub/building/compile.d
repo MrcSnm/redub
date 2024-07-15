@@ -282,11 +282,15 @@ bool buildProjectSingleThread(ProjectNode root, Compiler compiler, OS os)
 
 private void buildSucceeded(ProjectNode node, CompilationResult res)
 {
+    string cfg = node.requirements.targetConfiguration ? (" ["~node.requirements.targetConfiguration~"]") : null;
     if(node.isUpToDate)
-        infos("Up-to-Date: ", node.name, " ",node.requirements.version_," [", node.requirements.targetConfiguration,"]. Took ", res.msNeeded, "ms");
+    {
+        infos("Up-to-Date: ", node.name, cfg);
+    }
     else
     {
-        infos("Built: ", node.name, " ",node.requirements.version_," [", node.requirements.targetConfiguration,"]. Took ", res.msNeeded, "ms");
+        string ver = node.requirements.version_.length ? (" "~node.requirements.version_) : null;
+        infos("Built: ", node.name, ver, cfg, ". Took ", res.msNeeded, "ms");
         vlog("\n\t", res.compilationCommand, " \n");
 
     } 
