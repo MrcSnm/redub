@@ -2,7 +2,7 @@ module redub.building.cache;
 public import redub.compiler_identification;
 public import redub.libs.adv_diff.files;
 public import std.int128;
-import redub.package_searching.dub;
+import redub.api;
 import redub.buildapi;
 static import std.file;
 import std.path;

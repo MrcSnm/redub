@@ -1,6 +1,7 @@
 module redub.package_searching.dub;
 import redub.package_searching.api;
 import redub.logging;
+import redub.api;
 import hipjson;
 
 bool dubHook_PackageManagerDownloadPackage(string packageName, string packageVersion, string requiredBy = "")
@@ -142,16 +143,6 @@ string getPackagePath(string packageName, string packageVersion, string required
 
 
 
-string getDubWorkspacePath()
-{
-    import std.path;
-    import std.process;
-
-    version (Windows)
-        return buildNormalizedPath(environment["LOCALAPPDATA"], "dub");
-    else
-        return buildNormalizedPath(environment["HOME"], ".dub");
-}
 
 private ReducedPackageInfo getPackageInJSON(JSONValue json, string packageName, string packageVersion)
 {

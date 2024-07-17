@@ -142,7 +142,7 @@ struct DubArguments
         "Arbitrary pre- and suffixes to the identifiers below are recognized (e.g. ldc2 or dmd-2.063) and matched to the proper compiler type:" ~
         "dmd, gdc, ldc, gdmd, ldmd, gcc, g++"
     )
-    string compiler = "dmd";
+    string compiler;
 
     @(
         "Specifies a version string which contains the compiler name and its version "~

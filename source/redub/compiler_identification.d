@@ -1,5 +1,6 @@
 module redub.compiler_identification;
 public import redub.libs.semver;
+import hipjson;
 
 
 enum AcceptedCompiler
@@ -9,6 +10,20 @@ enum AcceptedCompiler
     ldc2,
     gcc,
     gxx
+}
+
+AcceptedCompiler acceptedCompilerfromString(string str)
+{
+    switch(str)
+    {
+        static foreach(mem; __traits(allMembers, AcceptedCompiler))
+        {
+            case mem:
+                return __traits(getMember, AcceptedCompiler, mem);
+        }
+        default:
+            throw new Exception("Invalid AcceptedCompiler string received: "~str);
+    }
 }
 
 
@@ -86,7 +101,7 @@ private string tryGetCompilerOnCwd(string compilerOrPath)
         import std.file;
         string tempPath = buildNormalizedPath(getcwd(), compilerOrPath);
         version(Windows) enum targetExtension = ".exe";
-        else enum targetExtension = cast(string)null;
+        else enum targetExtension = string.init;
         //If it does not, simply assume global
         if(exists(tempPath) && !isDir(tempPath) && tempPath.extension == targetExtension)
         {
@@ -153,9 +168,29 @@ private string getActualCompilerToUse(string preferredCompiler, ref string actua
 Compiler getCompiler(string compilerOrPath, string compilerAssumption)
 {
     import std.process;
+    import std.algorithm.comparison:either;
+    import redub.misc.find_executable;
     import std.exception;
+
+    JSONValue compilersInfo = getRedubCompilersInfo();
+    bool isDefault;
     if(compilerOrPath == null) 
-        compilerOrPath = "dmd";
+    {
+        if("defaultCompiler" in compilersInfo)
+            compilerOrPath = compilersInfo["defaultCompiler"].str;
+        else
+        {
+            compilerOrPath = either(findExecutable("dmd"), "dmd");
+            isDefault = true;
+        }
+    }
+    else
+        compilerOrPath = findExecutable(compilerOrPath);
+
+    Compiler ret = getCompilerFromCache(compilersInfo, compilerOrPath);
+    if(ret != Compiler.init)
+        return ret;
+
     compilerOrPath = tryGetCompilerOnCwd(compilerOrPath);
     
 
@@ -166,7 +201,6 @@ Compiler getCompiler(string compilerOrPath, string compilerAssumption)
         &tryInferGxx
     ];
 
-    Compiler ret;
     if(compilerAssumption == null)
     {
         string actualCompiler;
@@ -174,7 +208,10 @@ Compiler getCompiler(string compilerOrPath, string compilerAssumption)
         foreach(inf; inference)
         {
             if(inf(actualCompiler, versionString, ret))
+            {
+                saveCompilerInfo(compilersInfo, ret, isDefault);
                 return ret;
+            }
         }
     }
     else
@@ -182,6 +219,108 @@ Compiler getCompiler(string compilerOrPath, string compilerAssumption)
         return assumeCompiler(compilerOrPath, compilerAssumption);
     }
     throw new Exception("Could not infer which compiler you're using from "~compilerOrPath);
+}
+
+
+private string getRedubCompilersFile()
+{
+    import std.path;
+    import redub.api;
+    static string redubCompilersFile;
+    if(redubCompilersFile == null)
+        redubCompilersFile = buildNormalizedPath(getDubWorkspacePath, "redub_compilers.json");
+    return redubCompilersFile;
+}
+
+private JSONValue getRedubCompilersInfo()
+{
+    import std.file;
+    string cFile = getRedubCompilersFile();
+
+    if(exists(cFile))
+    {
+        JSONValue json = parseJSON(readText(cFile));
+        if(!json.hasErrorOccurred)
+            return json;
+    }
+    return JSONValue.emptyObject;
+}
+
+Compiler getCompilerFromCache(JSONValue allCompilersInfo, string compiler)
+{
+    import std.exception;
+    import std.file;
+
+    enum ACCEPTED_COMPILER = 0;
+    enum VERSION_ = 1;
+    enum FRONTEND_VERSION = 2;
+    enum VERSION_STRING = 3;
+    enum TIMESTAMP = 4;
+
+    if(!compiler.length)
+    {
+        JSONValue* def = "defaultCompiler" in allCompilersInfo;
+        if(def != null)
+            compiler = def.str;
+    }
+    JSONValue* comps = "compilers" in allCompilersInfo;
+    if(comps)
+    {
+        foreach(key, value; comps.object)
+        {
+            if(value.type != JSONType.array)
+                enforce(false, "Expected that the value from object "~key~" were an array.");
+            if(key == compiler)
+            {
+                JSONValue[] arr = value.array;
+                if(arr[TIMESTAMP].get!long != timeLastModified(key).stdTime)
+                    return Compiler.init;
+
+                return Compiler(
+                    acceptedCompilerfromString(arr[ACCEPTED_COMPILER].str),
+                    SemVer(arr[VERSION_].str),
+                    SemVer(arr[FRONTEND_VERSION].str),
+                    arr[VERSION_STRING].str,
+                    key
+                );
+            }
+        }
+    }
+
+    return Compiler.init;
+}
+
+/**
+* The file format is as specified:
+```json
+{
+    "C:\\D\\dmd\\dmd2\\windows\\bin64\\dmd.exe": ["dmd", "version_.toString", "frontendVersion.toString", "versionString"]
+}
+```
+ * Params:
+ *   allCompilersInfo = The JSON value of the current redub compilers info
+ *   compiler = The new compiler to add
+ */
+private void saveCompilerInfo(JSONValue allCompilersInfo, Compiler compiler, bool isDefault)
+{
+    import std.conv:to;
+    import std.file;
+
+    if(isDefault)
+        allCompilersInfo["defaultCompiler"] = JSONValue(compiler.binOrPath);
+
+    if(!("compilers" in allCompilersInfo))
+        allCompilersInfo["compilers"] = JSONValue.emptyObject;
+
+
+    allCompilersInfo["compilers"][compiler.binOrPath] = JSONValue([
+        JSONValue(compiler.compiler.to!string),
+        JSONValue(compiler.version_.toString),
+        JSONValue(compiler.frontendVersion.toString),
+        JSONValue(compiler.versionString),
+        JSONValue(timeLastModified(compiler.binOrPath).stdTime)
+    ]);
+    std.file.write(getRedubCompilersFile, allCompilersInfo.toString);
 }
 
 private Compiler assumeCompiler(string compilerOrPath, string compilerAssumption)

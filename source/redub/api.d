@@ -237,3 +237,15 @@ bool isIncremental(IncrementalInfer incremental, ProjectNode tree)
         case IncrementalInfer.off: return false;
     }
 }
+
+
+string getDubWorkspacePath()
+{
+    import std.path;
+    import std.process;
+
+    version (Windows)
+        return buildNormalizedPath(environment["LOCALAPPDATA"], "dub");
+    else
+        return buildNormalizedPath(environment["HOME"], ".dub");
+}
