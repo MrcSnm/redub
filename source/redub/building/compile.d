@@ -170,6 +170,7 @@ bool buildProjectParallelSimple(ProjectNode root, Compiler compiler, OS os)
 
     AdvCacheFormula formulaCache;
 
+    printUpToDateBuilds(root);
     while(true)
     {
         foreach(dep; dependencyFreePackages)
@@ -193,7 +194,8 @@ bool buildProjectParallelSimple(ProjectNode root, Compiler compiler, OS os)
         }
         else
         {
-            buildSucceeded(finishedPackage, res);
+            if(!finishedPackage.isUpToDate)
+                buildSucceeded(finishedPackage, res);
             finishedPackage.becomeIndependent();
             dependencyFreePackages = root.findLeavesNodes();
 
@@ -238,6 +240,8 @@ bool buildProjectFullyParallelized(ProjectNode root, Compiler compiler, OS os)
     AdvCacheFormula formulaCache;
     foreach(ProjectNode pack; root.collapse)
     {
+        if(pack.isUpToDate)
+            continue;
         CompilationResult res = receiveOnly!CompilationResult;
         ProjectNode finishedPackage = cast()res.node;
         if(res.status)
@@ -281,26 +285,29 @@ bool buildProjectSingleThread(ProjectNode root, Compiler compiler, OS os)
     ProjectNode[] dependencyFreePackages = root.findLeavesNodes();
     string mainPackHash = hashFrom(root.requirements, compiler);
     immutable string[string] env = cast(immutable)(environment.toAA);
+
+    printUpToDateBuilds(root);
     while(true)
     {
         ProjectNode finishedPackage;
         foreach(dep; dependencyFreePackages)
         {
-            CompilationResult res = execCompilation(dep.requirements.buildData, cast(shared)dep, os, compiler,
-                cast(shared)CompilationCache.get(mainPackHash, dep.requirements, compiler), env
-            );
-            finishedPackage = cast()res.node;
-            if(res.status)
+            if(!dep.isUpToDate)
             {
-                buildFailed(finishedPackage, res, compiler);
-                return false;
+                CompilationResult res = execCompilation(dep.requirements.buildData, cast(shared)dep, os, compiler,
+                    cast(shared)CompilationCache.get(mainPackHash, dep.requirements, compiler), env
+                );
+                if(res.status)
+                {
+                    buildFailed(finishedPackage, res, compiler);
+                    return false;
+                }
+                else
+                    buildSucceeded(finishedPackage, res);
             }
-            else
-            {
-                buildSucceeded(finishedPackage, res);
-                finishedPackage.becomeIndependent();
-                dependencyFreePackages = root.findLeavesNodes();
-            }
+            finishedPackage = dep;
+            finishedPackage.becomeIndependent();
+            dependencyFreePackages = root.findLeavesNodes();
         }
         if(finishedPackage is root)
             break;
