@@ -24,8 +24,11 @@ string findExecutable(string executableName)
             import std.string:toStringz;
             import core.sys.posix.sys.stat;
             stat_t stats;
-            stat(toStringz(tPath), &stats);
-            return stats.st_mode & (S_IXUSR | S_IXGRP | S_IXOTH);
+            if(stat(toStringz(tPath), &stats) != 0)
+                return false;
+
+            static immutable flags = S_IXUSR | S_IXGRP | S_IXOTH;
+            return (stats.st_mode & flags) == flags;
         }
         else return std.file.exists(tPath);
     }
