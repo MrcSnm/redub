@@ -208,6 +208,7 @@ struct AdvCacheFormula
 
 			if(!std.file.exists(dir)) continue;
 			enforce(std.file.isDir(dir), "Path sent is not a directory: "~dir);
+
 			foreach(DirEntry e; dirEntries(dir, SpanMode.depth))
             {
 				if(e.isDir) continue;

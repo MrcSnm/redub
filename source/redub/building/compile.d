@@ -197,12 +197,13 @@ bool buildProjectParallelSimple(ProjectNode root, Compiler compiler, OS os)
             finishedPackage.becomeIndependent();
             dependencyFreePackages = root.findLeavesNodes();
 
-            if(!finishedPackage.requirements.cfg.targetType.isLinkedSeparately)
-            {
-                CompilationCache existingCache = CompilationCache.get(mainPackHash, finishedPackage.requirements, compiler);
-                const AdvCacheFormula existingFormula = existingCache.getFormula();
-                updateCache(mainPackHash, CompilationCache.make(existingCache.requirementCache, finishedPackage.requirements, os, &existingFormula, &formulaCache));
-            }
+            // if(!finishedPackage.requirements.cfg.targetType.isLinkedSeparately)
+            // {
+            //     CompilationCache existingCache = CompilationCache.get(mainPackHash, finishedPackage.requirements, compiler);
+            //     const AdvCacheFormula existingFormula = existingCache.getFormula();
+            //     CompilationCache.make(existingCache.requirementCache, finishedPackage.requirements, os, &existingFormula, &formulaCache);
+            //     updateCache(mainPackHash, CompilationCache.make(existingCache.requirementCache, finishedPackage.requirements, os, &existingFormula, &formulaCache));
+            // }
             if(finishedPackage is root)
                 break;
         }
@@ -216,31 +217,26 @@ bool buildProjectFullyParallelized(ProjectNode root, Compiler compiler, OS os)
     import std.concurrency;
     string mainPackHash = hashFrom(root.requirements, compiler);
     CompilationCache[] cache = cacheStatusForProject(root, compiler);
+
     import std.process;
     immutable string[string] env = cast(immutable)(environment.toAA);
     size_t i = 0;
-    foreach(pack; root.collapse)
+    foreach(ProjectNode pack; root.collapse)
     {
-        spawn(&execCompilationThread, 
-            pack.requirements.buildData,
-            cast(shared)pack, os, compiler, 
-            cast(shared)cache[i++],
-            env
-        );
+        if(!pack.isUpToDate)
+            spawn(&execCompilationThread,
+                pack.requirements.buildData,
+                cast(shared)pack, os, compiler,
+                cast(shared)cache[i],
+                env
+            );
+        i++;
     }
+
+    printUpToDateBuilds(root);
 
     AdvCacheFormula formulaCache;
-    foreach(ProjectNode node; root.collapse)
-    {
-        if(!node.requirements.cfg.targetType.isLinkedSeparately)
-        {
-            CompilationCache existingCache = CompilationCache.get(mainPackHash, node.requirements, compiler);
-            const AdvCacheFormula existingFormula = existingCache.getFormula();
-            updateCache(mainPackHash, CompilationCache.make(existingCache.requirementCache, node.requirements, os, &existingFormula, &formulaCache));
-        }
-    }
-
-    foreach(pack; root.collapse)
+    foreach(ProjectNode pack; root.collapse)
     {
         CompilationResult res = receiveOnly!CompilationResult;
         ProjectNode finishedPackage = cast()res.node;
@@ -253,8 +249,18 @@ bool buildProjectFullyParallelized(ProjectNode root, Compiler compiler, OS os)
         }
         else
         {
-            // updateCache(mainPackHash, CompilationCache.make(res.cache.requirementCache, cast()res.node.requirements, os));
             buildSucceeded(finishedPackage, res);
+
+            //This code can't be enabled without a new compiler flag.
+            //Since there exists some projects puts their dependencies inside the same folder as the project definition, it will cause rebuilds if not done after
+            //everything.
+
+            // if(!finishedPackage.requirements.cfg.targetType.isLinkedSeparately)
+            // {
+            //     CompilationCache existingCache = CompilationCache.get(mainPackHash, finishedPackage.requirements, compiler);
+            //     const AdvCacheFormula existingFormula = existingCache.getFormula();
+            //     updateCache(mainPackHash, CompilationCache.make(existingCache.requirementCache, finishedPackage.requirements, os, &existingFormula, &formulaCache));
+            // }
         }
     }
     return doLink(root, os, compiler, mainPackHash, env, &formulaCache) && copyFiles(root);
@@ -302,20 +308,28 @@ bool buildProjectSingleThread(ProjectNode root, Compiler compiler, OS os)
     return doLink(root, os, compiler, mainPackHash, env) && copyFiles(root);
 }
 
+private void printUpToDateBuilds(ProjectNode root)
+{
+    string upToDate;
+    foreach(ProjectNode node; root.collapse)
+    {
+        if(node.isUpToDate)
+        {
+            string cfg = node.requirements.targetConfiguration ? (" ["~node.requirements.targetConfiguration~"]") : null;
+            upToDate~= node.name ~cfg~"; ";
+        }
+    }
+    if(upToDate.length)
+        infos("Up-to-Date: ", upToDate);
+}
+
 private void buildSucceeded(ProjectNode node, CompilationResult res)
 {
     string cfg = node.requirements.targetConfiguration ? (" ["~node.requirements.targetConfiguration~"]") : null;
-    if(node.isUpToDate)
-    {
-        infos("Up-to-Date: ", node.name, cfg);
-    }
-    else
-    {
-        string ver = node.requirements.version_.length ? (" "~node.requirements.version_) : null;
-        infos("Built: ", node.name, ver, cfg, ". Took ", res.msNeeded, "ms");
-        vlog("\n\t", res.compilationCommand, " \n");
+    string ver = node.requirements.version_.length ? (" "~node.requirements.version_) : null;
+    infos("Built: ", node.name, ver, cfg, ". Took ", res.msNeeded, "ms");
+    vlog("\n\t", res.compilationCommand, " \n");
 
-    } 
 }
 private void buildFailed(const ProjectNode node, CompilationResult res, const Compiler compiler)
 {
@@ -408,7 +422,8 @@ private bool doLink(ProjectNode root, OS os, Compiler compiler, string mainPackH
         {
             foreach(ProjectNode node; root.collapse)
             {
-                bool hasAlreadyWrittenInCache = formulaCache != null && !node.requirements.cfg.targetType.isLinkedSeparately;
+                // bool hasAlreadyWrittenInCache = formulaCache != null && !node.requirements.cfg.targetType.isLinkedSeparately;
+                bool hasAlreadyWrittenInCache = false;
 
                 if(!node.isUpToDate && !hasAlreadyWrittenInCache)
                 {

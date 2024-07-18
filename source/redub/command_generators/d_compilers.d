@@ -41,11 +41,8 @@ string[] parseBuildConfiguration(AcceptedCompiler comp, const BuildConfiguration
         else if(targetType == TargetType.dynamicLibrary)
             commands~= mapper(ValidDFlags.buildAsShared);
 
-
-
         commands~= mapper(ValidDFlags.objectDir)~getObjectDir(b.workingDir).escapePath;
         commands~= mapper(ValidDFlags.outputFile) ~ getConfigurationOutputPath(b, target).escapePath;
-    
 
     }
 

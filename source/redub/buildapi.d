@@ -750,19 +750,20 @@ class ProjectNode
             return false;
         }
 
-        static void transferNoneDependenciesAndClearOptional(ProjectNode node)
+        static void transferNoneDependenciesAndClearOptional(ProjectNode node, ref string[] removedOptionals)
         {
             ///Enters in the deepest node
             for(int i = 0; i < node.dependencies.length; i++)
             {
                 if(node.dependencies[i].isOptional)
                 {
-                    warn("Dependency ", node.dependencies[i].name, " is optional. And since there is no dependency requesting for it before this optional, it won't be included.");
+                    if(hasLogLevel(LogLevel.warn))
+                        removedOptionals~= node.dependencies[i].name;
                     node.dependencies[i].becomeIndependent();
                     i--;
                     continue;
                 }
-                transferNoneDependenciesAndClearOptional(node.dependencies[i]);
+                transferNoneDependenciesAndClearOptional(node.dependencies[i], removedOptionals);
             }
             ///If the node is none, transfer all of its dependencies to all of its parents
             if(node.requirements.cfg.targetType == TargetType.none)
@@ -912,8 +913,12 @@ class ProjectNode
                 node.becomeIndependent();
             }
         }
+
         mergeParentInDependencies(this);
-        transferNoneDependenciesAndClearOptional(this);
+        string[] removedOptionals;
+        transferNoneDependenciesAndClearOptional(this, removedOptionals);
+        if(removedOptionals.length)
+            warn("Optional Dependencies ", removedOptionals, " not included since they weren't requested as non optional from other places.");
         finishPublic(this, visitedBuffer, privatesToMerge, dependenciesToRemove, targetOS, isa);
         finishPrivate(privatesToMerge, dependenciesToRemove);
 

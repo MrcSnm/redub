@@ -195,11 +195,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
                     if("optional" in value && value["optional"].boolean == true)
                     {
                         if(!("default" in value) || value["default"].boolean == false)
-                        {
-                            warn("redub does not handle optional dependencies the same way as dub.'"~req.cfg.name~"' uses optional for dependency named '"~depName~"'.",
-                            "\n\tThe difference is that, for an optional dependency be included, it needs to show up in the dependency tree before it being optional.");
                             isOptional = true;
-                        }
                     }
                     if(depPath)
                         path = isAbsolute(depPath.str) ? depPath.str : buildNormalizedPath(req.cfg.workingDir, depPath.str);
