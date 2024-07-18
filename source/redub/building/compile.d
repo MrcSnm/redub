@@ -167,6 +167,9 @@ bool buildProjectParallelSimple(ProjectNode root, Compiler compiler, OS os)
 
     import std.process;
     immutable string[string] env = cast(immutable)(environment.toAA);
+
+    AdvCacheFormula formulaCache;
+
     while(true)
     {
         foreach(dep; dependencyFreePackages)
@@ -193,11 +196,18 @@ bool buildProjectParallelSimple(ProjectNode root, Compiler compiler, OS os)
             buildSucceeded(finishedPackage, res);
             finishedPackage.becomeIndependent();
             dependencyFreePackages = root.findLeavesNodes();
+
+            if(!finishedPackage.requirements.cfg.targetType.isLinkedSeparately)
+            {
+                CompilationCache existingCache = CompilationCache.get(mainPackHash, finishedPackage.requirements, compiler);
+                const AdvCacheFormula existingFormula = existingCache.getFormula();
+                updateCache(mainPackHash, CompilationCache.make(existingCache.requirementCache, finishedPackage.requirements, os, &existingFormula, &formulaCache));
+            }
             if(finishedPackage is root)
                 break;
         }
     }
-    return doLink(root, os, compiler, mainPackHash, env) && copyFiles(root);
+    return doLink(root, os, compiler, mainPackHash, env, &formulaCache) && copyFiles(root);
 }
 
 
@@ -218,6 +228,18 @@ bool buildProjectFullyParallelized(ProjectNode root, Compiler compiler, OS os)
             env
         );
     }
+
+    AdvCacheFormula formulaCache;
+    foreach(ProjectNode node; root.collapse)
+    {
+        if(!node.requirements.cfg.targetType.isLinkedSeparately)
+        {
+            CompilationCache existingCache = CompilationCache.get(mainPackHash, node.requirements, compiler);
+            const AdvCacheFormula existingFormula = existingCache.getFormula();
+            updateCache(mainPackHash, CompilationCache.make(existingCache.requirementCache, node.requirements, os, &existingFormula, &formulaCache));
+        }
+    }
+
     foreach(pack; root.collapse)
     {
         CompilationResult res = receiveOnly!CompilationResult;
@@ -235,7 +257,7 @@ bool buildProjectFullyParallelized(ProjectNode root, Compiler compiler, OS os)
             buildSucceeded(finishedPackage, res);
         }
     }
-    return doLink(root, os, compiler, mainPackHash, env) && copyFiles(root);
+    return doLink(root, os, compiler, mainPackHash, env, &formulaCache) && copyFiles(root);
 }
 
 /** 
@@ -345,7 +367,7 @@ private bool copyFiles(ProjectNode root)
     return true;
 }
 
-private bool doLink(ProjectNode root, OS os, Compiler compiler, string mainPackHash, immutable string[string] env)
+private bool doLink(ProjectNode root, OS os, Compiler compiler, string mainPackHash, immutable string[string] env, AdvCacheFormula* formulaCache = null)
 {
     bool isUpToDate = root.isUpToDate;
     bool shouldSkipLinking = isUpToDate || (compiler.isDCompiler && root.requirements.cfg.targetType.isStaticLibrary);
@@ -380,11 +402,15 @@ private bool doLink(ProjectNode root, OS os, Compiler compiler, string mainPackH
     else 
     {
         AdvCacheFormula cache;
+        if(formulaCache != null)
+            cache = *formulaCache;
         auto result = timed(()
         {
-            foreach(node; root.collapse)
+            foreach(ProjectNode node; root.collapse)
             {
-                if(!node.isUpToDate)
+                bool hasAlreadyWrittenInCache = formulaCache != null && !node.requirements.cfg.targetType.isLinkedSeparately;
+
+                if(!node.isUpToDate && !hasAlreadyWrittenInCache)
                 {
                     CompilationCache existingCache = CompilationCache.get(mainPackHash, node.requirements, compiler);
                     const AdvCacheFormula existingFormula = existingCache.getFormula();

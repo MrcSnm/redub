@@ -185,14 +185,20 @@ AdvCacheFormula generateCache(const BuildRequirements req, OS target, const(AdvC
     {
         return hashFunction(cast(string)content, output);
     };
-    string[] libs = req.extra.librariesFullPath.map!((libPath) => getLibraryPath(libPath, req.cfg.outputDirectory, target)).array;
+
+    string[] extraRequirements = [];
+
+    ///Libraries does not depend on libraries to be considered up to date. With that said, it can have a faster calculation and even
+    ///A main thread cache writing thus making it faster.
+    if(req.cfg.targetType.isLinkedSeparately)
+        extraRequirements = req.extra.librariesFullPath.map!((libPath) => getLibraryPath(libPath, req.cfg.outputDirectory, target)).array;
 
     return AdvCacheFormula.make(
         contentHasher, 
         //DO NOT use sourcePaths since importPaths is always custom + sourcePaths
         joiner([req.cfg.importDirectories, req.cfg.stringImportPaths]), ///This is causing problems when using subPackages without output path, they may clash after
         // the compilation is finished. Solving this would require hash calculation after linking
-        joiner([req.cfg.sourceFiles, libs, req.extra.expectedArtifacts, req.cfg.filesToCopy,req.cfg.extraDependencyFiles]),
+        joiner([req.cfg.sourceFiles, extraRequirements, req.extra.expectedArtifacts, req.cfg.filesToCopy,req.cfg.extraDependencyFiles]),
         existing,
         preprocessed
     );
