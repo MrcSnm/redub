@@ -178,12 +178,14 @@ Compiler getCompiler(string compilerOrPath, string compilerAssumption)
     {
         if("defaultCompiler" in compilersInfo)
             compilerOrPath = compilersInfo["defaultCompiler"].str;
-        else
-        {
-            compilerOrPath = either(findExecutable("dmd"), "dmd");
-            isDefault = true;
-        }
+        isDefault = true;
     }
+    if(compilerOrPath == null)
+        compilerOrPath = "dmd";
+
+    string locCompiler = tryGetCompilerOnCwd(compilerOrPath);
+    if(locCompiler != compilerOrPath)
+        compilerOrPath = locCompiler;
     else
         compilerOrPath = findExecutable(compilerOrPath);
 
@@ -191,8 +193,6 @@ Compiler getCompiler(string compilerOrPath, string compilerAssumption)
     if(ret != Compiler.init)
         return ret;
 
-    compilerOrPath = tryGetCompilerOnCwd(compilerOrPath);
-    
 
     immutable inference = [
         &tryInferDmd,
@@ -307,7 +307,9 @@ private void saveCompilerInfo(JSONValue allCompilersInfo, Compiler compiler, boo
     import std.file;
 
     if(isDefault)
-        allCompilersInfo["defaultCompiler"] = JSONValue(compiler.binOrPath);
+    {
+        allCompilersInfo["defaultCompiler"] = JSONValue(compiler.compiler.to!string);
+    }
 
     if(!("compilers" in allCompilersInfo))
         allCompilersInfo["compilers"] = JSONValue.emptyObject;
