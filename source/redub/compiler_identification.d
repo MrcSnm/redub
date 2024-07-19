@@ -235,13 +235,20 @@ private string getRedubCompilersFile()
 private JSONValue getRedubCompilersInfo()
 {
     import std.file;
+    import redub.buildapi;
+
     string cFile = getRedubCompilersFile();
 
     if(exists(cFile))
     {
         JSONValue json = parseJSON(readText(cFile));
         if(!json.hasErrorOccurred)
+        {
+            JSONValue* ver = "version" in json;
+            if(ver == null || ver.str != RedubVersionOnly)
+                return JSONValue.emptyObject;
             return json;
+        }
     }
     return JSONValue.emptyObject;
 }
@@ -304,12 +311,13 @@ Compiler getCompilerFromCache(JSONValue allCompilersInfo, string compiler)
 private void saveCompilerInfo(JSONValue allCompilersInfo, Compiler compiler, bool isDefault)
 {
     import std.conv:to;
+    import redub.buildapi;
     import std.file;
 
     if(isDefault)
-    {
         allCompilersInfo["defaultCompiler"] = JSONValue(compiler.compiler.to!string);
-    }
+    if(!("version" in allCompilersInfo))
+        allCompilersInfo["version"] = JSONValue(RedubVersionOnly);
 
     if(!("compilers" in allCompilersInfo))
         allCompilersInfo["compilers"] = JSONValue.emptyObject;
