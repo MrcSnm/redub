@@ -299,11 +299,11 @@ bool buildProjectSingleThread(ProjectNode root, Compiler compiler, OS os)
                 );
                 if(res.status)
                 {
-                    buildFailed(finishedPackage, res, compiler);
+                    buildFailed(dep, res, compiler);
                     return false;
                 }
                 else
-                    buildSucceeded(finishedPackage, res);
+                    buildSucceeded(dep, res);
             }
             finishedPackage = dep;
             finishedPackage.becomeIndependent();
