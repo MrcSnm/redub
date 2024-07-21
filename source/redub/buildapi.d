@@ -6,7 +6,7 @@ import redub.logging;
 import redub.package_searching.api;
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.7.9";
+enum RedubVersionOnly = "v1.7.10";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -255,6 +255,13 @@ struct BuildConfiguration
     {
         BuildConfiguration ret = clone;
         ret.dFlags.exclusiveMerge(other.dFlags);
+        return ret;
+    }
+
+    BuildConfiguration mergeLinkFlags(const BuildConfiguration other) const
+    {
+        BuildConfiguration ret = clone;
+        ret.linkFlags.exclusiveMerge(other.linkFlags);
         return ret;
     }
 
@@ -826,6 +833,7 @@ class ProjectNode
             target.requirements.cfg = target.requirements.cfg.mergeStringImport(input.requirements.cfg);
             target.requirements.cfg = target.requirements.cfg.mergeVersions(input.requirements.cfg);
             target.requirements.cfg = target.requirements.cfg.mergeFilteredDflags(input.requirements.cfg);
+            target.requirements.cfg = target.requirements.cfg.mergeLinkFlags(input.requirements.cfg);
             // if(target.requirements.cfg.targetType.isLinkedSeparately)
             //     target.requirements.cfg = target.requirements.cfg.mergeLinkFilesFromSource(input.requirements.cfg);
 
