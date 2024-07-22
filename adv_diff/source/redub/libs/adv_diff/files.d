@@ -88,6 +88,22 @@ struct AdvDirectory
 	}
 }
 
+struct DirectoriesWithFilter
+{
+	const string[] dirs;
+	///Ends with filter, usually .d and .di. Since they are both starting with .d, function will use an optimized way to check
+	bool usesDFilters;
+
+	pragma(inline, true) bool shouldInclude(string target)
+	{
+		import std.path;
+		string ext = target.extension;
+		if(ext.length == 0 || ext.length > 3) return false;
+		if(ext[1] == 'd' && ext.length == 2) return true;
+		return ext[2] == 'i' && ext.length == 3;
+	}
+}
+
 
 
 struct AdvCacheFormula
@@ -152,7 +168,7 @@ struct AdvCacheFormula
 	 */
 	static AdvCacheFormula make(DirRange, FileRange)(
 		ubyte[] function(ubyte[], ref ubyte[] output) contentHasher, 
-		DirRange directories, 
+		DirRange filteredDirectories,
 		FileRange files, 
 		const(AdvCacheFormula)* existing = null, 
 		AdvCacheFormula* cacheHolder = null
@@ -193,7 +209,8 @@ struct AdvCacheFormula
 			catch(Exception e) return false;
 			return true;
 		}
-		foreach(dir; directories)
+		foreach(filterDir; filteredDirectories)
+		foreach(dir; filterDir.dirs)
 		{
 			if(cacheHolder !is null && dir in cacheHolder.directories)
 			{
@@ -211,7 +228,7 @@ struct AdvCacheFormula
 
 			foreach(DirEntry e; dirEntries(dir, SpanMode.depth))
             {
-				if(e.isDir) continue;
+				if(e.isDir || !filterDir.shouldInclude(e.name)) continue;
 				long time = e.timeLastModified.stdTime;
                 dirTime+= time;
 				if(existingDir)

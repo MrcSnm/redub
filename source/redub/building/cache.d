@@ -196,7 +196,7 @@ AdvCacheFormula generateCache(const BuildRequirements req, OS target, const(AdvC
     return AdvCacheFormula.make(
         contentHasher, 
         //DO NOT use sourcePaths since importPaths is always custom + sourcePaths
-        joiner([req.cfg.importDirectories, req.cfg.stringImportPaths]), ///This is causing problems when using subPackages without output path, they may clash after
+        [DirectoriesWithFilter(req.cfg.importDirectories, true), DirectoriesWithFilter(req.cfg.stringImportPaths, false)], ///This is causing problems when using subPackages without output path, they may clash after
         // the compilation is finished. Solving this would require hash calculation after linking
         joiner([req.cfg.sourceFiles, extraRequirements, req.extra.expectedArtifacts, req.cfg.filesToCopy,req.cfg.extraDependencyFiles]),
         existing,

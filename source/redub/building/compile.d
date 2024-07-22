@@ -199,13 +199,13 @@ bool buildProjectParallelSimple(ProjectNode root, Compiler compiler, OS os)
             finishedPackage.becomeIndependent();
             dependencyFreePackages = root.findLeavesNodes();
 
-            // if(!finishedPackage.requirements.cfg.targetType.isLinkedSeparately)
-            // {
-            //     CompilationCache existingCache = CompilationCache.get(mainPackHash, finishedPackage.requirements, compiler);
-            //     const AdvCacheFormula existingFormula = existingCache.getFormula();
-            //     CompilationCache.make(existingCache.requirementCache, finishedPackage.requirements, os, &existingFormula, &formulaCache);
-            //     updateCache(mainPackHash, CompilationCache.make(existingCache.requirementCache, finishedPackage.requirements, os, &existingFormula, &formulaCache));
-            // }
+            if(!finishedPackage.requirements.cfg.targetType.isLinkedSeparately)
+            {
+                CompilationCache existingCache = CompilationCache.get(mainPackHash, finishedPackage.requirements, compiler);
+                const AdvCacheFormula existingFormula = existingCache.getFormula();
+                CompilationCache.make(existingCache.requirementCache, finishedPackage.requirements, os, &existingFormula, &formulaCache);
+                updateCache(mainPackHash, CompilationCache.make(existingCache.requirementCache, finishedPackage.requirements, os, &existingFormula, &formulaCache));
+            }
             if(finishedPackage is root)
                 break;
         }
@@ -259,12 +259,12 @@ bool buildProjectFullyParallelized(ProjectNode root, Compiler compiler, OS os)
             //Since there exists some projects puts their dependencies inside the same folder as the project definition, it will cause rebuilds if not done after
             //everything.
 
-            // if(!finishedPackage.requirements.cfg.targetType.isLinkedSeparately)
-            // {
-            //     CompilationCache existingCache = CompilationCache.get(mainPackHash, finishedPackage.requirements, compiler);
-            //     const AdvCacheFormula existingFormula = existingCache.getFormula();
-            //     updateCache(mainPackHash, CompilationCache.make(existingCache.requirementCache, finishedPackage.requirements, os, &existingFormula, &formulaCache));
-            // }
+            if(!finishedPackage.requirements.cfg.targetType.isLinkedSeparately)
+            {
+                CompilationCache existingCache = CompilationCache.get(mainPackHash, finishedPackage.requirements, compiler);
+                const AdvCacheFormula existingFormula = existingCache.getFormula();
+                updateCache(mainPackHash, CompilationCache.make(existingCache.requirementCache, finishedPackage.requirements, os, &existingFormula, &formulaCache));
+            }
         }
     }
     return doLink(root, os, compiler, mainPackHash, env, &formulaCache) && copyFiles(root);
@@ -429,8 +429,8 @@ private bool doLink(ProjectNode root, OS os, Compiler compiler, string mainPackH
         {
             foreach(ProjectNode node; root.collapse)
             {
-                // bool hasAlreadyWrittenInCache = formulaCache != null && !node.requirements.cfg.targetType.isLinkedSeparately;
-                bool hasAlreadyWrittenInCache = false;
+                bool hasAlreadyWrittenInCache = formulaCache != null && !node.requirements.cfg.targetType.isLinkedSeparately;
+                // bool hasAlreadyWrittenInCache = false;
 
                 if(!node.isUpToDate && !hasAlreadyWrittenInCache)
                 {
