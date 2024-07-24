@@ -6,7 +6,7 @@ import redub.logging;
 import redub.package_searching.api;
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.7.11";
+enum RedubVersionOnly = "v1.7.12";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -681,15 +681,6 @@ class ProjectNode
 
     ProjectNode addDependency(ProjectNode dep)
     {
-        import std.exception;
-        if(this.requirements.cfg.targetType == TargetType.sourceLibrary)
-        {
-            import std.conv;
-            enforce(dep.requirements.cfg.targetType == TargetType.sourceLibrary, 
-                "Project named '"~name~" which is a sourceLibrary, can not depend on project "~
-                dep.name~" since it can only depend on sourceLibrary. Dependency is a "~dep.requirements.cfg.targetType.to!string
-            );
-        }
         dep.parent~= this;
         dependencies~= dep;
         return this;
@@ -757,7 +748,16 @@ class ProjectNode
             return false;
         }
 
-        static void transferNoneDependenciesAndClearOptional(ProjectNode node, ref string[] removedOptionals)
+        /**
+         * This function will transfer its dependencies if they are none or sourceLibrary. Which means they aren't "compiled", but
+         * they are a container of dependencies inside their parent.
+         *
+         * If the dependency is none or sourceLibrary, they will be transferred.
+         * Params:
+         *   node = The root node
+         *   removedOptionals = String container for printing later warnings
+         */
+        static void transferDependenciesAndClearOptional(ProjectNode node, ref string[] removedOptionals)
         {
             ///Enters in the deepest node
             for(int i = 0; i < node.dependencies.length; i++)
@@ -770,10 +770,11 @@ class ProjectNode
                     i--;
                     continue;
                 }
-                transferNoneDependenciesAndClearOptional(node.dependencies[i], removedOptionals);
+                transferDependenciesAndClearOptional(node.dependencies[i], removedOptionals);
             }
-            ///If the node is none, transfer all of its dependencies to all of its parents
-            if(node.requirements.cfg.targetType == TargetType.none)
+            ///If the node is none or sourceLibrary, transfer all of its dependencies to all of its parents
+            bool shouldTransfer = node.requirements.cfg.targetType == TargetType.none || node.requirements.cfg.targetType == TargetType.sourceLibrary;
+            if(shouldTransfer)
             {
                 for(int i = 0; i < node.parent.length; i++)
                 {
@@ -782,7 +783,10 @@ class ProjectNode
                         p.addDependency(dep);
                 }
                 node.dependencies = null;
-                node.becomeIndependent();
+
+                ///Node is only independent when == none. It can't be independent on sourceLibrary since it needs to transfer its build commands.
+                if(node.requirements.cfg.targetType == TargetType.none)
+                    node.becomeIndependent();
             }
             
         }
@@ -924,7 +928,7 @@ class ProjectNode
 
         mergeParentInDependencies(this);
         string[] removedOptionals;
-        transferNoneDependenciesAndClearOptional(this, removedOptionals);
+        transferDependenciesAndClearOptional(this, removedOptionals);
         if(removedOptionals.length)
             warn("Optional Dependencies ", removedOptionals, " not included since they weren't requested as non optional from other places.");
         finishPublic(this, visitedBuffer, privatesToMerge, dependenciesToRemove, targetOS, isa);

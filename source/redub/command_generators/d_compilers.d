@@ -140,8 +140,8 @@ string dmdFlags(ValidDFlags flag)
         case versions: return "-version=";
         case debugVersions: return "-debug=";
         case importPaths: return "-I";
-        case objectDir: return "-od";
-        case outputFile: return "-of";
+        case objectDir: return "-od=";
+        case outputFile: return "-of=";
         case buildAsLibrary: return "-lib";
         case buildAsShared: return "-shared";
         case compileOnly: return "-c";
