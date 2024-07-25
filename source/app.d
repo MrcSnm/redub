@@ -209,6 +209,43 @@ int cleanMain(string[] args)
                 vlog("Removing ", output);
                 remove(output);
             }
+            string redubJsonCache = buildNormalizedPath(node.requirements.cfg.workingDir, "dub.sdl.redub_cache_json");
+            if(std.file.exists(redubJsonCache))
+            {
+                vlog("Removing redub json cache file.");
+                std.file.remove(redubJsonCache);
+            }
+            string ldc2Cache = buildNormalizedPath(node.requirements.cfg.workingDir, ".ldc2_cache");
+            if(std.file.exists(ldc2Cache))
+            {
+                vlog("Removing ldc2cache");
+                rmdirRecurse(ldc2Cache);
+            }
+            version(Windows)
+            {
+                if(node.requirements.cfg.targetType.isLinkedSeparately)
+                {
+                    string outPath = buildNormalizedPath(node.requirements.cfg.outputDirectory, node.name);
+                    foreach(ext; [".ilk", ".pdb"])
+                    {
+                        string genFile = outPath~ext;
+                        if(std.file.exists(genFile))
+                        {
+                            vlog("Removing ", genFile);
+                            std.file.remove(genFile);
+                        }
+                    }
+                }
+            }
+            foreach(copiedFile; node.requirements.cfg.filesToCopy)
+            {
+                string outFile = buildNormalizedPath(d.tree.requirements.cfg.outputDirectory, isAbsolute(copiedFile) ? baseName(copiedFile) : copiedFile);
+                if(std.file.exists(outFile))
+                {
+                    vlog("Removing ", outFile);
+                    std.file.remove(outFile);
+                }
+            }
         }
         return true;
     });
