@@ -14,6 +14,7 @@ struct ProjectDetails
     ProjectNode tree;
     Compiler compiler;
     ParallelType parallelType;
+    CompilationDetails cDetails;
     ///Makes the return code 0 for when using print commands.
     bool printOnly;
 
@@ -100,11 +101,13 @@ ParallelType inferParallel(ProjectDetails d)
 ProjectDetails buildProject(ProjectDetails d)
 {
     import redub.building.compile;
+    import redub.building.cache;
     import redub.command_generators.commons;
     import redub.misc.console_control_handler;
 
     if(!d.tree)
         return d;
+    invalidateCaches(d.tree, d.compiler, osFromArch(d.cDetails.arch));
 
     ProjectNode tree = d.tree;
     OS targetOS = osFromArch(tree.requirements.cfg.arch);
@@ -212,12 +215,10 @@ ProjectDetails resolveDependencies(
 
     if(invalidateCache)
         tree.invalidateCacheOnTree();
-    else 
-        invalidateCaches(tree, compiler, osFromArch(cDetails.arch));
 
     import redub.libs.colorize;    
     infos("Dependencies resolved ", "in ", (st.peek.total!"msecs"), " ms for \"", color(buildType, fg.magenta),"\" using ", compiler.binOrPath, " [", cInfo.targetOS, "-", cInfo.isa, "]");
-    return ProjectDetails(tree, compiler, cDetails.parallelType);
+    return ProjectDetails(tree, compiler, cDetails.parallelType, cDetails);
 }
 
 

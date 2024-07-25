@@ -62,6 +62,9 @@ int main(string[] args)
         case "deps":
             args = args[0] ~ args[2..$];
             return depsMain(args);
+        case "test":
+            args = args[0] ~ args[2..$];
+            return testMain(args);
         case "run":
             args = args[0] ~ args[2..$];
             goto default;
@@ -78,7 +81,11 @@ int runMain(string[] args)
         return d.getReturnCode;
     if(d.tree.requirements.cfg.targetType != TargetType.executable)
         return 1;
+    return executeProgram(d.tree, args);
+}
 
+int executeProgram(ProjectNode tree, string[] args)
+{
     ptrdiff_t execArgsInit = countUntil(args, "--");
     string execArgs;
     if(execArgsInit != -1) execArgs = " " ~ escapeShellCommand(args[execArgsInit+1..$]);
@@ -87,8 +94,8 @@ int runMain(string[] args)
     import redub.command_generators.commons;
     
     return wait(spawnShell(
-        buildNormalizedPath(d.tree.requirements.cfg.outputDirectory, 
-        d.tree.requirements.cfg.name~getExecutableExtension(os)) ~  execArgs
+        buildNormalizedPath(tree.requirements.cfg.outputDirectory, 
+        tree.requirements.cfg.name~getExecutableExtension(os)) ~  execArgs
     ));
 }
 
@@ -151,11 +158,35 @@ int describeMain(string[] args)
 int depsMain(string[] args)
 {
     ProjectDetails d = resolveDependencies(args);
-    if(!d.tree)
+    if(d.error)
         return 1;
     printProjectTree(d.tree);
     return 0;
 }
+
+int testMain(string[] args)
+{
+    ProjectDetails d = resolveDependencies(args);
+    if(d.error)
+        return d.getReturnCode();
+    import redub.parsers.build_type;
+    d.tree.requirements.cfg = d.tree.requirements.cfg.merge(parse(BuildType.unittest_, d.compiler.compiler));
+    d.tree.requirements.cfg.dFlags~= "-main";
+    d.tree.requirements.cfg.targetType = TargetType.executable;
+    d.tree.requirements.cfg.name~= "-test-";
+
+    if(d.tree.requirements.configuration.name)
+        d.tree.requirements.cfg.name~= d.tree.requirements.configuration.name;
+    else
+        d.tree.requirements.cfg.name~= "library";
+
+    d = buildProject(d);
+    if(d.error)
+        return d.getReturnCode();
+
+    return executeProgram(d.tree, args);
+}
+
 
 int cleanMain(string[] args)
 {
@@ -232,7 +263,7 @@ ProjectDetails resolveDependencies(string[] args)
     {
         import std.stdio;
         writeln(RedubVersion);
-        return ProjectDetails(null, Compiler.init, ParallelType.auto_,  true);
+        return ProjectDetails(null, Compiler.init, ParallelType.auto_, CompilationDetails.init, true);
     }
     if(bArgs.single)
     {
@@ -244,7 +275,7 @@ ProjectDetails resolveDependencies(string[] args)
         warn(RedubVersionShort~ " does not handle --single. Forwarding '"~dubCommand~"' to dub with working dir "~cwd);
 
         int status = wait(spawnShell(dubCommand, stdin, stdout, stderr, environment.toAA, Config.none, cwd));
-        return ProjectDetails(null, Compiler.init, ParallelType.auto_, true, status);
+        return ProjectDetails(null, Compiler.init, ParallelType.auto_, CompilationDetails.init, true, status);
     }
 
     if(bArgs.arch) bArgs.compiler = "ldc2";

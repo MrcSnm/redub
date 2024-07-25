@@ -400,13 +400,13 @@ T[] joinFlattened(T)(scope const T[][] args...)
 
 unittest
 {
-	static hasher = cast(ubyte[] function(ubyte[]))(ubyte[] content)
+	static ubyte[] hasher(ubyte[] content, ref ubyte[] output)
 	{
 		import std.digest.md;
 		return cast(ubyte[])toHexString(md5Of(content)).dup;
 	};
-	AdvCacheFormula formula = AdvCacheFormula.make(hasher, ["source"]);
-	AdvCacheFormula formula2 = AdvCacheFormula.make(hasher, ["source", "source/redub"]);
+	AdvCacheFormula formula = AdvCacheFormula.make(&hasher, [DirectoriesWithFilter(["source"], true)], string[].init);
+	AdvCacheFormula formula2 = AdvCacheFormula.make(&hasher, [DirectoriesWithFilter(["source", "source/redub"], true)], string[].init);
 
 	import std.stdio;
 	size_t diffCount;
@@ -415,7 +415,7 @@ unittest
 	JSONValue v = JSONValue.emptyObject;
 	formula.serialize(v);
 
-	writeln(v.toPrettyString());
+	writeln(v.toString());
 }
 
 private bool isInteger(JSONType type){return type == JSONType.integer || type == JSONType.uinteger;}
