@@ -291,6 +291,57 @@ string[] getLibFiles(const string[] filesToLink)
     return cast(string[])filesToLink.filter!((name) => name.extension.isLibraryExtension).array; //Array already guarantee nothing is modified.
 }
 
+BuildConfiguration getConfigurationFromLibsWithPkgConfig(string[] libs, out string[] modifiedFlagsFromPkgConfig)
+{
+    import std.algorithm : startsWith, splitter;
+    import std.string: strip;
+    import std.array : split;
+    import std.process;
+
+    static string[string] pkgConfigCache;
+
+    static string[] pkgconfig_bin = ["pkg-config", "--libs"];
+
+    BuildConfiguration ret;
+    foreach(l; libs)
+    {
+        string pkgConfigFlags;
+        if(l in pkgConfigCache)
+            pkgConfigFlags = pkgConfigCache[l];
+        else
+        {
+            auto flags = execute(pkgconfig_bin~l);
+            if(flags.status != 0)
+                flags = execute(pkgconfig_bin~("lib"~l));
+            if(flags.status == 0 && flags.output.strip.length != 0)
+                pkgConfigCache[l] = pkgConfigFlags = flags.output;
+        }
+        if(pkgConfigFlags.length)        
+        {
+            modifiedFlagsFromPkgConfig~= l;
+            foreach (string f; splitter(pkgConfigFlags))
+            {
+                if (f.startsWith("-L-L"))
+                    ret.linkFlags ~= f[2 .. $];
+                else if (f.startsWith("-defaultlib"))
+                    ret.dFlags~= f;
+                else if (f.startsWith("-L-defaultlib"))
+                    ret.dFlags~= f[2 .. $];
+                else if (f.startsWith("-pthread"))
+                    ret.linkFlags~= "-lpthread";
+                else if (f.startsWith("-L-l"))
+                    ret.linkFlags~= f[2 .. $].split(",");
+                else if (f.startsWith("-Wl,"))
+                    ret.linkFlags~= f[4 .. $].split(",");
+                else
+                    ret.linkFlags~= f;
+            }
+        }
+        else
+            ret.libraries~= l;
+    }
+    return ret;
+}
 
 ref T[] append(T, TRange)(ref T[] theArray, TRange theRange)
 {

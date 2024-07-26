@@ -6,7 +6,7 @@ import redub.logging;
 import redub.package_searching.api;
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.8.1";
+enum RedubVersionOnly = "v1.8.2";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -820,6 +820,18 @@ class ProjectNode
                 getOutputName(node.requirements.cfg.targetType, node.requirements.cfg.name, targetOS, isa)
             );
 
+            version(Posix)
+            {
+                if(node.requirements.cfg.targetType.isLinkedSeparately && node.requirements.cfg.libraries.length)
+                {
+                    import redub.command_generators.commons: getConfigurationFromLibsWithPkgConfig;
+                    string[] mod;
+                    BuildConfiguration pkgCfgLib = getConfigurationFromLibsWithPkgConfig(node.requirements.cfg.libraries, mod);
+                    node.requirements.cfg.libraries = pkgCfgLib.libraries;
+                    node.requirements.cfg = node.requirements.cfg.mergeDFlags(pkgCfgLib).mergeLinkFlags(pkgCfgLib);
+                }
+            }
+
             ///When windows builds shared libraries and they aren't root, it also generates a static library (import library)
             ///This library will enter on the cache formula
             if(!node.isRoot && node.requirements.cfg.targetType == TargetType.dynamicLibrary && targetOS.isWindows)
@@ -847,9 +859,9 @@ class ProjectNode
             final switch(input.requirements.cfg.targetType) with(TargetType)
             {
                 case autodetect: throw new Exception("Node should not be autodetect at this point");
-                case library, staticLibrary:
+                case library, staticLibrary, dynamicLibrary:
                         BuildConfiguration other = input.requirements.cfg.clone;
-                        ///Use library full path for the 
+                        ///Add the artifact full path to the target
                         target.requirements.extra.librariesFullPath.exclusiveMerge(
                             [buildNormalizedPath(other.outputDirectory, other.name)]
                         );
@@ -861,15 +873,6 @@ class ProjectNode
                     target.requirements.cfg = target.requirements.cfg.mergeLibPaths(input.requirements.cfg);
                     target.requirements.cfg = target.requirements.cfg.mergeSourcePaths(input.requirements.cfg);
                     target.requirements.cfg = target.requirements.cfg.mergeSourceFiles(input.requirements.cfg);
-                    break;
-                case dynamicLibrary: 
-                        BuildConfiguration other = input.requirements.cfg.clone;
-                        ///Use library full path for the 
-                        target.requirements.extra.librariesFullPath.exclusiveMerge(
-                            [buildNormalizedPath(other.outputDirectory, other.name)]
-                        );
-                        target.requirements.cfg = target.requirements.cfg.mergeLibraries(other);
-                        target.requirements.cfg = target.requirements.cfg.mergeLibPaths(other);
                     break;
                 case executable: break;
                 case none: throw new Exception("TargetType: none as a root project: nothing to do");
@@ -926,6 +929,7 @@ class ProjectNode
             }
         }
 
+
         mergeParentInDependencies(this);
         string[] removedOptionals;
         transferDependenciesAndClearOptional(this, removedOptionals);
@@ -933,8 +937,8 @@ class ProjectNode
             warn("Optional Dependencies ", removedOptionals, " not included since they weren't requested as non optional from other places.");
         finishPublic(this, visitedBuffer, privatesToMerge, dependenciesToRemove, targetOS, isa);
         finishPrivate(privatesToMerge, dependenciesToRemove);
-
         visitedBuffer.clear();
+
         dependenciesToRemove = null;
         privatesToMerge = null;
     }
