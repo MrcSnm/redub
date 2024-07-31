@@ -6,7 +6,7 @@ import redub.logging;
 import redub.package_searching.api;
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.8.2";
+enum RedubVersionOnly = "v1.8.3";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -85,10 +85,12 @@ TargetType targetFrom(string s)
     return ret;
 }
 
+enum cacheExclude;
+
 struct BuildConfiguration
 {
     bool isDebug;
-    string name;
+    @cacheExclude string name;
     string[] versions;
     string[] debugVersions;
     string[] importDirectories;
@@ -107,7 +109,7 @@ struct BuildConfiguration
     string[] preBuildCommands;
     string[] postBuildCommands;
     string sourceEntryPoint;
-    string outputDirectory;
+    @cacheExclude string outputDirectory;
     string workingDir;
     string arch;
     TargetType targetType;

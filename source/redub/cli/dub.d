@@ -144,6 +144,13 @@ struct DubArguments
     )
     string compiler;
 
+
+    @("Specifies where the target output is.")
+    string targetPath;
+
+    @("Specifies the target name")
+    string targetName;
+
     @(
         "Specifies a version string which contains the compiler name and its version "~
         "This can make the dependency resolution a lot faster since executing compiler --version won't be necessary "~

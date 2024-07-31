@@ -326,7 +326,7 @@ ProjectDetails resolveDependencies(string[] args)
     BuildType bt = BuildType.debug_;
     if(bArgs.buildType) bt = buildTypeFromString(bArgs.buildType);
 
-    return redub.api.resolveDependencies(
+    ProjectDetails ret =  redub.api.resolveDependencies(
         bArgs.build.force,
         os,
         CompilationDetails(bArgs.compiler, bArgs.arch, bArgs.compilerAssumption, bArgs.build.incremental, bArgs.build.combined, bArgs.build.parallel),
@@ -334,6 +334,13 @@ ProjectDetails resolveDependencies(string[] args)
         getInitialDubVariablesFromArguments(bArgs, DubBuildArguments.init, os, args),
         bt
     );
+
+    if(bArgs.targetPath)
+        ret.tree.requirements.cfg.outputDirectory = bArgs.targetPath;
+    if(bArgs.targetName)
+        ret.tree.requirements.cfg.name = bArgs.targetName;
+
+    return ret;
 }
 
 void updateVerbosity(DubCommonArguments a)

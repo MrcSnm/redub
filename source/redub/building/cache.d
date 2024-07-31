@@ -58,7 +58,7 @@ struct CompilationCache
     {
         import std.exception;
         JSONValue c = *getCache(rootHash);
-        string reqCache = hashFrom(req, compiler);
+        string reqCache = hashFrom(req, compiler, false);
         if(c == JSONValue.emptyObject)
             return CompilationCache(reqCache);
         enforce(c.type == JSONType.object, "Cache is corrupted, please delete it at "~getCacheFolder());
@@ -82,7 +82,7 @@ struct CompilationCache
         AdvCacheFormula otherFormula = generateCache(req, target, &formula, preprocessed);
         size_t diffCount;
         string[64] diffs = formula.diffStatus(otherFormula, diffCount);
-        return requirementCache == hashFrom(req, compiler) && diffCount == 0;
+        return requirementCache == hashFrom(req, compiler, false) && diffCount == 0;
     }
 }
 
@@ -142,7 +142,23 @@ ubyte[] hashFunction(const char[] input, ref ubyte[] output)
     return output;
 }
 
-string hashFrom(const BuildRequirements req, Compiler compiler)
+bool attrIncludesUDA(LookType, Attribs...)()
+{
+    static foreach(value; Attribs)
+        static if(is(typeof(value) == LookType) || is(LookType == value))
+            return true;
+    return false;
+}
+
+/**
+ *
+ * Params:
+ *   req = The requirements to generate
+ *   compiler = Using compiler
+ *   isRoot = This one may include less information. This allows more cache to be reused while keeping the smaller pieces of cache more restrained.
+ * Returns: The hash.
+ */
+string hashFrom(const BuildRequirements req, Compiler compiler, bool isRoot = true)
 {
     import std.conv:to;
     import xxhash3;
@@ -154,17 +170,24 @@ string hashFrom(const BuildRequirements req, Compiler compiler)
     xxh.put(cast(ubyte[])req.targetConfiguration);
     xxh.put(cast(ubyte[])req.version_);
 
+
     static foreach(i, v; BuildConfiguration.tupleof)
-    {
-        static if(is(typeof(v) == string)) xxh.put(cast(ubyte[])req.cfg.tupleof[i]);
-        else static if(is(typeof(v) == string[]))
+    {{
+
+        bool isExcludedFromRoot = attrIncludesUDA!(cacheExclude, __traits(getAttributes, v));
+        if(!isRoot || (isRoot && !isExcludedFromRoot))
         {
-            foreach(v; req.cfg.tupleof[i])
-                xxh.put(cast(ubyte[])v);
+            static if(is(typeof(v) == string)) xxh.put(cast(ubyte[])req.cfg.tupleof[i]);
+            else static if(is(typeof(v) == string[]))
+            {
+                foreach(v; req.cfg.tupleof[i])
+                    xxh.put(cast(ubyte[])v);
+            }
+            else
+                xxh.put(cast(ubyte[])req.cfg.tupleof[i].to!string);
         }
-        else
-            xxh.put(cast(ubyte[])req.cfg.tupleof[i].to!string);
-    }
+    }}
+
     return xxh.finish().toHexString.idup;
 }
 
