@@ -80,6 +80,8 @@ string getLibraryPath(string libName, string outputDir, OS os)
 string getConfigurationOutputPath(const BuildConfiguration conf, OS os)
 {
     import std.path;
+    import redub.building.cache;
+
     with(conf)
     {
         if(targetType.isStaticLibrary)
@@ -298,6 +300,8 @@ BuildConfiguration getConfigurationFromLibsWithPkgConfig(string[] libs, out stri
     import std.array : split;
     import std.process;
 
+    bool existsPkgConfig = true;
+
     static string[string] pkgConfigCache;
 
     static string[] pkgconfig_bin = ["pkg-config", "--libs"];
@@ -308,13 +312,18 @@ BuildConfiguration getConfigurationFromLibsWithPkgConfig(string[] libs, out stri
         string pkgConfigFlags;
         if(l in pkgConfigCache)
             pkgConfigFlags = pkgConfigCache[l];
-        else
+        else if(existsPkgConfig)
         {
-            auto flags = execute(pkgconfig_bin~l);
-            if(flags.status != 0)
-                flags = execute(pkgconfig_bin~("lib"~l));
-            if(flags.status == 0 && flags.output.strip.length != 0)
-                pkgConfigCache[l] = pkgConfigFlags = flags.output;
+            try
+            {
+                auto flags = execute(pkgconfig_bin~l);
+                if(flags.status != 0)
+                    flags = execute(pkgconfig_bin~("lib"~l));
+                if(flags.status == 0 && flags.output.strip.length != 0)
+                    pkgConfigCache[l] = pkgConfigFlags = flags.output;
+            }
+            catch(ProcessException e)
+                existsPkgConfig = false;
         }
         if(pkgConfigFlags.length)        
         {
