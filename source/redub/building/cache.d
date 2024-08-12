@@ -7,65 +7,74 @@ import redub.buildapi;
 static import std.file;
 import std.path;
 import hipjson;
+
 // import std.json;
 import redub.command_generators.commons;
 
-
 enum CACHE_FOLDER_NAME = ".redub";
+enum BIN_CACHE_FOLDER = "bin";
 
 Int128 toInt128(string input)
 {
-    if(input.length == 0) throw new Exception("Tried to send an empty string to convert.");
+    if (input.length == 0)
+        throw new Exception("Tried to send an empty string to convert.");
     Int128 ret;
     bool isNegative;
-    if(input[0] == '-') 
+    if (input[0] == '-')
     {
-        input = input[1..$];
+        input = input[1 .. $];
         isNegative = true;
     }
-    foreach(c; input)
+    foreach (c; input)
     {
-        if(c < '0' || c > '9') throw new Exception("Input string "~input~" is not a number.");
+        if (c < '0' || c > '9')
+            throw new Exception("Input string " ~ input ~ " is not a number.");
         int digit = c - '0';
         Int128 newResult = ret * 10 + digit;
-        if(newResult < ret)
-            throw new Exception("Input string "~input~" is too large for an Int128");
+        if (newResult < ret)
+            throw new Exception("Input string " ~ input ~ " is too large for an Int128");
         ret = newResult;
     }
     return isNegative ? ret * -1 : ret;
 }
-
-
 
 struct CompilationCache
 {
     ///Key for finding the cache
     string requirementCache;
     private AdvCacheFormula formula;
+    private AdvCacheFormula copyFormula;
 
     const(AdvCacheFormula) getFormula() const
     {
         return formula;
     }
 
-    static CompilationCache make(string requirementCache, const BuildRequirements req, OS target, const(AdvCacheFormula)* existing, AdvCacheFormula* preprocessed)
+    static CompilationCache make(string requirementCache, const BuildRequirements req, OS target, const(
+            AdvCacheFormula)* existing, AdvCacheFormula* preprocessed)
     {
         return CompilationCache(requirementCache, generateCache(req, target, existing, preprocessed));
     }
-    
 
     static CompilationCache get(string rootHash, const BuildRequirements req, Compiler compiler)
     {
         import std.exception;
         JSONValue c = *getCache(rootHash);
         string reqCache = hashFrom(req, compiler, false);
-        if(c == JSONValue.emptyObject)
+        if (c.type != JSONType.object || c.hasErrorOccurred)
+        {
+            import redub.logging;
+            error("Cache is corrupted, regenerating...");
             return CompilationCache(reqCache);
-        enforce(c.type == JSONType.object, "Cache is corrupted, please delete it at "~getCacheFolder());
+        }
+        if (c == JSONValue.emptyObject)
+            return CompilationCache(reqCache);
         JSONValue* targetCache = reqCache in c;
-        if(!targetCache)
+        if (!targetCache || targetCache.type != JSONType.array)
             return CompilationCache(reqCache);
-        return CompilationCache(reqCache, AdvCacheFormula.deserialize(*targetCache));
+
+
+        return CompilationCache(reqCache, AdvCacheFormula.deserialize(targetCache.array[0]), AdvCacheFormula.deserialize(targetCache.array[1]));
     }
 
     /** 
@@ -96,7 +105,7 @@ CompilationCache[] cacheStatusForProject(ProjectNode root, Compiler compiler)
     CompilationCache[] cache = new CompilationCache[](root.collapse.length);
     string rootCache = hashFrom(root.requirements, compiler);
     int i = 0;
-    foreach(const ProjectNode node; root.collapse)
+    foreach (const ProjectNode node; root.collapse)
         cache[i++] = CompilationCache.get(rootCache, node.requirements, compiler);
     return cache;
 }
@@ -116,14 +125,16 @@ void invalidateCaches(ProjectNode root, Compiler compiler, OS target)
     ptrdiff_t i = cacheStatus.length;
     AdvCacheFormula preprocessed;
 
-    foreach_reverse(ProjectNode n; root.collapse)
+    foreach_reverse (ProjectNode n; root.collapse)
     {
         --i;
-        if(!n.isUpToDate) continue;
-        if(!cacheStatus[i].isUpToDate(n.requirements, compiler, target, &preprocessed))
+        if (!n.isUpToDate)
+            continue;
+        if (!cacheStatus[i].isUpToDate(n.requirements, compiler, target, &preprocessed))
         {
             import redub.logging;
-            vlog("Project ", n.name," requires rebuild.");
+
+            vlog("Project ", n.name, " requires rebuild.");
             n.invalidateCache();
         }
     }
@@ -132,11 +143,12 @@ void invalidateCaches(ProjectNode root, Compiler compiler, OS target)
 ubyte[] hashFunction(const char[] input, ref ubyte[] output)
 {
     import xxhash3;
+
     XXH_64 xxh;
-    xxh.put(cast(const ubyte[])input);
+    xxh.put(cast(const ubyte[]) input);
 
     auto hash = xxh.finish;
-    if(output.length < hash.length)
+    if (output.length < hash.length)
         output.length = hash.length;
     output[] = hash[];
     return output;
@@ -144,8 +156,8 @@ ubyte[] hashFunction(const char[] input, ref ubyte[] output)
 
 bool attrIncludesUDA(LookType, Attribs...)()
 {
-    static foreach(value; Attribs)
-        static if(is(typeof(value) == LookType) || is(LookType == value))
+    static foreach (value; Attribs)
+        static if (is(typeof(value) == LookType) || is(LookType == value))
             return true;
     return false;
 }
@@ -158,37 +170,43 @@ bool attrIncludesUDA(LookType, Attribs...)()
  *   isRoot = This one may include less information. This allows more cache to be reused while keeping the smaller pieces of cache more restrained.
  * Returns: The hash.
  */
-string hashFrom(const BuildRequirements req, Compiler compiler, bool isRoot = true)
+string hashFrom(const BuildConfiguration cfg, Compiler compiler, bool isRoot = true)
 {
-    import std.conv:to;
+    import std.conv : to;
     import xxhash3;
-    import std.digest;
 
     XXH_64 xxh;
     xxh.start();
-    xxh.put(cast(ubyte[])compiler.versionString);
-    xxh.put(cast(ubyte[])req.targetConfiguration);
-    xxh.put(cast(ubyte[])req.version_);
+    xxh.put(cast(ubyte[]) compiler.versionString);
+    // xxh.put(cast(ubyte[])req.targetConfiguration);
+    // xxh.put(cast(ubyte[])req.version_);
 
-
-    static foreach(i, v; BuildConfiguration.tupleof)
-    {{
-
-        bool isExcludedFromRoot = attrIncludesUDA!(cacheExclude, __traits(getAttributes, v));
-        if(!isRoot || (isRoot && !isExcludedFromRoot))
+    static foreach (i, v; BuildConfiguration.tupleof)
+    {
         {
-            static if(is(typeof(v) == string)) xxh.put(cast(ubyte[])req.cfg.tupleof[i]);
-            else static if(is(typeof(v) == string[]))
+
+            bool isExcludedFromRoot = attrIncludesUDA!(cacheExclude, __traits(getAttributes, v));
+            if (!isRoot || (isRoot && !isExcludedFromRoot))
             {
-                foreach(v; req.cfg.tupleof[i])
-                    xxh.put(cast(ubyte[])v);
+                static if (is(typeof(v) == string))
+                    xxh.put(cast(ubyte[]) cfg.tupleof[i]);
+                else static if (is(typeof(v) == string[]))
+                {
+                    foreach (v; cfg.tupleof[i])
+                        xxh.put(cast(ubyte[]) v);
+                }
+                else
+                    xxh.put(cast(ubyte[]) cfg.tupleof[i].to!string);
             }
-            else
-                xxh.put(cast(ubyte[])req.cfg.tupleof[i].to!string);
         }
-    }}
+    }
 
     return xxh.finish().toHexString.idup;
+}
+
+string hashFrom(const BuildRequirements req, Compiler compiler, bool isRoot = true)
+{
+    return hashFrom(req.cfg, compiler, isRoot);
 }
 
 /** 
@@ -204,38 +222,46 @@ string hashFrom(const BuildRequirements req, Compiler compiler, bool isRoot = tr
 AdvCacheFormula generateCache(const BuildRequirements req, OS target, const(AdvCacheFormula)* existing, AdvCacheFormula* preprocessed)
 {
     import std.algorithm.iteration, std.array;
-    static contentHasher = (ubyte[] content, ref ubyte[] output)
-    {
-        return hashFunction(cast(string)content, output);
+
+    static contentHasher = (ubyte[] content, ref ubyte[] output) {
+        return hashFunction(cast(string) content, output);
     };
 
     string[] extraRequirements = [];
 
     ///Libraries does not depend on libraries to be considered up to date. With that said, it can have a faster calculation and even
     ///A main thread cache writing thus making it faster.
-    if(req.cfg.targetType.isLinkedSeparately)
-        extraRequirements = req.extra.librariesFullPath.map!((libPath) => getLibraryPath(libPath, req.cfg.outputDirectory, target)).array;
+    if (req.cfg.targetType.isLinkedSeparately)
+        extraRequirements = req.extra.librariesFullPath.map!(
+            (libPath) => getLibraryPath(libPath, req.cfg.outputDirectory, target)).array;
 
     return AdvCacheFormula.make(
-        contentHasher, 
-        //DO NOT use sourcePaths since importPaths is always custom + sourcePaths
-        [DirectoriesWithFilter(req.cfg.importDirectories, true), DirectoriesWithFilter(req.cfg.stringImportPaths, false)], ///This is causing problems when using subPackages without output path, they may clash after
+        contentHasher,//DO NOT use sourcePaths since importPaths is always custom + sourcePaths
+        [
+        DirectoriesWithFilter(req.cfg.importDirectories, true),
+        DirectoriesWithFilter(req.cfg.stringImportPaths, false)
+    ], ///This is causing problems when using subPackages without output path, they may clash after
         // the compilation is finished. Solving this would require hash calculation after linking
-        joiner([req.cfg.sourceFiles, extraRequirements, req.extra.expectedArtifacts, req.cfg.filesToCopy,req.cfg.extraDependencyFiles]),
+        joiner([
+            req.cfg.sourceFiles, extraRequirements, req.extra.expectedArtifacts,
+            req.cfg.filesToCopy, req.cfg.extraDependencyFiles
+    ]),
         existing,
         preprocessed
     );
 }
 
-
 string[] updateCache(string rootCache, const CompilationCache cache, bool writeToDisk = false)
 {
     JSONValue* v = getCache(rootCache);
-    JSONValue serializeTarget;
-    cache.formula.serialize(serializeTarget);
-    (*v)[cache.requirementCache] = serializeTarget;
+    JSONValue compileFormula;
+    JSONValue copyFormula;
+    cache.formula.serialize(compileFormula);
+    cache.copyFormula.serialize(copyFormula);
 
-    if(writeToDisk)
+    (*v)[cache.requirementCache] = JSONValue([compileFormula, copyFormula]);
+
+    if (writeToDisk)
         updateCacheOnDisk(rootCache);
     return null;
 }
@@ -249,34 +275,59 @@ private JSONValue* getCache(string rootCache)
 {
     static JSONValue[string] cacheJson;
     string folder = getCacheFolder;
-    if(!std.file.exists(folder)) std.file.mkdirRecurse(folder);
-    string file = getCacheFilePath(rootCache);
-    if(!std.file.exists(file)) std.file.write(file, "{}");
+    import redub.meta;
+    import redub.logging;
 
-    if(!(rootCache in cacheJson))
+    if(cacheJson == cacheJson.init)
     {
-        try cacheJson[rootCache] = parseJSON(std.file.readText(file));
-        catch(Exception e)
+        ///Deletes the cache folder if the version is different from the current one.
+        if(getExistingRedubVersion() != RedubVersionOnly && std.file.exists(folder))
+        {
+            info("Different redub version. Cleaning cache folder.");
+            std.file.rmdirRecurse(folder);
+        }
+    }
+    if (!std.file.exists(folder))
+        std.file.mkdirRecurse(folder);
+
+    string file = getCacheFilePath(rootCache);
+    if (!std.file.exists(file))
+        std.file.write(file, "{}");
+
+    if (!(rootCache in cacheJson))
+    {
+        try
+            cacheJson[rootCache] = parseJSON(std.file.readText(file));
+        catch (Exception e)
         {
             std.file.write(file, "{}");
             cacheJson[rootCache] = JSONValue.emptyObject;
         }
     }
+
     return &cacheJson[rootCache];
 }
-
-
 
 private string getCacheFolder()
 {
     static string cacheFolder;
-    if(!cacheFolder) cacheFolder = buildNormalizedPath(getDubWorkspacePath(), CACHE_FOLDER_NAME);
+    if (!cacheFolder)
+        cacheFolder = buildNormalizedPath(getDubWorkspacePath(), CACHE_FOLDER_NAME);
+    return cacheFolder;
+}
+
+private string getBinCacheFolder()
+{
+    static string cacheFolder;
+    if (!cacheFolder)
+        cacheFolder = buildNormalizedPath(getCacheFolder, BIN_CACHE_FOLDER);
     return cacheFolder;
 }
 
 private string getCacheFilePath(string rootCache)
 {
     static string cacheFilePath;
-    if(!cacheFilePath) cacheFilePath = buildNormalizedPath(getCacheFolder, rootCache~".json");
+    if (!cacheFilePath)
+        cacheFilePath = buildNormalizedPath(getCacheFolder, rootCache ~ ".json");
     return cacheFilePath;
 }

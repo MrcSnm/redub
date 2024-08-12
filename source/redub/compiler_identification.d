@@ -170,9 +170,10 @@ Compiler getCompiler(string compilerOrPath, string compilerAssumption)
     import std.process;
     import std.algorithm.comparison:either;
     import redub.misc.find_executable;
+    import redub.meta;
     import std.exception;
 
-    JSONValue compilersInfo = getRedubCompilersInfo();
+    JSONValue compilersInfo = getRedubMeta();
     bool isDefault;
     if(compilerOrPath == null) 
     {
@@ -221,37 +222,6 @@ Compiler getCompiler(string compilerOrPath, string compilerAssumption)
     throw new Exception("Could not infer which compiler you're using from "~compilerOrPath);
 }
 
-
-private string getRedubCompilersFile()
-{
-    import std.path;
-    import redub.api;
-    static string redubCompilersFile;
-    if(redubCompilersFile == null)
-        redubCompilersFile = buildNormalizedPath(getDubWorkspacePath, "redub_compilers.json");
-    return redubCompilersFile;
-}
-
-private JSONValue getRedubCompilersInfo()
-{
-    import std.file;
-    import redub.buildapi;
-
-    string cFile = getRedubCompilersFile();
-
-    if(exists(cFile))
-    {
-        JSONValue json = parseJSON(readText(cFile));
-        if(!json.hasErrorOccurred)
-        {
-            JSONValue* ver = "version" in json;
-            if(ver == null || ver.str != RedubVersionOnly)
-                return JSONValue.emptyObject;
-            return json;
-        }
-    }
-    return JSONValue.emptyObject;
-}
 
 Compiler getCompilerFromCache(JSONValue allCompilersInfo, string compiler)
 {
@@ -310,6 +280,7 @@ Compiler getCompilerFromCache(JSONValue allCompilersInfo, string compiler)
  */
 private void saveCompilerInfo(JSONValue allCompilersInfo, Compiler compiler, bool isDefault)
 {
+    import redub.meta;
     import std.conv:to;
     import redub.buildapi;
     import std.file;
@@ -330,7 +301,7 @@ private void saveCompilerInfo(JSONValue allCompilersInfo, Compiler compiler, boo
         JSONValue(compiler.versionString),
         JSONValue(timeLastModified(compiler.binOrPath).stdTime)
     ]);
-    std.file.write(getRedubCompilersFile, allCompilersInfo.toString);
+    saveRedubMeta(allCompilersInfo.toString);
 }
 
 private Compiler assumeCompiler(string compilerOrPath, string compilerAssumption)
