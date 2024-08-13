@@ -116,6 +116,8 @@ struct AdvCacheFormula
 	AdvDirectory[string] directories;
 	AdvFile[string] files;
 
+	bool isEmptyFormula() const { return total == Int128(0, 0); }
+
 
 	
 	/** 

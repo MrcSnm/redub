@@ -5,9 +5,10 @@ public import std.system;
 import redub.command_generators.commons;
 
 
-string[] parseLinkConfiguration(const ThreadBuildData data, OS target, Compiler compiler)
+string[] parseLinkConfiguration(const ThreadBuildData data, OS target, Compiler compiler, string requirementCache)
 {
     import std.path;
+    import redub.building.cache;
     string[] commands;
 
     const BuildConfiguration b = data.cfg;
@@ -19,7 +20,7 @@ string[] parseLinkConfiguration(const ThreadBuildData data, OS target, Compiler 
 
             if (targetType.isLinkedSeparately)
             {
-                commands~= "-of"~buildNormalizedPath(outputDirectory, getOutputName(b, target));
+                commands~= "-of"~buildNormalizedPath(getCacheOutputDir(requirementCache, b, compiler, target), getOutputName(b, target)).escapePath;
                 commands~= buildNormalizedPath(outputDirectory, name~getObjectExtension(target));
             }
             string arch = mapArch(compiler.compiler, b.arch);
@@ -52,14 +53,15 @@ string[] parseLinkConfiguration(const ThreadBuildData data, OS target, Compiler 
     return commands;
 }
 
-string[] parseLinkConfigurationMSVC(const ThreadBuildData data, OS target, Compiler compiler)
+string[] parseLinkConfigurationMSVC(const ThreadBuildData data, OS target, Compiler compiler, string requirementCache)
 {
     import std.algorithm.iteration;
     import std.path;
     import std.string;
+    import redub.building.cache;
 
 
-    if(!target.isWindows) return parseLinkConfiguration(data, target, compiler);
+    if(!target.isWindows) return parseLinkConfiguration(data, target, compiler, requirementCache);
     string[] commands;
     const BuildConfiguration b = data.cfg;
     with(b)
@@ -89,7 +91,8 @@ string[] parseLinkConfigurationMSVC(const ThreadBuildData data, OS target, Compi
         commands = mapAppend(commands, libraries, (string l) => "-L"~stripExtension(l)~".lib");
         
         commands~= buildNormalizedPath(outputDirectory, name~getObjectExtension(target)).escapePath;
-        commands~= "-of"~buildNormalizedPath(outputDirectory, getOutputName(targetType, name, target)).escapePath;
+
+        commands~= "-of"~buildNormalizedPath(getCacheOutputDir(requirementCache, b, compiler, target), getOutputName(b, target)).escapePath;
     }
     return commands;
 }

@@ -17,8 +17,8 @@ struct ProjectDetails
     CompilationDetails cDetails;
     ///Makes the return code 0 for when using print commands.
     bool printOnly;
-
     int externalErrorCode = int.min;
+    bool forceRebuild;
 
     bool error() const {return this == ProjectDetails.init; }
 
@@ -107,7 +107,11 @@ ProjectDetails buildProject(ProjectDetails d)
 
     if(!d.tree)
         return d;
-    invalidateCaches(d.tree, d.compiler, osFromArch(d.cDetails.arch));
+
+    if(d.forceRebuild)
+        d.tree.invalidateCacheOnTree();
+    else
+        invalidateCaches(d.tree, d.compiler, osFromArch(d.cDetails.arch));
 
     ProjectNode tree = d.tree;
     OS targetOS = osFromArch(tree.requirements.cfg.arch);
@@ -213,12 +217,10 @@ ProjectDetails resolveDependencies(
     compiler.usesIncremental = isIncremental(cDetails.incremental, tree);
     redub.parsers.environment.setupEnvironmentVariablesForPackageTree(tree);
 
-    if(invalidateCache)
-        tree.invalidateCacheOnTree();
 
     import redub.libs.colorize;    
     infos("Dependencies resolved ", "in ", (st.peek.total!"msecs"), " ms for \"", color(buildType, fg.magenta),"\" using ", compiler.binOrPath, " [", cInfo.targetOS, "-", cInfo.isa, "]");
-    return ProjectDetails(tree, compiler, cDetails.parallelType, cDetails);
+    return ProjectDetails(tree, compiler, cDetails.parallelType, cDetails, false, 0, invalidateCache);
 }
 
 

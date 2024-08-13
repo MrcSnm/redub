@@ -6,7 +6,7 @@ import redub.logging;
 import redub.package_searching.api;
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.8.5";
+enum RedubVersionOnly = "v1.8.6";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -966,7 +966,11 @@ class ProjectNode
      */
     void invalidateCacheOnTree()
     {
-        foreach(node; collapse) node.shouldRebuild = true;
+        foreach(ProjectNode node; collapse)
+        {
+            node.shouldRebuild = true;
+            node.needsCopyOnly = false;
+        }
     }
 
     /** 

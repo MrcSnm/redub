@@ -110,7 +110,7 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
 
             if(!isDCompiler(compiler) && !ret.status) //Always requires link.
             {
-                CompilationResult linkRes = link(data, os, compiler, env);
+                CompilationResult linkRes = link(cast()pack, cache.requirementCache, data, os, compiler, env);
                 ret.status = linkRes.status;
                 ret.output~= linkRes.message;
                 res.compilationCommand~= linkRes.compilationCommand;
@@ -120,7 +120,7 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
         ///Shared Library(mostly?)
         if(isDCompiler(compiler) && isLinkedSeparately(data.cfg.targetType) && !pack.isRoot)
         {
-            CompilationResult linkRes = link(data, os, compiler, env);
+            CompilationResult linkRes = link(cast()pack, cache.requirementCache, data, os, compiler, env);
             ret.status = linkRes.status;
             ret.output~= linkRes.message;
             res.compilationCommand~= "\n\nLinking: \n\t"~ linkRes.compilationCommand;
@@ -147,19 +147,27 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
     return res;
 }
 
-CompilationResult link(const ThreadBuildData data, OS os, Compiler compiler, immutable string[string] env)
+CompilationResult link(ProjectNode root, string requirementCache, const ThreadBuildData data, OS os, Compiler compiler, immutable string[string] env)
 {
     import std.process;
     CompilationResult ret;
+    if(!root.isCopyEnough)
+    {
+        ret.compilationCommand = getLinkCommands(data, os, compiler, requirementCache);
+        auto exec = executeShell(ret.compilationCommand);
+        ret.status = exec.status;
+        ret.message = exec.output;
+        if(exec.status != 0)
+            return ret;
+    }
+    import redub.command_generators.commons;
+    import std.path;
 
-    ret.compilationCommand = getLinkCommands(data, os, compiler);
+    string inDir = getCacheOutputDir(requirementCache, cast()root.requirements, compiler, os);
+    string outDir = getConfigurationOutputPath(data.cfg, os);
+    copyDir(inDir, dirName(outDir));
 
-    auto exec = executeShell(ret.compilationCommand);
-    ret.status = exec.status;
-    ret.message = exec.output;
 
-    if(exec.status != 0)
-        return ret;
 
     if(data.cfg.targetType.isLinkedSeparately)
         executeCommands(data.cfg.postGenerateCommands, "postGenerateCommand", ret, data.cfg.workingDir, env);
@@ -408,7 +416,7 @@ private bool doLink(ProjectNode root, OS os, Compiler compiler, string mainPackH
     {
         CompilationResult linkRes;
         auto result = timed(() {
-             linkRes = link(root.requirements.buildData, os, compiler, env);
+             linkRes = link(root, mainPackHash, root.requirements.buildData, os, compiler, env);
              return true;
         });
         if(linkRes.status)
