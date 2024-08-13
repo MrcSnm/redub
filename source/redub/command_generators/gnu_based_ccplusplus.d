@@ -6,7 +6,7 @@ import redub.command_generators.commons;
 import redub.logging;
 
 /// Parse G++ configuration
-string[] parseBuildConfiguration(const BuildConfiguration b, OS os)
+string[] parseBuildConfiguration(const BuildConfiguration b, OS os, Compiler compiler, string requirementCache)
 {
     import std.algorithm.iteration:map;
     import std.path;

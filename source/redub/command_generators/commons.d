@@ -77,17 +77,22 @@ string getLibraryPath(string libName, string outputDir, OS os)
     
 }
 
-string getConfigurationOutputPath(const BuildConfiguration conf, OS os)
+string getConfigurationOutputName(const BuildConfiguration conf, OS os)
 {
-    import std.path;
     import redub.building.cache;
-
     with(conf)
     {
         if(targetType.isStaticLibrary)
-            return buildNormalizedPath(outputDirectory, getOutputName(targetType, name, os));
-        return buildNormalizedPath(outputDirectory, name~getObjectExtension(os));
+            return getOutputName(targetType, name, os);
+        return name~getObjectExtension(os);
     }
+}
+
+
+string getConfigurationOutputPath(const BuildConfiguration conf, OS os)
+{
+    import std.path;
+    return buildNormalizedPath(conf.outputDirectory, getConfigurationOutputName(conf, os));
 }
 
 string getExecutableExtension(OS os, ISA isa = std.system.instructionSetArchitecture)
@@ -161,6 +166,18 @@ string getExtension(TargetType t, OS target, ISA isa)
         case TargetType.library, TargetType.staticLibrary: return target.getLibraryExtension;
         case TargetType.dynamicLibrary: return target.getDynamicLibraryExtension;
     }
+}
+
+void copyDir(string fromDir, string toDir, bool shallow = true)
+{
+    import std.file;
+    import std.path;
+    import std.exception;
+    enforce(isDir(fromDir), "Input must be a directory");
+    enforce(isDir(toDir), "Output must be a directory");
+
+    foreach(DirEntry e; dirEntries(fromDir, shallow ? SpanMode.shallow : SpanMode.depth))
+        std.file.copy(e.name, buildNormalizedPath(toDir, baseName(e.name)));
 }
 
 /** 

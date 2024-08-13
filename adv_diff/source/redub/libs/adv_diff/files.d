@@ -97,10 +97,14 @@ struct DirectoriesWithFilter
 	pragma(inline, true) bool shouldInclude(string target)
 	{
 		import std.path;
-		string ext = target.extension;
-		if(ext.length == 0 || ext.length > 3) return false;
-		if(ext[1] == 'd' && ext.length == 2) return true;
-		return ext[2] == 'i' && ext.length == 3;
+		if(usesDFilters)
+		{
+			string ext = target.extension;
+			if(ext.length == 0 || ext.length > 3) return false;
+			if(ext[1] == 'd' && ext.length == 2) return true;
+			return ext[2] == 'i' && ext.length == 3;
+		}
+		return true;
 	}
 }
 
@@ -175,8 +179,8 @@ struct AdvCacheFormula
 	)
 	{
 		import std.file;
-		import std.stdio;
 		import std.array;
+		import std.stdio;
 		AdvCacheFormula ret;
 		Int128 totalTime;
 		static ubyte[] fileBuffer;
@@ -229,6 +233,7 @@ struct AdvCacheFormula
 			foreach(DirEntry e; dirEntries(dir, SpanMode.depth))
             {
 				if(e.isDir || !filterDir.shouldInclude(e.name)) continue;
+
 				long time = e.timeLastModified.stdTime;
                 dirTime+= time;
 				if(existingDir)
@@ -247,6 +252,8 @@ struct AdvCacheFormula
 				if(!hashContent(e.name, fileBuffer, hashedContent, contentHasher)) continue;
 				advDir.files[e.name] = AdvFile(time, hashedContent.dup);
 				advDir.contentHash = contentHasher(joinFlattened(advDir.contentHash, hashedContent), hashedContent).dup;
+
+
             }
 			totalTime+= advDir.total = dirTime;
 			ret.directories[dir] = advDir;

@@ -656,6 +656,7 @@ class ProjectNode
     ProjectNode[] parent;
     ProjectNode[] dependencies;
     private bool shouldRebuild = false;
+    private bool needsCopyOnly = false;
     private ProjectNode[] collapsedRef;
     private bool _isOptional = false;
 
@@ -947,6 +948,11 @@ class ProjectNode
     
     bool isUpToDate() const { return !shouldRebuild; }
     bool isUpToDate() const shared { return !shouldRebuild; }
+
+    bool isCopyEnough() const { return needsCopyOnly; }
+    bool isCopyEnough() const shared { return needsCopyOnly; }
+
+    void setCopyEnough() { needsCopyOnly = true; }
 
     ///Invalidates self and parent caches
     void invalidateCache()

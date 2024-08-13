@@ -50,12 +50,20 @@ struct CompilationCache
         return formula;
     }
 
-    static CompilationCache make(string requirementCache, const BuildRequirements req, OS target, const(
-            AdvCacheFormula)* existing, AdvCacheFormula* preprocessed)
+    static CompilationCache make(string requirementCache, const BuildRequirements req, OS target, Compiler compiler,
+        const(AdvCacheFormula)* existing, AdvCacheFormula* preprocessed)
     {
-        return CompilationCache(requirementCache, generateCache(req, target, existing, preprocessed));
+        return CompilationCache(requirementCache, getCompilationCacheFormula(req, target, existing, preprocessed), getCopyCacheFormula(requirementCache, req, compiler, target, existing, preprocessed));
     }
 
+    /**
+     *
+     * Params:
+     *   rootHash = The root BuildRequirements hash
+     *   req = The BuildRequirements in which it will calculate the hash to find its cache
+     *   compiler = The compiler which the requirement was built with
+     * Returns: The compilation cache found inside .redub folder.
+     */
     static CompilationCache get(string rootHash, const BuildRequirements req, Compiler compiler)
     {
         import std.exception;
@@ -84,13 +92,30 @@ struct CompilationCache
      *   compiler = Compiler to generate hash
      *   target = Target to generate hash
      *   cache = Optional argument which stores precalculated results
-     * Returns: isUpToDate
+     * Returns: isCompilationUpToDate
      */
-    bool isUpToDate(const BuildRequirements req, Compiler compiler, OS target, AdvCacheFormula* preprocessed) const
+    bool isCompilationUpToDate(const BuildRequirements req, Compiler compiler, OS target, AdvCacheFormula* preprocessed) const
     {
-        AdvCacheFormula otherFormula = generateCache(req, target, &formula, preprocessed);
+        AdvCacheFormula otherFormula = getCompilationCacheFormula(req, target, &formula, preprocessed);
         size_t diffCount;
         string[64] diffs = formula.diffStatus(otherFormula, diffCount);
+        return requirementCache == hashFrom(req, compiler, false) && diffCount == 0;
+    }
+
+    /**
+     *
+     * Params:
+     *   req = Requirement to generate hash
+     *   compiler = Compiler to generate hash
+     *   target = Target to generate hash
+     *   cache = Optional argument which stores precalculated results
+     * Returns: isCompilationUpToDate
+     */
+    bool isCopyUpToDate(const BuildRequirements req, Compiler compiler, OS target, AdvCacheFormula* preprocessed) const
+    {
+        AdvCacheFormula otherFormula = getCopyCacheFormula(requirementCache, req, compiler, target, &formula, preprocessed);
+        size_t diffCount;
+        string[64] diffs = copyFormula.diffStatus(otherFormula, diffCount);
         return requirementCache == hashFrom(req, compiler, false) && diffCount == 0;
     }
 }
@@ -128,12 +153,13 @@ void invalidateCaches(ProjectNode root, Compiler compiler, OS target)
     foreach_reverse (ProjectNode n; root.collapse)
     {
         --i;
+        if(cacheStatus[i].isCopyUpToDate(n.requirements, compiler, target, &preprocessed))
+            n.setCopyEnough();
         if (!n.isUpToDate)
             continue;
-        if (!cacheStatus[i].isUpToDate(n.requirements, compiler, target, &preprocessed))
+        if (!cacheStatus[i].isCompilationUpToDate(n.requirements, compiler, target, &preprocessed))
         {
             import redub.logging;
-
             vlog("Project ", n.name, " requires rebuild.");
             n.invalidateCache();
         }
@@ -219,7 +245,7 @@ string hashFrom(const BuildRequirements req, Compiler compiler, bool isRoot = tr
  *   preprocessed = This will store calculations on an AdvCacheFormula, so, subsequent checks are much faster
  * Returns: A new AdvCacheFormula
  */
-AdvCacheFormula generateCache(const BuildRequirements req, OS target, const(AdvCacheFormula)* existing, AdvCacheFormula* preprocessed)
+AdvCacheFormula getCompilationCacheFormula(const BuildRequirements req, OS target, const(AdvCacheFormula)* existing, AdvCacheFormula* preprocessed)
 {
     import std.algorithm.iteration, std.array;
 
@@ -245,7 +271,46 @@ AdvCacheFormula generateCache(const BuildRequirements req, OS target, const(AdvC
         joiner([
             req.cfg.sourceFiles, extraRequirements, req.extra.expectedArtifacts,
             req.cfg.filesToCopy, req.cfg.extraDependencyFiles
-    ]),
+        ]),
+        existing,
+        preprocessed
+    );
+}
+
+string getCacheOutputDir(string requirementCache, const BuildRequirements req, Compiler compiler, OS os)
+{
+    return buildNormalizedPath(getCacheFolder, requirementCache~"x"~hashFrom(req, compiler));
+}
+
+string getCacheOutputDir(string requirementCache, const BuildConfiguration cfg, Compiler compiler, OS os)
+{
+    return buildNormalizedPath(getCacheFolder, requirementCache~"x"~hashFrom(cfg, compiler));
+}
+
+
+/**
+ * Stores the output artifact directory. Used for saving artifacts elsewhere and simply copying if they are already up to date.
+ * Params:
+ *   requirementCache = The root cache on which this formula was built with. It is used for finding the output directory.
+ *   req = The requirements will load adv_diff with the paths to watch for changes
+ *   target = Target is important for knowing how the library is called
+ *   existing = An existing formula reference as input is important for getting content hash if they aren't up to date
+ *   preprocessed = This will store calculations on an AdvCacheFormula, so, subsequent checks are much faster
+ * Returns: A new AdvCacheFormula
+ */
+AdvCacheFormula getCopyCacheFormula(string requirementCache, const BuildRequirements req, Compiler compiler, OS os, const(AdvCacheFormula)* existing, AdvCacheFormula* preprocessed)
+{
+    import std.algorithm.iteration, std.array;
+
+    static contentHasher = (ubyte[] content, ref ubyte[] output) {
+        return hashFunction(cast(string) content, output);
+    };
+
+    return AdvCacheFormula.make(
+        contentHasher,//DO NOT use sourcePaths since importPaths is always custom + sourcePaths
+        [
+            DirectoriesWithFilter([getCacheOutputDir(requirementCache, req, compiler, os)], false)
+        ],  string[].init,
         existing,
         preprocessed
     );

@@ -84,18 +84,28 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
         ExecutionResult ret;
         if(isDCompiler(compiler) && std.system.os.isWindows)
         {
-            string[] flags = getCompilationFlags(cfg, os, compiler);
-            string commandFile = createCommandFile(cfg, os, compiler, flags, res.compilationCommand);
-            res.compilationCommand = compiler.binOrPath ~ " "~res.compilationCommand;
-            ret = executeShell(compiler.binOrPath ~ " @"~commandFile);
-            std.file.remove(commandFile);
+            import std.path;
+            string inDir = getCacheOutputDir(cache.requirementCache, cast()pack.requirements, compiler, os);
+            if(!exists(inDir))
+                mkdirRecurse(inDir);
+
+            if(!pack.isCopyEnough)
+            {
+                string[] flags = getCompilationFlags(cfg, os, compiler, cache.requirementCache);
+                string commandFile = createCommandFile(cfg, os, compiler, flags, res.compilationCommand);
+                res.compilationCommand = compiler.binOrPath ~ " "~res.compilationCommand;
+                ret = executeShell(compiler.binOrPath ~ " @"~commandFile);
+                std.file.remove(commandFile);
+            }
+            copyDir(inDir, dirName(outDir));
+
         }
         else
         {
             ///Creates a folder to C output since it doesn't do automatically.
             if(!isDCompiler(compiler))
                 createOutputDirFolder(cfg);
-            res.compilationCommand = getCompileCommands(cfg, os, compiler);
+            res.compilationCommand = getCompileCommands(cfg, os, compiler, cache.requirementCache);
             ret = executeShell(res.compilationCommand, null, Config.none, size_t.max, cfg.workingDir);
 
             if(!isDCompiler(compiler) && !ret.status) //Always requires link.
@@ -203,8 +213,8 @@ bool buildProjectParallelSimple(ProjectNode root, Compiler compiler, OS os)
             {
                 CompilationCache existingCache = CompilationCache.get(mainPackHash, finishedPackage.requirements, compiler);
                 const AdvCacheFormula existingFormula = existingCache.getFormula();
-                CompilationCache.make(existingCache.requirementCache, finishedPackage.requirements, os, &existingFormula, &formulaCache);
-                updateCache(mainPackHash, CompilationCache.make(existingCache.requirementCache, finishedPackage.requirements, os, &existingFormula, &formulaCache));
+                CompilationCache.make(existingCache.requirementCache, finishedPackage.requirements, os, compiler, &existingFormula, &formulaCache);
+                updateCache(mainPackHash, CompilationCache.make(existingCache.requirementCache, finishedPackage.requirements, os, compiler, &existingFormula, &formulaCache));
             }
             if(finishedPackage is root)
                 break;
@@ -263,7 +273,7 @@ bool buildProjectFullyParallelized(ProjectNode root, Compiler compiler, OS os)
             {
                 CompilationCache existingCache = CompilationCache.get(mainPackHash, finishedPackage.requirements, compiler);
                 const AdvCacheFormula existingFormula = existingCache.getFormula();
-                updateCache(mainPackHash, CompilationCache.make(existingCache.requirementCache, finishedPackage.requirements, os, &existingFormula, &formulaCache));
+                updateCache(mainPackHash, CompilationCache.make(existingCache.requirementCache, finishedPackage.requirements, os, compiler, &existingFormula, &formulaCache));
             }
         }
     }
@@ -334,7 +344,8 @@ private void buildSucceeded(ProjectNode node, CompilationResult res)
 {
     string cfg = node.requirements.targetConfiguration ? (" ["~node.requirements.targetConfiguration~"]") : null;
     string ver = node.requirements.version_.length ? (" "~node.requirements.version_) : null;
-    infos("Built: ", node.name, ver, cfg, ". Took ", res.msNeeded, "ms");
+
+    infos(node.isCopyEnough ? "Copied: " : "Built: ", node.name, ver, cfg, ". Took ", res.msNeeded, "ms");
     vlog("\n\t", res.compilationCommand, " \n");
 
 }
@@ -436,7 +447,7 @@ private bool doLink(ProjectNode root, OS os, Compiler compiler, string mainPackH
                 {
                     CompilationCache existingCache = CompilationCache.get(mainPackHash, node.requirements, compiler);
                     const AdvCacheFormula existingFormula = existingCache.getFormula();
-                    updateCache(mainPackHash, CompilationCache.make(existingCache.requirementCache, node.requirements, os, &existingFormula, &cache));
+                    updateCache(mainPackHash, CompilationCache.make(existingCache.requirementCache, node.requirements, os, compiler, &existingFormula, &cache));
                 }
             }
             updateCacheOnDisk(mainPackHash);

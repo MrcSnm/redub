@@ -10,26 +10,26 @@ static import redub.command_generators.dmd;
 static import redub.command_generators.ldc;
 
 
-string[] getCompilationFlags(const BuildConfiguration cfg, OS os, Compiler compiler)
+string[] getCompilationFlags(const BuildConfiguration cfg, OS os, Compiler compiler, string requirementCache)
 {
     switch(compiler.compiler) with(AcceptedCompiler)
     {
         case gxx:
-            return redub.command_generators.gnu_based_ccplusplus.parseBuildConfiguration(cfg, os);
+            return redub.command_generators.gnu_based_ccplusplus.parseBuildConfiguration(cfg, os, compiler, requirementCache);
         case gcc:
-            return redub.command_generators.gnu_based.parseBuildConfiguration(cfg, os);
+            return redub.command_generators.gnu_based.parseBuildConfiguration(cfg, os, compiler, requirementCache);
         case dmd:
-            return redub.command_generators.dmd.parseBuildConfiguration(cfg, os);
+            return redub.command_generators.dmd.parseBuildConfiguration(cfg, os, compiler, requirementCache);
         case ldc2:
-            return redub.command_generators.ldc.parseBuildConfiguration(cfg, os);
+            return redub.command_generators.ldc.parseBuildConfiguration(cfg, os, compiler, requirementCache);
         default:throw new Exception("Unsupported compiler '"~compiler.binOrPath~"'");
     }
 
 }
 
-string getCompileCommands(const BuildConfiguration cfg, OS os, Compiler compiler)
+string getCompileCommands(const BuildConfiguration cfg, OS os, Compiler compiler, string requirementCache)
 {
-    string[] flags = getCompilationFlags(cfg,os,compiler);
+    string[] flags = getCompilationFlags(cfg,os,compiler, requirementCache);
     return escapeShellCommand(compiler.binOrPath) ~ " " ~ processFlags(flags);
 }
 
