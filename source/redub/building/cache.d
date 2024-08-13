@@ -153,8 +153,6 @@ void invalidateCaches(ProjectNode root, Compiler compiler, OS target)
     foreach_reverse (ProjectNode n; root.collapse)
     {
         --i;
-        if(cacheStatus[i].isCopyUpToDate(n.requirements, compiler, target, &preprocessed))
-            n.setCopyEnough();
         if (!n.isUpToDate)
             continue;
         if (!cacheStatus[i].isCompilationUpToDate(n.requirements, compiler, target, &preprocessed))
@@ -163,6 +161,8 @@ void invalidateCaches(ProjectNode root, Compiler compiler, OS target)
             vlog("Project ", n.name, " requires rebuild.");
             n.invalidateCache();
         }
+        else if(cacheStatus[i].isCopyUpToDate(n.requirements, compiler, target, &preprocessed))
+            n.setCopyEnough();
     }
 }
 
@@ -253,13 +253,6 @@ AdvCacheFormula getCompilationCacheFormula(const BuildRequirements req, OS targe
         return hashFunction(cast(string) content, output);
     };
 
-    string[] extraRequirements = [];
-
-    ///Libraries does not depend on libraries to be considered up to date. With that said, it can have a faster calculation and even
-    ///A main thread cache writing thus making it faster.
-    if (req.cfg.targetType.isLinkedSeparately)
-        extraRequirements = req.extra.librariesFullPath.map!(
-            (libPath) => getLibraryPath(libPath, req.cfg.outputDirectory, target)).array;
 
     return AdvCacheFormula.make(
         contentHasher,//DO NOT use sourcePaths since importPaths is always custom + sourcePaths
@@ -269,7 +262,7 @@ AdvCacheFormula getCompilationCacheFormula(const BuildRequirements req, OS targe
     ], ///This is causing problems when using subPackages without output path, they may clash after
         // the compilation is finished. Solving this would require hash calculation after linking
         joiner([
-            req.cfg.sourceFiles, extraRequirements, req.extra.expectedArtifacts,
+            req.cfg.sourceFiles,
             req.cfg.filesToCopy, req.cfg.extraDependencyFiles
         ]),
         existing,

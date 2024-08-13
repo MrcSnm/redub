@@ -434,9 +434,17 @@ private bool doLink(ProjectNode root, OS os, Compiler compiler, string mainPackH
             infos("Linked: ", root.name, " finished in ", result.msecs, "ms!");
             vlog("\n\t", linkRes.compilationCommand, " \n");
         }
-
-        
     }
+    ///Try copying if it already exists, this operation is fast anyway for up to date builds.
+    else if(root.isCopyEnough)
+    {
+        import redub.command_generators.commons;
+        import std.path;
+        string inDir = getCacheOutputDir(mainPackHash, cast()root.requirements, compiler, os);
+        string outDir = getConfigurationOutputPath(root.requirements.cfg, os);
+        copyDir(inDir, dirName(outDir));
+    }
+
     if(isUpToDate)
         infos("Up-to-Date: ", root.name, ", skipping linking");
     else 
