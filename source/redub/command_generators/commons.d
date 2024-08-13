@@ -175,7 +175,11 @@ void copyDir(string fromDir, string toDir, bool shallow = true)
     import std.exception;
     import redub.misc.hard_link;
     enforce(isDir(fromDir), "Input must be a directory");
-    enforce(isDir(toDir), "Output must be a directory");
+
+    if(!exists(toDir))
+        mkdirRecurse(toDir);
+    else
+        enforce(isDir(toDir), "Output must be a directory");
 
     foreach(DirEntry e; dirEntries(fromDir, shallow ? SpanMode.shallow : SpanMode.depth))
         hardLinkFile(e.name, buildNormalizedPath(toDir, baseName(e.name)), true);
