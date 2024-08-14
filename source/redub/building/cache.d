@@ -42,6 +42,7 @@ struct CompilationCache
 {
     ///Key for finding the cache
     string requirementCache;
+    string rootHash;
     private AdvCacheFormula formula;
     private AdvCacheFormula copyFormula;
 
@@ -50,10 +51,10 @@ struct CompilationCache
         return formula;
     }
 
-    static CompilationCache make(string requirementCache, const BuildRequirements req, OS target, Compiler compiler,
+    static CompilationCache make(string requirementCache, string mainPackHash, const BuildRequirements req, OS target, Compiler compiler,
         const(AdvCacheFormula)* existing, AdvCacheFormula* preprocessed)
     {
-        return CompilationCache(requirementCache, getCompilationCacheFormula(req, target, existing, preprocessed), getCopyCacheFormula(requirementCache, req, compiler, target, existing, preprocessed));
+        return CompilationCache(requirementCache, mainPackHash, getCompilationCacheFormula(req, target, existing, preprocessed), getCopyCacheFormula(mainPackHash, req, compiler, target, existing, preprocessed));
     }
 
     /**
@@ -73,16 +74,16 @@ struct CompilationCache
         {
             import redub.logging;
             error("Cache is corrupted, regenerating...");
-            return CompilationCache(reqCache);
+            return CompilationCache(reqCache, rootHash);
         }
         if (c == JSONValue.emptyObject)
-            return CompilationCache(reqCache);
+            return CompilationCache(reqCache, rootHash);
         JSONValue* targetCache = reqCache in c;
         if (!targetCache || targetCache.type != JSONType.array)
-            return CompilationCache(reqCache);
+            return CompilationCache(reqCache, rootHash);
 
 
-        return CompilationCache(reqCache, AdvCacheFormula.deserialize(targetCache.array[0]), AdvCacheFormula.deserialize(targetCache.array[1]));
+        return CompilationCache(reqCache, rootHash, AdvCacheFormula.deserialize(targetCache.array[0]), AdvCacheFormula.deserialize(targetCache.array[1]));
     }
 
     /** 
@@ -111,12 +112,12 @@ struct CompilationCache
      *   cache = Optional argument which stores precalculated results
      * Returns: isCompilationUpToDate
      */
-    bool isCopyUpToDate(const BuildRequirements req, Compiler compiler, OS target, AdvCacheFormula* preprocessed) const
+    bool needsNewCopy(const BuildRequirements req, Compiler compiler, OS target, AdvCacheFormula* preprocessed) const
     {
-        AdvCacheFormula otherFormula = getCopyCacheFormula(requirementCache, req, compiler, target, &formula, preprocessed);
+        AdvCacheFormula otherFormula = getCopyCacheFormula(rootHash, req, compiler, target, &formula, preprocessed);
         size_t diffCount;
         string[64] diffs = copyFormula.diffStatus(otherFormula, diffCount);
-        return requirementCache == hashFrom(req, compiler, false) && diffCount == 0 && !copyFormula.isEmptyFormula;
+        return diffCount != 0 && !copyFormula.isEmptyFormula;
     }
 }
 
@@ -153,6 +154,9 @@ void invalidateCaches(ProjectNode root, Compiler compiler, OS target)
     foreach_reverse (ProjectNode n; root.collapse)
     {
         --i;
+        if(cacheStatus[i].needsNewCopy(n.requirements, compiler, target, &preprocessed))
+            n.setCopyEnough();
+
         if (!n.isUpToDate)
             continue;
         if (!cacheStatus[i].isCompilationUpToDate(n.requirements, compiler, target, &preprocessed))
@@ -161,8 +165,6 @@ void invalidateCaches(ProjectNode root, Compiler compiler, OS target)
             vlog("Project ", n.name, " requires rebuild.");
             n.invalidateCache();
         }
-        else if(cacheStatus[i].isCopyUpToDate(n.requirements, compiler, target, &preprocessed))
-            n.setCopyEnough();
     }
 }
 
@@ -270,28 +272,32 @@ AdvCacheFormula getCompilationCacheFormula(const BuildRequirements req, OS targe
     );
 }
 
-string getCacheOutputDir(string requirementCache, const BuildRequirements req, Compiler compiler, OS os)
+string getCacheOutputDir(string mainPackHash, const BuildRequirements req, Compiler compiler, OS os)
 {
-    return buildNormalizedPath(getCacheFolder, requirementCache~"x"~hashFrom(req, compiler));
+    if(mainPackHash.length == 0)
+        throw new Exception("No hash.");
+    return buildNormalizedPath(getCacheFolder, mainPackHash, hashFrom(req, compiler));
 }
 
-string getCacheOutputDir(string requirementCache, const BuildConfiguration cfg, Compiler compiler, OS os)
+string getCacheOutputDir(string mainPackHash, const BuildConfiguration cfg, Compiler compiler, OS os)
 {
-    return buildNormalizedPath(getCacheFolder, requirementCache~"x"~hashFrom(cfg, compiler));
+    if(mainPackHash.length == 0)
+        throw new Exception("No hash.");
+    return buildNormalizedPath(getCacheFolder, mainPackHash, hashFrom(cfg, compiler));
 }
 
 
 /**
  * Stores the output artifact directory. Used for saving artifacts elsewhere and simply copying if they are already up to date.
  * Params:
- *   requirementCache = The root cache on which this formula was built with. It is used for finding the output directory.
+ *   mainPackHash = The root cache on which this formula was built with. It is used for finding the output directory.
  *   req = The requirements will load adv_diff with the paths to watch for changes
  *   target = Target is important for knowing how the library is called
  *   existing = An existing formula reference as input is important for getting content hash if they aren't up to date
  *   preprocessed = This will store calculations on an AdvCacheFormula, so, subsequent checks are much faster
  * Returns: A new AdvCacheFormula
  */
-AdvCacheFormula getCopyCacheFormula(string requirementCache, const BuildRequirements req, Compiler compiler, OS os, const(AdvCacheFormula)* existing, AdvCacheFormula* preprocessed)
+AdvCacheFormula getCopyCacheFormula(string mainPackHash, const BuildRequirements req, Compiler compiler, OS os, const(AdvCacheFormula)* existing, AdvCacheFormula* preprocessed)
 {
     import std.algorithm.iteration, std.array;
 
@@ -299,11 +305,19 @@ AdvCacheFormula getCopyCacheFormula(string requirementCache, const BuildRequirem
         return hashFunction(cast(string) content, output);
     };
 
+
+    string[] extraRequirements = [];
+    if (req.cfg.targetType.isLinkedSeparately)
+        extraRequirements = req.extra.librariesFullPath.map!(
+            (libPath) => getLibraryPath(libPath, req.cfg.outputDirectory, os)).array;
+
+
     return AdvCacheFormula.make(
         contentHasher,//DO NOT use sourcePaths since importPaths is always custom + sourcePaths
         [
-            DirectoriesWithFilter([getCacheOutputDir(requirementCache, req, compiler, os)], false)
-        ],  string[].init,
+            DirectoriesWithFilter([], false)
+        ],
+        joiner([req.extra.expectedArtifacts, extraRequirements]),
         existing,
         preprocessed
     );
@@ -384,8 +398,5 @@ private string getBinCacheFolder()
 
 private string getCacheFilePath(string rootCache)
 {
-    static string cacheFilePath;
-    if (!cacheFilePath)
-        cacheFilePath = buildNormalizedPath(getCacheFolder, rootCache ~ ".json");
-    return cacheFilePath;
+    return buildNormalizedPath(getCacheFolder, rootCache ~ ".json");
 }

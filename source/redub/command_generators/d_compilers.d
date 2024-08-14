@@ -5,7 +5,7 @@ import redub.compiler_identification;
 import redub.command_generators.ldc;
 import redub.building.cache;
 
-string[] parseBuildConfiguration(AcceptedCompiler comp, const BuildConfiguration b, OS target, Compiler compiler, string requirementCache)
+string[] parseBuildConfiguration(AcceptedCompiler comp, const BuildConfiguration b, OS target, Compiler compiler, string mainPackhash)
 {
     import std.path;
     string function(ValidDFlags) mapper = getFlagMapper(comp);
@@ -44,7 +44,7 @@ string[] parseBuildConfiguration(AcceptedCompiler comp, const BuildConfiguration
 
         commands~= mapper(ValidDFlags.objectDir)~getObjectDir(b.workingDir).escapePath;
 
-        commands~= mapper(ValidDFlags.outputFile) ~ buildNormalizedPath(getCacheOutputDir(requirementCache, b, compiler, target), getConfigurationOutputName(b, target)).escapePath;
+        commands~= mapper(ValidDFlags.outputFile) ~ buildNormalizedPath(getCacheOutputDir(mainPackhash, b, compiler, target), getConfigurationOutputName(b, target)).escapePath;
         // commands~= mapper(ValidDFlags.outputFile) ~ getConfigurationOutputPath(b, target).escapePath;
 
     }

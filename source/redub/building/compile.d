@@ -66,7 +66,7 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
     }
     try
     {
-        if(pack.isUpToDate)
+        if(pack.isUpToDate && !pack.isCopyEnough)
         {
             res.cache = cache;
             return res;
@@ -81,41 +81,43 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
         if(executeCommands(cfg.preBuildCommands, "preBuildCommand", res, cfg.workingDir, env).status)
             return res;
 
-        ExecutionResult ret;
-        if(isDCompiler(compiler) && std.system.os.isWindows)
-        {
-            import std.path;
-            string inDir = getCacheOutputDir(cache.requirementCache, cast()pack.requirements, compiler, os);
-            if(!exists(inDir))
-                mkdirRecurse(inDir);
+        import std.path;
+        string inDir = getCacheOutputDir(cache.rootHash, cast()pack.requirements, compiler, os);
+        if(!exists(inDir))
+            mkdirRecurse(inDir);
 
+        ///Creates a folder to C output since it doesn't do automatically.
+        if(!isDCompiler(compiler))
+            createOutputDirFolder(cfg);
+
+        ExecutionResult ret;
+        if(std.system.os.isWindows)
+        {
             if(!pack.isCopyEnough)
             {
-                string[] flags = getCompilationFlags(cfg, os, compiler, cache.requirementCache);
+                string[] flags = getCompilationFlags(cfg, os, compiler, cache.rootHash);
                 string commandFile = createCommandFile(cfg, os, compiler, flags, res.compilationCommand);
                 res.compilationCommand = compiler.binOrPath ~ " "~res.compilationCommand;
                 ret = executeShell(compiler.binOrPath ~ " @"~commandFile);
                 std.file.remove(commandFile);
             }
-            copyDir(inDir, dirName(outDir));
-
         }
         else
         {
-            ///Creates a folder to C output since it doesn't do automatically.
-            if(!isDCompiler(compiler))
-                createOutputDirFolder(cfg);
-            res.compilationCommand = getCompileCommands(cfg, os, compiler, cache.requirementCache);
+            res.compilationCommand = getCompileCommands(cfg, os, compiler, cache.rootHash);
             ret = executeShell(res.compilationCommand, null, Config.none, size_t.max, cfg.workingDir);
-
-            if(!isDCompiler(compiler) && !ret.status) //Always requires link.
-            {
-                CompilationResult linkRes = link(cast()pack, cache.requirementCache, data, os, compiler, env);
-                ret.status = linkRes.status;
-                ret.output~= linkRes.message;
-                res.compilationCommand~= linkRes.compilationCommand;
-            }
         }
+
+        if(!isDCompiler(compiler) && !ret.status) //Always requires link.
+        {
+            CompilationResult linkRes = link(cast()pack, cache.requirementCache, data, os, compiler, env);
+            ret.status = linkRes.status;
+            ret.output~= linkRes.message;
+            res.compilationCommand~= linkRes.compilationCommand;
+        }
+
+        copyDir(inDir, dirName(outDir));
+
 
         ///Shared Library(mostly?)
         if(isDCompiler(compiler) && isLinkedSeparately(data.cfg.targetType) && !pack.isRoot)
@@ -147,13 +149,13 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
     return res;
 }
 
-CompilationResult link(ProjectNode root, string requirementCache, const ThreadBuildData data, OS os, Compiler compiler, immutable string[string] env)
+CompilationResult link(ProjectNode root, string rootHash, const ThreadBuildData data, OS os, Compiler compiler, immutable string[string] env)
 {
     import std.process;
     CompilationResult ret;
     if(!root.isCopyEnough)
     {
-        ret.compilationCommand = getLinkCommands(data, os, compiler, requirementCache);
+        ret.compilationCommand = getLinkCommands(data, os, compiler, rootHash);
         auto exec = executeShell(ret.compilationCommand);
         ret.status = exec.status;
         ret.message = exec.output;
@@ -163,7 +165,7 @@ CompilationResult link(ProjectNode root, string requirementCache, const ThreadBu
     import redub.command_generators.commons;
     import std.path;
 
-    string inDir = getCacheOutputDir(requirementCache, cast()root.requirements, compiler, os);
+    string inDir = getCacheOutputDir(rootHash, cast()root.requirements, compiler, os);
     string outDir = getConfigurationOutputPath(data.cfg, os);
     copyDir(inDir, dirName(outDir));
 
@@ -188,19 +190,24 @@ bool buildProjectParallelSimple(ProjectNode root, Compiler compiler, OS os)
 
     AdvCacheFormula formulaCache;
 
-    printUpToDateBuilds(root);
+    printCachedBuildInfo(root);
     while(true)
     {
         foreach(dep; dependencyFreePackages)
         {
             if(!(dep in spawned))
             {
-                spawned[dep] = true;
-                spawn(&execCompilationThread, 
-                    dep.requirements.buildData, cast(shared)dep, os,
-                    compiler, cast(shared)CompilationCache.get(mainPackHash, dep.requirements, compiler),
-                    env
-                );
+                if(dep.shouldEnterCompilationThread)
+                {
+                    spawned[dep] = true;
+                    spawn(&execCompilationThread,
+                        dep.requirements.buildData, cast(shared)dep, os,
+                        compiler, cast(shared)CompilationCache.get(mainPackHash, dep.requirements, compiler),
+                        env
+                    );
+                }
+                else
+                    dep.becomeIndependent();
             }
         }
         CompilationResult res = receiveOnly!CompilationResult;
@@ -221,8 +228,8 @@ bool buildProjectParallelSimple(ProjectNode root, Compiler compiler, OS os)
             {
                 CompilationCache existingCache = CompilationCache.get(mainPackHash, finishedPackage.requirements, compiler);
                 const AdvCacheFormula existingFormula = existingCache.getFormula();
-                CompilationCache.make(existingCache.requirementCache, finishedPackage.requirements, os, compiler, &existingFormula, &formulaCache);
-                updateCache(mainPackHash, CompilationCache.make(existingCache.requirementCache, finishedPackage.requirements, os, compiler, &existingFormula, &formulaCache));
+                CompilationCache.make(existingCache.requirementCache, mainPackHash, finishedPackage.requirements, os, compiler, &existingFormula, &formulaCache);
+                updateCache(mainPackHash, CompilationCache.make(existingCache.requirementCache, mainPackHash, finishedPackage.requirements, os, compiler, &existingFormula, &formulaCache));
             }
             if(finishedPackage is root)
                 break;
@@ -241,27 +248,31 @@ bool buildProjectFullyParallelized(ProjectNode root, Compiler compiler, OS os)
     import std.process;
     immutable string[string] env = cast(immutable)(environment.toAA);
     size_t i = 0;
+    size_t sentPackages = 0;
     foreach(ProjectNode pack; root.collapse)
     {
-        if(!pack.isUpToDate)
+        if(pack.shouldEnterCompilationThread)
+        {
+            sentPackages++;
             spawn(&execCompilationThread,
                 pack.requirements.buildData,
                 cast(shared)pack, os, compiler,
                 cast(shared)cache[i],
                 env
             );
+
+        }
         i++;
     }
 
-    printUpToDateBuilds(root);
+    printCachedBuildInfo(root);
 
     AdvCacheFormula formulaCache;
-    foreach(ProjectNode pack; root.collapse)
+    foreach(_; 0..sentPackages)
     {
-        if(pack.isUpToDate)
-            continue;
         CompilationResult res = receiveOnly!CompilationResult;
         ProjectNode finishedPackage = cast()res.node;
+
         if(res.status)
         {
             import core.thread;
@@ -273,15 +284,11 @@ bool buildProjectFullyParallelized(ProjectNode root, Compiler compiler, OS os)
         {
             buildSucceeded(finishedPackage, res);
 
-            //This code can't be enabled without a new compiler flag.
-            //Since there exists some projects puts their dependencies inside the same folder as the project definition, it will cause rebuilds if not done after
-            //everything.
-
             if(!finishedPackage.requirements.cfg.targetType.isLinkedSeparately)
             {
                 CompilationCache existingCache = CompilationCache.get(mainPackHash, finishedPackage.requirements, compiler);
                 const AdvCacheFormula existingFormula = existingCache.getFormula();
-                updateCache(mainPackHash, CompilationCache.make(existingCache.requirementCache, finishedPackage.requirements, os, compiler, &existingFormula, &formulaCache));
+                updateCache(mainPackHash, CompilationCache.make(existingCache.requirementCache, mainPackHash, finishedPackage.requirements, os, compiler, &existingFormula, &formulaCache));
             }
         }
     }
@@ -304,13 +311,13 @@ bool buildProjectSingleThread(ProjectNode root, Compiler compiler, OS os)
     string mainPackHash = hashFrom(root.requirements, compiler);
     immutable string[string] env = cast(immutable)(environment.toAA);
 
-    printUpToDateBuilds(root);
+    printCachedBuildInfo(root);
     while(true)
     {
         ProjectNode finishedPackage;
         foreach(dep; dependencyFreePackages)
         {
-            if(!dep.isUpToDate)
+            if(dep.shouldEnterCompilationThread)
             {
                 CompilationResult res = execCompilation(dep.requirements.buildData, cast(shared)dep, os, compiler,
                     cast(shared)CompilationCache.get(mainPackHash, dep.requirements, compiler), env
@@ -333,28 +340,37 @@ bool buildProjectSingleThread(ProjectNode root, Compiler compiler, OS os)
     return doLink(root, os, compiler, mainPackHash, env) && copyFiles(root);
 }
 
-private void printUpToDateBuilds(ProjectNode root)
+private void printCachedBuildInfo(ProjectNode root)
 {
     string upToDate;
+    string copyEnough;
     foreach(ProjectNode node; root.collapse)
     {
-        if(node.isUpToDate)
-        {
-            string cfg = node.requirements.targetConfiguration ? (" ["~node.requirements.targetConfiguration~"]") : null;
-            upToDate~= node.name ~cfg~"; ";
-        }
+        string cfg = node.requirements.targetConfiguration ? (" ["~node.requirements.targetConfiguration~"]") : null;
+        cfg = node.name~ cfg~"; ";
+
+        if(node.isCopyEnough)
+            copyEnough~= cfg;
+        else if(node.isUpToDate)
+            upToDate~= cfg;
     }
+    if(copyEnough.length)
+        infos("Copy Enough: ", copyEnough);
     if(upToDate.length)
         infos("Up-to-Date: ", upToDate);
 }
 
+
 private void buildSucceeded(ProjectNode node, CompilationResult res)
 {
-    string cfg = node.requirements.targetConfiguration ? (" ["~node.requirements.targetConfiguration~"]") : null;
-    string ver = node.requirements.version_.length ? (" "~node.requirements.version_) : null;
+    if(!node.isCopyEnough)
+    {
+        string cfg = node.requirements.targetConfiguration ? (" ["~node.requirements.targetConfiguration~"]") : null;
+        string ver = node.requirements.version_.length ? (" "~node.requirements.version_) : null;
 
-    infos(node.isCopyEnough ? "Copied: " : "Built: ", node.name, ver, cfg, ". Took ", res.msNeeded, "ms");
-    vlog("\n\t", res.compilationCommand, " \n");
+        infos("Built: ", node.name, ver, cfg, ". Took ", res.msNeeded, "ms");
+        vlog("\n\t", res.compilationCommand, " \n");
+    }
 
 }
 private void buildFailed(const ProjectNode node, CompilationResult res, const Compiler compiler)
@@ -463,7 +479,7 @@ private bool doLink(ProjectNode root, OS os, Compiler compiler, string mainPackH
                 {
                     CompilationCache existingCache = CompilationCache.get(mainPackHash, node.requirements, compiler);
                     const AdvCacheFormula existingFormula = existingCache.getFormula();
-                    updateCache(mainPackHash, CompilationCache.make(existingCache.requirementCache, node.requirements, os, compiler, &existingFormula, &cache));
+                    updateCache(mainPackHash, CompilationCache.make(existingCache.requirementCache, mainPackHash, node.requirements, os, compiler, &existingFormula, &cache));
                 }
             }
             updateCacheOnDisk(mainPackHash);

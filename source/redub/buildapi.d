@@ -6,7 +6,7 @@ import redub.logging;
 import redub.package_searching.api;
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.8.8";
+enum RedubVersionOnly = "v1.9.0";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -945,6 +945,7 @@ class ProjectNode
         dependenciesToRemove = null;
         privatesToMerge = null;
     }
+
     
     bool isUpToDate() const { return !shouldRebuild; }
     bool isUpToDate() const shared { return !shouldRebuild; }
@@ -952,11 +953,18 @@ class ProjectNode
     bool isCopyEnough() const { return needsCopyOnly; }
     bool isCopyEnough() const shared { return needsCopyOnly; }
 
+    bool shouldEnterCompilationThread() const
+    {
+        return !isUpToDate || isCopyEnough;
+    }
+
+
     void setCopyEnough() { needsCopyOnly = true; }
 
     ///Invalidates self and parent caches
     void invalidateCache()
     {
+        needsCopyOnly = false;
         shouldRebuild = true;
         foreach(p; parent) p.invalidateCache();
     }
