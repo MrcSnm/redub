@@ -153,6 +153,7 @@ CompilationResult link(ProjectNode root, string rootHash, const ThreadBuildData 
 {
     import std.process;
     CompilationResult ret;
+
     if(!root.isCopyEnough)
     {
         ret.compilationCommand = getLinkCommands(data, os, compiler, rootHash);

@@ -7,6 +7,7 @@ public import redub.compiler_identification;
 import redub.buildapi;
 import std.process;
 import std.datetime.stopwatch;
+public import std.file:DirEntry;
 
 
 OS osFromArch(string arch)
@@ -230,6 +231,18 @@ string unescapePath(string targetPath)
         return targetPath[1..$-1];
     return targetPath;
 }
+bool isFileHidden(DirEntry e)
+{
+    version(Windows)
+    {
+        import core.sys.windows.winnt;
+        return (e.attributes & FILE_ATTRIBUTE_HIDDEN) != 0;
+    }
+    else
+    {
+        return e.name.length >= 0 && e.name[0] == '.';
+    }
+}
 
 void putSourceFiles(
     ref string[] output,
@@ -247,18 +260,7 @@ void putSourceFiles(
     import std.exception;
     
 
-    static bool isFileHidden(DirEntry e)
-    {
-        version(Windows)
-        {
-            import core.sys.windows.winnt;
-            return (e.attributes & FILE_ATTRIBUTE_HIDDEN) != 0;
-        }
-        else
-        {
-            return e.name.length >= 0 && e.name[0] == '.';
-        }
-    }
+
 
 
 

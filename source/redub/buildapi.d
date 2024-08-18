@@ -6,7 +6,7 @@ import redub.logging;
 import redub.package_searching.api;
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.9.0";
+enum RedubVersionOnly = "v1.9.1";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -959,7 +959,10 @@ class ProjectNode
     }
 
 
-    void setCopyEnough() { needsCopyOnly = true; }
+    void setCopyEnough()
+    {
+        needsCopyOnly = true;
+    }
 
     ///Invalidates self and parent caches
     void invalidateCache()

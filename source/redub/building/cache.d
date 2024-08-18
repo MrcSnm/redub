@@ -154,11 +154,11 @@ void invalidateCaches(ProjectNode root, Compiler compiler, OS target)
     foreach_reverse (ProjectNode n; root.collapse)
     {
         --i;
+        if (!n.isUpToDate)
+            continue;
         if(cacheStatus[i].needsNewCopy(n.requirements, compiler, target, &preprocessed))
             n.setCopyEnough();
 
-        if (!n.isUpToDate)
-            continue;
         if (!cacheStatus[i].isCompilationUpToDate(n.requirements, compiler, target, &preprocessed))
         {
             import redub.logging;

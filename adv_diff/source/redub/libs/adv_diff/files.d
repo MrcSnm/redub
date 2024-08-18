@@ -163,7 +163,7 @@ struct AdvCacheFormula
 	}
 
 	/** 
-	 * 
+	 * It won't include hidden files in the formula
 	 * Params:
 	 *   contentHasher = Optional. If this input is given, it will read each file content and hash them
 	 *   directories = Which directories it should put on this formula
@@ -183,6 +183,7 @@ struct AdvCacheFormula
 		import std.file;
 		import std.array;
 		import std.stdio;
+		import redub.command_generators.commons;
 		AdvCacheFormula ret;
 		Int128 totalTime;
 		static ubyte[] fileBuffer;
@@ -229,12 +230,12 @@ struct AdvCacheFormula
 			const(AdvDirectory)* existingDir;
 			if(existing) existingDir = dir in existing.directories;
 
-			if(!std.file.exists(dir)) continue;
+			if(!std.file.exists(dir) ||isFileHidden(DirEntry(dir))) continue;
 			enforce(std.file.isDir(dir), "Path sent is not a directory: "~dir);
 
 			foreach(DirEntry e; dirEntries(dir, SpanMode.depth))
             {
-				if(e.isDir || !filterDir.shouldInclude(e.name)) continue;
+				if(e.isDir || !filterDir.shouldInclude(e.name) || isFileHidden(e)) continue;
 
 				long time = e.timeLastModified.stdTime;
                 dirTime+= time;
