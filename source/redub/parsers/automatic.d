@@ -52,7 +52,7 @@ BuildRequirements parseProject(
         default: throw new Exception("Unsupported project type "~projectFile~" at dir "~projectWorkingDir);
     }
 
-    redub.parsers.environment.setupEnvironmentVariablesForPackage(cast(immutable)req);
+    redub.parsers.environment.setupEnvironmentVariablesForPackage(req.cfg);
     req.cfg = redub.parsers.environment.parseEnvironment(req.cfg);
     req.cfg.arch = arch;
 

@@ -107,7 +107,9 @@ struct RootPackageDubVariables
 struct PackageDubVariables
 {
     ///Path to the package itself
-    string PACKAGE_DIR ;
+    string PACKAGE_DIR;
+    ///Path to the package itself
+    string DUB_PACKAGE_DIR ;
     ///Contents of the "targetType" field as defined by the package recipe
     string DUB_TARGET_TYPE ;
     ///Contents of the "targetPath" field as defined by the package recipe
@@ -188,21 +190,39 @@ void setupEnvironmentVariablesForPackageTree(ProjectNode root)
 }
 
 /** 
- * Setups environment variables based on BuildRequirements -
- * - PACKAGE_DIR
+ * Gets the following variables for including in the environment in the build step.
+ * - DUB_PACKAGE_DIR
  * - DUB_TARGET_TYPE
  * - DUB_TARGET_PATH
  * - DUB_TARGET_NAME
  * - DUB_MAIN_SOURCE_FILE
  */
-void setupEnvironmentVariablesForPackage(immutable BuildRequirements root)
+PackageDubVariables getEnvironmentVariablesForPackage(const BuildConfiguration cfg)
 {
     import std.conv:to;
-    environment["PACKAGE_DIR"] = root.cfg.workingDir;
-    environment["DUB_TARGET_TYPE"] = root.cfg.targetType.to!string;
-    environment["DUB_TARGET_PATH"] = root.cfg.outputDirectory;
-    environment["DUB_TARGET_NAME"] = root.cfg.name;
-    environment["DUB_MAIN_SOURCE_FILE"] = root.cfg.sourceEntryPoint;
+    return PackageDubVariables(
+        PACKAGE_DIR: cfg.workingDir,
+        DUB_PACKAGE_DIR: cfg.workingDir,
+        DUB_TARGET_TYPE: cfg.targetType.to!string,
+        DUB_TARGET_PATH: cfg.outputDirectory,
+        DUB_TARGET_NAME: cfg.name,
+        DUB_MAIN_SOURCE_FILE: cfg.sourceEntryPoint,
+    );
+}
+
+/** 
+ * Setups environment variables based on BuildConfiguration -
+ * - DUB_PACKAGE_DIR
+ * - DUB_TARGET_TYPE
+ * - DUB_TARGET_PATH
+ * - DUB_TARGET_NAME
+ * - DUB_MAIN_SOURCE_FILE
+ */
+void setupEnvironmentVariablesForPackage(const BuildConfiguration cfg)
+{
+    PackageDubVariables pack = getEnvironmentVariablesForPackage(cfg);
+    static foreach(mem; __traits(allMembers, PackageDubVariables))
+        environment[mem] = __traits(getMember, pack, mem);
 }
 string parseStringWithEnvironment(string str)
 {

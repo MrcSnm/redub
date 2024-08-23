@@ -186,9 +186,6 @@ bool buildProjectParallelSimple(ProjectNode root, Compiler compiler, OS os)
     string mainPackHash = hashFrom(root.requirements, compiler);
     bool[ProjectNode] spawned;
 
-    import std.process;
-    immutable string[string] env = cast(immutable)(environment.toAA);
-
     AdvCacheFormula formulaCache;
 
     printCachedBuildInfo(root);
@@ -204,7 +201,7 @@ bool buildProjectParallelSimple(ProjectNode root, Compiler compiler, OS os)
                     spawn(&execCompilationThread,
                         dep.requirements.buildData, cast(shared)dep, os,
                         compiler, cast(shared)CompilationCache.get(mainPackHash, dep.requirements, compiler),
-                        env
+                        getEnvForProject(dep)
                     );
                 }
                 else
@@ -236,7 +233,7 @@ bool buildProjectParallelSimple(ProjectNode root, Compiler compiler, OS os)
                 break;
         }
     }
-    return doLink(root, os, compiler, mainPackHash, env, &formulaCache) && copyFiles(root);
+    return doLink(root, os, compiler, mainPackHash, &formulaCache) && copyFiles(root);
 }
 
 
@@ -246,8 +243,6 @@ bool buildProjectFullyParallelized(ProjectNode root, Compiler compiler, OS os)
     string mainPackHash = hashFrom(root.requirements, compiler);
     CompilationCache[] cache = cacheStatusForProject(root, compiler);
 
-    import std.process;
-    immutable string[string] env = cast(immutable)(environment.toAA);
     size_t i = 0;
     size_t sentPackages = 0;
     foreach(ProjectNode pack; root.collapse)
@@ -259,7 +254,7 @@ bool buildProjectFullyParallelized(ProjectNode root, Compiler compiler, OS os)
                 pack.requirements.buildData,
                 cast(shared)pack, os, compiler,
                 cast(shared)cache[i],
-                env
+                getEnvForProject(pack)
             );
 
         }
@@ -293,7 +288,7 @@ bool buildProjectFullyParallelized(ProjectNode root, Compiler compiler, OS os)
             }
         }
     }
-    return doLink(root, os, compiler, mainPackHash, env, &formulaCache) && copyFiles(root);
+    return doLink(root, os, compiler, mainPackHash, &formulaCache) && copyFiles(root);
 }
 
 /** 
@@ -307,10 +302,8 @@ bool buildProjectFullyParallelized(ProjectNode root, Compiler compiler, OS os)
  */
 bool buildProjectSingleThread(ProjectNode root, Compiler compiler, OS os)
 {
-    import std.process;
     ProjectNode[] dependencyFreePackages = root.findLeavesNodes();
     string mainPackHash = hashFrom(root.requirements, compiler);
-    immutable string[string] env = cast(immutable)(environment.toAA);
 
     printCachedBuildInfo(root);
     while(true)
@@ -321,7 +314,7 @@ bool buildProjectSingleThread(ProjectNode root, Compiler compiler, OS os)
             if(dep.shouldEnterCompilationThread)
             {
                 CompilationResult res = execCompilation(dep.requirements.buildData, cast(shared)dep, os, compiler,
-                    cast(shared)CompilationCache.get(mainPackHash, dep.requirements, compiler), env
+                    cast(shared)CompilationCache.get(mainPackHash, dep.requirements, compiler), getEnvForProject(dep)
                 );
                 if(res.status)
                 {
@@ -338,7 +331,7 @@ bool buildProjectSingleThread(ProjectNode root, Compiler compiler, OS os)
         if(finishedPackage is root)
             break;
     }
-    return doLink(root, os, compiler, mainPackHash, env) && copyFiles(root);
+    return doLink(root, os, compiler, mainPackHash) && copyFiles(root);
 }
 
 private void printCachedBuildInfo(ProjectNode root)
@@ -424,7 +417,19 @@ private bool copyFiles(ProjectNode root)
     return true;
 }
 
-private bool doLink(ProjectNode root, OS os, Compiler compiler, string mainPackHash, immutable string[string] env, AdvCacheFormula* formulaCache = null)
+immutable(string[string]) getEnvForProject(const ProjectNode node)
+{
+    import redub.parsers.environment;
+    import std.process:environment;
+    PackageDubVariables vars = getEnvironmentVariablesForPackage(node.requirements.cfg);
+    string[string] env = environment.toAA;
+    static foreach(mem; __traits(allMembers, PackageDubVariables))
+        env[mem] = __traits(getMember, vars, mem);
+    return cast(immutable)env;
+
+}
+
+private bool doLink(ProjectNode root, OS os, Compiler compiler, string mainPackHash, AdvCacheFormula* formulaCache = null)
 {
     bool isUpToDate = root.isUpToDate;
     bool shouldSkipLinking = isUpToDate || (compiler.isDCompiler && root.requirements.cfg.targetType.isStaticLibrary);
@@ -433,7 +438,7 @@ private bool doLink(ProjectNode root, OS os, Compiler compiler, string mainPackH
     {
         CompilationResult linkRes;
         auto result = timed(() {
-             linkRes = link(root, mainPackHash, root.requirements.buildData, os, compiler, env);
+             linkRes = link(root, mainPackHash, root.requirements.buildData, os, compiler, getEnvForProject(root));
              return true;
         });
         if(linkRes.status)
