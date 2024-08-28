@@ -6,7 +6,7 @@ import redub.logging;
 import redub.package_searching.api;
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.9.4";
+enum RedubVersionOnly = "v1.9.5";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -14,7 +14,8 @@ enum RedubVersion = RedubVersionShort ~ " - A reimagined DUB";
 
 enum TargetType
 {
-    none = 0, //Bug
+    invalid = 0, //Bug
+    none,
     autodetect,
     executable,
     library,
@@ -823,6 +824,7 @@ class ProjectNode
                 getOutputName(node.requirements.cfg.targetType, node.requirements.cfg.name, targetOS, isa)
             );
 
+            ///Execute pkg-config for Posix
             version(Posix)
             {
                 if(node.requirements.cfg.targetType.isLinkedSeparately && node.requirements.cfg.libraries.length)
@@ -879,6 +881,7 @@ class ProjectNode
                     break;
                 case executable: break;
                 case none: throw new Exception("TargetType: none as a root project: nothing to do");
+                case invalid: throw new Exception("No targetType was found.");
                     // if(input.parent.length == 0)
                     //     throw new Exception("targetType: none as a root project: nothing to do");
                     // else
@@ -926,7 +929,7 @@ class ProjectNode
             foreach(node; dependenciesToRemove)
             {
                 vlog("Project ", node.name, " is a ", node.requirements.cfg.targetType == TargetType.sourceLibrary ? "sourceLibrary" : "none",". Becoming independent.");
-                if(node.requirements.cfg.targetType == TargetType.none)
+                if(node.requirements.cfg.targetType == TargetType.none && node.parent.length != 0)
                     node.dependencies = null;
                 node.becomeIndependent();
             }

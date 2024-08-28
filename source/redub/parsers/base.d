@@ -20,12 +20,13 @@ struct ParseConfig
     string requiredBy;
     bool firstRun = true;
     bool preGenerateRun = true;
+    bool isRoot = false;
 }
 
 
 void setName(ref BuildRequirements req, string name, ParseConfig c)
 {
-    if(c.firstRun)
+    if(c.firstRun || req.cfg.name.length == 0)
         req.cfg.name = name;
 }
 void setTargetPath(ref BuildRequirements req, string path, ParseConfig c){req.cfg.outputDirectory = path;}
@@ -39,7 +40,25 @@ void addImportPaths(ref BuildRequirements req, JSONStringArray paths, ParseConfi
 void addStringImportPaths(ref BuildRequirements req, JSONStringArray paths, ParseConfig c){req.cfg.stringImportPaths.exclusiveMergePaths(paths);}
 void addExtraDependencyFiles(ref BuildRequirements req, JSONStringArray files, ParseConfig c){req.cfg.extraDependencyFiles.exclusiveMerge(files);}
 void addFilesToCopy(ref BuildRequirements req, JSONStringArray files, ParseConfig c){req.cfg.filesToCopy = req.cfg.filesToCopy.append(files);}
-void addPreGenerateCommands(ref BuildRequirements req, JSONStringArray cmds, ParseConfig c){req.cfg.preGenerateCommands = req.cfg.preGenerateCommands.append(cmds);}
+void addPreGenerateCommands(ref BuildRequirements req, JSONStringArray cmds, ParseConfig c)
+{
+    import hipjson;
+    infos("Pre-gen ", "Running commands for ", c.requiredBy);
+    foreach(JSONValue cmd; cmds.save)
+    {
+        import std.process;
+        import std.stdio;
+        import std.conv:to;
+
+        if(hasLogLevel(LogLevel.verbose))
+            vlog("Executing: ", executeShell("echo "~cmd.str, environment.toAA).output);
+
+        auto status = wait(spawnShell(cmd.str, stdin, stdout, stderr, environment.toAA, Config.none, c.workingDir));
+        if(status)
+            throw new Exception("preGenerateCommand '"~cmd.str~"' exited with code "~status.to!string);
+    }
+    req.cfg.preGenerateCommands = req.cfg.preGenerateCommands.append(cmds);
+}
 void addPostGenerateCommands(ref BuildRequirements req, JSONStringArray cmds, ParseConfig c){req.cfg.postGenerateCommands = req.cfg.postGenerateCommands.append(cmds);}
 void addPreBuildCommands(ref BuildRequirements req, JSONStringArray cmds, ParseConfig c){req.cfg.preBuildCommands = req.cfg.preBuildCommands.append(cmds);}
 void addPostBuildCommands(ref BuildRequirements req, JSONStringArray cmds, ParseConfig c){req.cfg.postBuildCommands = req.cfg.postBuildCommands.append(cmds);}

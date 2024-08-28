@@ -161,6 +161,7 @@ string getExtension(TargetType t, OS target, ISA isa)
 {
     final switch(t)
     {
+        case TargetType.invalid: throw new Exception("Can't use invalid targetType.");
         case TargetType.none: return null;
         case TargetType.autodetect, TargetType.sourceLibrary: return null;
         case TargetType.executable: return target.getExecutableExtension(isa);

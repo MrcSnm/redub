@@ -81,56 +81,62 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
         if(executeCommands(cfg.preBuildCommands, "preBuildCommand", res, cfg.workingDir, env).status)
             return res;
 
-        import std.path;
-        string inDir = getCacheOutputDir(cache.rootHash, cast()pack.requirements, compiler, os);
-        if(!exists(inDir))
-            mkdirRecurse(inDir);
 
-        ///Creates a folder to C output since it doesn't do automatically.
-        if(!isDCompiler(compiler))
-            createOutputDirFolder(cfg);
-
-        ExecutionResult ret;
-        if(std.system.os.isWindows)
+        if(pack.requirements.cfg.targetType != TargetType.none)
         {
-            if(!pack.isCopyEnough)
+            import std.path;
+            string inDir = getCacheOutputDir(cache.rootHash, cast()pack.requirements, compiler, os);
+            if(!exists(inDir))
+                mkdirRecurse(inDir);
+
+            ///Creates a folder to C output since it doesn't do automatically.
+            if(!isDCompiler(compiler))
+                createOutputDirFolder(cfg);
+
+            ExecutionResult ret;
+            if(std.system.os.isWindows)
             {
-                string[] flags = getCompilationFlags(cfg, os, compiler, cache.rootHash);
-                string commandFile = createCommandFile(cfg, os, compiler, flags, res.compilationCommand);
-                res.compilationCommand = compiler.binOrPath ~ " "~res.compilationCommand;
-                ret = executeShell(compiler.binOrPath ~ " @"~commandFile);
-                std.file.remove(commandFile);
+                if(!pack.isCopyEnough)
+                {
+                    string[] flags = getCompilationFlags(cfg, os, compiler, cache.rootHash);
+                    string commandFile = createCommandFile(cfg, os, compiler, flags, res.compilationCommand);
+                    res.compilationCommand = compiler.binOrPath ~ " "~res.compilationCommand;
+                    ret = executeShell(compiler.binOrPath ~ " @"~commandFile);
+                    std.file.remove(commandFile);
+                }
             }
+            else
+            {
+                res.compilationCommand = getCompileCommands(cfg, os, compiler, cache.rootHash);
+                ret = executeShell(res.compilationCommand, null, Config.none, size_t.max, cfg.workingDir);
+            }
+
+            if(!isDCompiler(compiler) && !ret.status) //Always requires link.
+            {
+                CompilationResult linkRes = link(cast()pack, cache.requirementCache, data, os, compiler, env);
+                ret.status = linkRes.status;
+                ret.output~= linkRes.message;
+                res.compilationCommand~= linkRes.compilationCommand;
+            }
+
+            copyDir(inDir, dirName(outDir));
+
+
+            ///Shared Library(mostly?)
+            if(isDCompiler(compiler) && isLinkedSeparately(data.cfg.targetType) && !pack.isRoot)
+            {
+                CompilationResult linkRes = link(cast()pack, cache.requirementCache, data, os, compiler, env);
+                ret.status = linkRes.status;
+                ret.output~= linkRes.message;
+                res.compilationCommand~= "\n\nLinking: \n\t"~ linkRes.compilationCommand;
+            }
+            
+
+            res.status = ret.status;
+            res.message = ret.output;
+
         }
-        else
-        {
-            res.compilationCommand = getCompileCommands(cfg, os, compiler, cache.rootHash);
-            ret = executeShell(res.compilationCommand, null, Config.none, size_t.max, cfg.workingDir);
-        }
 
-        if(!isDCompiler(compiler) && !ret.status) //Always requires link.
-        {
-            CompilationResult linkRes = link(cast()pack, cache.requirementCache, data, os, compiler, env);
-            ret.status = linkRes.status;
-            ret.output~= linkRes.message;
-            res.compilationCommand~= linkRes.compilationCommand;
-        }
-
-        copyDir(inDir, dirName(outDir));
-
-
-        ///Shared Library(mostly?)
-        if(isDCompiler(compiler) && isLinkedSeparately(data.cfg.targetType) && !pack.isRoot)
-        {
-            CompilationResult linkRes = link(cast()pack, cache.requirementCache, data, os, compiler, env);
-            ret.status = linkRes.status;
-            ret.output~= linkRes.message;
-            res.compilationCommand~= "\n\nLinking: \n\t"~ linkRes.compilationCommand;
-        }
-        
-
-        res.status = ret.status;
-        res.message = ret.output;
 
         if(res.status == 0)
         {
@@ -139,7 +145,6 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
             if(!cfg.targetType.isLinkedSeparately && executeCommands(cfg.postGenerateCommands, "postGenerateCommand", res, cfg.workingDir, env).status)
                 return res;
         }
-        // res.cache = cast(shared)CompilationCache.make(cache.requirementCache, req, os);
     }
     catch(Throwable e)
     {
@@ -432,7 +437,7 @@ immutable(string[string]) getEnvForProject(const ProjectNode node)
 private bool doLink(ProjectNode root, OS os, Compiler compiler, string mainPackHash, AdvCacheFormula* formulaCache = null)
 {
     bool isUpToDate = root.isUpToDate;
-    bool shouldSkipLinking = isUpToDate || (compiler.isDCompiler && root.requirements.cfg.targetType.isStaticLibrary);
+    bool shouldSkipLinking = isUpToDate || (compiler.isDCompiler && !root.requirements.cfg.targetType.isLinkedSeparately);
 
     if(!shouldSkipLinking)
     {
@@ -469,7 +474,7 @@ private bool doLink(ProjectNode root, OS os, Compiler compiler, string mainPackH
 
     if(isUpToDate)
         infos("Up-to-Date: ", root.name, ", skipping linking");
-    else 
+    else if(root.requirements.cfg.targetType != TargetType.none)
     {
         AdvCacheFormula cache;
         if(formulaCache != null)

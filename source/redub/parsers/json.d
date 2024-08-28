@@ -59,6 +59,7 @@ private JSONValue parseJSONCached(string filePath)
 BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
 {
     import std.exception;
+    cfg.isRoot = isRoot;
     ///Setup base of configuration before finding anything
     if(cfg.firstRun)
     {
@@ -74,26 +75,6 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
         vlog("Added project ", cfg.requiredBy, " to memory cache.");
     }
     BuildRequirements buildRequirements = getDefaultBuildRequirement(cfg);
-
-    immutable static preGenerateRun = [
-        "preGenerateCommands": (ref BuildRequirements req, JSONValue v, ParseConfig c)
-        {
-            info("Running preGenerateCommands for ", req.name);
-            foreach(JSONValue cmd; v.array)
-            {
-                import std.process;
-                import std.stdio;
-                import std.conv:to;
-
-                if(hasLogLevel(LogLevel.verbose))
-                    vlog("Executing: ", executeShell("echo "~cmd.str, environment.toAA).output);
-
-                auto status = wait(spawnShell(cmd.str, stdin, stdout, stderr, environment.toAA, Config.none, c.workingDir));
-                if(status)
-                    throw new Exception("preGenerateCommand '"~cmd.str~"' exited with code "~status.to!string);
-            }
-        }
-    ];
 
     immutable static requirementsRun = [
         "name": (ref BuildRequirements req, JSONValue v, ParseConfig c){setName(req, v.str, c);},
@@ -118,6 +99,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
         "dflags":  (ref BuildRequirements req, JSONValue v, ParseConfig c){addDflags(req, v.strArr, c);},
         "configurations": (ref BuildRequirements req, JSONValue v, ParseConfig c)
         {
+            ///If it is a recursive call (not firstRun), it won't care about configurations
             if(c.firstRun)
             {
                 import std.conv:to;
@@ -285,12 +267,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
     }
     string[] unusedKeys;
 
-    if(cfg.preGenerateRun)
-    {
-        setName(buildRequirements, json["name"].str, cfg);
-        runHandlers(preGenerateRun, buildRequirements, cfg, json, false, unusedKeys);
-        cfg.preGenerateRun = false;
-    }
+    setName(buildRequirements, json["name"].str, cfg);
     runHandlers(requirementsRun, buildRequirements, cfg, json, false, unusedKeys);
 
     if(cfg.firstRun && unusedKeys.length) warn("Unused Keys -> ", unusedKeys);

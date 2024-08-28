@@ -606,7 +606,6 @@ struct JSONValue
 				}
 				case '[':
 				{
-					import std.stdio;
 					if(state != JSONState.lookingForNext && state != JSONState.value)
 						return JSONValue.errorObj(getErr(" expected to be a value. "));
 					if(!pushNewScope(JSONValue.create(JSONArray.createNew(), lastKey)))
