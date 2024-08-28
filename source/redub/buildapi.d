@@ -6,7 +6,7 @@ import redub.logging;
 import redub.package_searching.api;
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.9.5";
+enum RedubVersionOnly = "v1.9.6";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -157,33 +157,15 @@ struct BuildConfiguration
 
     immutable(BuildConfiguration) idup() inout
     {
-        return immutable BuildConfiguration(
-            isDebug,
-            name,
-            versions.idup,
-            debugVersions.idup,
-            importDirectories.idup,
-            libraryPaths.idup,
-            stringImportPaths.idup,
-            libraries.idup,
-            linkFlags.idup,
-            dFlags.idup,
-            sourcePaths.idup,
-            sourceFiles.idup,
-            excludeSourceFiles.idup,
-            extraDependencyFiles.idup,
-            filesToCopy.idup,
-            preGenerateCommands.idup,
-            postGenerateCommands.idup,
-            preBuildCommands.idup,
-            postBuildCommands.idup,
-            sourceEntryPoint,
-            outputDirectory,
-            workingDir,
-            arch,
-            targetType
-        );
-
+        BuildConfiguration ret;
+        static foreach(i, value; BuildConfiguration.tupleof)
+        {
+            static if(is(typeof(ret.tupleof[i]) == string[]))
+                ret.tupleof[i] = cast(string[])this.tupleof[i].idup;
+            else
+                ret.tupleof[i] = this.tupleof[i];
+        }
+        return cast(immutable)ret;
     }
 
     BuildConfiguration clone() const{return cast()this;}

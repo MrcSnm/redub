@@ -333,7 +333,7 @@ private bool isOS(string osRep)
 {
     switch(osRep)
     {
-        case "posix", "linux", "osx", "windows", "freebsd", "netbsd", "openbsd", "dragonflybsd", "solaris", "watchos", "tvos", "ios": return true;
+        case "posix", "linux", "osx", "darwin", "windows", "freebsd", "netbsd", "openbsd", "dragonflybsd", "solaris", "watchos", "tvos", "ios": return true;
         default: return false;
     }
 }
@@ -375,7 +375,7 @@ private bool matchesOS(string osRep, OS os)
         case "dragonflybsd": return os == dragonFlyBSD;
         case "solaris": return os == solaris;
         case "linux": return os == linux || os == android;
-        case "osx": return os == osx || os == iOS || os == tvOS || os == watchOS;
+        case "darwin", "osx": return os == osx || os == iOS || os == tvOS || os == watchOS;
         case "watchos": return os == watchOS;
         case "tvos": return os == tvOS;
         case "ios": return os == iOS;
@@ -427,6 +427,10 @@ struct PlatformFilter
 
         if(isArch(ret.targetOS)) swap(ret.targetOS, ret.targetArch);
         if(isOS(ret.targetArch)) swap(ret.targetArch, ret.targetOS);
+
+        ///TODO: Remove 'darwin' support.
+        if(ret.targetOS == "darwin")
+            warn("'darwin' OS filter has been used but it is deprecated. Please use 'osx' instead.");
 
         return ret;
     }

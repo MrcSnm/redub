@@ -94,8 +94,10 @@ int executeProgram(ProjectNode tree, string[] args)
     import redub.command_generators.commons;
     
     return wait(spawnShell(
-        buildNormalizedPath(tree.requirements.cfg.outputDirectory, 
-        tree.requirements.cfg.name~getExecutableExtension(os)) ~  execArgs
+        escapeShellCommand(
+            buildNormalizedPath(tree.requirements.cfg.outputDirectory, 
+            tree.requirements.cfg.name~getExecutableExtension(os)) ~  execArgs   
+        )
     ));
 }
 
