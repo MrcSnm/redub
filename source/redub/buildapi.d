@@ -6,7 +6,7 @@ import redub.logging;
 import redub.package_searching.api;
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.9.3";
+enum RedubVersionOnly = "v1.9.4";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -853,8 +853,8 @@ class ProjectNode
             target.requirements.cfg = target.requirements.cfg.mergeVersions(input.requirements.cfg);
             target.requirements.cfg = target.requirements.cfg.mergeFilteredDflags(input.requirements.cfg);
             target.requirements.cfg = target.requirements.cfg.mergeLinkFlags(input.requirements.cfg);
-            // if(target.requirements.cfg.targetType.isLinkedSeparately)
-            //     target.requirements.cfg = target.requirements.cfg.mergeLinkFilesFromSource(input.requirements.cfg);
+
+            target.requirements.cfg = target.requirements.cfg.mergeLinkFilesFromSource(input.requirements.cfg);
 
             target.requirements.extra.librariesFullPath.exclusiveMerge(
                 input.requirements.extra.librariesFullPath

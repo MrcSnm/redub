@@ -306,7 +306,7 @@ string[] getLinkFiles(const string[] filesToLink)
     import std.path;
     import std.array;
     import std.algorithm.iteration;
-    return cast(string[])filesToLink.filter!((name) => name.extension.isLinkerValidExtension).array; //Array already guarantee nothing is modified.
+    return cast(string[])filesToLink.filter!((string name) => extension(name).isLinkerValidExtension).array; //Array already guarantee nothing is modified.
 }
 
 string[] getLibFiles(const string[] filesToLink)
@@ -314,7 +314,7 @@ string[] getLibFiles(const string[] filesToLink)
     import std.path;
     import std.array;
     import std.algorithm.iteration;
-    return cast(string[])filesToLink.filter!((name) => name.extension.isLibraryExtension).array; //Array already guarantee nothing is modified.
+    return cast(string[])filesToLink.filter!((string name) => extension(name).isLibraryExtension).array; //Array already guarantee nothing is modified.
 }
 
 BuildConfiguration getConfigurationFromLibsWithPkgConfig(string[] libs, out string[] modifiedFlagsFromPkgConfig)
