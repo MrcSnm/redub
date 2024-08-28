@@ -115,6 +115,12 @@ private void getProjectTreeImpl(
                     );
                 }
             }
+            else if(visitedDep.requirements.version_ != dep.version_)
+            {
+                // error("Found different versions to parse: ", visitedDep.name, " ", visitedDep.requirements.version_, "  vs ", dep.version_);
+                BuildRequirements depConfig = parseDependency(dep, node.requirements, info);
+                visitedDep.requirements = depConfig;
+            }
 
         }
         else
@@ -135,7 +141,7 @@ private void getProjectTreeImpl(
 private BuildRequirements parseDependency(Dependency dep, BuildRequirements parent, CompilationInfo info)
 {
     import redub.package_searching.cache;
-    vvlog("Parsing dependency ", dep.name, " with parent ", parent.name);
+    vvlog("Dependency ", dep.name, " ", dep.version_, " ", dep.pkgInfo.bestVersion, " with parent ", parent.name);
     BuildRequirements depReq = parseProject(dep.pkgInfo.path, info.compiler, info.arch, dep.subConfiguration, dep.subPackage, null, info.targetOS, info.isa);
     depReq.cfg.name = dep.fullName;
     return depReq;
