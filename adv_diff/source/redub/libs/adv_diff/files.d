@@ -1,4 +1,4 @@
-/** 
+/**
  * This module aims to provide a smart and optimized way to check cache and up to date checks.
  * It uses file times for initial comparison and if it fails, content hash is checked instead.
  * Beyond that, it also provides a cache composition formula.
@@ -28,12 +28,12 @@ struct AdvFile
 		import std.digest:toHexString;
 		output = JSONValue([JSONValue(timeModified), JSONValue(contentHash.toHexString)]);
 	}
-	/** 
+	/**
 	 * Specification:
 	 * [TIME_LONG, CONTENT_HASH]
 	 * Params:
-	 *   input = 
-	 * Returns: 
+	 *   input =
+	 * Returns:
 	 */
 	static AdvFile deserialize(JSONValue input)
 	{
@@ -62,12 +62,12 @@ struct AdvDirectory
 		output[dirName] = JSONValue([JSONValue(total.data.hi), JSONValue(total.data.lo), JSONValue(toHexString(contentHash)), dir]);
 	}
 
-	/** 
+	/**
 	 * Specification:
 	 * [$INT128_HI, $INT128_LOW, $CONTENT_HASH, {[FILENAME] : ADV_FILE_SPEC}]
 	 * Params:
-	 *   input = 
-	 * Returns: 
+	 *   input =
+	 * Returns:
 	 */
 	static AdvDirectory deserialize(JSONValue input)
 	{
@@ -83,7 +83,7 @@ struct AdvDirectory
 		{
 			files[fileName] = AdvFile.deserialize(advFile);
 		}
-		
+
 		return AdvDirectory(Int128(v[0].get!ulong, v[1].get!ulong), fromHexString(v[2].str), files);
 	}
 }
@@ -101,8 +101,11 @@ struct DirectoriesWithFilter
 		{
 			string ext = target.extension;
 			if(ext.length == 0 || ext.length > 3) return false;
-			if(ext[1] == 'd' && ext.length == 2) return true;
-			return ext[2] == 'i' && ext.length == 3;
+			if(ext[1] == 'd') {
+				return ext.length == 2 ||
+					(ext.length == 3 && ext[2] == 'i');
+			}
+			return false;
 		}
 		return true;
 	}
@@ -119,11 +122,11 @@ struct AdvCacheFormula
 	bool isEmptyFormula() const { return total == Int128(0, 0); }
 
 
-	
-	/** 
+
+	/**
 	* JSON specification:
 	* [$ADV_TOTAL_HI, $ADV_TOTAL_LO, {DIRS}, {FILES}]
-	* 
+	*
 	* Returns: AdvCacheFormula
 	*/
 	static AdvCacheFormula deserialize(JSONValue input)
@@ -151,7 +154,7 @@ struct AdvCacheFormula
 		JSONValue dirsJson = JSONValue.emptyObject;
 		foreach(string dirName, const AdvDirectory advDir; directories)
 			advDir.serialize(dirsJson, dirName);
-		
+
 		JSONValue filesJson = JSONValue.emptyObject;
 		foreach(string fileName, const AdvFile advFile; files)
 		{
@@ -162,7 +165,7 @@ struct AdvCacheFormula
 		output = JSONValue([JSONValue(total.data.hi), JSONValue(total.data.lo), dirsJson, filesJson]);
 	}
 
-	/** 
+	/**
 	 * It won't include hidden files in the formula
 	 * Params:
 	 *   contentHasher = Optional. If this input is given, it will read each file content and hash them
@@ -173,10 +176,10 @@ struct AdvCacheFormula
 	 * Returns: A completely new AdvCacheFormula which may reference or not the cacheHolder fields.
 	 */
 	static AdvCacheFormula make(DirRange, FileRange)(
-		ubyte[] function(ubyte[], ref ubyte[] output) contentHasher, 
+		ubyte[] function(ubyte[], ref ubyte[] output) contentHasher,
 		DirRange filteredDirectories,
-		FileRange files, 
-		const(AdvCacheFormula)* existing = null, 
+		FileRange files,
+		const(AdvCacheFormula)* existing = null,
 		AdvCacheFormula* cacheHolder = null
 	)
 	{
@@ -198,10 +201,10 @@ struct AdvCacheFormula
 				size_t fSize;
 				File f = File(url);
 				//Does not exists
-				if(!f.isOpen) 
+				if(!f.isOpen)
 				{
 					outputHash = null;
-					return false; 
+					return false;
 				}
 				fSize = f.size;
 				if(fSize > buffer.length)
@@ -297,7 +300,7 @@ struct AdvCacheFormula
 		return ret;
 	}
 
-	/** 
+	/**
 	 * Use this version when you want to store a significant amount of diffs while not allocating
 	 * any memory.
 	 * Params:
@@ -313,7 +316,7 @@ struct AdvCacheFormula
 		return ret;
 	}
 
-	/** 
+	/**
 	 * Since this function does not allocate memory, do not send an empty diff array if you wish to save how many
 	 * diffs there are.
 	 * Params:
@@ -327,8 +330,8 @@ struct AdvCacheFormula
 		if(other.total == total) return true;
 
 		static size_t diffFiles(
-			const ref AdvFile[string] filesOther, 
-			const ref AdvFile[string] files, 
+			const ref AdvFile[string] filesOther,
+			const ref AdvFile[string] files,
 			ref string[] diffs, size_t diffCount) @nogc
 		{
 			ptrdiff_t plainDiff = cast(ptrdiff_t)filesOther.length - cast(ptrdiff_t)files.length;
