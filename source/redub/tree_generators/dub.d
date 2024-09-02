@@ -22,6 +22,8 @@ struct CompilationInfo
  * does that recursively.
  * 
  * If a project with the same name is found, it is merged with its existing counterpart
+ *
+ * It also clears the jsonCache so it is better suited for a library
  * 
  * Params:
  *   req = Root project to build
@@ -30,6 +32,7 @@ struct CompilationInfo
  */
 ProjectNode getProjectTree(BuildRequirements req, CompilationInfo info)
 {
+    import redub.parsers.json;
     ProjectNode tree = new ProjectNode(req, false);
     string[string] subConfigs = req.getSubConfigurations;
     ProjectNode[string] visited;
@@ -37,6 +40,7 @@ ProjectNode getProjectTree(BuildRequirements req, CompilationInfo info)
     getProjectTreeImpl(queue, info, subConfigs, visited);
     detectCycle(tree);
     tree.finish(info.targetOS, info.isa);
+    clearJsonCache();
     return tree;
 }   
 

@@ -37,6 +37,7 @@ BuildRequirements parse(string filePath,
     return parse(parseJSONCached(filePath), c, isRoot);
 }
 
+
 private JSONValue[string] jsonCache;
 ///Optimization to be used when dealing with subPackages
 private JSONValue parseJSONCached(string filePath)
@@ -47,6 +48,11 @@ private JSONValue parseJSONCached(string filePath)
     if(jsonCache[filePath].hasErrorOccurred)
         throw new Exception(jsonCache[filePath].error);
     return jsonCache[filePath];
+}
+
+public void clearJsonCache()
+{
+    jsonCache = null;
 }
 
 
@@ -329,11 +335,16 @@ private JSONStringArray strArr(JSONValue target, string prop)
     return JSONStringArray();
 }
 
+enum OSExtension
+{
+    webAssembly = OS.unknown + 1
+}
+
 private bool isOS(string osRep)
 {
     switch(osRep)
     {
-        case "posix", "linux", "osx", "darwin", "windows", "freebsd", "netbsd", "openbsd", "dragonflybsd", "solaris", "watchos", "tvos", "ios": return true;
+        case "posix", "linux", "osx", "darwin", "windows", "freebsd", "netbsd", "openbsd", "dragonflybsd", "solaris", "watchos", "tvos", "ios", "webassembly": return true;
         default: return false;
     }
 }
@@ -357,6 +368,7 @@ private bool matchesArch(string archRep, ISA isa)
             throw new Exception("No appropriate switch clause found for architecture '"~archRep~"'");
     }
 }
+
 private bool matchesOS(string osRep, OS os)
 {
     switch(osRep) with(OS)
@@ -380,6 +392,7 @@ private bool matchesOS(string osRep, OS os)
         case "tvos": return os == tvOS;
         case "ios": return os == iOS;
         case "windows": return os == win32 || os == win64;
+        case "webassembly", "wasm": return cast(OSExtension)os == OSExtension.webAssembly;
         default: throw new Exception("No appropriate switch clause found for the OS '"~osRep~"'");
     }
 }

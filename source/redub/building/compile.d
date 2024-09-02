@@ -496,7 +496,10 @@ private bool doLink(ProjectNode root, OS os, Compiler compiler, string mainPackH
             updateCacheOnDisk(mainPackHash);
             return true;
         });
-        info("Wrote cache in ", result.msecs, "ms");
+        ///Ignore that message if it is not relevant enough [more than 5 ms]
+        if(result.msecs > 5)
+            info("Wrote cache in ", result.msecs, "ms");
+
     }
         
     return true;
