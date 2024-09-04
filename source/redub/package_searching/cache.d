@@ -22,6 +22,19 @@ PackageInfo* findPackage(string packageName, string packageVersion, string requi
     return packageName in packagesCache;
 }
 
+private string getBetterPackageInfo(PackageInfo* input, string packageName)
+{
+    string ret = packageName;
+    while(input != null)
+    {
+        if(input.requiredBy == null)
+            break;
+        ret = input.requiredBy~"->"~ret;
+        input = input.requiredBy in packagesCache;
+    }
+    return ret;
+}
+
 PackageInfo* findPackage(string packageName, string packageVersion, string requiredBy)
 {
     import redub.package_searching.dub;
@@ -46,7 +59,8 @@ PackageInfo* findPackage(string packageName, string packageVersion, string requi
                 error("Using ", pkg.path, " for package ", pkg.packageName);
             }
             else
-                throw new Exception("Package "~packageName~" with first requirement found '"~pkg.requiredVersion.toString~"' is not compatible with the new requirement: "~packageVersion);
+                throw new Exception("Package "~packageName~" with first requirement found '"~pkg.requiredVersion.toString~"' from the dependency '" ~
+                getBetterPackageInfo(pkg, packageName)~"' is not compatible with the new requirement: "~packageVersion ~ " required by "~requiredBy~ " ("~getBetterPackageInfo(requiredBy in packagesCache, requiredBy))~")";
         }
         vlog("Using ", packageName, " with version: ", pkg.bestVersion, ". Initial requirement was '", pkg.requiredVersion, ". Current is ", packageVersion);
         return pkg;
