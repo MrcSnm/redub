@@ -388,6 +388,7 @@ private bool copyFiles(ProjectNode root)
 {
     static import std.file;
     import redub.misc.hard_link;
+    import redub.misc.glob_entries;
     import std.path;
     string outputDir = root.requirements.cfg.outputDirectory;
     foreach(ProjectNode proj; root.collapse)
@@ -396,8 +397,9 @@ private bool copyFiles(ProjectNode root)
         if(files.length)
         {
             info("\tCopying files for project ", proj.name);
-            foreach(f; files)
+            foreach(filesSpec; files) foreach(e; globDirEntriesShallow(filesSpec))
             {
+                string f = e.name;
                 string inputPath;
                 string outputPath;
                 if(isAbsolute(f))
@@ -411,7 +413,8 @@ private bool copyFiles(ProjectNode root)
                     outputPath = buildNormalizedPath(outputDir, f);
                 }
                 vlog("\t\tCopying ", inputPath, " to ", outputPath);
-                if(!hardLinkFile(inputPath, outputPath, true))
+
+                if(!hardLink(inputPath, outputPath, true))
                 {
                     error("Could not copy file ", inputPath);
                     return false;

@@ -32,6 +32,8 @@ bool hardLinkFile(string from, string to, bool overwrite = false)
     import std.utf;
     if(!exists(from))
         throw new Exception("File "~from~ " does not exists. ");
+    if(!isFile(from))
+        throw new Exception("Input '"~from~"' is not a file. ");
     string toDir = dirName(to);
     if(!exists(toDir))
     {
@@ -86,4 +88,33 @@ bool hardLinkFile(string from, string to, bool overwrite = false)
         return false;
     }
     return true;
+}
+
+bool hardLinkDir(string dir, string to, bool overwrite = false)
+{
+    import std.exception;
+    import std.path;
+    import std.file;
+
+    foreach(DirEntry e; dirEntries(dir, SpanMode.depth))
+    {
+        if(e.isDir)
+            continue;
+        string output = buildNormalizedPath(to, e.name[dir.length+1..$]);
+        string outputDir = dirName(output);
+        if(!exists(outputDir))
+            mkdirRecurse(outputDir);
+
+        if(!hardLinkFile(e.name, output, overwrite))
+            return false;
+    }
+    return true;
+}
+
+bool hardLink(string input, string to, bool overwrite = false)
+{
+    import std.file;
+    if(isDir(input))
+        return hardLinkDir(input, to, overwrite);
+    return hardLinkFile(input, to, overwrite);
 }

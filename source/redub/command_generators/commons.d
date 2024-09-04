@@ -260,18 +260,12 @@ void putSourceFiles(
     import std.algorithm.searching;
     import std.exception;
     
-
-
-
-
-
     foreach(path; paths)
     {
         DirEntryLoop: foreach(DirEntry e; dirEntries(unescapePath(path), SpanMode.depth))
         {
-            import redub.misc.match_glob;
             foreach(exclusion; excludeFiles)
-                if(e.name.matchesGlob(exclusion))
+                if(e.name.globMatch(exclusion))
                     continue DirEntryLoop;
             if(isFileHidden(e) || e.isDir)
                 continue;
