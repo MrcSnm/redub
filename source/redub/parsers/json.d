@@ -83,7 +83,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
     BuildRequirements buildRequirements = getDefaultBuildRequirement(cfg);
 
     immutable static requirementsRun = [
-        "name": (ref BuildRequirements req, JSONValue v, ParseConfig c){setName(req, v.str, c);},
+        "name": (ref BuildRequirements req, JSONValue v, ParseConfig c){},
         "targetType": (ref BuildRequirements req, JSONValue v, ParseConfig c){setTargetType(req, v.str, c);},
         "targetPath": (ref BuildRequirements req, JSONValue v, ParseConfig c){setTargetPath(req, v.str, c);},
         "importPaths": (ref BuildRequirements req, JSONValue v, ParseConfig c){addImportPaths(req, v.strArr, c);},
@@ -191,14 +191,12 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
                 }
                 else if(value.type == JSONType.string) ///Version style
                     version_ = value.str;
+
                 if(isSubpackageDependency)
                 {
                     ///Match all dependencies which are subpackages should have the same version as the parent project.
                     if(SemVer(version_).isMatchAll())
-                    {
                         version_ = c.version_;
-                        redub.package_searching.cache.putPackageInCache(depName, version_, path);
-                    }
                 }
                 PackageInfo* info;
                 if(!path)
@@ -221,6 +219,8 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
         },
         "subPackages": (ref BuildRequirements req, JSONValue v, ParseConfig c){}
     ];
+
+
     if(cfg.subPackage)
     {
         enforce("name" in json, 
@@ -238,11 +238,34 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
         bool isSubpackageInPackage = false;
         foreach(JSONValue p; json["subPackages"].array)
         {
+            import std.path;
+            import std.exception;
+            import redub.package_searching.cache;
             enforce(p.type == JSONType.object || p.type == JSONType.string, "subPackages may only be either a string or an object");
-            if(p.type == JSONType.object) //subPackage is at same file
+            if(p.type == JSONType.object)
             {
                 const(JSONValue)* name = "name" in p;
                 enforce(name, "All subPackages entries must contain a name.");
+                redub.package_searching.cache.putPackageInCache(buildRequirements.cfg.name~":"~name.str, cfg.version_, cfg.workingDir);
+            }
+            else
+            {
+                string subPackagePath = p.str;
+                if(!std.path.isAbsolute(subPackagePath))
+                    subPackagePath = buildNormalizedPath(cfg.workingDir, subPackagePath);
+                enforce(std.file.isDir(subPackagePath),
+                    "subPackage path '"~subPackagePath~"' must be a directory "
+                );
+                string subPackageName = pathSplitter(subPackagePath).back;
+                redub.package_searching.cache.putPackageInCache(buildRequirements.cfg.name~":"~subPackageName, cfg.version_, cfg.workingDir);
+            }
+        }
+
+        foreach(JSONValue p; json["subPackages"].array)
+        {
+            if(p.type == JSONType.object) //subPackage is at same file
+            {
+                const(JSONValue)* name = "name" in p;
                 if(name.str == cfg.subPackage)
                     return parse(p, ParseConfig(cfg.workingDir, cfg.subConfiguration, null, cfg.version_, cfg.compiler, cfg.arch, cfg.targetOS, cfg.isa, cfg.requiredBy, true, true));
             }
@@ -253,9 +276,6 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
                 string subPackagePath = p.str;
                 if(!std.path.isAbsolute(subPackagePath))
                     subPackagePath = buildNormalizedPath(cfg.workingDir, subPackagePath);
-                enforce(std.file.isDir(subPackagePath), 
-                    "subPackage path '"~subPackagePath~"' must be a directory "
-                );
                 string subPackageName = pathSplitter(subPackagePath).back;
                 if(subPackageName == cfg.subPackage)
                 {

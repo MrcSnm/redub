@@ -11,14 +11,22 @@ struct ParseConfig
 {
     string workingDir;
     BuildRequirements.Configuration subConfiguration;
+    ///Which subPackage to parse
     string subPackage;
+    ///Which version this is
     string version_ = "~master";
+    ///Filter for Compiler
     string compiler;
+    ///Filter for Arch
     string arch;
+    ///Filter for OS
     OS targetOS;
+    ///Filter for ISA
     ISA isa;
     string requiredBy;
+    ///When first run is equals false, it won't do anything at "configurations"
     bool firstRun = true;
+    ///When preGenerateRun is true, it will run the preGenerateRun
     bool preGenerateRun = true;
     bool isRoot = false;
 }

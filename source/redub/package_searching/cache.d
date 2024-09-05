@@ -60,7 +60,7 @@ PackageInfo* findPackage(string packageName, string packageVersion, string requi
             }
             else
                 throw new Exception("Package "~packageName~" with first requirement found '"~pkg.requiredVersion.toString~"' from the dependency '" ~
-                getBetterPackageInfo(pkg, packageName)~"' is not compatible with the new requirement: "~packageVersion ~ " required by "~requiredBy~ " ("~getBetterPackageInfo(requiredBy in packagesCache, requiredBy))~")";
+                getBetterPackageInfo(pkg, packageName)~"' is not compatible with the new requirement: "~packageVersion ~ " required by "~requiredBy~ " ("~getBetterPackageInfo(requiredBy in packagesCache, requiredBy)~")");
         }
         vlog("Using ", packageName, " with version: ", pkg.bestVersion, ". Initial requirement was '", pkg.requiredVersion, ". Current is ", packageVersion);
         return pkg;
