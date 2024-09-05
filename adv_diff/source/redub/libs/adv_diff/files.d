@@ -338,8 +338,7 @@ struct AdvCacheFormula
 			if(plainDiff != 0)
 			{
 				if(plainDiff < 0) plainDiff*= -1;
-				diffCount = cast(size_t)plainDiff;
-				return diffCount;
+				return diffCount + cast(size_t)plainDiff;
 			}
 			foreach(fileName, otherAdv; filesOther)
 			{
@@ -356,7 +355,6 @@ struct AdvCacheFormula
 		}
 
 		diffCount = diffFiles(other.files, files, diffs, diffCount);
-
 		foreach(dirName, otherAdvDir; other.directories)
 		{
 			const(AdvDirectory)* advDir = dirName in directories;
@@ -368,7 +366,7 @@ struct AdvCacheFormula
 			}
 			else
 			{
-				if(otherAdvDir.total != advDir.total && otherAdvDir.contentHash != advDir.contentHash)
+				if(otherAdvDir.total != advDir.total || otherAdvDir.contentHash != advDir.contentHash)
 				{
 					//If directory total is different, check per file
 					diffCount = diffFiles(otherAdvDir.files, advDir.files, diffs, diffCount);
