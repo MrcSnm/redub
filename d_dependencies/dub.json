@@ -1,0 +1,25 @@
+{
+	"authors": [
+		"Marcelo"
+	],
+	"dflags": [
+		"-deps=simports/deps_file"
+	],
+	"configurations": [
+		{
+			"name": "library",
+			"targetType": "library"
+		},
+		{
+			"name": "test",
+			"stringImportPaths": [
+				"simports"
+			],
+			"targetType": "executable"
+		}
+	],
+	"copyright": "Copyright © 2024, Marcelo",
+	"description": "A minimal D application.",
+	"license": "proprietary",
+	"name": "d_dependencies"
+}

@@ -1,0 +1,16 @@
+.dub
+docs.json
+__dummy.html
+docs/
+/d_dependencies
+d_dependencies.so
+d_dependencies.dylib
+d_dependencies.dll
+d_dependencies.a
+d_dependencies.lib
+d_dependencies-test-*
+*.exe
+*.pdb
+*.o
+*.obj
+*.lst
