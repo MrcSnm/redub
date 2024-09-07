@@ -334,12 +334,6 @@ struct AdvCacheFormula
 			const ref AdvFile[string] files,
 			ref string[] diffs, size_t diffCount) @nogc
 		{
-			ptrdiff_t plainDiff = cast(ptrdiff_t)filesOther.length - cast(ptrdiff_t)files.length;
-			if(plainDiff != 0)
-			{
-				if(plainDiff < 0) plainDiff*= -1;
-				return diffCount + cast(size_t)plainDiff;
-			}
 			foreach(fileName, otherAdv; filesOther)
 			{
 				const(AdvFile)* advFile = fileName in files;
@@ -347,9 +341,15 @@ struct AdvCacheFormula
 				otherAdv.contentHash != advFile.contentHash))
 				{
 					if(diffCount + 1 < diffs.length)
-						diffs[diffCount] = fileName;
-					diffCount++;
+						diffs[diffCount++] = fileName;
 				}
+			}
+			ptrdiff_t plainDiff = cast(ptrdiff_t)filesOther.length - cast(ptrdiff_t)files.length;
+			if(plainDiff < 0)
+			{
+				foreach(fileName, currAdv; files)
+					if(diffCount + 1 < diffs.length && !(fileName in filesOther))
+						diffs[diffCount++] = fileName;
 			}
 			return diffCount;
 		}
@@ -361,8 +361,7 @@ struct AdvCacheFormula
 			if(advDir is null)
 			{
 				if(diffCount + 1 < diffs.length)
-					diffs[diffCount] = dirName;
-				diffCount++;
+					diffs[diffCount++] = dirName;
 			}
 			else
 			{

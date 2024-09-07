@@ -150,6 +150,7 @@ string dmdFlags(ValidDFlags flag)
         case compileOnly: return "-c";
         case arch: throw new Exception("arch not supported by dmd.");
         case preserveNames: return "-op";
+        case deps: return "-deps";
     }
 }
 
@@ -182,6 +183,7 @@ string ldcFlags(ValidDFlags flag)
         case compileOnly: return "-c";
         case arch: return "--mtriple=";
         case preserveNames: return "--oq";
+        case deps: return "--deps";
     }
 }
 
@@ -268,5 +270,6 @@ enum ValidDFlags
     buildAsShared,
     compileOnly,
     arch,
-    preserveNames
+    preserveNames,
+    deps
 }

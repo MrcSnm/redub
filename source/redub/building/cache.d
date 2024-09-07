@@ -95,12 +95,13 @@ struct CompilationCache
      *   cache = Optional argument which stores precalculated results
      * Returns: isCompilationUpToDate
      */
-    bool isCompilationUpToDate(const BuildRequirements req, Compiler compiler, OS target, AdvCacheFormula* preprocessed) const
+    bool isCompilationUpToDate(const BuildRequirements req, Compiler compiler, OS target, AdvCacheFormula* preprocessed, out string[64] diffs, out size_t diffCount) const
     {
+        if(requirementCache != hashFrom(req, compiler, false))
+            return false;
         AdvCacheFormula otherFormula = getCompilationCacheFormula(req, target, &formula, preprocessed);
-        size_t diffCount;
-        string[64] diffs = formula.diffStatus(otherFormula, diffCount);
-        return requirementCache == hashFrom(req, compiler, false) && diffCount == 0;
+        diffs = formula.diffStatus(otherFormula, diffCount);
+        return diffCount == 0;
     }
 
     /**
@@ -114,6 +115,8 @@ struct CompilationCache
      */
     bool needsNewCopy(const BuildRequirements req, Compiler compiler, OS target, AdvCacheFormula* preprocessed) const
     {
+        if(copyFormula.isEmptyFormula)
+            return false;
         AdvCacheFormula otherFormula = getCopyCacheFormula(rootHash, req, compiler, target, &formula, preprocessed);
         size_t diffCount;
         string[64] diffs = copyFormula.diffStatus(otherFormula, diffCount);
@@ -151,6 +154,10 @@ void invalidateCaches(ProjectNode root, Compiler compiler, OS target)
     ptrdiff_t i = cacheStatus.length;
     AdvCacheFormula preprocessed;
 
+    string[64] dirtyFiles;
+    size_t dirtyCount;
+
+
     foreach_reverse (ProjectNode n; root.collapse)
     {
         --i;
@@ -159,10 +166,9 @@ void invalidateCaches(ProjectNode root, Compiler compiler, OS target)
         if(cacheStatus[i].needsNewCopy(n.requirements, compiler, target, &preprocessed))
             n.setCopyEnough();
 
-        if (!cacheStatus[i].isCompilationUpToDate(n.requirements, compiler, target, &preprocessed))
+        if (!cacheStatus[i].isCompilationUpToDate(n.requirements, compiler, target, &preprocessed, dirtyFiles, dirtyCount))
         {
-            import redub.logging;
-            vlog("Project ", n.name, " requires rebuild.");
+            n.setFilesDirty(dirtyFiles[0..dirtyCount]);
             n.invalidateCache();
         }
     }

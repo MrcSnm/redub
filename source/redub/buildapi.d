@@ -6,7 +6,7 @@ import redub.logging;
 import redub.package_searching.api;
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.9.11";
+enum RedubVersionOnly = "v1.9.12";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -642,6 +642,7 @@ class ProjectNode
     private bool needsCopyOnly = false;
     private ProjectNode[] collapsedRef;
     private bool _isOptional = false;
+    private string[] dirtyFiles;
 
     string name() const { return requirements.name; }
 
@@ -947,6 +948,14 @@ class ProjectNode
     void setCopyEnough()
     {
         needsCopyOnly = true;
+    }
+
+    void setFilesDirty(const string[] files)
+    {
+        import redub.logging;
+        if(hasLogLevel(LogLevel.verbose))
+            warnTitle("Project "~ name ~ " Dirty Files: ", files);
+        this.dirtyFiles = files.dup;
     }
 
     ///Invalidates self and parent caches
