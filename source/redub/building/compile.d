@@ -58,6 +58,7 @@ private auto execCompiler(const BuildConfiguration cfg, string compilerBin, stri
     if(std.system.os.isWindows && isDCompiler)
     {
         string cmdFile = createCommandFile(cfg, compileFlags, compilationCommands);
+        compilationCommands = compilerBin ~ " "~compilationCommands;
         scope(exit)
             std.file.remove(cmdFile);
         return executeShell(compilerBin~ " @"~cmdFile, null, Config.none, size_t.max, cfg.workingDir);

@@ -173,7 +173,6 @@ ProjectDetails buildProject(ProjectDetails d)
             case ParallelType.no:
                 info("Project ", tree.name," is single dependency, performing single threaded build");
                 return buildProjectSingleThread(tree, d.compiler, targetOS);
-                break;
             default: 
                 throw new Exception(`Unsupported parallel type in this step.`);
         }
