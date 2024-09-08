@@ -11,7 +11,9 @@ string[] parseBuildConfiguration(AcceptedCompiler comp, const BuildConfiguration
     string function(ValidDFlags) mapper = getFlagMapper(comp);
 
     
-    string[] commands = [mapper(ValidDFlags.enableColor), mapper(ValidDFlags.preserveNames)];
+    string[] commands = [mapper(ValidDFlags.enableColor)];
+    string preserve = mapper(ValidDFlags.preserveNames);
+    if(preserve) commands ~= preserve;
     with(b)
     {
         commands~= dFlags;
@@ -29,7 +31,10 @@ string[] parseBuildConfiguration(AcceptedCompiler comp, const BuildConfiguration
 
         commands = mapAppendPrefix(commands, stringImportPaths, mapper(ValidDFlags.stringImportPaths), true);
 
-        putSourceFiles(commands, workingDir, sourcePaths, sourceFiles, excludeSourceFiles, ".d");
+        if(changedBuildFiles.length)
+            commands~= changedBuildFiles;
+        else 
+            putSourceFiles(commands, workingDir, sourcePaths, sourceFiles, excludeSourceFiles, ".d");
 
         string arch = mapArch(comp, b.arch);
         if(arch)
@@ -42,9 +47,14 @@ string[] parseBuildConfiguration(AcceptedCompiler comp, const BuildConfiguration
         else if(targetType == TargetType.dynamicLibrary)
             commands~= mapper(ValidDFlags.buildAsShared);
 
-        commands~= mapper(ValidDFlags.objectDir)~getObjectDir(b.workingDir).escapePath;
+        string cacheDir = getCacheOutputDir(mainPackhash, b, compiler, os);
 
-        commands~= mapper(ValidDFlags.outputFile) ~ buildNormalizedPath(getCacheOutputDir(mainPackhash, b, compiler, target), getConfigurationOutputName(b, target)).escapePath;
+        commands~= mapper(ValidDFlags.objectDir)~getObjectDir(cacheDir).escapePath;
+        if(!b.outputsDeps)
+            commands~= mapper(ValidDFlags.outputFile) ~ buildNormalizedPath(cacheDir, getConfigurationOutputName(b, target)).escapePath;
+
+        if(b.outputsDeps)
+            commands~= mapper(ValidDFlags.deps) ~ (buildNormalizedPath(cacheDir)~".deps").escapePath;
         // commands~= mapper(ValidDFlags.outputFile) ~ getConfigurationOutputPath(b, target).escapePath;
 
     }
@@ -150,7 +160,7 @@ string dmdFlags(ValidDFlags flag)
         case compileOnly: return "-c";
         case arch: throw new Exception("arch not supported by dmd.");
         case preserveNames: return "-op";
-        case deps: return "-deps";
+        case deps: return "-deps=";
     }
 }
 
@@ -183,7 +193,7 @@ string ldcFlags(ValidDFlags flag)
         case compileOnly: return "-c";
         case arch: return "--mtriple=";
         case preserveNames: return "--oq";
-        case deps: return "--deps";
+        case deps: return "--deps=";
     }
 }
 

@@ -157,7 +157,6 @@ void invalidateCaches(ProjectNode root, Compiler compiler, OS target)
     string[64] dirtyFiles;
     size_t dirtyCount;
 
-
     foreach_reverse (ProjectNode n; root.collapse)
     {
         --i;

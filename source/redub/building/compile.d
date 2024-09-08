@@ -111,6 +111,11 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
                 ret = executeShell(res.compilationCommand, null, Config.none, size_t.max, cfg.workingDir);
             }
 
+            //For working around bug 3541, 24748, dmd generates .obj files besides files, redub will move them out
+            //of there to the object directory
+            if(cfg.outputsDeps && cfg.preservePath && compiler.compiler == AcceptedCompiler.dmd)
+                moveGeneratedObjectFiles(cfg.sourcePaths, cfg.sourceFiles, cfg.excludeSourceFiles, getObjectDir(inDir),getObjectExtension(os));
+
             if(!isDCompiler(compiler) && !ret.status) //Always requires link.
             {
                 CompilationResult linkRes = link(cast()pack, cache.requirementCache, data, os, compiler, env);

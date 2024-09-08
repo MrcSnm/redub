@@ -66,7 +66,8 @@ class ModuleParsing
 			if(mod == null)
 				continue;
 			visited[filePath] = true;
-			findDependeesImpl(mod, ret, visited);			
+			ret~= *mod;
+			findDependeesImpl(mod, ret, visited);	
 		}
 		return ret;
 		

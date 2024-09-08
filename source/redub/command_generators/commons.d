@@ -41,17 +41,14 @@ ISA isaFromArch(string arch)
 }
 
 
-string getObjectDir(string projWorkingDir)
+string getObjectDir(string cacheDir)
 {
     import std.path;
     import std.file;
 
-    static string objDir;
-    if(objDir is null)
-    {
-        objDir = buildNormalizedPath(tempDir, ".redub");
-        if(!exists(objDir)) mkdirRecurse(objDir);
-    }
+    string objDir = buildNormalizedPath(cacheDir, "..", "obj/");
+    if(!exists(objDir)) 
+        mkdirRecurse(objDir);
     return objDir;
 }
 
@@ -87,6 +84,18 @@ string getConfigurationOutputName(const BuildConfiguration conf, OS os)
             return getOutputName(targetType, name, os);
         return name~getObjectExtension(os);
     }
+}
+
+string getDepsFilePath(ProjectNode root, Compiler compiler, OS os)
+{
+    import redub.building.cache;
+    string packHash = hashFrom(root.requirements, compiler);
+    return getDepsFilePath(getCacheOutputDir(packHash, root.requirements.cfg, compiler, os));
+}
+
+string getDepsFilePath(string cacheDir)
+{
+    return cacheDir~".deps";
 }
 
 
@@ -279,6 +288,8 @@ void putSourceFiles(
             }
         }
     }
+    if(files.length == 0)
+        return;
     size_t length = output.length;
     output.length+= files.length;
     foreach(i, file; files)
@@ -292,6 +303,47 @@ void putSourceFiles(
             );
         }
         output[length+i] = escapePath(file);
+    }
+}
+
+///DMD only when using -op
+void moveGeneratedObjectFiles(
+    const string[] paths, 
+    const string[] files, 
+    const string[] excludeFiles,
+    string moveDir,
+    string extension
+)
+{
+    import std.file;
+    import std.path;
+    import std.string:endsWith;
+    import std.algorithm.searching;
+    import std.exception;
+    foreach(path; paths)
+    {
+        string basePath = unescapePath(path);
+        DirEntryLoop: foreach(DirEntry e; dirEntries(basePath, SpanMode.depth))
+        {
+            foreach(exclusion; excludeFiles)
+                if(e.name.globMatch(exclusion))
+                    continue DirEntryLoop;
+            if(isFileHidden(e) || e.isDir)
+                continue;
+            if(e.name.endsWith(extension))
+            {
+                string targetPath = buildNormalizedPath(moveDir, e.name[basePath.length+1..$]);
+                string targetDir = dirName(targetPath);
+                if(!exists(targetDir))
+                    mkdirRecurse(targetDir);
+                rename(e.name, targetPath);
+            }
+        }
+    }
+    foreach(i, file; files)
+    {
+        string targetPath = buildNormalizedPath(moveDir, baseName(setExtension(file, extension)));
+        rename(file, targetPath);
     }
 }
 

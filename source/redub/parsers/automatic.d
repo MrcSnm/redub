@@ -55,6 +55,8 @@ BuildRequirements parseProject(
     redub.parsers.environment.setupEnvironmentVariablesForPackage(req.cfg);
     req.cfg = redub.parsers.environment.parseEnvironment(req.cfg);
     req.cfg.arch = arch;
+    if(isRoot)
+        req.cfg.outputsDeps = true;
 
     partiallyFinishBuildRequirements(req);
     

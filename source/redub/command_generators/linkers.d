@@ -20,8 +20,13 @@ string[] parseLinkConfiguration(const ThreadBuildData data, OS target, Compiler 
 
             if (targetType.isLinkedSeparately)
             {
-                commands~= "-of"~buildNormalizedPath(getCacheOutputDir(requirementCache, b, compiler, target), getOutputName(b, target)).escapePath;
-                commands~= buildNormalizedPath(outputDirectory, name~getObjectExtension(target));
+                string cacheDir = getCacheOutputDir(requirementCache, b, compiler, os);
+                string objExtension = getObjectExtension(target);
+                commands~= "-of"~buildNormalizedPath(cacheDir, getOutputName(b, target)).escapePath;
+                if(b.outputsDeps)
+                    putSourceFiles(commands, null, [getObjectDir(cacheDir)], null, null, objExtension);
+                else
+                    commands~= buildNormalizedPath(outputDirectory, name~objExtension);
             }
             string arch = mapArch(compiler.compiler, b.arch);
             if(arch)
@@ -46,7 +51,7 @@ string[] parseLinkConfiguration(const ThreadBuildData data, OS target, Compiler 
             commands~= "--format=default";
             commands~= "rcs";
             commands~= buildNormalizedPath(outputDirectory, getOutputName(b, target));
-            putObjectFiles(commands, b, target);
+            putObjectFiles(commands, b, target, ".c", ".cpp", ".cc", ".i", ".cxx", ".c++");
         }
     }
 
@@ -114,11 +119,11 @@ string getTargetTypeFlag(TargetType o, Compiler compiler)
 }
 
 
-private void putObjectFiles(ref string[] target, const BuildConfiguration b, OS os)
+private void putObjectFiles(ref string[] target, const BuildConfiguration b, OS os, scope const string[] extensions...)
 {
     import std.file;
     import std.path;
     string[] objectFiles;
-    putSourceFiles(objectFiles, b.workingDir, b.sourcePaths, b.sourceFiles, b.excludeSourceFiles, ".c", ".cpp", ".cc", ".i", ".cxx", ".c++");
+    putSourceFiles(objectFiles, b.workingDir, b.sourcePaths, b.sourceFiles, b.excludeSourceFiles, extensions);
     target = mapAppend(target, objectFiles, (string src) => setExtension(src, getObjectExtension(os)));
 }

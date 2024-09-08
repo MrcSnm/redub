@@ -6,7 +6,7 @@ import redub.logging;
 import redub.package_searching.api;
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.9.12";
+enum RedubVersionOnly = "v1.10.0";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -110,7 +110,14 @@ struct BuildConfiguration
     string[] preBuildCommands;
     string[] postBuildCommands;
     string sourceEntryPoint;
+
+    ///When having those files, the build will use them instead of sourcePaths + sourceFiles
+    @cacheExclude string[] changedBuildFiles;
     @cacheExclude string outputDirectory;
+    ///Whenever present, --deps= will be pased to the compiler for using advanced compilation mode
+    @cacheExclude bool outputsDeps;
+    ///Uses --oq on ldc, -op on dmd (rename+move while bug exists)
+    @cacheExclude bool preservePath = true;
     string workingDir;
     string arch;
     TargetType targetType;
@@ -957,6 +964,7 @@ class ProjectNode
             warnTitle("Project "~ name ~ " Dirty Files: ", files);
         this.dirtyFiles = files.dup;
     }
+    const(string[]) getDirtyFiles() const { return cast(const)this.dirtyFiles; }
 
     ///Invalidates self and parent caches
     void invalidateCache()

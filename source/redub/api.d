@@ -97,6 +97,36 @@ ParallelType inferParallel(ProjectDetails d)
     return d.parallelType;
 }
 
+/** 
+ * Unchanged Files can't deal with directories at that moment.
+ * Params:
+ *   root = The root of the project
+ */
+string[] getChangedBuildFiles(ProjectNode root, Compiler compiler, OS os)
+{
+    import std.file;
+    import std.path;
+    import redub.command_generators.commons;
+    if(!root.isRoot)
+        throw new Exception("Can only exclude unchanged files from root at this moment.");
+
+    string depsPath = getDepsFilePath(root, compiler, os);
+    if(!exists(depsPath))
+        return null;
+    import d_depedencies;
+    ModuleParsing moduleParse = parseDependencies(std.file.readText(depsPath), 
+        buildNormalizedPath("/Library/D/dmd")
+    );
+
+    import std.algorithm.iteration;
+    import std.array : array;
+    const string[] dirtyFiles = filter!((string f) => !f.isDir)(root.getDirtyFiles()).array;
+    string[] buildFiles = map!((ModuleDef def) => def.modPath)(moduleParse.findDependees(dirtyFiles)).array;
+    if(hasLogLevel(LogLevel.info))
+        warnTitle("Project files to rebuild: ", buildFiles);
+    return buildFiles;
+}
+
 
 ProjectDetails buildProject(ProjectDetails d)
 {
@@ -112,9 +142,9 @@ ProjectDetails buildProject(ProjectDetails d)
         d.tree.invalidateCacheOnTree();
     else
         invalidateCaches(d.tree, d.compiler, osFromArch(d.cDetails.arch));
-
     ProjectNode tree = d.tree;
     OS targetOS = osFromArch(tree.requirements.cfg.arch);
+    tree.requirements.cfg.changedBuildFiles = getChangedBuildFiles(tree, d.compiler, targetOS);;
     startHandlingConsoleControl();
 
     ParallelType parallel = inferParallel(d);
