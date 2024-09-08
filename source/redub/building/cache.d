@@ -217,9 +217,9 @@ string hashFrom(const BuildConfiguration cfg, Compiler compiler, bool isRoot = t
     static foreach (i, v; BuildConfiguration.tupleof)
     {
         {
-
-            bool isExcludedFromRoot = attrIncludesUDA!(cacheExclude, __traits(getAttributes, v));
-            if (!isRoot || (isRoot && !isExcludedFromRoot))
+            bool isExcluded = attrIncludesUDA!(cacheExclude, __traits(getAttributes, v));
+            bool isExcludedFromRoot = attrIncludesUDA!(excludeRoot, __traits(getAttributes, v));
+            if (!(isExcluded || (isRoot && isExcludedFromRoot)))
             {
                 static if (is(typeof(v) == string))
                     xxh.put(cast(ubyte[]) cfg.tupleof[i]);

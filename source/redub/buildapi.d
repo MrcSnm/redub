@@ -86,6 +86,7 @@ TargetType targetFrom(string s)
     return ret;
 }
 
+enum excludeRoot;
 enum cacheExclude;
 
 struct BuildConfiguration
@@ -113,7 +114,7 @@ struct BuildConfiguration
 
     ///When having those files, the build will use them instead of sourcePaths + sourceFiles
     @cacheExclude string[] changedBuildFiles;
-    @cacheExclude string outputDirectory;
+    @excludeRoot string outputDirectory;
     ///Whenever present, --deps= will be pased to the compiler for using advanced compilation mode
     @cacheExclude bool outputsDeps;
     ///Uses --oq on ldc, -op on dmd (rename+move while bug exists)
