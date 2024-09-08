@@ -51,6 +51,7 @@ string[] parseBuildConfiguration(AcceptedCompiler comp, const BuildConfiguration
 
         if(b.outputsDeps)
             commands~= mapper(ValidDFlags.objectDir)~getObjectDir(cacheDir).escapePath;
+
         if(!b.outputsDeps)
             commands~= mapper(ValidDFlags.outputFile) ~ buildNormalizedPath(cacheDir, getConfigurationOutputName(b, target)).escapePath;
 

@@ -314,7 +314,7 @@ ProjectDetails resolveDependencies(string[] args)
         warn(RedubVersionShort~ " does not handle --single. Forwarding '"~dubCommand~"' to dub with working dir "~cwd);
 
         int status = wait(spawnShell(dubCommand, stdin, stdout, stderr, environment.toAA, Config.none, cwd));
-        return ProjectDetails(null, Compiler.init, ParallelType.auto_, CompilationDetails.init, true, status);
+        return ProjectDetails(null, Compiler.init, ParallelType.auto_, CompilationDetails.init, false, true, status);
     }
 
     if(bArgs.arch) bArgs.compiler = "ldc2";
@@ -331,7 +331,7 @@ ProjectDetails resolveDependencies(string[] args)
     ProjectDetails ret =  redub.api.resolveDependencies(
         bArgs.build.force,
         os,
-        CompilationDetails(bArgs.compiler, bArgs.arch, bArgs.compilerAssumption, bArgs.build.incremental, bArgs.build.combined, bArgs.build.parallel),
+        CompilationDetails(bArgs.compiler, bArgs.arch, bArgs.compilerAssumption, bArgs.build.incremental, bArgs.build.useExistingObj, bArgs.build.combined, bArgs.build.parallel),
         ProjectToParse(bArgs.config, workingDir, subPackage, recipe),
         getInitialDubVariablesFromArguments(bArgs, DubBuildArguments.init, os, args),
         bt

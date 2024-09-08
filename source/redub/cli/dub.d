@@ -27,7 +27,7 @@ enum ParallelType
     no = "no"
 }
 
-enum IncrementalInfer
+enum Inference
 {
     auto_ = "auto",
     off = "off",
@@ -223,7 +223,7 @@ struct DubBuildArguments
     @("Build incrementally. This usually works on a case basis, so for you case, disabling it might make it faster."~ 
     "It is inferred to be incremental when dependencies count >= 3. Supports |auto|on|off|")
     @("incremental")
-    IncrementalInfer incremental;
+    Inference incremental;
 
     @("Build parallelization type. Supported options are |auto|full|leaves|no|. Default being auto. Full will attempt "~ 
     " to build every dependency at the same time. Leaves will build in parallel the dependencies that has no dependency. No will "~
@@ -231,6 +231,15 @@ struct DubBuildArguments
     )
     @("parallel")
     ParallelType parallel;
+
+    @(
+        "Whether or not to use existing .obj/.o files on the root build. Supported options are |auto|on|off. "~
+        "Based on tests, it can bring faster compilation when your package is not using libraries. "~
+        "Auto will deactivate existing objects when your package has any lib dependencies, while keep it active when " ~
+        "no dependency is there"
+    )
+    @("use-existing-obj")
+    Inference useExistingObj;
 
     @("Tries to build the whole project in a single compiler run")
     bool combined;

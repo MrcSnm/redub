@@ -15,6 +15,7 @@ struct ProjectDetails
     Compiler compiler;
     ParallelType parallelType;
     CompilationDetails cDetails;
+    bool useExistingObjFiles;
     ///Makes the return code 0 for when using print commands.
     bool printOnly;
     int externalErrorCode = int.min;
@@ -47,7 +48,9 @@ struct CompilationDetails
     ///Assumption to make dependency resolution slightly faster
     string assumption;
     ///Makes the build incremental or not
-    IncrementalInfer incremental;
+    Inference incremental;
+    ///Makes the build use existing files
+    Inference useExistingObj;
     ///Whether the build should force single project
     bool combinedBuild;
     ///Whether the build should be fully parallel, simple, no or inferred
@@ -149,15 +152,13 @@ ProjectDetails buildProject(ProjectDetails d)
         invalidateCaches(d.tree, d.compiler, osFromArch(d.cDetails.arch));
     ProjectNode tree = d.tree;
     OS targetOS = osFromArch(tree.requirements.cfg.arch);
-    tree.requirements.cfg.changedBuildFiles = getChangedBuildFiles(tree, d.compiler, targetOS);;
+    if(d.useExistingObjFiles)
+        tree.requirements.cfg.changedBuildFiles = getChangedBuildFiles(tree, d.compiler, targetOS);;
     startHandlingConsoleControl();
-
-    ParallelType parallel = inferParallel(d);
 
     auto result = timed(()
     {
-
-        switch(parallel)
+        switch(inferParallel(d))
         {
             case ParallelType.full:
                 info("Project ", tree.name," is fully parallelizable! Will build everything at the same time");
@@ -255,7 +256,7 @@ ProjectDetails resolveDependencies(
 
     import redub.libs.colorize;    
     infos("Dependencies resolved ", "in ", (st.peek.total!"msecs"), " ms for \"", color(buildType, fg.magenta),"\" using ", compiler.binOrPath, " [", cInfo.targetOS, "-", cInfo.isa, "]");
-    return ProjectDetails(tree, compiler, cDetails.parallelType, cDetails, false, 0, invalidateCache);
+    return ProjectDetails(tree, compiler, cDetails.parallelType, cDetails, shouldUseExistingObj(cDetails.useExistingObj, tree), false, 0, invalidateCache);
 }
 
 
@@ -266,13 +267,29 @@ ProjectDetails resolveDependencies(
  *   tree = The tree to find compilation units 
  * Returns: 
  */
-bool isIncremental(IncrementalInfer incremental, ProjectNode tree)
+bool isIncremental(Inference incremental, ProjectNode tree)
 {
     final switch(incremental)
     {
-        case IncrementalInfer.auto_: return tree.collapse.length < 3;
-        case IncrementalInfer.on: return true;
-        case IncrementalInfer.off: return false;
+        case Inference.auto_: return tree.collapse.length < 3;
+        case Inference.on: return true;
+        case Inference.off: return false;
+    }
+}
+/**
+ *
+ * Params:
+ *   inf = If auto, it will disable inf when having a single compilation unit
+ *   tree = The tree to find compilation units
+ * Returns:
+ */
+bool shouldUseExistingObj(Inference inf, ProjectNode tree)
+{
+    final switch(inf)
+    {
+        case Inference.auto_: return tree.collapse.length == 1;
+        case Inference.on: return true;
+        case Inference.off: return false;
     }
 }
 
