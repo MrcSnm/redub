@@ -1,3 +1,5 @@
+module d_depedencies;
+
 struct ModuleDef
 {
 	string modName;
@@ -5,7 +7,7 @@ struct ModuleDef
 	ModuleDef[string] importedBy;
 	ModuleDef[string] imports;
 
-	void addImport(ref ModuleDef imported)
+	package void addImport(ref ModuleDef imported)
 	{
 		imported.importedBy[modPath] = this;
 		imports[imported.modPath] = imported;
@@ -37,21 +39,15 @@ class ModuleParsing
 		}
 		return ret;
 	}
-	ModuleDef[] findDependees(string filePath)
+	ModuleDef[] findDependees(const string[] filesPath)
 	{
 		bool[string] visited;
-		return findDependees(filePath, visited);
+		return findDependees(filesPath, visited);
 	}
 
-	ModuleDef[] findDependees(string filePath, ref bool[string] visited)
+	ModuleDef[] findDependees(const string[] filesPath, ref bool[string] visited)
 	{
-		ModuleDef* mod = filePath in allModules;
-		if(mod == null)
-			return null;
-		visited[filePath] = true;
-
 		ModuleDef[] ret;
-
 		static void findDependeesImpl(ModuleDef* input, ref ModuleDef[] ret, ref bool[string] visited)
 		{
 			foreach(modPath, ref modDef; input.importedBy)
@@ -64,15 +60,22 @@ class ModuleParsing
 				}
 			}
 		}
-
-		findDependeesImpl(mod, ret, visited);
+		foreach(filePath; filesPath)
+		{
+			ModuleDef* mod = filePath in allModules;
+			if(mod == null)
+				continue;
+			visited[filePath] = true;
+			findDependeesImpl(mod, ret, visited);			
+		}
 		return ret;
+		
 	}
 }
 
 
 
-void put(Q, T)(Q range, scope T[] args ...) if(is(T == U*, U))
+private void put(Q, T)(Q range, scope T[] args ...) if(is(T == U*, U))
 {
     int i = 0;
     foreach(v; range)
