@@ -121,14 +121,37 @@ ModuleParsing parseDependencies(string deps, immutable scope string[] exclude...
 			continue outer;
 
 		///(moduleName) (modulePath) (:) (private/public/string) (:) (importedName) ((importedPath)
-		string modName, modPath, importType, importedName, importedPath;
-		put(splitter(line," "), &modName, &modPath, null, &importType, null, &importedName, &importedPath);
+		string modName, modPath, importType, importStatic, importedName, importedPath;
+		int i = 0;
+
+		foreach(part; splitter(line, ":"))
+		{
+			auto infos = splitter(part, " ");
+			switch(i)
+			{
+				case 0:
+					infos.put(&modName, &modPath);
+					break;
+				case 1:
+					infos.put(&importType, &importStatic);
+					break;
+				case 2:
+					infos.put(&importedName, &importedPath);
+					break;
+				case 3: break; //object (/Library/D/dmd/src/druntime/import/object.d) : public : core.attribute (/Library/D/dmd/src/druntime/import/core/attribute.d):selector
+				default:
+					throw new Exception("Unexpected format received with line "~line);
+			}
+			i++;
+		}
+		modPath = cleanImportPath(modPath);
+		importedPath = cleanImportPath(importedPath);
 
 
 		if(current == null || modName != current.modName)
 			current = ret.getModuleInCache(modName.dup, cleanImportPath(modPath).dup);
 
-		ModuleDef* importedRef = ret.getModuleInCache(importedName, cleanImportPath(importedPath));
+		ModuleDef* importedRef = ret.getModuleInCache(importedName, importedPath);
 		current.addImport(*importedRef);
 	}
 	return ret;
@@ -137,8 +160,12 @@ ModuleParsing parseDependencies(string deps, immutable scope string[] exclude...
 unittest
 {
 	import std.stdio;
-	immutable string testcase = import("hip_deps");
+	immutable string testcase = import("dub.deps");
 	ModuleParsing p = parseDependencies(testcase);
-	foreach(dep; p.findDependees("D:\\\\HipremeEngine\\\\source\\\\hip\\\\global\\\\gamedef.d"))
-		writeln(dep.modName);
+	foreach(ModuleDef v; p.allModules)
+	{
+		// writeln(v.modName);
+	}
+	// foreach(dep; p.findDependees("D:\\\\HipremeEngine\\\\source\\\\hip\\\\global\\\\gamedef.d"))
+	// 	writeln(dep.modName);
 }
