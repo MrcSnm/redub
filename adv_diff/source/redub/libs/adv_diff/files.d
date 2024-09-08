@@ -62,6 +62,14 @@ struct AdvDirectory
 		output[dirName] = JSONValue([JSONValue(total.data.hi), JSONValue(total.data.lo), JSONValue(toHexString(contentHash)), dir]);
 	}
 
+	pragma(inline, true) package void putContentHashInPlace(const ubyte[] newHash)
+	{
+		if(newHash.length != contentHash.length)
+			contentHash = newHash.dup;
+		else
+			contentHash[] = newHash[];
+	}
+
 	/**
 	 * Specification:
 	 * [$INT128_HI, $INT128_LOW, $CONTENT_HASH, {[FILENAME] : ADV_FILE_SPEC}]
@@ -165,6 +173,35 @@ struct AdvCacheFormula
 		output = JSONValue([JSONValue(total.data.hi), JSONValue(total.data.lo), dirsJson, filesJson]);
 	}
 
+	private static bool hashContent(string url, ref ubyte[] buffer, ref ubyte[] outputHash, ubyte[] function(ubyte[], ref ubyte[] output) contentHasher)
+	{
+		import std.file;
+		import std.array;
+		import std.stdio;
+		try
+		{
+			size_t fSize;
+			File f = File(url);
+			//Does not exists
+			if(!f.isOpen)
+			{
+				outputHash = null;
+				return false;
+			}
+			fSize = f.size;
+			if(fSize > buffer.length)
+			{
+				import core.memory;
+				GC.free(buffer.ptr);
+				buffer = uninitializedArray!(ubyte[])(fSize);
+			}
+			f.rawRead(buffer[0..fSize]);
+			contentHasher(buffer[0..fSize], outputHash);
+		}
+		catch(Exception e) return false;
+		return true;
+	}
+
 	/**
 	 * It won't include hidden files in the formula
 	 * Params:
@@ -194,31 +231,7 @@ struct AdvCacheFormula
 			fileBuffer = uninitializedArray!(ubyte[])(1_000_000);
 		ubyte[] hashedContent;
 
-		static bool hashContent(string url, ref ubyte[] buffer, ref ubyte[] outputHash, ubyte[] function(ubyte[], ref ubyte[] output) contentHasher)
-		{
-			try
-			{
-				size_t fSize;
-				File f = File(url);
-				//Does not exists
-				if(!f.isOpen)
-				{
-					outputHash = null;
-					return false;
-				}
-				fSize = f.size;
-				if(fSize > buffer.length)
-				{
-					import core.memory;
-					GC.free(buffer.ptr);
-					buffer = uninitializedArray!(ubyte[])(fSize);
-				}
-				f.rawRead(buffer[0..fSize]);
-				contentHasher(buffer[0..fSize], outputHash);
-			}
-			catch(Exception e) return false;
-			return true;
-		}
+
 		foreach(filterDir; filteredDirectories)
 		foreach(dir; filterDir.dirs)
 		{
@@ -250,16 +263,14 @@ struct AdvCacheFormula
 						if(existingFile.timeModified == time)
 						{
 							advDir.files[e.name] = existingFile.dup;
-							advDir.contentHash = contentHasher(joinFlattened(advDir.contentHash, existingFile.contentHash), hashedContent);
+							advDir.putContentHashInPlace(contentHasher(joinFlattened(advDir.contentHash, existingFile.contentHash), hashedContent));
 							continue;
 						}
 					}
 				}
 				if(!hashContent(e.name, fileBuffer, hashedContent, contentHasher)) continue;
 				advDir.files[e.name] = AdvFile(time, hashedContent.dup);
-				advDir.contentHash = contentHasher(joinFlattened(advDir.contentHash, hashedContent), hashedContent).dup;
-
-
+				advDir.putContentHashInPlace(contentHasher(joinFlattened(advDir.contentHash, hashedContent), hashedContent));
             }
 			totalTime+= advDir.total = dirTime;
 			ret.directories[dir] = advDir;
@@ -365,7 +376,7 @@ struct AdvCacheFormula
 			}
 			else
 			{
-				if(otherAdvDir.total != advDir.total || otherAdvDir.contentHash != advDir.contentHash)
+				if(otherAdvDir.contentHash != advDir.contentHash)
 				{
 					//If directory total is different, check per file
 					diffCount = diffFiles(otherAdvDir.files, advDir.files, diffs, diffCount);
