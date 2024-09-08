@@ -150,9 +150,9 @@ CompilationCache[] cacheStatusForProject(ProjectNode root, Compiler compiler)
  */
 void invalidateCaches(ProjectNode root, Compiler compiler, OS target)
 {
-    const CompilationCache[] cacheStatus = cacheStatusForProject(root, compiler);
+    CompilationCache[] cacheStatus = cacheStatusForProject(root, compiler);
     ptrdiff_t i = cacheStatus.length;
-    AdvCacheFormula preprocessed;
+    AdvCacheFormula preprocessed = cacheStatus[0].copyFormula;
 
     string[64] dirtyFiles;
     size_t dirtyCount;
