@@ -26,7 +26,7 @@ string[] parseLinkConfiguration(const ThreadBuildData data, OS target, Compiler 
                 if(b.outputsDeps)
                     putSourceFiles(commands, null, [getObjectDir(cacheDir)], null, null, objExtension);
                 else
-                    commands~= buildNormalizedPath(outputDirectory, name~objExtension);
+                    commands~= buildNormalizedPath(outputDirectory, name~objExtension).escapePath;
             }
             string arch = mapArch(compiler.compiler, b.arch);
             if(arch)
@@ -94,10 +94,16 @@ string[] parseLinkConfigurationMSVC(const ThreadBuildData data, OS target, Compi
         commands = mapAppendPrefix(commands, libraryPaths, "-L/LIBPATH:", true);
         commands~= getLinkFiles(b.sourceFiles);
         commands = mapAppend(commands, libraries, (string l) => "-L"~stripExtension(l)~".lib");
-        
-        commands~= buildNormalizedPath(outputDirectory, name~getObjectExtension(target)).escapePath;
 
-        commands~= "-of"~buildNormalizedPath(getCacheOutputDir(requirementCache, b, compiler, target), getOutputName(b, target)).escapePath;
+
+        string objExtension = getObjectExtension(target);
+        string cacheDir = getCacheOutputDir(requirementCache, b, compiler, target);
+        if(b.outputsDeps)
+            putSourceFiles(commands, null, [getObjectDir(cacheDir)], null, null, objExtension);
+        else
+            commands~= buildNormalizedPath(outputDirectory, name~objExtension).escapePath;
+
+        commands~= "-of"~buildNormalizedPath(cacheDir, getOutputName(b, target)).escapePath;
     }
     return commands;
 }

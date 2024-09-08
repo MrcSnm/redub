@@ -67,7 +67,7 @@ class ModuleParsing
 				continue;
 			visited[filePath] = true;
 			ret~= *mod;
-			findDependeesImpl(mod, ret, visited);	
+			findDependeesImpl(mod, ret, visited);
 		}
 		return ret;
 		
@@ -125,7 +125,7 @@ ModuleParsing parseDependencies(string deps, immutable scope string[] exclude...
 		string modName, modPath, importType, importStatic, importedName, importedPath;
 		int i = 0;
 
-		foreach(part; splitter(line, ":"))
+		foreach(part; splitter(line, " : "))
 		{
 			auto infos = splitter(part, " ");
 			switch(i)
@@ -141,7 +141,10 @@ ModuleParsing parseDependencies(string deps, immutable scope string[] exclude...
 					break;
 				case 3: break; //object (/Library/D/dmd/src/druntime/import/object.d) : public : core.attribute (/Library/D/dmd/src/druntime/import/core/attribute.d):selector
 				default:
-					throw new Exception("Unexpected format received with line "~line);
+					import std.stdio;
+					writeln("Unexpected format received with line '"~line);
+					writeln(infos);
+					throw new Exception("Information received: input name: "~modName~"  input path:" ~ modPath~" importType: "~importType~" importStatic: "~importStatic~" importedName: "~importedName~" importedPath:"~importedPath);
 			}
 			i++;
 		}
@@ -162,6 +165,19 @@ unittest
 {
 	import std.stdio;
 	immutable string testcase = import("dub.deps");
+	ModuleParsing p = parseDependencies(testcase);
+	foreach(ModuleDef v; p.allModules)
+	{
+		// writeln(v.modName);
+	}
+	// foreach(dep; p.findDependees("D:\\\\HipremeEngine\\\\source\\\\hip\\\\global\\\\gamedef.d"))
+	// 	writeln(dep.modName);
+}
+
+unittest
+{
+	import std.stdio;
+	immutable string testcase = `core.internal.hash (C:\\D\\dmd2\\windows\\bin64\\..\\..\\src\\druntime\\import\\core\\internal\\hash.d) : private : object (C:\\D\\dmd2\\windows\\bin64\\..\\..\\src\\druntime\\import\\object.d)`;
 	ModuleParsing p = parseDependencies(testcase);
 	foreach(ModuleDef v; p.allModules)
 	{
