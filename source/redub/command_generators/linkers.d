@@ -71,6 +71,14 @@ string[] parseLinkConfigurationMSVC(const ThreadBuildData data, OS target, Compi
     const BuildConfiguration b = data.cfg;
     with(b)
     {
+        string cacheDir = getCacheOutputDir(requirementCache, b, compiler, target);
+        commands~= "-of"~buildNormalizedPath(cacheDir, getOutputName(b, target)).escapePath;
+        string objExtension = getObjectExtension(target);
+        if(b.outputsDeps)
+            putSourceFiles(commands, null, [getObjectDir(cacheDir)], null, null, objExtension);
+        else
+            commands~= buildNormalizedPath(outputDirectory, name~objExtension).escapePath;
+
         if(compiler.isDCompiler)
         {
             import redub.command_generators.d_compilers;
@@ -95,15 +103,6 @@ string[] parseLinkConfigurationMSVC(const ThreadBuildData data, OS target, Compi
         commands~= getLinkFiles(b.sourceFiles);
         commands = mapAppend(commands, libraries, (string l) => "-L"~stripExtension(l)~".lib");
 
-
-        string objExtension = getObjectExtension(target);
-        string cacheDir = getCacheOutputDir(requirementCache, b, compiler, target);
-        if(b.outputsDeps)
-            putSourceFiles(commands, null, [getObjectDir(cacheDir)], null, null, objExtension);
-        else
-            commands~= buildNormalizedPath(outputDirectory, name~objExtension).escapePath;
-
-        commands~= "-of"~buildNormalizedPath(cacheDir, getOutputName(b, target)).escapePath;
     }
     return commands;
 }

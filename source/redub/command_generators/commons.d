@@ -519,7 +519,7 @@ ref string[] mapAppendReverse(Q, T)(return ref string[] appendTarget, const scop
     return appendTarget;
 }
 
-string createCommandFile(const BuildConfiguration cfg, OS os, Compiler compiler, string[] flags, out string joinedFlags)
+string createCommandFile(const BuildConfiguration cfg, string[] flags, out string joinedFlags)
 {
     import std.random;
     import std.string;

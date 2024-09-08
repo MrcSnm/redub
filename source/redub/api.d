@@ -147,7 +147,11 @@ ProjectDetails buildProject(ProjectDetails d)
         return d;
 
     if(d.forceRebuild)
+    {
+        if(!cleanProject(d, false))
+            throw new Exception("Could not clean project ", d.tree.name);
         d.tree.invalidateCacheOnTree();
+    }
     else
         invalidateCaches(d.tree, d.compiler, osFromArch(d.cDetails.arch));
     ProjectNode tree = d.tree;
@@ -183,6 +187,77 @@ ProjectDetails buildProject(ProjectDetails d)
 }
 
 
+
+bool cleanProject(ProjectDetails d, bool showMessages)
+{
+    import std.path;
+    import redub.command_generators.commons;
+    auto res = timed(()
+    {
+        if(showMessages)
+            info("Cleaning project ", d.tree.name);
+        import std.file;
+        foreach(ProjectNode node; d.tree.collapse)
+        {
+            string output = buildNormalizedPath(
+                node.requirements.cfg.outputDirectory,
+                getOutputName(node.requirements.cfg.targetType, node.name, os)
+            );
+            if(std.file.exists(output))
+            {
+                if(showMessages)
+                    vlog("Removing ", output);
+                remove(output);
+            }
+            string redubJsonCache = buildNormalizedPath(node.requirements.cfg.workingDir, "dub.sdl.redub_cache_json");
+            if(std.file.exists(redubJsonCache))
+            {
+                if(showMessages)
+                    vlog("Removing redub json cache file.");
+                std.file.remove(redubJsonCache);
+            }
+            string ldc2Cache = buildNormalizedPath(node.requirements.cfg.workingDir, ".ldc2_cache");
+            if(std.file.exists(ldc2Cache))
+            {
+                if(showMessages)
+                    vlog("Removing ldc2cache");
+                rmdirRecurse(ldc2Cache);
+            }
+            version(Windows)
+            {
+                if(node.requirements.cfg.targetType.isLinkedSeparately)
+                {
+                    string outPath = buildNormalizedPath(node.requirements.cfg.outputDirectory, node.name);
+                    foreach(ext; [".ilk", ".pdb"])
+                    {
+                        string genFile = outPath~ext;
+                        if(std.file.exists(genFile))
+                        {
+                            if(showMessages)
+                                vlog("Removing ", genFile);
+                            std.file.remove(genFile);
+                        }
+                    }
+                }
+            }
+            foreach(copiedFile; node.requirements.cfg.filesToCopy)
+            {
+                string outFile = buildNormalizedPath(d.tree.requirements.cfg.outputDirectory, isAbsolute(copiedFile) ? baseName(copiedFile) : copiedFile);
+                if(std.file.exists(outFile))
+                {
+                    if(showMessages)
+                        vlog("Removing ", outFile);
+                    std.file.remove(outFile);
+                }
+            }
+        }
+        return true;
+    });
+
+    if(showMessages)
+        info("Finished cleaning project in ", res.msecs, "ms");
+    return res.value;
+}
 /** 
  * Use this function to get a project information.
  * Params:

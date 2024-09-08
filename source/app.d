@@ -195,66 +195,7 @@ int cleanMain(string[] args)
     ProjectDetails d = resolveDependencies(args);
     if(!d.tree)
         return d.getReturnCode;
-    
-    auto res = timed(()
-    {
-        info("Cleaning project ", d.tree.name);
-        import std.file;
-        foreach(ProjectNode node; d.tree.collapse)
-        {
-            string output = buildNormalizedPath(
-                node.requirements.cfg.outputDirectory, 
-                getOutputName(node.requirements.cfg.targetType, node.name, os)
-            );
-            if(std.file.exists(output))
-            {
-                vlog("Removing ", output);
-                remove(output);
-            }
-            string redubJsonCache = buildNormalizedPath(node.requirements.cfg.workingDir, "dub.sdl.redub_cache_json");
-            if(std.file.exists(redubJsonCache))
-            {
-                vlog("Removing redub json cache file.");
-                std.file.remove(redubJsonCache);
-            }
-            string ldc2Cache = buildNormalizedPath(node.requirements.cfg.workingDir, ".ldc2_cache");
-            if(std.file.exists(ldc2Cache))
-            {
-                vlog("Removing ldc2cache");
-                rmdirRecurse(ldc2Cache);
-            }
-            version(Windows)
-            {
-                if(node.requirements.cfg.targetType.isLinkedSeparately)
-                {
-                    string outPath = buildNormalizedPath(node.requirements.cfg.outputDirectory, node.name);
-                    foreach(ext; [".ilk", ".pdb"])
-                    {
-                        string genFile = outPath~ext;
-                        if(std.file.exists(genFile))
-                        {
-                            vlog("Removing ", genFile);
-                            std.file.remove(genFile);
-                        }
-                    }
-                }
-            }
-            foreach(copiedFile; node.requirements.cfg.filesToCopy)
-            {
-                string outFile = buildNormalizedPath(d.tree.requirements.cfg.outputDirectory, isAbsolute(copiedFile) ? baseName(copiedFile) : copiedFile);
-                if(std.file.exists(outFile))
-                {
-                    vlog("Removing ", outFile);
-                    std.file.remove(outFile);
-                }
-            }
-        }
-        return true;
-    });
-
-    info("Finished cleaning project in ", res.msecs, "ms");
-
-    return res.value ? 0 : 1;
+    return cleanProject(d, true);
 }
 
 int buildMain(string[] args)

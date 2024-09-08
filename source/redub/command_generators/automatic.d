@@ -9,7 +9,20 @@ static import redub.command_generators.gnu_based_ccplusplus;
 static import redub.command_generators.dmd;
 static import redub.command_generators.ldc;
 
+string escapeCompilationCommands(string compilerBin, string[] flags)
+{
+    return escapeShellCommand(compilerBin) ~ " " ~ processFlags(flags);
+}
 
+/**
+ * This must be used on Windows since they need a command file
+ * Params:
+ *   cfg =
+ *   os =
+ *   compiler =
+ *   mainPackHash =
+ * Returns: The compilation commands those arguments generates
+ */
 string[] getCompilationFlags(const BuildConfiguration cfg, OS os, Compiler compiler, string mainPackHash)
 {
     switch(compiler.compiler) with(AcceptedCompiler)
@@ -24,23 +37,28 @@ string[] getCompilationFlags(const BuildConfiguration cfg, OS os, Compiler compi
             return redub.command_generators.ldc.parseBuildConfiguration(cfg, os, compiler, mainPackHash);
         default:throw new Exception("Unsupported compiler '"~compiler.binOrPath~"'");
     }
-
 }
 
-string getCompileCommands(const BuildConfiguration cfg, OS os, Compiler compiler, string mainPackHash)
+string[] getLinkFlags(const ThreadBuildData data, OS os, Compiler compiler, string mainPackHash)
 {
-    string[] flags = getCompilationFlags(cfg,os,compiler, mainPackHash);
-    return escapeShellCommand(compiler.binOrPath) ~ " " ~ processFlags(flags);
+    import command_generators.linkers;
+    version(Windows)
+        return parseLinkConfigurationMSVC(data, os, compiler, mainPackHash);
+    else
+        return parseLinkConfiguration(data, os, compiler, mainPackHash);
 }
+
+string getLinkerBin(Compiler compiler)
+{
+    if(compiler.isDCompiler)
+        return compiler.binOrPath;
+    return compiler.archiver;
+}
+
 
 string getLinkCommands(const ThreadBuildData data, OS os, Compiler compiler, string mainPackHash)
 {
-    import command_generators.linkers;
-    string[] flags;
-    
-    version(Windows) flags = parseLinkConfigurationMSVC(data, os, compiler, mainPackHash);
-    else flags = parseLinkConfiguration(data, os, compiler, mainPackHash);
-
+    string[] flags = getLinkFlags(data, os, compiler, mainPackHash);
     if(compiler.compiler == AcceptedCompiler.invalid)
         throw new Exception("Unsupported compiler '" ~ compiler.binOrPath~"'");
 

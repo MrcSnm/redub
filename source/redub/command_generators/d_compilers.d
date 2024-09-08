@@ -16,14 +16,25 @@ string[] parseBuildConfiguration(AcceptedCompiler comp, const BuildConfiguration
     if(preserve) commands ~= preserve;
     with(b)
     {
-        commands~= dFlags;
+
         if(isDebug) commands~= "-debug";
+        string cacheDir = getCacheOutputDir(mainPackhash, b, compiler, os);
+        if(compiler.compiler == AcceptedCompiler.ldc2 && !b.outputsDeps) ///Ldc always outputs object files
+        {
+            //It must output a main file on obj folder, since it will crash otherwise
+            commands~= mapper(ValidDFlags.objectDir) ~ buildNormalizedPath(cacheDir~ "_obj").escapePath;
+        }
+        else if(b.outputsDeps)
+            commands~= mapper(ValidDFlags.objectDir)~getObjectDir(cacheDir).escapePath;
+
+        commands~= dFlags;
         if(comp == AcceptedCompiler.ldc2)
         {
             ///commands~= "--cache-retrieval=hardlink"; // Doesn't work on Windows when using a multi drives projects
             commands~= "--cache=.ldc2_cache";
             commands~= "--cache-prune";
         }
+
 
         commands = mapAppendPrefix(commands, debugVersions, mapper(ValidDFlags.debugVersions), false);
         commands = mapAppendPrefix(commands, versions, mapper(ValidDFlags.versions), false);
@@ -47,17 +58,12 @@ string[] parseBuildConfiguration(AcceptedCompiler comp, const BuildConfiguration
         else if(targetType == TargetType.dynamicLibrary)
             commands~= mapper(ValidDFlags.buildAsShared);
 
-        string cacheDir = getCacheOutputDir(mainPackhash, b, compiler, os);
-
-        if(b.outputsDeps)
-            commands~= mapper(ValidDFlags.objectDir)~getObjectDir(cacheDir).escapePath;
 
         if(!b.outputsDeps)
             commands~= mapper(ValidDFlags.outputFile) ~ buildNormalizedPath(cacheDir, getConfigurationOutputName(b, target)).escapePath;
 
         if(b.outputsDeps)
             commands~= mapper(ValidDFlags.deps) ~ (buildNormalizedPath(cacheDir)~".deps").escapePath;
-        // commands~= mapper(ValidDFlags.outputFile) ~ getConfigurationOutputPath(b, target).escapePath;
 
     }
 

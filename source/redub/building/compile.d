@@ -49,6 +49,22 @@ void execCompilationThread(immutable ThreadBuildData data, shared ProjectNode pa
     }
 }
 
+private auto execCompiler(const BuildConfiguration cfg, string compilerBin, string[] compileFlags, out string compilationCommands, bool isDCompiler)
+{
+    import std.system;
+    import std.process;
+    import std.file;
+    import redub.command_generators.commons;
+    if(std.system.os.isWindows && isDCompiler)
+    {
+        string cmdFile = createCommandFile(cfg, compileFlags, compilationCommands);
+        scope(exit)
+            std.file.remove(cmdFile);
+        return executeShell(compilerBin~ " @"~cmdFile, null, Config.none, size_t.max, cfg.workingDir);
+    }
+    return executeShell(escapeCompilationCommands(compilerBin, compileFlags), null, Config.none, size_t.max, cfg.workingDir);
+}
+
 CompilationResult execCompilation(immutable ThreadBuildData data, shared ProjectNode pack, OS os, Compiler compiler, shared CompilationCache cache, immutable string[string] env)
 {
     import std.file;
@@ -94,22 +110,8 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
                 createOutputDirFolder(cfg);
 
             ExecutionResult ret;
-            if(std.system.os.isWindows)
-            {
-                if(!pack.isCopyEnough)
-                {
-                    string[] flags = getCompilationFlags(cfg, os, compiler, cache.rootHash);
-                    string commandFile = createCommandFile(cfg, os, compiler, flags, res.compilationCommand);
-                    res.compilationCommand = compiler.binOrPath ~ " "~res.compilationCommand;
-                    ret = executeShell(compiler.binOrPath ~ " @"~commandFile);
-                    std.file.remove(commandFile);
-                }
-            }
-            else
-            {
-                res.compilationCommand = getCompileCommands(cfg, os, compiler, cache.rootHash);
-                ret = executeShell(res.compilationCommand, null, Config.none, size_t.max, cfg.workingDir);
-            }
+            if(!pack.isCopyEnough)
+                ret = execCompiler(cfg, compiler.binOrPath, getCompilationFlags(cfg, os, compiler, cache.rootHash), res.compilationCommand, compiler.isDCompiler);
 
             //For working around bug 3541, 24748, dmd generates .obj files besides files, redub will move them out
             //of there to the object directory
@@ -135,11 +137,8 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
                 ret.output~= linkRes.message;
                 res.compilationCommand~= "\n\nLinking: \n\t"~ linkRes.compilationCommand;
             }
-            
-
             res.status = ret.status;
             res.message = ret.output;
-
         }
 
 
@@ -168,17 +167,7 @@ CompilationResult link(ProjectNode root, string rootHash, const ThreadBuildData 
 
     if(!root.isCopyEnough)
     {
-        ret.compilationCommand = getLinkCommands(data, os, compiler, rootHash);
-        string toExec = ret.compilationCommand;
-        string cmdFile;
-        if(std.system.os.isWindows)
-        {
-            cmdFile = createCommandFile(data.cfg, os, compiler, [ret.compilationCommand], ret.compilationCommand);
-            toExec = compiler.binOrPath~" @"~cmdFile;
-        }
-        auto exec = executeShell(toExec);
-        if(std.system.os.isWindows)
-            std.file.remove(cmdFile);
+        auto exec = execCompiler(data.cfg, getLinkerBin(compiler), getLinkFlags(data, os, compiler, rootHash), ret.compilationCommand, compiler.isDCompiler);
         ret.status = exec.status;
         ret.message = exec.output;
         if(exec.status != 0)
