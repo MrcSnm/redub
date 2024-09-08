@@ -109,17 +109,30 @@ ModuleParsing parseDependencies(string deps, immutable scope string[] exclude...
 	 *   importPath = Import Path style in the way dmd -deps saves.
 	 * Returns: A cleaned path only string
 	 */
-	static string cleanImportPath(string importPath)
+	static string cleanImportPath(string importPath, bool isUsingWinSep)
 	{
 		if(importPath.length == 0) return null;
 		if(importPath[0] != '(') return importPath;
 		ptrdiff_t lastIndex = lastIndexOf(importPath, ')');
-		return importPath[1..lastIndex];
+		string ret = importPath[1..lastIndex];
+		if(isUsingWinSep)
+		{
+			import std.string;
+			return replace(ret, "\\\\", "\\");
+		}
+		return ret;
 	}
+	bool isUsingWindowsSep;
+	bool hasCheckWindowsSep;
 	outer: foreach(string line; splitter(deps, "\n"))
 	{
 		foreach(value; exclude) if(line.startsWith(value))
 			continue outer;
+		if(!hasCheckWindowsSep)
+		{
+			isUsingWindowsSep = line.indexOf('\\') != -1;
+			hasCheckWindowsSep = true;
+		}
 
 		///(moduleName) (modulePath) (:) (private/public/string) (:) (importedName) ((importedPath)
 		string modName, modPath, importType, importStatic, importedName, importedPath;
@@ -148,12 +161,14 @@ ModuleParsing parseDependencies(string deps, immutable scope string[] exclude...
 			}
 			i++;
 		}
-		modPath = cleanImportPath(modPath);
-		importedPath = cleanImportPath(importedPath);
+		importedPath = cleanImportPath(importedPath, isUsingWindowsSep);
 
 
 		if(current == null || modName != current.modName)
-			current = ret.getModuleInCache(modName.dup, cleanImportPath(modPath).dup);
+		{
+			modPath = cleanImportPath(modPath, isUsingWindowsSep);
+			current = ret.getModuleInCache(modName.dup, isUsingWindowsSep ? modPath : modPath.idup);
+		}
 
 		ModuleDef* importedRef = ret.getModuleInCache(importedName, importedPath);
 		current.addImport(*importedRef);

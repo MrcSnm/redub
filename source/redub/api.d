@@ -106,6 +106,8 @@ string[] getChangedBuildFiles(ProjectNode root, Compiler compiler, OS os)
 {
     import std.file;
     import std.path;
+    import std.algorithm.iteration;
+    import std.array : array;
     import redub.command_generators.commons;
     if(!root.isRoot)
         throw new Exception("Can only exclude unchanged files from root at this moment.");
@@ -113,16 +115,28 @@ string[] getChangedBuildFiles(ProjectNode root, Compiler compiler, OS os)
     string depsPath = getDepsFilePath(root, compiler, os);
     if(!exists(depsPath))
         return null;
+    const string[] dirtyFiles = filter!((string f) => !f.isDir)(root.getDirtyFiles()).array;
+    if(dirtyFiles.length == 0)
+        return null;
+
     import d_depedencies;
     ModuleParsing moduleParse = parseDependencies(std.file.readText(depsPath), 
         buildNormalizedPath("/Library/D/dmd")
     );
 
-    import std.algorithm.iteration;
-    import std.array : array;
-    const string[] dirtyFiles = filter!((string f) => !f.isDir)(root.getDirtyFiles()).array;
+
+
     string[] buildFiles = map!((ModuleDef def) => def.modPath)(moduleParse.findDependees(dirtyFiles)).array;
-    if(hasLogLevel(LogLevel.info))
+
+    foreach(mod; moduleParse.allModules)
+    {
+        if(mod.modName == "app")
+        {
+            import std.stdio;
+            writeln(mod.modPath, " ", dirtyFiles[0], " ", dirtyFiles[0] in moduleParse.allModules);
+        }
+    }
+    if(hasLogLevel(LogLevel.verbose))
         warnTitle("Project files to rebuild: ", buildFiles);
     return buildFiles;
 }
