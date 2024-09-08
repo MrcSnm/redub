@@ -49,7 +49,8 @@ string[] parseBuildConfiguration(AcceptedCompiler comp, const BuildConfiguration
 
         string cacheDir = getCacheOutputDir(mainPackhash, b, compiler, os);
 
-        commands~= mapper(ValidDFlags.objectDir)~getObjectDir(cacheDir).escapePath;
+        if(b.outputsDeps)
+            commands~= mapper(ValidDFlags.objectDir)~getObjectDir(cacheDir).escapePath;
         if(!b.outputsDeps)
             commands~= mapper(ValidDFlags.outputFile) ~ buildNormalizedPath(cacheDir, getConfigurationOutputName(b, target)).escapePath;
 

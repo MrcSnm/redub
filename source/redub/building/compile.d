@@ -162,12 +162,23 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
 CompilationResult link(ProjectNode root, string rootHash, const ThreadBuildData data, OS os, Compiler compiler, immutable string[string] env)
 {
     import std.process;
+    import std.file;
+    import redub.command_generators.commons;
     CompilationResult ret;
 
     if(!root.isCopyEnough)
     {
         ret.compilationCommand = getLinkCommands(data, os, compiler, rootHash);
-        auto exec = executeShell(ret.compilationCommand);
+        string toExec = ret.compilationCommand;
+        string cmdFile;
+        if(std.system.os.isWindows)
+        {
+            cmdFile = createCommandFile(data.cfg, os, compiler, [ret.compilationCommand], ret.compilationCommand);
+            toExec = compiler.binOrPath~" @"~cmdFile;
+        }
+        auto exec = executeShell(toExec);
+        if(std.system.os.isWindows)
+            std.file.remove(cmdFile);
         ret.status = exec.status;
         ret.message = exec.output;
         if(exec.status != 0)

@@ -120,22 +120,13 @@ string[] getChangedBuildFiles(ProjectNode root, Compiler compiler, OS os)
         return null;
 
     import d_depedencies;
+
+    //TODO: Improve that
     ModuleParsing moduleParse = parseDependencies(std.file.readText(depsPath), 
         buildNormalizedPath("/Library/D/dmd")
     );
 
-
-
     string[] buildFiles = map!((ModuleDef def) => def.modPath)(moduleParse.findDependees(dirtyFiles)).array;
-
-    foreach(mod; moduleParse.allModules)
-    {
-        if(mod.modName == "app")
-        {
-            import std.stdio;
-            writeln(mod.modPath, " ", dirtyFiles[0], " ", dirtyFiles[0] in moduleParse.allModules);
-        }
-    }
     if(hasLogLevel(LogLevel.verbose))
         warnTitle("Project files to rebuild: ", buildFiles);
     return buildFiles;
