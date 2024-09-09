@@ -185,10 +185,18 @@ Compiler getCompiler(string compilerOrPath, string compilerAssumption)
         compilerOrPath = "dmd";
 
     string locCompiler = tryGetCompilerOnCwd(compilerOrPath);
-    if(locCompiler != compilerOrPath)
+    bool isGlobal = locCompiler == compilerOrPath;
+    if(!isGlobal)
         compilerOrPath = locCompiler;
     else
+    {
+        if(JSONValue* globalPaths = "globalPaths" in compilersInfo)
+        {
+            if(JSONValue* cachedPath = compilerOrPath in *globalPaths)
+                return getCompilerFromCache(compilersInfo, cachedPath.str);
+        }
         compilerOrPath = findExecutable(compilerOrPath);
+    }
 
     Compiler ret = getCompilerFromCache(compilersInfo, compilerOrPath);
     if(ret != Compiler.init)
@@ -210,7 +218,7 @@ Compiler getCompiler(string compilerOrPath, string compilerAssumption)
         {
             if(inf(actualCompiler, versionString, ret))
             {
-                saveCompilerInfo(compilersInfo, ret, isDefault);
+                saveCompilerInfo(compilersInfo, ret, isDefault, isGlobal);
                 return ret;
             }
         }
@@ -278,7 +286,7 @@ Compiler getCompilerFromCache(JSONValue allCompilersInfo, string compiler)
  *   allCompilersInfo = The JSON value of the current redub compilers info
  *   compiler = The new compiler to add
  */
-private void saveCompilerInfo(JSONValue allCompilersInfo, Compiler compiler, bool isDefault)
+private void saveCompilerInfo(JSONValue allCompilersInfo, Compiler compiler, bool isDefault, bool isGlobal)
 {
     import redub.meta;
     import std.conv:to;
@@ -286,7 +294,15 @@ private void saveCompilerInfo(JSONValue allCompilersInfo, Compiler compiler, boo
     import std.file;
 
     if(isDefault)
+    {
         allCompilersInfo["defaultCompiler"] = JSONValue(compiler.compiler.to!string);
+    }
+    if(isGlobal)
+    {
+        if(!("globalPaths" in allCompilersInfo))
+            allCompilersInfo["globalPaths"] = JSONValue.emptyObject;
+        allCompilersInfo["globalPaths"][compiler.compiler.to!string] = JSONValue(compiler.binOrPath);
+    }
     if(!("version" in allCompilersInfo))
         allCompilersInfo["version"] = JSONValue(RedubVersionOnly);
 
