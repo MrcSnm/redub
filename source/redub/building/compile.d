@@ -14,7 +14,12 @@ struct CompilationResult
     size_t msNeeded;
     int status;
     shared ProjectNode node;
-    shared CompilationCache cache;
+}
+
+struct HashPair
+{
+    string rootHash;
+    string requirementHash;
 }
 
 import std.typecons;
@@ -40,9 +45,9 @@ private ExecutionResult executeCommands(const string[] commandsList, string list
     return ExecutionResult(0, "Success");
 }
 
-void execCompilationThread(immutable ThreadBuildData data, shared ProjectNode pack, OS os, Compiler compiler, shared CompilationCache cache, immutable string[string] env)
+void execCompilationThread(immutable ThreadBuildData data, shared ProjectNode pack, OS os, Compiler compiler, HashPair hash, immutable string[string] env)
 {
-    CompilationResult res = execCompilation(data, pack, os, compiler, cache, env);
+    CompilationResult res = execCompilation(data, pack, os, compiler, hash, env);
     scope(exit)
     {
         ownerTid.send(res);
@@ -66,7 +71,7 @@ private auto execCompiler(const BuildConfiguration cfg, string compilerBin, stri
     return executeShell(escapeCompilationCommands(compilerBin, compileFlags), null, Config.none, size_t.max, cfg.workingDir);
 }
 
-CompilationResult execCompilation(immutable ThreadBuildData data, shared ProjectNode pack, OS os, Compiler compiler, shared CompilationCache cache, immutable string[string] env)
+CompilationResult execCompilation(immutable ThreadBuildData data, shared ProjectNode pack, OS os, Compiler compiler, HashPair hash, immutable string[string] env)
 {
     import std.file;
     import std.process;
@@ -79,15 +84,11 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
     scope(exit)
     {
         res.msNeeded = sw.peek.total!"msecs";
-        res.cache.requirementCache = cache.requirementCache;
     }
     try
     {
         if(pack.isUpToDate && !pack.isCopyEnough)
-        {
-            res.cache = cache;
             return res;
-        }
 
         immutable BuildConfiguration cfg = data.cfg;
         //Remove existing binary, since it won't be replaced by simply executing commands
@@ -102,7 +103,7 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
         if(pack.requirements.cfg.targetType != TargetType.none)
         {
             import std.path;
-            string inDir = getCacheOutputDir(cache.rootHash, cast()pack.requirements, compiler, os);
+            string inDir = getCacheOutputDir(hash.rootHash, cast()pack.requirements, compiler, os);
             if(!exists(inDir))
                 mkdirRecurse(inDir);
 
@@ -112,7 +113,7 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
 
             ExecutionResult ret;
             if(!pack.isCopyEnough)
-                ret = execCompiler(cfg, compiler.binOrPath, getCompilationFlags(cfg, os, compiler, cache.rootHash), res.compilationCommand, compiler.isDCompiler);
+                ret = execCompiler(cfg, compiler.binOrPath, getCompilationFlags(cfg, os, compiler, hash.rootHash), res.compilationCommand, compiler.isDCompiler);
 
             //For working around bug 3541, 24748, dmd generates .obj files besides files, redub will move them out
             //of there to the object directory
@@ -121,7 +122,7 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
 
             if(!isDCompiler(compiler) && !ret.status) //Always requires link.
             {
-                CompilationResult linkRes = link(cast()pack, cache.requirementCache, data, os, compiler, env);
+                CompilationResult linkRes = link(cast()pack, hash.requirementHash, data, os, compiler, env);
                 ret.status = linkRes.status;
                 ret.output~= linkRes.message;
                 res.compilationCommand~= linkRes.compilationCommand;
@@ -133,7 +134,7 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
             ///Shared Library(mostly?)
             if(isDCompiler(compiler) && isLinkedSeparately(data.cfg.targetType) && !pack.isRoot)
             {
-                CompilationResult linkRes = link(cast()pack, cache.requirementCache, data, os, compiler, env);
+                CompilationResult linkRes = link(cast()pack, hash.requirementHash, data, os, compiler, env);
                 ret.status = linkRes.status;
                 ret.output~= linkRes.message;
                 res.compilationCommand~= "\n\nLinking: \n\t"~ linkRes.compilationCommand;
@@ -211,7 +212,7 @@ bool buildProjectParallelSimple(ProjectNode root, Compiler compiler, OS os)
                     spawned[dep] = true;
                     spawn(&execCompilationThread,
                         dep.requirements.buildData, cast(shared)dep, os,
-                        compiler, cast(shared)CompilationCache.get(mainPackHash, dep.requirements, compiler),
+                        compiler, HashPair(mainPackHash, hashFrom(dep.requirements, compiler)),
                         getEnvForProject(dep)
                     );
                 }
@@ -252,7 +253,6 @@ bool buildProjectFullyParallelized(ProjectNode root, Compiler compiler, OS os)
 {
     import std.concurrency;
     string mainPackHash = hashFrom(root.requirements, compiler);
-    CompilationCache[] cache = cacheStatusForProject(root, compiler);
 
     size_t i = 0;
     size_t sentPackages = 0;
@@ -264,7 +264,7 @@ bool buildProjectFullyParallelized(ProjectNode root, Compiler compiler, OS os)
             spawn(&execCompilationThread,
                 pack.requirements.buildData,
                 cast(shared)pack, os, compiler,
-                cast(shared)cache[i],
+                HashPair(mainPackHash, hashFrom(pack.requirements, compiler)),
                 getEnvForProject(pack)
             );
 
@@ -325,7 +325,7 @@ bool buildProjectSingleThread(ProjectNode root, Compiler compiler, OS os)
             if(dep.shouldEnterCompilationThread)
             {
                 CompilationResult res = execCompilation(dep.requirements.buildData, cast(shared)dep, os, compiler,
-                    cast(shared)CompilationCache.get(mainPackHash, dep.requirements, compiler), getEnvForProject(dep)
+                    HashPair(mainPackHash,  hashFrom(dep.requirements, compiler)), getEnvForProject(dep)
                 );
                 if(res.status)
                 {
