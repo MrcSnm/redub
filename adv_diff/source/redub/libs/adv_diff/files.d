@@ -14,19 +14,20 @@ struct AdvFile
 {
 	///This will be used to compare before content hash
 	ulong timeModified;
-	ubyte[] contentHash;
+	ubyte[8] contentHash;
 
 	AdvFile dup() const
 	{
-		ubyte[] returnHash;
-		if(contentHash.length) returnHash = contentHash.dup;
-		return AdvFile(timeModified, returnHash);
+		return this;
+		// ubyte[] returnHash;
+		// if(contentHash.length) returnHash = contentHash.dup;
+		// return AdvFile(timeModified, returnHash);
 	}
 
 	void serialize(ref JSONValue output) const
 	{
 		import std.digest:toHexString;
-		output = JSONValue([JSONValue(timeModified), JSONValue(contentHash.toHexString)]);
+		output = JSONValue([JSONValue(timeModified), JSONValue(contentHash[].toHexString)]);
 	}
 	/**
 	 * Specification:
@@ -39,14 +40,14 @@ struct AdvFile
 	{
 		enforce(input.type == JSONType.array, "Input json for AdvFile deserialization is not an array.");
 		enforce(input.array.length == 2, "Input json for AdvFile deserialization is an array with size different from 2.");
-		return AdvFile(input.array[0].get!ulong, fromHexString(input.array[1].str));
+		return AdvFile(input.array[0].get!ulong, hashFromString(input.array[1].str));
 	}
 }
 
 struct AdvDirectory
 {
 	Int128 total;
-	ubyte[] contentHash;
+	ubyte[8] contentHash; //Since this structure is optimized for xxhash, it will use 8 bytes hash
 	AdvFile[string] files;
 
 	void serialize(ref JSONValue output, string dirName) const
@@ -59,15 +60,12 @@ struct AdvDirectory
 			dir[fileName] = v;
 		}
 		import std.digest;
-		output[dirName] = JSONValue([JSONValue(total.data.hi), JSONValue(total.data.lo), JSONValue(toHexString(contentHash)), dir]);
+		output[dirName] = JSONValue([JSONValue(total.data.hi), JSONValue(total.data.lo), JSONValue(toHexString(contentHash[])), dir]);
 	}
 
-	pragma(inline, true) package void putContentHashInPlace(const ubyte[] newHash)
+	pragma(inline, true) package void putContentHashInPlace(const ubyte[8] newHash)
 	{
-		if(newHash.length != contentHash.length)
-			contentHash = newHash.dup;
-		else
-			contentHash[] = newHash[];
+		contentHash[] = newHash[];
 	}
 
 	/**
@@ -92,7 +90,7 @@ struct AdvDirectory
 			files[fileName] = AdvFile.deserialize(advFile);
 		}
 
-		return AdvDirectory(Int128(v[0].get!ulong, v[1].get!ulong), fromHexString(v[2].str), files);
+		return AdvDirectory(Int128(v[0].get!ulong, v[1].get!ulong), hashFromString(v[2].str), files);
 	}
 }
 
@@ -263,14 +261,14 @@ struct AdvCacheFormula
 						if(existingFile.timeModified == time)
 						{
 							advDir.files[e.name] = existingFile.dup;
-							advDir.putContentHashInPlace(contentHasher(joinFlattened(advDir.contentHash, existingFile.contentHash), hashedContent));
+							advDir.putContentHashInPlace(contentHasher(joinFlattened(advDir.contentHash, existingFile.contentHash), hashedContent)[0..8]);
 							continue;
 						}
 					}
 				}
 				if(!hashContent(e.name, fileBuffer, hashedContent, contentHasher)) continue;
-				advDir.files[e.name] = AdvFile(time, hashedContent.dup);
-				advDir.putContentHashInPlace(contentHasher(joinFlattened(advDir.contentHash, hashedContent), hashedContent));
+				advDir.files[e.name] = AdvFile(time, hashedContent[0..8]);
+				advDir.putContentHashInPlace(contentHasher(joinFlattened(advDir.contentHash, hashedContent), hashedContent)[0..8]);
             }
 			totalTime+= advDir.total = dirTime;
 			ret.directories[dir] = advDir;
@@ -303,7 +301,7 @@ struct AdvCacheFormula
 				}
 			}
 			if(!hashContent(file, fileBuffer, hashedContent, contentHasher)) continue;
-			ret.files[file] = AdvFile(time, hashedContent.dup);
+			ret.files[file] = AdvFile(time, hashedContent[0..8]);
 			if(cacheHolder !is null)
 				cacheHolder.files[file] = ret.files[file];
         }
@@ -387,25 +385,45 @@ struct AdvCacheFormula
 	}
 }
 
-ubyte[] fromHexString(string hexStr)
+
+pragma(inline, true)
+private ubyte getNumFromHexChar(char a)
 {
-	import std.conv : parse;
-	size_t sz = hexStr.length/2;
-	size_t index = 0;
-	ubyte[] ret;
-	if(hexStr.length % 2 != 0)
+	if(a >= '0' && a <= '9')
+		return cast(ubyte)(a - '0');
+	return cast(ubyte)((a - 'A') + 10);
+}
+
+
+ubyte[8] hashFromString(const string hexStr)
+{
+	if(hexStr.length != 16)
 	{
-		ret = new ubyte[](sz + 1);
-		string str = hexStr[0..1];
-		ret[0] = str.parse!ubyte(16);
-		hexStr = hexStr[1..$];
-		index = 1;
-	} else ret = new ubyte[](sz);
-	foreach(i; 0..hexStr.length/2)
-	{
-		string str = hexStr[i*2..(i+1)*2];
-		ret[index++] = str.parse!ubyte(16);
+		char[16] ret = void;
+		ret[0] = '0';
+		ret[1..$] = hexStr[];
+		return fromHexString2(ret);
 	}
+	return fromHexString2(cast(char[16])hexStr[0..16]);
+
+}
+
+ubyte[8] fromHexString2(const ref char[16] hexStr)
+{
+	ubyte[8] ret;
+	foreach(i; 0..8)
+		ret[i] = cast(ubyte)((getNumFromHexChar(hexStr[i*2])*16) + getNumFromHexChar(hexStr[i*2+1]));
+	return ret;
+}
+
+
+ubyte[] fromHexString2(string hexStr)
+{
+	size_t sz = hexStr.length/2;
+	ubyte[] ret;
+
+	foreach(i; 0..sz)
+		ret[i] = cast(ubyte)((getNumFromHexChar(hexStr[i*2])*16) + getNumFromHexChar(hexStr[i*2+1]));
 	return ret;
 }
 

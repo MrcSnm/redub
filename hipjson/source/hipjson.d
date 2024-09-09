@@ -456,83 +456,6 @@ struct JSONValue
 		scope JSONValue[] stack = uninitializedArray!(JSONValue[])(128);
 		scope ptrdiff_t stackLength = 0;
 
-		bool pushNewScope(JSONValue val)
-		{
-			assert(val.type == JSONType.object || val.type == JSONType.array || val.type == JSONType.null_, "Unexpected push.");
-			JSONValue* currTemp = current;
-
-			stackLength++;
-			if(stackLength > stack.length)
-				stack~= val;
-			else
-				stack[stackLength-1] = val;
-
-			current = &stack[stackLength-1];
-
-
-			switch(currTemp.type)
-			{
-				case JSONType.object:
-					currTemp.data.object.value[val.key] = *current;
-					break;
-				case JSONType.array:
-					currTemp.data.array = JSONArray.append(currTemp.data.array, *current);
-					break;
-				case JSONType.null_:
-					currTemp.type = val.type;
-					currTemp.data = val.data;
-					break;
-				default: return false;
-			}
-			return true;
-
-		}
-		void popScope()
-		{
-			assert(stackLength > 0, "Unexpected pop.");
-			
-			stackLength--;
-			if(stackLength > 0)
-			{
-				JSONValue* next = &stack[stackLength-1];
-				if(current.type == JSONType.array)
-				{
-					current.data.array = JSONArray.trim(current.data.array);
-					if(next.type == JSONType.array)
-					{
-						next.data.array.getArray[$-1] = *current;
-					}
-				// 	else if(next.type == JSONType.object)
-				// 	{
-				// 		JSONValue* v = current.key in next.data.object.value;
-				// 		current.data.array = JSONArray.trim(current.data.array);
-				// 		*v = *current;
-				// 	}
-				}
-				current = next;
-				assert(current.type == JSONType.object || current.type == JSONType.array, "Unexpected value in stack. (Typed "~(cast(size_t)(current.type)).to!string);
-			}
-		}
-
-
-		void pushToStack(JSONValue val)
-		{
-			switch(current.type) with(JSONType)
-			{
-				case object:
-					current.data.object.value[val.key] = val;
-					break;
-				case array:
-					current.data.array = JSONArray.append(current.data.array, val);
-					break;
-				case null_:
-					*current = val;
-					break;
-				default: assert(false, "Unexpected stack type: "~current.getTypeName);
-			}
-			lastValue = val;
-		}
-
 		size_t line = 0;
 		string getErr(string err="", string f = __FILE_FULL_PATH__, size_t l = __LINE__)
 		{
@@ -553,14 +476,14 @@ struct JSONValue
 					if(state != JSONState.value)
 						return JSONValue.errorObj(getErr());
 					JSONValue obj = JSONValue.create(new JSONObject(), lastKey);
-					if(!pushNewScope(obj))
+					if(!pushNewScope(obj, current, stackLength, stack))
 						return JSONValue.errorObj(getErr("Could not push new scope in JSON. Only array, object or null are valid"));
 
 					state = JSONState.key;
 					break;
 				}
 				case '}':
-					popScope();
+					popScope(stackLength, stack, current);
 					state = JSONState.lookingForNext;
 					break;
 				case ':':
@@ -586,7 +509,7 @@ struct JSONValue
 								return JSONValue.errorObj(getErr("unclosed quotes."));
 							JSONValue keyJson;
 							keyJson.key = lastKey;
-							pushToStack(keyJson);
+							pushToStack(keyJson, current, lastValue);
 							state = JSONState.lookingAssignment;
 							break;
 						}
@@ -595,7 +518,7 @@ struct JSONValue
 							string val;
 							if(!getNextString(data, index, index, val))
 								return JSONValue.errorObj(getErr("unclosed quotes."));
-							pushToStack(JSONValue.create!string(val, lastKey));
+							pushToStack(JSONValue.create!string(val, lastKey), current, lastValue);
 							state = JSONState.lookingForNext;
 							break;
 						}
@@ -608,7 +531,7 @@ struct JSONValue
 				{
 					if(state != JSONState.lookingForNext && state != JSONState.value)
 						return JSONValue.errorObj(getErr(" expected to be a value. "));
-					if(!pushNewScope(JSONValue.create(JSONArray.createNew(), lastKey)))
+					if(!pushNewScope(JSONValue.create(JSONArray.createNew(), lastKey), current, stackLength, stack))
 						return JSONValue.errorObj(getErr("Could not push new scope in JSON. Only array, object or null are valid"));
 					state = JSONState.value;
 					break;
@@ -616,7 +539,7 @@ struct JSONValue
 				case ']':
 					if(state != JSONState.lookingForNext && state != JSONState.value)
 						return JSONValue.errorObj(getErr("expected to be a value. "));
-					popScope();
+					popScope(stackLength, stack, current);
 					state = JSONState.lookingForNext;
 					break;
 				case ',':
@@ -643,28 +566,28 @@ struct JSONValue
 									return JSONValue.errorObj(getErr("unexpected number."));
 								if(!getNextNumber(data, index, index, lastValue.data, lastValue.type))
 									return JSONValue.errorObj(getErr("unexpected end of file."));
-								pushToStack(lastValue);
+								pushToStack(lastValue, current, lastValue);
 								state = JSONState.lookingForNext;
 							}
 							else if(index + "true".length < data.length && data[index.."true".length + index] == "true")
 							{
 								if(state == JSONState.lookingForNext && current.type != JSONType.array)
 									return JSONValue.errorObj(getErr("unexpected number."));
-								pushToStack(JSONValue.create!bool(true, lastKey));
+								pushToStack(JSONValue.create!bool(true, lastKey), current, lastValue);
 								state = JSONState.lookingForNext;
 							}
 							else if(index + "false".length < data.length && data[index.."false".length + index] == "false")
 							{
 								if(state == JSONState.lookingForNext && current.type != JSONType.array)
 									return JSONValue.errorObj(getErr("unexpected number."));
-								pushToStack(JSONValue.create!bool(false, lastKey));
+								pushToStack(JSONValue.create!bool(false, lastKey), current, lastValue);
 								state = JSONState.lookingForNext;
 							}
 							else if(index + "null".length < data.length && data[index.."null".length + index] == "null")
 							{
 								if(state == JSONState.lookingForNext && current.type != JSONType.array)
 									return JSONValue.errorObj(getErr("unexpected number."));
-								pushToStack(JSONValue.create(null, lastKey));
+								pushToStack(JSONValue.create(null, lastKey), current, lastValue);
 								state = JSONState.lookingForNext;
 							}
 							break;
@@ -913,6 +836,88 @@ private struct StringPool
 		return new char[](strSize);
 	}
 }
+
+pragma(inline, true)
+bool pushNewScope(JSONValue val, ref JSONValue* current, ref ptrdiff_t stackLength, ref JSONValue[] stack)
+{
+	assert(val.type == JSONType.object || val.type == JSONType.array || val.type == JSONType.null_, "Unexpected push.");
+	JSONValue* currTemp = current;
+
+	stackLength++;
+	if(stackLength > stack.length)
+		stack~= val;
+	else
+		stack[stackLength-1] = val;
+
+	current = &stack[stackLength-1];
+
+
+	switch(currTemp.type)
+	{
+		case JSONType.object:
+			currTemp.data.object.value[val.key] = *current;
+			break;
+		case JSONType.array:
+			currTemp.data.array = JSONArray.append(currTemp.data.array, *current);
+			break;
+		case JSONType.null_:
+			currTemp.type = val.type;
+			currTemp.data = val.data;
+			break;
+		default: return false;
+	}
+	return true;
+}
+
+
+pragma(inline, true)
+void popScope(ref ptrdiff_t stackLength, ref JSONValue[] stack, ref JSONValue* current)
+{
+	assert(stackLength > 0, "Unexpected pop.");
+
+	stackLength--;
+	if(stackLength > 0)
+	{
+		JSONValue* next = &stack[stackLength-1];
+		if(current.type == JSONType.array)
+		{
+			current.data.array = JSONArray.trim(current.data.array);
+			if(next.type == JSONType.array)
+			{
+				next.data.array.getArray[$-1] = *current;
+			}
+		// 	else if(next.type == JSONType.object)
+		// 	{
+		// 		JSONValue* v = current.key in next.data.object.value;
+		// 		current.data.array = JSONArray.trim(current.data.array);
+		// 		*v = *current;
+		// 	}
+		}
+		current = next;
+		import std.conv;
+		assert(current.type == JSONType.object || current.type == JSONType.array, "Unexpected value in stack. (Typed "~(cast(size_t)(current.type)).to!string);
+	}
+}
+
+pragma(inline, true)
+void pushToStack(JSONValue val, ref JSONValue* current, ref JSONValue lastValue)
+{
+	switch(current.type) with(JSONType)
+	{
+		case object:
+			current.data.object.value[val.key] = val;
+			break;
+		case array:
+			current.data.array = JSONArray.append(current.data.array, val);
+			break;
+		case null_:
+			*current = val;
+			break;
+		default: assert(false, "Unexpected stack type: "~current.getTypeName);
+	}
+	lastValue = val;
+}
+
 
 unittest
 {
