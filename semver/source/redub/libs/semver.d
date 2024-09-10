@@ -209,7 +209,7 @@ struct SemVer
 
     bool satisfies(const SemVer requirement) const 
     {
-        if(comparison == ComparisonTypes.any) return true;
+        if(comparison == ComparisonTypes.any || requirement.isMatchAll) return true;
         if(invalid) return false;
 
         if(requirement.isUsingRange)
