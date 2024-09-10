@@ -110,6 +110,7 @@ struct BuildConfiguration
     string[] postGenerateCommands;
     string[] preBuildCommands;
     string[] postBuildCommands;
+    ///Unused
     string sourceEntryPoint;
 
     ///When having those files, the build will use them instead of sourcePaths + sourceFiles
@@ -417,6 +418,24 @@ ref string[] exclusiveMergePaths(StringRange)(return scope ref string[] a, Strin
     }
     return a;
 }
+
+ref string[] inPlaceFilter(return scope ref string[] a, bool function(string obj) shouldInclude)
+{
+    size_t includeLength = 0;
+    for(int i = 0; i < a.length; i++)
+    {
+        if(!shouldInclude(a[i]))
+        {
+            a[i] = a[i+1];
+            i++;
+        }
+        else
+            includeLength++;
+    }
+    a.length = includeLength;
+    return a;
+}
+
 
 /** 
  * This may be more useful in the future. Also may increase compilation speed

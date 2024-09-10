@@ -82,7 +82,7 @@ private void partiallyFinishBuildRequirements(ref BuildRequirements req)
         req.cfg.outputDirectory = buildNormalizedPath(req.cfg.workingDir, req.cfg.outputDirectory);
 
     alias StringArrayRef = string[]*;
-    StringArrayRef[] toAbsolutize = [
+    scope StringArrayRef[] toAbsolutize = [
         &req.cfg.importDirectories,
         &req.cfg.libraryPaths,
         &req.cfg.stringImportPaths,
@@ -99,7 +99,6 @@ private void partiallyFinishBuildRequirements(ref BuildRequirements req)
             import redub.command_generators.commons : escapePath;
             if(!isAbsolute(dir)) 
                 dir = buildNormalizedPath(req.cfg.workingDir, dir);
-            // dir = escapePath(dir);
         }
     }
 
@@ -108,13 +107,13 @@ private void partiallyFinishBuildRequirements(ref BuildRequirements req)
     auto libraries = req.cfg.sourceFiles.filter!((name) => name.extension.isLibraryExtension);
     req.cfg.libraries.exclusiveMergePaths(libraries);
 
-    import std.array;
     ///Remove libraries from the sourceFiles.
-    req.cfg.sourceFiles = req.cfg.sourceFiles.filter!((name) => !name.extension.isLibraryExtension).array;
+    req.cfg.sourceFiles = inPlaceFilter(req.cfg.sourceFiles, (string file) => !file.extension.isLibraryExtension);
 
 
-    if(!isAbsolute(req.cfg.sourceEntryPoint)) 
-        req.cfg.sourceEntryPoint = buildNormalizedPath(req.cfg.workingDir, req.cfg.sourceEntryPoint);
+    //Unused
+    // if(!isAbsolute(req.cfg.sourceEntryPoint))
+        // req.cfg.sourceEntryPoint = buildNormalizedPath(req.cfg.workingDir, req.cfg.sourceEntryPoint);
 
 
     import std.algorithm.sorting;
