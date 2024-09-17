@@ -75,7 +75,8 @@ private auto execCompiler(const BuildConfiguration cfg, string compilerBin, stri
             std.file.remove(cmdFile);
         return executeShell(compilerBin~ " @"~cmdFile, null, Config.none, size_t.max, cfg.workingDir);
     }
-    return executeShell(escapeCompilationCommands(compilerBin, compileFlags), null, Config.none, size_t.max, cfg.workingDir);
+    compilationCommands = escapeCompilationCommands(compilerBin, compileFlags);
+    return executeShell(compilationCommands, null, Config.none, size_t.max, cfg.workingDir);
 }
 
 CompilationResult execCompilation(immutable ThreadBuildData data, shared ProjectNode pack, CompilationInfo info, HashPair hash, immutable string[string] env)
