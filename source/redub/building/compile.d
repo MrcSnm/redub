@@ -3,7 +3,6 @@ import redub.building.cache;
 import redub.logging;
 import redub.buildapi;
 import std.system;
-import std.concurrency;
 import redub.compiler_identification;
 import redub.command_generators.automatic;
 
@@ -29,10 +28,12 @@ struct HashPair
     string requirementHash;
 }
 
-import std.typecons;
-import core.sys.windows.stat;
 import redub.api;
-alias ExecutionResult = Tuple!(int, "status", string, "output");
+struct ExecutionResult
+{
+    int status;
+    string output;
+}
 /**
 *   If any command has status, it will stop executing them and return
 */
@@ -41,7 +42,7 @@ private ExecutionResult executeCommands(const string[] commandsList, string list
     import std.process;
     foreach(cmd; commandsList)
     {
-        auto execRes  = executeShell(cmd, env, Config.none, size_t.max, workingDir);
+        auto execRes  = cast(ExecutionResult)executeShell(cmd, env, Config.none, size_t.max, workingDir);
         if(execRes.status)
         {
             res.status = execRes.status;
@@ -54,6 +55,7 @@ private ExecutionResult executeCommands(const string[] commandsList, string list
 
 void execCompilationThread(immutable ThreadBuildData data, shared ProjectNode pack, CompilationInfo info, HashPair hash, immutable string[string] env)
 {
+    import std.concurrency;
     CompilationResult res = execCompilation(data, pack, info, hash, env);
     scope(exit)
     {
@@ -124,7 +126,7 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
 
             ExecutionResult ret;
             if(!pack.isCopyEnough)
-                ret = execCompiler(cfg, compiler.binOrPath, getCompilationFlags(cfg, os, compiler, hash.rootHash), res.compilationCommand, compiler.isDCompiler);
+                ret = cast(ExecutionResult)execCompiler(cfg, compiler.binOrPath, getCompilationFlags(cfg, os, compiler, hash.rootHash), res.compilationCommand, compiler.isDCompiler);
 
             //For working around bug 3541, 24748, dmd generates .obj files besides files, redub will move them out
             //of there to the object directory
