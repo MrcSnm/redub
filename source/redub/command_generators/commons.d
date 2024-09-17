@@ -211,7 +211,9 @@ string getOutputName(TargetType t, string name, OS os, ISA isa = std.system.inst
     {
         import std.path;
         string dir = dirName(name);
-        outputName = dir ~ "lib" ~ name[dir.length..$];
+        name = name[dir.length..$];
+        if(name[0] == dirSeparator[0]) name = name[1..$];
+        outputName = dir ~ (dir[$-1] == dirSeparator[0] ? "" : dirSeparator) ~ "lib" ~ name;
     }
     outputName~= t.getExtension(os, isa);
     return outputName;

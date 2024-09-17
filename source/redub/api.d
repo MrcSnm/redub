@@ -156,8 +156,9 @@ ProjectDetails buildProject(ProjectDetails d)
         invalidateCaches(d.tree, d.compiler, osFromArch(d.cDetails.arch));
     ProjectNode tree = d.tree;
     OS targetOS = osFromArch(tree.requirements.cfg.arch);
+    ISA isa = isaFromArch(tree.requirements.cfg.arch);
     if(d.useExistingObjFiles)
-        tree.requirements.cfg.changedBuildFiles = getChangedBuildFiles(tree, d.compiler, targetOS);;
+        tree.requirements.cfg.changedBuildFiles = getChangedBuildFiles(tree, d.compiler, targetOS);
     startHandlingConsoleControl();
 
     auto result = timed(()
@@ -166,13 +167,13 @@ ProjectDetails buildProject(ProjectDetails d)
         {
             case ParallelType.full:
                 info("Project ", tree.name," is fully parallelizable! Will build everything at the same time");
-                return buildProjectFullyParallelized(tree, d.compiler, targetOS); 
+                return buildProjectFullyParallelized(tree, d.compiler, targetOS, isa); 
             case ParallelType.leaves:
                 info("Project ", tree.name," will build with simple parallelization!");
-                return buildProjectParallelSimple(tree, d.compiler, targetOS); 
+                return buildProjectParallelSimple(tree, d.compiler, targetOS, isa); 
             case ParallelType.no:
                 info("Project ", tree.name," is single dependency, performing single threaded build");
-                return buildProjectSingleThread(tree, d.compiler, targetOS);
+                return buildProjectSingleThread(tree, d.compiler, targetOS, isa);
             default: 
                 throw new Exception(`Unsupported parallel type in this step.`);
         }
