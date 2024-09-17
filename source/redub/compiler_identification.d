@@ -193,7 +193,11 @@ Compiler getCompiler(string compilerOrPath, string compilerAssumption)
         if(JSONValue* globalPaths = "globalPaths" in compilersInfo)
         {
             if(JSONValue* cachedPath = compilerOrPath in *globalPaths)
-                return getCompilerFromCache(compilersInfo, cachedPath.str);
+            {
+                Compiler ret = getCompilerFromCache(compilersInfo, cachedPath.str);
+                if(ret != Compiler.init)
+                    return ret;
+            }
         }
         compilerOrPath = findExecutable(compilerOrPath);
     }
