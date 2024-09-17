@@ -360,12 +360,13 @@ bool isIncremental(Inference incremental, ProjectNode tree)
  */
 bool shouldUseExistingObj(Inference inf, ProjectNode tree)
 {
-    final switch(inf)
-    {
-        case Inference.auto_: return tree.collapse.length == 1;
-        case Inference.on: return true;
-        case Inference.off: return false;
-    }
+    return false;
+    // final switch(inf)
+    // {
+    //     case Inference.auto_: return tree.collapse.length == 1;
+    //     case Inference.on: return true;
+    //     case Inference.off: return false;
+    // }
 }
 
 

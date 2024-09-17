@@ -210,10 +210,10 @@ string getOutputName(TargetType t, string name, OS os, ISA isa = std.system.inst
     if(os.isPosix && t.isAnyLibrary)
     {
         import std.path;
-        string dir = dirName(name);
-        name = name[dir.length..$];
-        if(name[0] == dirSeparator[0]) name = name[1..$];
-        outputName = dir ~ (dir[$-1] == dirSeparator[0] ? "" : dirSeparator) ~ "lib" ~ name;
+        import std.string;
+        string[] parts = split(name, dirSeparator);
+        parts[$-1] = "lib"~parts[$-1];
+        outputName = join(parts, dirSeparator);
     }
     outputName~= t.getExtension(os, isa);
     return outputName;

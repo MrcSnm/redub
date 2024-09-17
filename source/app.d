@@ -243,7 +243,7 @@ ProjectDetails resolveDependencies(string[] args)
     {
         import std.stdio;
         writeln(RedubVersion);
-        return ProjectDetails(null, Compiler.init, ParallelType.auto_, CompilationDetails.init, true);
+        return ProjectDetails(null, Compiler.init, ParallelType.auto_, CompilationDetails.init, false, true);
     }
     if(bArgs.single)
     {
