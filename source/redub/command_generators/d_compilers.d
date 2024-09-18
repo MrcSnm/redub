@@ -19,10 +19,15 @@ string[] parseBuildConfiguration(AcceptedCompiler comp, const BuildConfiguration
 
         if(isDebug) commands~= "-debug";
         string cacheDir = getCacheOutputDir(mainPackhash, b, compiler, os);
-        if(compiler.compiler == AcceptedCompiler.ldc2 && !b.outputsDeps) ///Ldc always outputs object files
+        ///Whenever a single output file is specified, DMD does not output obj files
+        ///For LDC, it does output them anyway
+        if(compiler.compiler == AcceptedCompiler.ldc2 && !b.outputsDeps)
         {
-            //It must output a main file on obj folder, since it will crash otherwise
-            commands~= mapper(ValidDFlags.objectDir) ~ buildNormalizedPath(cacheDir~ "_obj").escapePath;
+            import std.file;
+            string ldcObjOutDir = escapePath(cacheDir~ "_obj");
+            mkdirRecurse(ldcObjOutDir);
+
+            commands~= mapper(ValidDFlags.objectDir) ~ ldcObjOutDir;
         }
         else if(b.outputsDeps)
             commands~= mapper(ValidDFlags.objectDir)~getObjectDir(cacheDir).escapePath;

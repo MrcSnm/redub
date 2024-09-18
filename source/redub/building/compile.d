@@ -511,6 +511,8 @@ private void saveFinishedBuilds(ProjNodeRange)(ProjNodeRange finishedProjects, s
         }
     }
     updateCacheOnDisk(mainPackHash);
+
+    ///TODO: Start comparing current build time with the last one
 }
 
 private bool doLink(ProjectNode root, CompilationInfo info, string mainPackHash, AdvCacheFormula* formulaCache = null)

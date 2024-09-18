@@ -6,7 +6,7 @@ import redub.logging;
 import redub.package_searching.api;
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.11.3";
+enum RedubVersionOnly = "v1.11.4";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -262,7 +262,11 @@ struct BuildConfiguration
     BuildConfiguration mergeFilteredDflags(const BuildConfiguration other) const
     {
         immutable string[] filterDflags = [
-            "-betterC"
+            "-betterC",
+            "-mixin=",
+            "-ftime-trace",
+            "-ftime-trace-file=",
+            "-ftime-trace-granularity=",
         ];
 
         BuildConfiguration ret = clone;
