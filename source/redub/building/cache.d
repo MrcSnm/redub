@@ -310,6 +310,15 @@ AdvCacheFormula getCopyCacheFormula(string mainPackHash, const BuildRequirements
     };
     string cacheDir = getCacheOutputDir(mainPackHash, req.cfg, compiler, os);
 
+    string[] dirs = [cacheDir];
+    if(compiler.compiler == AcceptedCompiler.ldc2)
+    {
+        ///LDC object output directory
+        dirs~= cacheDir~ "_obj";
+    }
+    if(req.cfg.outputsDeps)
+        dirs~= getObjectDir(cacheDir);
+
 
     string[] extraRequirements = [];
     if (req.cfg.targetType.isLinkedSeparately)
@@ -319,10 +328,7 @@ AdvCacheFormula getCopyCacheFormula(string mainPackHash, const BuildRequirements
 
     return AdvCacheFormula.make(
         contentHasher,//DO NOT use sourcePaths since importPaths is always custom + sourcePaths
-        [
-            DirectoriesWithFilter([cacheDir], false),
-            DirectoriesWithFilter([], false)
-        ],
+        [DirectoriesWithFilter(dirs, false)],
         joiner([req.extra.expectedArtifacts, extraRequirements]),
         existing,
         preprocessed

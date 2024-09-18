@@ -33,13 +33,6 @@ void cwriteln(T...)(T args)
 	stdout.cwrite(args, '\n');
 }
 
-/// Coloured writef to a File.
-void cwritef(Char, A...)(File f, in Char[] fmt, A args)
-{
-	import std.string : format;
-	auto s = format(fmt, args);
-	f.cwrite(s);
-}
 
 /// Coloured writef to a File.
 void cwrite(S...)(File f, S args)

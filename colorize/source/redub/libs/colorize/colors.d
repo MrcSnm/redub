@@ -6,8 +6,6 @@
  */
 module redub.libs.colorize.colors;
 
-import std.string : format;
-
 private template color_type(int offset)
 {
 	enum type : int
@@ -71,6 +69,7 @@ string color(
 	const mode m=mode.init
 ) pure
 {
+	import std.string : format;
 	return format("\033[%d;%d;%dm%s\033[0m", m, c, b, str);
 }
 
@@ -96,6 +95,7 @@ unittest
 string colorHelper(T)(const string str, const T t=T.init) pure
 	if(is(T : fg) || is(T : bg) || is(T : mode))
 {
+	import std.string : format;
 	return format("\033[%dm%s\033[0m", t, str);
 }
 
