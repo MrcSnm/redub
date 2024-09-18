@@ -232,6 +232,7 @@ bool buildProjectParallelSimple(ProjectNode root, Compiler compiler, OS os, ISA 
 {
     import std.concurrency;
     ProjectNode[] dependencyFreePackages = root.findLeavesNodes();
+    ProjectNode[] finishedBuilds;
     string mainPackHash = hashFrom(root.requirements, compiler);
     bool[ProjectNode] spawned;
 
@@ -261,13 +262,14 @@ bool buildProjectParallelSimple(ProjectNode root, Compiler compiler, OS os, ISA 
         ProjectNode finishedPackage = cast()res.node;
         if(res.status)
         {
-            buildFailed(finishedPackage, res, compiler);
+            buildFailed(finishedPackage, res, compiler, finishedBuilds, mainPackHash, &formulaCache);
             return false;
         }
         else
         {
             if(!finishedPackage.isUpToDate)
                 buildSucceeded(finishedPackage, res);
+            finishedBuilds~= finishedPackage;
             finishedPackage.becomeIndependent();
             dependencyFreePackages = root.findLeavesNodes();
 
@@ -289,6 +291,7 @@ bool buildProjectParallelSimple(ProjectNode root, Compiler compiler, OS os, ISA 
 bool buildProjectFullyParallelized(ProjectNode root, Compiler compiler, OS os, ISA isa)
 {
     import std.concurrency;
+    ProjectNode[] finishedBuilds;
     string mainPackHash = hashFrom(root.requirements, compiler);
 
     size_t i = 0;
@@ -321,13 +324,14 @@ bool buildProjectFullyParallelized(ProjectNode root, Compiler compiler, OS os, I
         if(res.status)
         {
             import core.thread;
-            buildFailed(finishedPackage, res, compiler);
+            buildFailed(finishedPackage, res, compiler, finishedBuilds, mainPackHash, &formulaCache);
             thread_joinAll();
             return false;
         }
         else
         {
             buildSucceeded(finishedPackage, res);
+            finishedBuilds~= finishedPackage;
 
             if(!finishedPackage.requirements.cfg.targetType.isLinkedSeparately)
             {
@@ -352,6 +356,7 @@ bool buildProjectFullyParallelized(ProjectNode root, Compiler compiler, OS os, I
 bool buildProjectSingleThread(ProjectNode root, Compiler compiler, OS os, ISA isa)
 {
     ProjectNode[] dependencyFreePackages = root.findLeavesNodes();
+    ProjectNode[] finishedBuilds;
     string mainPackHash = hashFrom(root.requirements, compiler);
 
     printCachedBuildInfo(root);
@@ -368,11 +373,14 @@ bool buildProjectSingleThread(ProjectNode root, Compiler compiler, OS os, ISA is
                 );
                 if(res.status)
                 {
-                    buildFailed(dep, res, compiler);
+                    buildFailed(dep, res, compiler, finishedBuilds, mainPackHash, null);
                     return false;
                 }
                 else
+                {
+                    finishedBuilds~= dep;
                     buildSucceeded(dep, res);
+                }
             }
             finishedPackage = dep;
             finishedPackage.becomeIndependent();
@@ -417,7 +425,9 @@ private void buildSucceeded(ProjectNode node, CompilationResult res)
     }
 
 }
-private void buildFailed(const ProjectNode node, CompilationResult res, const Compiler compiler)
+private void buildFailed(const ProjectNode node, CompilationResult res, const Compiler compiler, 
+    ProjectNode[] finishedPackages, string mainPackHash, AdvCacheFormula* formulaCache
+)
 {
     import redub.misc.github_tag_check;
     errorTitle("Build Failure: '", node.name, " ",node.requirements.version_," [", node.requirements.targetConfiguration,"]' \n\t",
@@ -426,6 +436,7 @@ private void buildFailed(const ProjectNode node, CompilationResult res, const Co
         "\nFailed after ", res.msNeeded,"ms with message\n\t", res.message
     );
     showNewerVersionMessage();
+    saveFinishedBuilds(finishedPackages, mainPackHash, compiler, formulaCache);
 }
 
 
@@ -482,6 +493,26 @@ immutable(string[string]) getEnvForProject(const ProjectNode node)
 
 }
 
+private void saveFinishedBuilds(ProjNodeRange)(ProjNodeRange finishedProjects, string mainPackHash, const Compiler compiler, AdvCacheFormula* formulaCache)
+{
+    AdvCacheFormula cache;
+    if(formulaCache != null)
+        cache = *formulaCache;
+    foreach(ProjectNode node; finishedProjects)
+    {
+        bool hasAlreadyWrittenInCache = formulaCache != null && !node.requirements.cfg.targetType.isLinkedSeparately;
+        // bool hasAlreadyWrittenInCache = false;
+
+        if(!node.isUpToDate && !hasAlreadyWrittenInCache)
+        {
+            CompilationCache existingCache = CompilationCache.get(mainPackHash, node.requirements, compiler);
+            const AdvCacheFormula existingFormula = existingCache.getFormula();
+            updateCache(mainPackHash, CompilationCache.make(existingCache.requirementCache, mainPackHash, node.requirements, os, compiler, &existingFormula, &cache));
+        }
+    }
+    updateCacheOnDisk(mainPackHash);
+}
+
 private bool doLink(ProjectNode root, CompilationInfo info, string mainPackHash, AdvCacheFormula* formulaCache = null)
 {
     Compiler compiler = info.compiler;
@@ -525,24 +556,9 @@ private bool doLink(ProjectNode root, CompilationInfo info, string mainPackHash,
         infos("Up-to-Date: ", root.name, ", skipping linking");
     else if(root.requirements.cfg.targetType != TargetType.none)
     {
-        AdvCacheFormula cache;
-        if(formulaCache != null)
-            cache = *formulaCache;
         auto result = timed(()
         {
-            foreach(ProjectNode node; root.collapse)
-            {
-                bool hasAlreadyWrittenInCache = formulaCache != null && !node.requirements.cfg.targetType.isLinkedSeparately;
-                // bool hasAlreadyWrittenInCache = false;
-
-                if(!node.isUpToDate && !hasAlreadyWrittenInCache)
-                {
-                    CompilationCache existingCache = CompilationCache.get(mainPackHash, node.requirements, compiler);
-                    const AdvCacheFormula existingFormula = existingCache.getFormula();
-                    updateCache(mainPackHash, CompilationCache.make(existingCache.requirementCache, mainPackHash, node.requirements, os, compiler, &existingFormula, &cache));
-                }
-            }
-            updateCacheOnDisk(mainPackHash);
+            saveFinishedBuilds(root.collapse, mainPackHash, compiler, formulaCache);
             return true;
         });
         ///Ignore that message if it is not relevant enough [more than 5 ms]
