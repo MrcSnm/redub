@@ -98,7 +98,7 @@ struct CompilationCache
     {
         if(requirementCache != hashFrom(req, compiler, false))
             return false;
-        AdvCacheFormula otherFormula = getCompilationCacheFormula(req, target, &formula, preprocessed);
+        AdvCacheFormula otherFormula = getCompilationCacheFormula(req,target, &formula, preprocessed);
         diffs = formula.diffStatus(otherFormula, diffCount);
         return diffCount == 0;
     }
@@ -254,19 +254,18 @@ string hashFrom(const BuildRequirements req, Compiler compiler, bool isRoot = tr
  */
 AdvCacheFormula getCompilationCacheFormula(const BuildRequirements req, OS target, const(AdvCacheFormula)* existing, AdvCacheFormula* preprocessed)
 {
-    import std.algorithm.iteration, std.array;
+    import std.algorithm.iteration, std.array, std.path;
 
     static contentHasher = (ubyte[] content, ref ubyte[] output) {
         return hashFunction(cast(string) content, output);
     };
 
-
     return AdvCacheFormula.make(
         contentHasher,//DO NOT use sourcePaths since importPaths is always custom + sourcePaths
         [
-        DirectoriesWithFilter(req.cfg.importDirectories, true),
-        DirectoriesWithFilter(req.cfg.stringImportPaths, false)
-    ], ///This is causing problems when using subPackages without output path, they may clash after
+            DirectoriesWithFilter(req.cfg.importDirectories, true),
+            DirectoriesWithFilter(req.cfg.stringImportPaths, false)
+        ], ///This is causing problems when using subPackages without output path, they may clash after
         // the compilation is finished. Solving this would require hash calculation after linking
         joiner([
             req.cfg.sourceFiles,
@@ -304,11 +303,12 @@ string getCacheOutputDir(string mainPackHash, const BuildConfiguration cfg, Comp
  */
 AdvCacheFormula getCopyCacheFormula(string mainPackHash, const BuildRequirements req, Compiler compiler, OS os, const(AdvCacheFormula)* existing, AdvCacheFormula* preprocessed)
 {
-    import std.algorithm.iteration, std.array;
+    import std.algorithm.iteration, std.array, std.path;
 
     static contentHasher = (ubyte[] content, ref ubyte[] output) {
         return hashFunction(cast(string) content, output);
     };
+    string cacheDir = getCacheOutputDir(mainPackHash, req.cfg, compiler, os);
 
 
     string[] extraRequirements = [];
@@ -320,6 +320,7 @@ AdvCacheFormula getCopyCacheFormula(string mainPackHash, const BuildRequirements
     return AdvCacheFormula.make(
         contentHasher,//DO NOT use sourcePaths since importPaths is always custom + sourcePaths
         [
+            DirectoriesWithFilter([cacheDir], false),
             DirectoriesWithFilter([], false)
         ],
         joiner([req.extra.expectedArtifacts, extraRequirements]),
