@@ -1,5 +1,4 @@
 module redub.cli.dub;
-public import std.getopt;
 
 /// The URL to the official package registry and it's default fallback registries.
 static immutable string[] defaultRegistryURLs = [
@@ -250,8 +249,9 @@ struct DubBuildArguments
 
 
 
-GetoptResult betterGetopt(T)(ref string[] args, out T opts) if(is(T == struct))
+auto betterGetopt(T)(ref string[] args, out T opts) if(is(T == struct))
 {
+    import std.getopt;
     alias _ = opts;
     return mixin("getopt(args, " ~ genGetoptCall!(T)("_") ~ ")");
 }

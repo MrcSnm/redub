@@ -1,7 +1,6 @@
 module redub.parsers.environment;
 import redub.cli.dub;
 import redub.buildapi;
-import std.process;
 import std.system;
 
 
@@ -126,6 +125,7 @@ struct PackageDubVariables
  */
 void setupBuildEnvironmentVariables(InitialDubVariables dubVars)
 {
+    import std.process;
     static foreach(member; __traits(allMembers, InitialDubVariables))
     {
         environment[member] = mixin("dubVars.",member);
@@ -135,6 +135,7 @@ void setupBuildEnvironmentVariables(InitialDubVariables dubVars)
 
 InitialDubVariables getInitialDubVariablesFromArguments(DubArguments args, DubBuildArguments bArgs, OS os, string[] rawArgs)
 {
+    import std.process;
     import std.file;
     InitialDubVariables dubVars;
     dubVars.DUB                 = rawArgs[0];
@@ -164,6 +165,7 @@ InitialDubVariables getInitialDubVariablesFromArguments(DubArguments args, DubBu
  */
 void setupEnvironmentVariablesForRootPackage(immutable BuildRequirements root)
 {
+    import std.process;
     import std.conv:to;
     environment["DUB_ROOT_PACKAGE"] = root.name;
     environment["DUB_ROOT_PACKAGE_DIR"] = root.cfg.workingDir;
@@ -185,6 +187,7 @@ void setupEnvironmentVariablesForPackageTree(ProjectNode root)
 {
     ///Path to a specific package that is part of the package's dependency graph. $ must be in uppercase letters without the semver string.
     // <PKG>_PACKAGE_DIR ;
+    import std.process;
     foreach(ProjectNode mem; root.collapse)
         environment[mem.name.toUppercase~"_PACKAGE_DIR"] = mem.requirements.cfg.workingDir;
 }
@@ -220,12 +223,14 @@ PackageDubVariables getEnvironmentVariablesForPackage(const BuildConfiguration c
  */
 void setupEnvironmentVariablesForPackage(const BuildConfiguration cfg)
 {
+    import std.process;
     PackageDubVariables pack = getEnvironmentVariablesForPackage(cfg);
     static foreach(mem; __traits(allMembers, PackageDubVariables))
         environment[mem] = __traits(getMember, pack, mem);
 }
 string parseStringWithEnvironment(string str)
 {
+    import std.process;
     import std.ascii:isAlphaNum;
     struct VarPos
     {

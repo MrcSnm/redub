@@ -1,6 +1,5 @@
 module redub.buildapi;
 
-import std.path;
 public import std.system:OS, ISA;
 import redub.logging;
 import redub.package_searching.api;
@@ -812,6 +811,7 @@ class ProjectNode
         static void finishSelfRequirements(ProjectNode node, OS targetOS, ISA isa)
         {
             //Finish self requirements
+            import std.path;
             import std.string:replace;
             ///Format from Have_project:subpackage to Have_project_subpackage
             node.requirements.cfg.name = node.requirements.cfg.name.replace(":", "_");
@@ -863,6 +863,7 @@ class ProjectNode
         }
         static void finishMerging(ProjectNode target, ProjectNode input)
         {
+            import std.path;
             vvlog("Merging ", input.name, " into ", target.name);
             target.requirements.cfg = target.requirements.cfg.mergeImport(input.requirements.cfg);
             target.requirements.cfg = target.requirements.cfg.mergeStringImport(input.requirements.cfg);
@@ -1165,6 +1166,7 @@ enum ProjectType
 private TargetType inferTargetType(BuildConfiguration cfg)
 {
     static immutable string[] filesThatInfersExecutable = ["app.d", "main.d", "app.c", "main.c"];
+    import std.path;
     foreach(p; cfg.sourcePaths)
     {
         static import std.file;

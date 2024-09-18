@@ -4,7 +4,6 @@ public import redub.libs.adv_diff.files;
 public import std.int128;
 import redub.api;
 import redub.buildapi;
-static import std.file;
 import std.path;
 import hipjson;
 
@@ -346,11 +345,13 @@ string[] updateCache(string rootCache, const CompilationCache cache, bool writeT
 
 void updateCacheOnDisk(string rootCache)
 {
+    static import std.file;
     std.file.write(getCacheFilePath(rootCache), getCache(rootCache).toString());
 }
 
 private JSONValue* getCache(string rootCache)
 {
+    static import std.file;
     static JSONValue[string] cacheJson;
     string folder = getCacheFolder;
     import redub.meta;

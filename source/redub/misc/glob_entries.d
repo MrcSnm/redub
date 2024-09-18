@@ -1,9 +1,9 @@
 module redub.misc.glob_entries;
-import std.path;
 public import std.file:DirEntry;
 
 auto globDirEntriesShallow(string dirGlob)
 {
+    import std.path;
     import std.file;
     import std.traits:ReturnType;
     import std.string:indexOf;

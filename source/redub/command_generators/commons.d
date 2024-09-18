@@ -5,8 +5,6 @@ public import redub.compiler_identification;
 
 //Import the commonly shared buildapi
 import redub.buildapi;
-import std.process;
-import std.datetime.stopwatch;
 public import std.file:DirEntry;
 
 

@@ -2,7 +2,6 @@ module redub.command_generators.automatic;
 public import std.system;
 public import redub.buildapi;
 public import redub.compiler_identification;
-import std.process;
 
 static import redub.command_generators.gnu_based;
 static import redub.command_generators.gnu_based_ccplusplus;
@@ -11,6 +10,7 @@ static import redub.command_generators.ldc;
 
 string escapeCompilationCommands(string compilerBin, string[] flags)
 {
+    import std.process;
     return escapeShellCommand(compilerBin) ~ " " ~ processFlags(flags);
 }
 
@@ -58,6 +58,7 @@ string getLinkerBin(Compiler compiler)
 
 string getLinkCommands(const ThreadBuildData data, OS os, Compiler compiler, string mainPackHash)
 {
+    import std.process;
     string[] flags = getLinkFlags(data, os, compiler, mainPackHash);
     if(compiler.compiler == AcceptedCompiler.invalid)
         throw new Exception("Unsupported compiler '" ~ compiler.binOrPath~"'");
@@ -78,5 +79,6 @@ private auto processFlags(string[] flags)
 {
     import std.algorithm.iteration;
     import std.array:join;
+    import std.process;
     return (map!((string v) => escapeShellCommand(v))(flags)).join(" ");
 }

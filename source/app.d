@@ -1,9 +1,3 @@
-import std.algorithm:countUntil;
-import std.conv:to;
-import std.array;
-import std.path;
-import std.file;
-import std.process;
 import redub.api;
 
 import redub.compiler_identification;
@@ -86,6 +80,9 @@ int runMain(string[] args)
 
 int executeProgram(ProjectNode tree, string[] args)
 {
+    import std.path;
+    import std.process;
+    import std.algorithm:countUntil;
     ptrdiff_t execArgsInit = countUntil(args, "--");
     string execArgs;
     if(execArgsInit != -1) execArgs = " " ~ escapeShellCommand(args[execArgsInit+1..$]);
@@ -103,6 +100,7 @@ int executeProgram(ProjectNode tree, string[] args)
 
 int describeMain(string[] args)
 {
+    import std.getopt;
     DubDescribeArguments desc;
     try 
     {
@@ -150,6 +148,7 @@ int describeMain(string[] args)
 
     foreach(data; outputContainer)
     {
+        import std.process;
         import std.stdio;
         writeln(escapeShellCommand(data));
     }
@@ -223,7 +222,9 @@ string findProgramPath(string program)
 
 ProjectDetails resolveDependencies(string[] args)
 {
+    import std.file;
     import std.algorithm.comparison:either;
+    import std.getopt;
     import redub.api;
     string subPackage = parseSubpackageFromCli(args);
     string workingDir = std.file.getcwd();
@@ -249,6 +250,7 @@ ProjectDetails resolveDependencies(string[] args)
     {
         import std.process;
         import std.stdio;
+        import std.array;
         string dubCommand = "dub "~join(unmodArgs[1..$], " ");
         environment["DUB_EXE"] = environment["DUB"] = "dub";
         string cwd = getcwd;
