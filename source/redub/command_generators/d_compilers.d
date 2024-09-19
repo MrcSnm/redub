@@ -160,7 +160,9 @@ string dmdFlags(ValidDFlags flag)
         case profileGC: return "-profile=gc";
         case coverage: return "-cov";
         case coverageCTFE: return "-cov=ctfe";
-        
+        case mixinFile: return "-mixin=mixed_in.d";
+        case timeTrace: return "-ftime-trace";
+        case timeTraceFile: return "-ftime-trace-file=trace.json";
         case enableColor: return "-color=on";
         case stringImportPaths: return "-J=";
         case versions: return "-version=";
@@ -193,7 +195,9 @@ string ldcFlags(ValidDFlags flag)
         case profileGC: return "";
         case coverage: return "-cov";
         case coverageCTFE: return "-cov=ctfe";
-
+        case mixinFile: return "-mixin=mixed_in.d";
+        case timeTrace: return "--ftime-trace";
+        case timeTraceFile: return "--ftime-trace-file=trace.json";
         case enableColor: return "--enable-color=true";
         case stringImportPaths: return "-J=";
         case versions: return "--d-version=";
@@ -282,6 +286,9 @@ enum ValidDFlags
     @"buildOption" coverage,
     @"buildOption" coverageCTFE,
 
+    timeTrace,
+    timeTraceFile,
+    mixinFile,
     enableColor,
     stringImportPaths,
     versions,

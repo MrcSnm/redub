@@ -5,7 +5,7 @@ import redub.logging;
 import redub.package_searching.api;
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.11.6";
+enum RedubVersionOnly = "v1.11.7";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -29,6 +29,8 @@ enum BuildType
     plain = "plain",
     release = "release",
     release_debug = "release-debug",
+    time_trace = "time-trace",
+    mixin_check = "mixin-check",
     release_nobounds = "release-nobounds",
     unittest_ = "unittest",
     profile = "profile",
