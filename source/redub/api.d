@@ -4,6 +4,7 @@ import redub.logging;
 import redub.tree_generators.dub;
 import redub.parsers.automatic;
 import redub.command_generators.automatic;
+public import redub.cli.dub: ParallelType, Inference;
 public import redub.parsers.environment;
 public import std.system;
 public import redub.buildapi;
@@ -34,6 +35,20 @@ struct ProjectDetails
 
     void getLinkerFiles(out string[] output) const {putLinkerFiles(tree, output);}
     void getSourceFiles(out string[] output) const {putSourceFiles(tree, output);}
+
+    /**
+    *   Returns whatever this project is supposed to produce [.wasm, .exe, .dll, .lib, .so, ]
+    */
+    string getOutputFile()
+    {
+        import std.path;
+        import redub.command_generators.commons;
+
+        return buildNormalizedPath(
+            tree.requirements.cfg.outputDirectory,
+            getOutputName(tree.requirements.cfg.targetType, tree.name, osFromArch(cDetails.arch), isaFromArch(cDetails.arch))
+        );
+    }
 }
 
 /** 

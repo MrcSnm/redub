@@ -16,8 +16,10 @@ string[] parseBuildConfiguration(AcceptedCompiler comp, const BuildConfiguration
     if(preserve) commands ~= preserve;
     with(b)
     {
-
         if(isDebug) commands~= "-debug";
+        if(compilerVerbose) commands~= mapper(ValidDFlags.verbose);
+        if(compilerVerboseCodeGen) commands~= mapper(ValidDFlags.verboseCodeGen);
+
         string cacheDir = getCacheOutputDir(mainPackhash, b, compiler, os);
         ///Whenever a single output file is specified, DMD does not output obj files
         ///For LDC, it does output them anyway
@@ -161,6 +163,8 @@ string dmdFlags(ValidDFlags flag)
         case coverage: return "-cov";
         case coverageCTFE: return "-cov=ctfe";
         case mixinFile: return "-mixin=mixed_in.d";
+        case verbose: return "-v";
+        case verboseCodeGen: return "-vasm";
         case timeTrace: return "-ftime-trace";
         case timeTraceFile: return "-ftime-trace-file=trace.json";
         case enableColor: return "-color=on";
@@ -196,6 +200,8 @@ string ldcFlags(ValidDFlags flag)
         case coverage: return "-cov";
         case coverageCTFE: return "-cov=ctfe";
         case mixinFile: return "-mixin=mixed_in.d";
+        case verbose: return "-v";
+        case verboseCodeGen: return "--v-cg";
         case timeTrace: return "--ftime-trace";
         case timeTraceFile: return "--ftime-trace-file=trace.json";
         case enableColor: return "--enable-color=true";
@@ -286,6 +292,8 @@ enum ValidDFlags
     @"buildOption" coverage,
     @"buildOption" coverageCTFE,
 
+    verbose,
+    verboseCodeGen,
     timeTrace,
     timeTraceFile,
     mixinFile,

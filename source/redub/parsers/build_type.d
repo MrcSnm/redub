@@ -13,6 +13,8 @@ BuildConfiguration parse(BuildType buildType, AcceptedCompiler comp)
         case BuildType.plain: break;
         case BuildType.release:           b.dFlags = [m(releaseMode), m(optimize), m(inline)]; break;
         case BuildType.release_debug:     b.dFlags = [m(releaseMode), m(optimize), m(inline), m(debugInfo)]; break;
+        case BuildType.compiler_verbose:  b.compilerVerbose = true; break;
+        case BuildType.codegen_verbose:   b.compilerVerboseCodeGen = true; break;
         case BuildType.time_trace:        b.dFlags = [m(timeTrace), m(timeTraceFile)]; break;
         case BuildType.mixin_check:       b.dFlags = [m(mixinFile)]; break;
         case BuildType.release_nobounds:  b.dFlags = [m(releaseMode), m(optimize), m(inline), m(noBoundsCheck)]; break;

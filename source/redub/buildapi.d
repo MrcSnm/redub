@@ -5,7 +5,7 @@ import redub.logging;
 import redub.package_searching.api;
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.11.8";
+enum RedubVersionOnly = "v1.11.9";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -29,6 +29,8 @@ enum BuildType
     plain = "plain",
     release = "release",
     release_debug = "release-debug",
+    compiler_verbose = "compiler-verbose",
+    codegen_verbose = "codegen-verbose",
     time_trace = "time-trace",
     mixin_check = "mixin-check",
     release_nobounds = "release-nobounds",
@@ -121,6 +123,9 @@ struct BuildConfiguration
     @cacheExclude bool outputsDeps;
     ///Uses --oq on ldc, -op on dmd (rename+move while bug exists)
     @cacheExclude bool preservePath = true;
+    @cacheExclude bool compilerVerbose;
+    @cacheExclude bool compilerVerboseCodeGen;
+
     string workingDir;
     string arch;
     TargetType targetType;
@@ -195,6 +200,8 @@ struct BuildConfiguration
         ret.targetType = either(other.targetType, ret.targetType);
         ret.outputDirectory = either(other.outputDirectory, ret.outputDirectory);
         ret = ret.mergeCommands(other);
+        ret.compilerVerbose = other.compilerVerbose;
+        ret.compilerVerboseCodeGen = other.compilerVerboseCodeGen;
         ret.extraDependencyFiles.exclusiveMergePaths(other.extraDependencyFiles);
         ret.filesToCopy.exclusiveMergePaths(other.filesToCopy);
         ret.stringImportPaths.exclusiveMergePaths(other.stringImportPaths);
