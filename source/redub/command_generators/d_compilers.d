@@ -66,7 +66,8 @@ string[] parseBuildConfiguration(AcceptedCompiler comp, const BuildConfiguration
             commands~= mapper(ValidDFlags.buildAsShared);
 
 
-        if(!b.outputsDeps)
+        //Output path for libs must still be specified
+        if(!b.outputsDeps || targetType.isStaticLibrary)
             commands~= mapper(ValidDFlags.outputFile) ~ buildNormalizedPath(cacheDir, getConfigurationOutputName(b, s.os)).escapePath;
 
         if(b.outputsDeps)

@@ -9,3 +9,5 @@ build
 bin
 .DS_Store
 *.out
+.ldc2_cache
+trace.json

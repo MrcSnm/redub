@@ -36,6 +36,14 @@ struct ProjectDetails
     void getLinkerFiles(out string[] output) const {putLinkerFiles(tree, output);}
     void getSourceFiles(out string[] output) const {putSourceFiles(tree, output);}
 
+    string getCacheOutputDir(CompilingSession s) const
+    {
+        import redub.building.cache;
+        import std.path;
+        string hash = hashFrom(tree.requirements, s);
+        return buildNormalizedPath(getCacheFolder, hash);
+    }
+
     /**
     *   Returns whatever this project is supposed to produce [.wasm, .exe, .dll, .lib, .so, ]
     */
@@ -207,6 +215,7 @@ bool cleanProject(ProjectDetails d, bool showMessages)
 {
     import std.path;
     import redub.command_generators.commons;
+    
     auto res = timed(()
     {
         if(showMessages)
@@ -265,6 +274,26 @@ bool cleanProject(ProjectDetails d, bool showMessages)
                     std.file.remove(outFile);
                 }
             }
+        }
+        
+
+        import redub.building.cache;
+        
+        string hash = hashFrom(d.tree.requirements, CompilingSession(d.compiler, osFromArch(d.cDetails.arch), isaFromArch(d.cDetails.arch)));
+        string cacheOutput = buildNormalizedPath(getCacheFolder, hash);
+        string cacheFile = getCacheFilePath(hash);
+
+        if(exists(cacheOutput))
+        {
+            if(showMessages)
+                vlog("Removing cache output dir ", cacheOutput);
+            rmdirRecurse(cacheOutput);
+        }
+        if(exists(cacheFile))
+        {
+            if(showMessages)
+                vlog("Removing cache reference file ", cacheFile);
+            remove(cacheFile);
         }
         return true;
     });

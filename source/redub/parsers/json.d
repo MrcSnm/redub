@@ -50,10 +50,11 @@ private JSONValue parseJSONCached(string filePath)
     return jsonCache[filePath];
 }
 
-public void clearJsonCache()
-{
-    jsonCache = null;
-}
+/** 
+ * This function was created since on libraries, they may be reusing multiple times and thus
+ * storing the cache between runs may trigger errors.
+ */
+public void clearJsonCache(){jsonCache = null;}
 
 
 

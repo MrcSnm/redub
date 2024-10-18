@@ -398,7 +398,7 @@ private JSONValue* getCache(string rootCache)
     return &cacheJson[rootCache];
 }
 
-private string getCacheFolder()
+string getCacheFolder()
 {
     static string cacheFolder;
     if (!cacheFolder)
@@ -406,15 +406,7 @@ private string getCacheFolder()
     return cacheFolder;
 }
 
-private string getBinCacheFolder()
-{
-    static string cacheFolder;
-    if (!cacheFolder)
-        cacheFolder = buildNormalizedPath(getCacheFolder, BIN_CACHE_FOLDER);
-    return cacheFolder;
-}
-
-private string getCacheFilePath(string rootCache)
+string getCacheFilePath(string rootCache)
 {
     return buildNormalizedPath(getCacheFolder, rootCache ~ ".json");
 }
