@@ -15,13 +15,6 @@ struct CompilationResult
     shared ProjectNode node;
 }
 
-struct CompilationInfo
-{
-    Compiler compiler;
-    OS os;
-    ISA isa;
-}
-
 struct HashPair
 {
     string rootHash;
@@ -53,7 +46,7 @@ private ExecutionResult executeCommands(const string[] commandsList, string list
     return ExecutionResult(0, "Success");
 }
 
-void execCompilationThread(immutable ThreadBuildData data, shared ProjectNode pack, CompilationInfo info, HashPair hash, immutable string[string] env)
+void execCompilationThread(immutable ThreadBuildData data, shared ProjectNode pack, CompilingSession info, HashPair hash, immutable string[string] env)
 {
     import std.concurrency;
     CompilationResult res = execCompilation(data, pack, info, hash, env);
@@ -81,7 +74,7 @@ private auto execCompiler(const BuildConfiguration cfg, string compilerBin, stri
     return executeShell(compilationCommands, null, Config.none, size_t.max, cfg.workingDir);
 }
 
-CompilationResult execCompilation(immutable ThreadBuildData data, shared ProjectNode pack, CompilationInfo info, HashPair hash, immutable string[string] env)
+CompilationResult execCompilation(immutable ThreadBuildData data, shared ProjectNode pack, CompilingSession info, HashPair hash, immutable string[string] env)
 {
     import std.file;
     import std.process;
@@ -120,7 +113,7 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
         if(pack.requirements.cfg.targetType != TargetType.none)
         {
             import std.path;
-            string inDir = getCacheOutputDir(hash.rootHash, cast()pack.requirements, compiler, os);
+            string inDir = getCacheOutputDir(hash.rootHash, cast()pack.requirements, info);
             if(!exists(inDir))
                 mkdirRecurse(inDir);
 
@@ -130,7 +123,7 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
 
             ExecutionResult ret;
             if(!pack.isCopyEnough)
-                ret = cast(ExecutionResult)execCompiler(cfg, compiler.binOrPath, getCompilationFlags(cfg, os, compiler, hash.rootHash), res.compilationCommand, compiler.isDCompiler);
+                ret = cast(ExecutionResult)execCompiler(cfg, compiler.binOrPath, getCompilationFlags(cfg, info, hash.rootHash), res.compilationCommand, compiler.isDCompiler);
 
             //For working around bug 3541, 24748, dmd generates .obj files besides files, redub will move them out
             //of there to the object directory
@@ -190,7 +183,7 @@ bool makeFileExecutable(string filePath)
 	}
 }
 
-CompilationResult link(ProjectNode root, string rootHash, const ThreadBuildData data, CompilationInfo info, immutable string[string] env)
+CompilationResult link(ProjectNode root, string rootHash, const ThreadBuildData data, CompilingSession info, immutable string[string] env)
 {
     import std.process;
     import std.file;
@@ -202,7 +195,7 @@ CompilationResult link(ProjectNode root, string rootHash, const ThreadBuildData 
 
     if(!root.isCopyEnough)
     {
-        auto exec = execCompiler(data.cfg, getLinkerBin(compiler), getLinkFlags(data, os, compiler, rootHash), ret.compilationCommand, compiler.isDCompiler);
+        auto exec = execCompiler(data.cfg, getLinkerBin(compiler), getLinkFlags(data, info, rootHash), ret.compilationCommand, compiler.isDCompiler);
         ret.status = exec.status;
         ret.message = exec.output;
         if(exec.status != 0)
@@ -211,7 +204,7 @@ CompilationResult link(ProjectNode root, string rootHash, const ThreadBuildData 
     import redub.command_generators.commons;
     import std.path;
 
-    string inDir = getCacheOutputDir(rootHash, cast()root.requirements, compiler, os);
+    string inDir = getCacheOutputDir(rootHash, cast()root.requirements, info);
     string outDir = getConfigurationOutputPath(data.cfg, os);
     copyDir(inDir, dirName(outDir));
 
@@ -232,12 +225,12 @@ CompilationResult link(ProjectNode root, string rootHash, const ThreadBuildData 
 }
 
 
-bool buildProjectParallelSimple(ProjectNode root, Compiler compiler, OS os, ISA isa)
+bool buildProjectParallelSimple(ProjectNode root, CompilingSession s)
 {
     import std.concurrency;
     ProjectNode[] dependencyFreePackages = root.findLeavesNodes();
     ProjectNode[] finishedBuilds;
-    string mainPackHash = hashFrom(root.requirements, compiler);
+    string mainPackHash = hashFrom(root.requirements, s);
     bool[ProjectNode] spawned;
 
     AdvCacheFormula formulaCache;
@@ -254,7 +247,7 @@ bool buildProjectParallelSimple(ProjectNode root, Compiler compiler, OS os, ISA 
                     spawned[dep] = true;
                     spawn(&execCompilationThread,
                         dep.requirements.buildData, cast(shared)dep, 
-                        CompilationInfo(compiler, os, isa), HashPair(mainPackHash, hashFrom(dep.requirements, compiler)),
+                        s, HashPair(mainPackHash, hashFrom(dep.requirements, s)),
                         getEnvForProject(dep)
                     );
                 }
@@ -266,7 +259,7 @@ bool buildProjectParallelSimple(ProjectNode root, Compiler compiler, OS os, ISA 
         ProjectNode finishedPackage = cast()res.node;
         if(res.status)
         {
-            buildFailed(finishedPackage, res, compiler, finishedBuilds, mainPackHash, &formulaCache);
+            buildFailed(finishedPackage, res, s, finishedBuilds, mainPackHash, &formulaCache);
             return false;
         }
         else
@@ -279,24 +272,24 @@ bool buildProjectParallelSimple(ProjectNode root, Compiler compiler, OS os, ISA 
 
             if(!finishedPackage.requirements.cfg.targetType.isLinkedSeparately)
             {
-                CompilationCache existingCache = CompilationCache.get(mainPackHash, finishedPackage.requirements, compiler);
+                CompilationCache existingCache = CompilationCache.get(mainPackHash, finishedPackage.requirements, s);
                 const AdvCacheFormula existingFormula = existingCache.getFormula();
-                CompilationCache.make(existingCache.requirementCache, mainPackHash, finishedPackage.requirements, os, compiler, &existingFormula, &formulaCache);
-                updateCache(mainPackHash, CompilationCache.make(existingCache.requirementCache, mainPackHash, finishedPackage.requirements, os, compiler, &existingFormula, &formulaCache));
+                CompilationCache.make(existingCache.requirementCache, mainPackHash, finishedPackage.requirements, s, &existingFormula, &formulaCache);
+                updateCache(mainPackHash, CompilationCache.make(existingCache.requirementCache, mainPackHash, finishedPackage.requirements, s, &existingFormula, &formulaCache));
             }
             if(finishedPackage is root)
                 break;
         }
     }
-    return doLink(root, CompilationInfo(compiler, os, isa), mainPackHash, &formulaCache) && copyFiles(root);
+    return doLink(root, s, mainPackHash, &formulaCache) && copyFiles(root);
 }
 
 
-bool buildProjectFullyParallelized(ProjectNode root, Compiler compiler, OS os, ISA isa)
+bool buildProjectFullyParallelized(ProjectNode root, CompilingSession s)
 {
     import std.concurrency;
     ProjectNode[] finishedBuilds;
-    string mainPackHash = hashFrom(root.requirements, compiler);
+    string mainPackHash = hashFrom(root.requirements, s);
 
     size_t i = 0;
     size_t sentPackages = 0;
@@ -308,8 +301,8 @@ bool buildProjectFullyParallelized(ProjectNode root, Compiler compiler, OS os, I
             spawn(&execCompilationThread,
                 pack.requirements.buildData,
                 cast(shared)pack, 
-                CompilationInfo(compiler, os, isa),
-                HashPair(mainPackHash, hashFrom(pack.requirements, compiler)),
+                s,
+                HashPair(mainPackHash, hashFrom(pack.requirements, s)),
                 getEnvForProject(pack)
             );
 
@@ -328,7 +321,7 @@ bool buildProjectFullyParallelized(ProjectNode root, Compiler compiler, OS os, I
         if(res.status)
         {
             import core.thread;
-            buildFailed(finishedPackage, res, compiler, finishedBuilds, mainPackHash, &formulaCache);
+            buildFailed(finishedPackage, res, s, finishedBuilds, mainPackHash, &formulaCache);
             thread_joinAll();
             return false;
         }
@@ -339,13 +332,13 @@ bool buildProjectFullyParallelized(ProjectNode root, Compiler compiler, OS os, I
 
             if(!finishedPackage.requirements.cfg.targetType.isLinkedSeparately)
             {
-                CompilationCache existingCache = CompilationCache.get(mainPackHash, finishedPackage.requirements, compiler);
+                CompilationCache existingCache = CompilationCache.get(mainPackHash, finishedPackage.requirements, s);
                 const AdvCacheFormula existingFormula = existingCache.getFormula();
-                updateCache(mainPackHash, CompilationCache.make(existingCache.requirementCache, mainPackHash, finishedPackage.requirements, os, compiler, &existingFormula, &formulaCache));
+                updateCache(mainPackHash, CompilationCache.make(existingCache.requirementCache, mainPackHash, finishedPackage.requirements, s, &existingFormula, &formulaCache));
             }
         }
     }
-    return doLink(root, CompilationInfo(compiler, os, isa), mainPackHash, &formulaCache) && copyFiles(root);
+    return doLink(root, s, mainPackHash, &formulaCache) && copyFiles(root);
 }
 
 /** 
@@ -357,11 +350,11 @@ bool buildProjectFullyParallelized(ProjectNode root, Compiler compiler, OS os, I
  *   os = Which OS
  * Returns: Has succeeded
  */
-bool buildProjectSingleThread(ProjectNode root, Compiler compiler, OS os, ISA isa)
+bool buildProjectSingleThread(ProjectNode root, CompilingSession s)
 {
     ProjectNode[] dependencyFreePackages = root.findLeavesNodes();
     ProjectNode[] finishedBuilds;
-    string mainPackHash = hashFrom(root.requirements, compiler);
+    string mainPackHash = hashFrom(root.requirements, s);
 
     printCachedBuildInfo(root);
     while(true)
@@ -372,12 +365,12 @@ bool buildProjectSingleThread(ProjectNode root, Compiler compiler, OS os, ISA is
             if(dep.shouldEnterCompilationThread)
             {
                 CompilationResult res = execCompilation(dep.requirements.buildData, cast(shared)dep, 
-                    CompilationInfo(compiler, os, isa),
-                    HashPair(mainPackHash,  hashFrom(dep.requirements, compiler)), getEnvForProject(dep)
+                    s,
+                    HashPair(mainPackHash,  hashFrom(dep.requirements, s)), getEnvForProject(dep)
                 );
                 if(res.status)
                 {
-                    buildFailed(dep, res, compiler, finishedBuilds, mainPackHash, null);
+                    buildFailed(dep, res, s, finishedBuilds, mainPackHash, null);
                     return false;
                 }
                 else
@@ -393,7 +386,7 @@ bool buildProjectSingleThread(ProjectNode root, Compiler compiler, OS os, ISA is
         if(finishedPackage is root)
             break;
     }
-    return doLink(root, CompilationInfo(compiler, os, isa), mainPackHash) && copyFiles(root);
+    return doLink(root, s, mainPackHash) && copyFiles(root);
 }
 
 private void printCachedBuildInfo(ProjectNode root)
@@ -429,18 +422,18 @@ private void buildSucceeded(ProjectNode node, CompilationResult res)
     }
 
 }
-private void buildFailed(const ProjectNode node, CompilationResult res, const Compiler compiler, 
+private void buildFailed(const ProjectNode node, CompilationResult res, CompilingSession s,
     ProjectNode[] finishedPackages, string mainPackHash, AdvCacheFormula* formulaCache
 )
 {
     import redub.misc.github_tag_check;
     errorTitle("Build Failure: '", node.name, " ",node.requirements.version_," [", node.requirements.targetConfiguration,"]' \n\t",
-        RedubVersionShort, "\n\t", compiler.getCompilerWithVersion, "\n\tFailed with flags: \n\n\t",
+        RedubVersionShort, "\n\t", s.compiler.getCompilerWithVersion, "\n\tFailed with flags: \n\n\t",
         res.compilationCommand, 
         "\nFailed after ", res.msNeeded,"ms with message\n\t", res.message
     );
     showNewerVersionMessage();
-    saveFinishedBuilds(finishedPackages, mainPackHash, compiler, formulaCache);
+    saveFinishedBuilds(finishedPackages, mainPackHash, s, formulaCache);
 }
 
 
@@ -497,7 +490,7 @@ immutable(string[string]) getEnvForProject(const ProjectNode node)
 
 }
 
-private void saveFinishedBuilds(ProjNodeRange)(ProjNodeRange finishedProjects, string mainPackHash, const Compiler compiler, AdvCacheFormula* formulaCache)
+private void saveFinishedBuilds(ProjNodeRange)(ProjNodeRange finishedProjects, string mainPackHash, CompilingSession s, AdvCacheFormula* formulaCache)
 {
     AdvCacheFormula cache;
     if(formulaCache != null)
@@ -509,9 +502,9 @@ private void saveFinishedBuilds(ProjNodeRange)(ProjNodeRange finishedProjects, s
 
         if(!node.isUpToDate && !hasAlreadyWrittenInCache)
         {
-            CompilationCache existingCache = CompilationCache.get(mainPackHash, node.requirements, compiler);
+            CompilationCache existingCache = CompilationCache.get(mainPackHash, node.requirements, s);
             const AdvCacheFormula existingFormula = existingCache.getFormula();
-            updateCache(mainPackHash, CompilationCache.make(existingCache.requirementCache, mainPackHash, node.requirements, os, compiler, &existingFormula, &cache));
+            updateCache(mainPackHash, CompilationCache.make(existingCache.requirementCache, mainPackHash, node.requirements, s, &existingFormula, &cache));
         }
     }
     updateCacheOnDisk(mainPackHash);
@@ -519,7 +512,7 @@ private void saveFinishedBuilds(ProjNodeRange)(ProjNodeRange finishedProjects, s
     ///TODO: Start comparing current build time with the last one
 }
 
-private bool doLink(ProjectNode root, CompilationInfo info, string mainPackHash, AdvCacheFormula* formulaCache = null)
+private bool doLink(ProjectNode root, CompilingSession info, string mainPackHash, AdvCacheFormula* formulaCache = null)
 {
     Compiler compiler = info.compiler;
     bool isUpToDate = root.isUpToDate;
@@ -553,7 +546,7 @@ private bool doLink(ProjectNode root, CompilationInfo info, string mainPackHash,
     {
         import redub.command_generators.commons;
         import std.path;
-        string inDir = getCacheOutputDir(mainPackHash, cast()root.requirements, compiler, os);
+        string inDir = getCacheOutputDir(mainPackHash, cast()root.requirements, info);
         string outDir = getConfigurationOutputPath(root.requirements.cfg, os);
         copyDir(inDir, dirName(outDir));
     }
@@ -564,7 +557,7 @@ private bool doLink(ProjectNode root, CompilationInfo info, string mainPackHash,
     {
         auto result = timed(()
         {
-            saveFinishedBuilds(root.collapse, mainPackHash, compiler, formulaCache);
+            saveFinishedBuilds(root.collapse, mainPackHash, info, formulaCache);
             return true;
         });
         ///Ignore that message if it is not relevant enough [more than 5 ms]

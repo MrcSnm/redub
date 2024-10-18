@@ -6,7 +6,7 @@ import redub.command_generators.d_compilers;
 
 
 
-string[] parseBuildConfiguration(const BuildConfiguration b, OS os, Compiler compiler, string requirementCache)
+string[] parseBuildConfiguration(const BuildConfiguration b, CompilingSession s, string requirementCache)
 {
-    return redub.command_generators.d_compilers.parseBuildConfiguration(AcceptedCompiler.ldc2, b, os, compiler, requirementCache);
+    return redub.command_generators.d_compilers.parseBuildConfiguration(AcceptedCompiler.ldc2, b, s, requirementCache);
 }

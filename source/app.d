@@ -39,9 +39,19 @@ string formatError(string err)
 int main(string[] args)
 {
     if(args.length == 1)
-        return runMain(args);
+        return runMain(args, []);
 
-    string action = args[1];
+    import std.algorithm:countUntil;
+    ptrdiff_t execArgsInit = countUntil(args, "--");
+
+    string[] runArgs;
+    if(execArgsInit != -1)
+    {
+        runArgs = args[execArgsInit+1..$];
+        args = args[0..execArgsInit];
+    }
+
+    string action = args.length > 1 ? args[1] : "";
     switch(action)
     {
         case "build":
@@ -63,39 +73,34 @@ int main(string[] args)
             args = args[0] ~ args[2..$];
             goto default;
         default:
-            return runMain(args);
+            return runMain(args, runArgs);
     }
 }
 
 
-int runMain(string[] args)
+int runMain(string[] args, string[] runArgs)
 {
     ProjectDetails d = buildProject(resolveDependencies(args));
     if(!d.tree || d.usesExternalErrorCode)
         return d.getReturnCode;
     if(d.tree.requirements.cfg.targetType != TargetType.executable)
         return 1;
-    return executeProgram(d.tree, args);
+    return executeProgram(d.tree, runArgs);
 }
 
 int executeProgram(ProjectNode tree, string[] args)
 {
     import std.path;
+    import std.array:join;
     import std.process;
-    import std.algorithm:countUntil;
-    ptrdiff_t execArgsInit = countUntil(args, "--");
-    string execArgs;
-    if(execArgsInit != -1) execArgs = " " ~ escapeShellCommand(args[execArgsInit+1..$]);
-
-
     import redub.command_generators.commons;
-    
+
     return wait(spawnShell(
         escapeShellCommand(
             buildNormalizedPath(tree.requirements.cfg.outputDirectory, 
-            tree.requirements.cfg.name~getExecutableExtension(os)) ~  execArgs   
+            tree.requirements.cfg.name~getExecutableExtension(os))) ~ " "~ join(args, " ")
         )
-    ));
+    );
 }
 
 int describeMain(string[] args)

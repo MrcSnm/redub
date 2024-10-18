@@ -5,7 +5,7 @@ import redub.compiler_identification;
 import redub.command_generators.ldc;
 import redub.building.cache;
 
-string[] parseBuildConfiguration(AcceptedCompiler comp, const BuildConfiguration b, OS target, Compiler compiler, string mainPackhash)
+string[] parseBuildConfiguration(AcceptedCompiler comp, const BuildConfiguration b, CompilingSession s, string mainPackhash)
 {
     import std.path;
     string function(ValidDFlags) mapper = getFlagMapper(comp);
@@ -20,10 +20,10 @@ string[] parseBuildConfiguration(AcceptedCompiler comp, const BuildConfiguration
         if(compilerVerbose) commands~= mapper(ValidDFlags.verbose);
         if(compilerVerboseCodeGen) commands~= mapper(ValidDFlags.verboseCodeGen);
 
-        string cacheDir = getCacheOutputDir(mainPackhash, b, compiler, os);
+        string cacheDir = getCacheOutputDir(mainPackhash, b, s);
         ///Whenever a single output file is specified, DMD does not output obj files
         ///For LDC, it does output them anyway
-        if(compiler.compiler == AcceptedCompiler.ldc2 && !b.outputsDeps)
+        if(s.compiler.compiler == AcceptedCompiler.ldc2 && !b.outputsDeps)
         {
             import std.file;
             string ldcObjOutDir = escapePath(cacheDir~ "_obj");
@@ -67,7 +67,7 @@ string[] parseBuildConfiguration(AcceptedCompiler comp, const BuildConfiguration
 
 
         if(!b.outputsDeps)
-            commands~= mapper(ValidDFlags.outputFile) ~ buildNormalizedPath(cacheDir, getConfigurationOutputName(b, target)).escapePath;
+            commands~= mapper(ValidDFlags.outputFile) ~ buildNormalizedPath(cacheDir, getConfigurationOutputName(b, s.os)).escapePath;
 
         if(b.outputsDeps)
             commands~= mapper(ValidDFlags.deps) ~ (buildNormalizedPath(cacheDir)~".deps").escapePath;

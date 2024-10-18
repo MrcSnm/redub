@@ -84,11 +84,11 @@ string getConfigurationOutputName(const BuildConfiguration conf, OS os)
     }
 }
 
-string getDepsFilePath(ProjectNode root, Compiler compiler, OS os)
+string getDepsFilePath(ProjectNode root, CompilingSession s)
 {
     import redub.building.cache;
-    string packHash = hashFrom(root.requirements, compiler);
-    return getDepsFilePath(getCacheOutputDir(packHash, root.requirements.cfg, compiler, os));
+    string packHash = hashFrom(root.requirements, s);
+    return getDepsFilePath(getCacheOutputDir(packHash, root.requirements.cfg, s));
 }
 
 string getDepsFilePath(string cacheDir)

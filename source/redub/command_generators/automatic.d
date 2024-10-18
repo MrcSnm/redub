@@ -23,29 +23,29 @@ string escapeCompilationCommands(string compilerBin, string[] flags)
  *   mainPackHash =
  * Returns: The compilation commands those arguments generates
  */
-string[] getCompilationFlags(const BuildConfiguration cfg, OS os, Compiler compiler, string mainPackHash)
+string[] getCompilationFlags(const BuildConfiguration cfg, CompilingSession s, string mainPackHash)
 {
-    switch(compiler.compiler) with(AcceptedCompiler)
+    switch(s.compiler.compiler) with(AcceptedCompiler)
     {
         case gxx:
-            return redub.command_generators.gnu_based_ccplusplus.parseBuildConfiguration(cfg, os, compiler, mainPackHash);
+            return redub.command_generators.gnu_based_ccplusplus.parseBuildConfiguration(cfg, s, mainPackHash);
         case gcc:
-            return redub.command_generators.gnu_based.parseBuildConfiguration(cfg, os, compiler, mainPackHash);
+            return redub.command_generators.gnu_based.parseBuildConfiguration(cfg, s, mainPackHash);
         case dmd:
-            return redub.command_generators.dmd.parseBuildConfiguration(cfg, os, compiler, mainPackHash);
+            return redub.command_generators.dmd.parseBuildConfiguration(cfg, s, mainPackHash);
         case ldc2:
-            return redub.command_generators.ldc.parseBuildConfiguration(cfg, os, compiler, mainPackHash);
-        default:throw new Exception("Unsupported compiler '"~compiler.binOrPath~"'");
+            return redub.command_generators.ldc.parseBuildConfiguration(cfg, s, mainPackHash);
+        default:throw new Exception("Unsupported compiler '"~s.compiler.binOrPath~"'");
     }
 }
 
-string[] getLinkFlags(const ThreadBuildData data, OS os, Compiler compiler, string mainPackHash)
+string[] getLinkFlags(const ThreadBuildData data, CompilingSession s, string mainPackHash)
 {
     import command_generators.linkers;
     version(Windows)
-        return parseLinkConfigurationMSVC(data, os, compiler, mainPackHash);
+        return parseLinkConfigurationMSVC(data, s, mainPackHash);
     else
-        return parseLinkConfiguration(data, os, compiler, mainPackHash);
+        return parseLinkConfiguration(data, s, mainPackHash);
 }
 
 string getLinkerBin(Compiler compiler)
@@ -56,16 +56,16 @@ string getLinkerBin(Compiler compiler)
 }
 
 
-string getLinkCommands(const ThreadBuildData data, OS os, Compiler compiler, string mainPackHash)
+string getLinkCommands(const ThreadBuildData data, CompilingSession s, string mainPackHash)
 {
     import std.process;
-    string[] flags = getLinkFlags(data, os, compiler, mainPackHash);
-    if(compiler.compiler == AcceptedCompiler.invalid)
-        throw new Exception("Unsupported compiler '" ~ compiler.binOrPath~"'");
+    string[] flags = getLinkFlags(data, s, mainPackHash);
+    if(s.compiler.compiler == AcceptedCompiler.invalid)
+        throw new Exception("Unsupported compiler '" ~ s.compiler.binOrPath~"'");
 
-    if(compiler.isDCompiler)
-        return escapeShellCommand(compiler.binOrPath) ~ " "~ processFlags(flags);
-    return escapeShellCommand(compiler.archiver) ~ " " ~ processFlags(flags);
+    if(s.compiler.isDCompiler)
+        return escapeShellCommand(s.compiler.binOrPath) ~ " "~ processFlags(flags);
+    return escapeShellCommand(s.compiler.archiver) ~ " " ~ processFlags(flags);
 }
 
 

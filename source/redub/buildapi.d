@@ -1,15 +1,27 @@
 module redub.buildapi;
 
 public import std.system:OS, ISA;
+public import redub.compiler_identification: Compiler;
 import redub.logging;
 import redub.package_searching.api;
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.11.9";
+enum RedubVersionOnly = "v1.12.0";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
 enum RedubVersion = RedubVersionShort ~ " - A reimagined DUB";
+
+/**
+ * CompilingSession is important for the hash calculation and thus is passed all around while building.
+ * This guarantees that if any of its configuration changes, a build can be retriggered or recovered
+ */
+struct CompilingSession
+{
+    Compiler compiler;
+    OS os;
+    ISA isa;
+}
 
 enum TargetType
 {

@@ -120,7 +120,7 @@ ParallelType inferParallel(ProjectDetails d)
  * Params:
  *   root = The root of the project
  */
-string[] getChangedBuildFiles(ProjectNode root, Compiler compiler, OS os)
+string[] getChangedBuildFiles(ProjectNode root, CompilingSession s)
 {
     import std.file;
     import std.path;
@@ -130,7 +130,7 @@ string[] getChangedBuildFiles(ProjectNode root, Compiler compiler, OS os)
     if(!root.isRoot)
         throw new Exception("Can only exclude unchanged files from root at this moment.");
 
-    string depsPath = getDepsFilePath(root, compiler, os);
+    string depsPath = getDepsFilePath(root, s);
     if(!exists(depsPath))
         return null;
     const string[] dirtyFiles = filter!((string f) => !f.isDir)(root.getDirtyFiles()).array;
@@ -161,6 +161,8 @@ ProjectDetails buildProject(ProjectDetails d)
     if(!d.tree)
         return d;
 
+    CompilingSession session = CompilingSession(d.compiler, osFromArch(d.cDetails.arch), isaFromArch(d.tree.requirements.cfg.arch));
+
     if(d.forceRebuild)
     {
         if(!cleanProject(d, false))
@@ -168,12 +170,10 @@ ProjectDetails buildProject(ProjectDetails d)
         d.tree.invalidateCacheOnTree();
     }
     else
-        invalidateCaches(d.tree, d.compiler, osFromArch(d.cDetails.arch));
+        invalidateCaches(d.tree,session);
     ProjectNode tree = d.tree;
-    OS targetOS = osFromArch(tree.requirements.cfg.arch);
-    ISA isa = isaFromArch(tree.requirements.cfg.arch);
     if(d.useExistingObjFiles)
-        tree.requirements.cfg.changedBuildFiles = getChangedBuildFiles(tree, d.compiler, targetOS);
+        tree.requirements.cfg.changedBuildFiles = getChangedBuildFiles(tree, session);
     startHandlingConsoleControl();
 
     auto result = timed(()
@@ -182,13 +182,13 @@ ProjectDetails buildProject(ProjectDetails d)
         {
             case ParallelType.full:
                 info("Project ", tree.name," is fully parallelizable! Will build everything at the same time");
-                return buildProjectFullyParallelized(tree, d.compiler, targetOS, isa); 
+                return buildProjectFullyParallelized(tree, session);
             case ParallelType.leaves:
                 info("Project ", tree.name," will build with simple parallelization!");
-                return buildProjectParallelSimple(tree, d.compiler, targetOS, isa); 
+                return buildProjectParallelSimple(tree, session);
             case ParallelType.no:
                 info("Project ", tree.name," is single dependency, performing single threaded build");
-                return buildProjectSingleThread(tree, d.compiler, targetOS, isa);
+                return buildProjectSingleThread(tree, session);
             default: 
                 throw new Exception(`Unsupported parallel type in this step.`);
         }

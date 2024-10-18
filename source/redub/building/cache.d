@@ -50,10 +50,10 @@ struct CompilationCache
         return formula;
     }
 
-    static CompilationCache make(string requirementCache, string mainPackHash, const BuildRequirements req, OS target, Compiler compiler,
+    static CompilationCache make(string requirementCache, string mainPackHash, const BuildRequirements req, CompilingSession s,
         const(AdvCacheFormula)* existing, AdvCacheFormula* preprocessed)
     {
-        return CompilationCache(requirementCache, mainPackHash, getCompilationCacheFormula(req, target, existing, preprocessed), getCopyCacheFormula(mainPackHash, req, compiler, target, existing, preprocessed));
+        return CompilationCache(requirementCache, mainPackHash, getCompilationCacheFormula(req, s.os, existing, preprocessed), getCopyCacheFormula(mainPackHash, req, s, existing, preprocessed));
     }
 
     /**
@@ -61,14 +61,14 @@ struct CompilationCache
      * Params:
      *   rootHash = The root BuildRequirements hash
      *   req = The BuildRequirements in which it will calculate the hash to find its cache
-     *   compiler = The compiler which the requirement was built with
+     *   s = CompilingSession for getting the hash
      * Returns: The compilation cache found inside .redub folder.
      */
-    static CompilationCache get(string rootHash, const BuildRequirements req, Compiler compiler)
+    static CompilationCache get(string rootHash, const BuildRequirements req, CompilingSession s)
     {
         import std.exception;
         JSONValue c = *getCache(rootHash);
-        string reqCache = hashFrom(req, compiler, false);
+        string reqCache = hashFrom(req, s, false);
         if (c.type != JSONType.object || c.hasErrorOccurred)
         {
             import redub.logging;
@@ -94,11 +94,11 @@ struct CompilationCache
      *   cache = Optional argument which stores precalculated results
      * Returns: isCompilationUpToDate
      */
-    bool isCompilationUpToDate(const BuildRequirements req, Compiler compiler, OS target, AdvCacheFormula* preprocessed, out string[64] diffs, out size_t diffCount) const
+    bool isCompilationUpToDate(const BuildRequirements req, CompilingSession s, AdvCacheFormula* preprocessed, out string[64] diffs, out size_t diffCount) const
     {
-        if(requirementCache != hashFrom(req, compiler, false))
+        if(requirementCache != hashFrom(req, s, false))
             return false;
-        AdvCacheFormula otherFormula = getCompilationCacheFormula(req,target, &formula, preprocessed);
+        AdvCacheFormula otherFormula = getCompilationCacheFormula(req, s.os, &formula, preprocessed);
         diffs = formula.diffStatus(otherFormula, diffCount);
         return diffCount == 0;
     }
@@ -112,11 +112,11 @@ struct CompilationCache
      *   cache = Optional argument which stores precalculated results
      * Returns: isCompilationUpToDate
      */
-    bool needsNewCopy(const BuildRequirements req, Compiler compiler, OS target, AdvCacheFormula* preprocessed) const
+    bool needsNewCopy(const BuildRequirements req, CompilingSession s, AdvCacheFormula* preprocessed) const
     {
         if(copyFormula.isEmptyFormula)
             return false;
-        AdvCacheFormula otherFormula = getCopyCacheFormula(rootHash, req, compiler, target, &formula, preprocessed);
+        AdvCacheFormula otherFormula = getCopyCacheFormula(rootHash, req, s, &formula, preprocessed);
         size_t diffCount;
         string[64] diffs = copyFormula.diffStatus(otherFormula, diffCount);
         return diffCount != 0 && !copyFormula.isEmptyFormula;
@@ -128,13 +128,13 @@ struct CompilationCache
  *   root = 
  * Returns: Current cache status from root, without modifying it
  */
-CompilationCache[] cacheStatusForProject(ProjectNode root, Compiler compiler)
+CompilationCache[] cacheStatusForProject(ProjectNode root, CompilingSession s)
 {
     CompilationCache[] cache = new CompilationCache[](root.collapse.length);
-    string rootCache = hashFrom(root.requirements, compiler);
+    string rootCache = hashFrom(root.requirements, s);
     int i = 0;
     foreach (const ProjectNode node; root.collapse)
-        cache[i++] = CompilationCache.get(rootCache, node.requirements, compiler);
+        cache[i++] = CompilationCache.get(rootCache, node.requirements, s);
     return cache;
 }
 
@@ -145,11 +145,11 @@ CompilationCache[] cacheStatusForProject(ProjectNode root, Compiler compiler)
  * situation
  * Params:
  *   root = Project root for traversing
- *   compiler = Which compiler is being used to check the caches
+ *   s = The session on which the cache should be invalidated
  */
-void invalidateCaches(ProjectNode root, Compiler compiler, OS target)
+void invalidateCaches(ProjectNode root, CompilingSession s)
 {
-    CompilationCache[] cacheStatus = cacheStatusForProject(root, compiler);
+    CompilationCache[] cacheStatus = cacheStatusForProject(root, s);
     ptrdiff_t i = cacheStatus.length;
     AdvCacheFormula preprocessed = cacheStatus[0].copyFormula;
 
@@ -161,10 +161,10 @@ void invalidateCaches(ProjectNode root, Compiler compiler, OS target)
         --i;
         if (!n.isUpToDate)
             continue;
-        if(cacheStatus[i].needsNewCopy(n.requirements, compiler, target, &preprocessed))
+        if(cacheStatus[i].needsNewCopy(n.requirements, s, &preprocessed))
             n.setCopyEnough();
 
-        if (!cacheStatus[i].isCompilationUpToDate(n.requirements, compiler, target, &preprocessed, dirtyFiles, dirtyCount))
+        if (!cacheStatus[i].isCompilationUpToDate(n.requirements, s, &preprocessed, dirtyFiles, dirtyCount))
         {
             n.setFilesDirty(dirtyFiles[0..dirtyCount]);
             n.invalidateCache();
@@ -200,17 +200,21 @@ bool attrIncludesUDA(LookType, Attribs...)()
  * Params:
  *   req = The requirements to generate
  *   compiler = Using compiler
+ *   os = The target os is important for the cache so it doesn't build the same files, same configuration but different OS
+ *   isa = ISA is important as one may build other ISA for the same OS
  *   isRoot = This one may include less information. This allows more cache to be reused while keeping the smaller pieces of cache more restrained.
  * Returns: The hash.
  */
-string hashFrom(const BuildConfiguration cfg, Compiler compiler, bool isRoot = true)
+string hashFrom(const BuildConfiguration cfg, CompilingSession session, bool isRoot = true)
 {
     import std.conv : to;
     import xxhash3;
 
     XXH_64 xxh;
     xxh.start();
-    xxh.put(cast(ubyte[]) compiler.versionString);
+    xxh.put(cast(ubyte[]) session.compiler.versionString);
+    xxh.put(cast(ubyte)session.os);
+    xxh.put(cast(ubyte)session.isa);
     // xxh.put(cast(ubyte[])req.targetConfiguration);
     // xxh.put(cast(ubyte[])req.version_);
 
@@ -237,9 +241,9 @@ string hashFrom(const BuildConfiguration cfg, Compiler compiler, bool isRoot = t
     return xxh.finish().toHexString.idup;
 }
 
-string hashFrom(const BuildRequirements req, Compiler compiler, bool isRoot = true)
+string hashFrom(const BuildRequirements req, CompilingSession s, bool isRoot = true)
 {
-    return hashFrom(req.cfg, compiler, isRoot);
+    return hashFrom(req.cfg, s, isRoot);
 }
 
 /** 
@@ -276,18 +280,18 @@ AdvCacheFormula getCompilationCacheFormula(const BuildRequirements req, OS targe
     );
 }
 
-string getCacheOutputDir(string mainPackHash, const BuildRequirements req, Compiler compiler, OS os)
+string getCacheOutputDir(string mainPackHash, const BuildRequirements req, CompilingSession s)
 {
     if(mainPackHash.length == 0)
         throw new Exception("No hash.");
-    return buildNormalizedPath(getCacheFolder, mainPackHash, hashFrom(req, compiler));
+    return buildNormalizedPath(getCacheFolder, mainPackHash, hashFrom(req, s));
 }
 
-string getCacheOutputDir(string mainPackHash, const BuildConfiguration cfg, Compiler compiler, OS os)
+string getCacheOutputDir(string mainPackHash, const BuildConfiguration cfg, CompilingSession s)
 {
     if(mainPackHash.length == 0)
         throw new Exception("No hash.");
-    return buildNormalizedPath(getCacheFolder, mainPackHash, hashFrom(cfg, compiler));
+    return buildNormalizedPath(getCacheFolder, mainPackHash, hashFrom(cfg, s));
 }
 
 
@@ -296,22 +300,22 @@ string getCacheOutputDir(string mainPackHash, const BuildConfiguration cfg, Comp
  * Params:
  *   mainPackHash = The root cache on which this formula was built with. It is used for finding the output directory.
  *   req = The requirements will load adv_diff with the paths to watch for changes
- *   target = Target is important for knowing how the library is called
+ *   s = The session in which the compilation is happening
  *   existing = An existing formula reference as input is important for getting content hash if they aren't up to date
  *   preprocessed = This will store calculations on an AdvCacheFormula, so, subsequent checks are much faster
  * Returns: A new AdvCacheFormula
  */
-AdvCacheFormula getCopyCacheFormula(string mainPackHash, const BuildRequirements req, Compiler compiler, OS os, const(AdvCacheFormula)* existing, AdvCacheFormula* preprocessed)
+AdvCacheFormula getCopyCacheFormula(string mainPackHash, const BuildRequirements req, CompilingSession s, const(AdvCacheFormula)* existing, AdvCacheFormula* preprocessed)
 {
     import std.algorithm.iteration, std.array, std.path;
 
     static contentHasher = (ubyte[] content, ref ubyte[] output) {
         return hashFunction(cast(string) content, output);
     };
-    string cacheDir = getCacheOutputDir(mainPackHash, req.cfg, compiler, os);
+    string cacheDir = getCacheOutputDir(mainPackHash, req.cfg, s);
 
     string[] dirs = [cacheDir];
-    if(compiler.compiler == AcceptedCompiler.ldc2)
+    if(s.compiler.compiler == AcceptedCompiler.ldc2)
     {
         ///LDC object output directory
         dirs~= cacheDir~ "_obj";
