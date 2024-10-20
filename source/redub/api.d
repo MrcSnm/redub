@@ -189,13 +189,10 @@ ProjectDetails buildProject(ProjectDetails d)
         switch(inferParallel(d))
         {
             case ParallelType.full:
-                info("Project ", tree.name," is fully parallelizable! Will build everything at the same time");
                 return buildProjectFullyParallelized(tree, session);
             case ParallelType.leaves:
-                info("Project ", tree.name," will build with simple parallelization!");
                 return buildProjectParallelSimple(tree, session);
             case ParallelType.no:
-                info("Project ", tree.name," is single dependency, performing single threaded build");
                 return buildProjectSingleThread(tree, session);
             default: 
                 throw new Exception(`Unsupported parallel type in this step.`);
@@ -204,7 +201,7 @@ ProjectDetails buildProject(ProjectDetails d)
     bool buildSucceeded = result.value;
     if(!buildSucceeded)
         throw new Exception("Build failure");
-    info("Built project in ", result.msecs, " ms.");
+    infos("Finished ", d.tree.name, " - ", result.msecs, "ms - To force a rebuild of up-to-date targets, run again with --force");
 
     return d;
 }
@@ -348,16 +345,15 @@ ProjectDetails resolveDependencies(
     }
 
     redub.parsers.environment.setupBuildEnvironmentVariables(dubVars);
+    CompilationInfo cInfo = CompilationInfo(compiler.getCompilerString, cDetails.arch, osFromArch(cDetails.arch), isaFromArch(cDetails.arch));
+
 
     BuildRequirements req = parseProject(
         proj.workingDir, 
-        compiler.getCompilerString,
-        cDetails.arch,
+        cInfo,
         BuildRequirements.Configuration(proj.configuration, false), 
         proj.subPackage,
         proj.recipe,
-        osFromArch(cDetails.arch),
-        isaFromArch(cDetails.arch),
         true
     );
     redub.parsers.environment.setupEnvironmentVariablesForRootPackage(cast(immutable)req);
@@ -365,7 +361,6 @@ ProjectDetails resolveDependencies(
     req.cfg = req.cfg.merge(redub.parsers.build_type.parse(buildType, compiler.compiler));
 
 
-    CompilationInfo cInfo = CompilationInfo(compiler.getCompilerString, cDetails.arch, osFromArch(cDetails.arch), isaFromArch(cDetails.arch));
     ProjectNode tree = getProjectTree(req, cInfo);
     if(cDetails.combinedBuild)
         tree.combine();
@@ -374,8 +369,16 @@ ProjectDetails resolveDependencies(
 
 
     import redub.libs.colorize;    
-    infos("Dependencies resolved ", "in ", (st.peek.total!"msecs"), " ms for \"", color(buildType, fg.magenta),"\" using ", compiler.binOrPath, " [", cInfo.targetOS, "-", cInfo.isa, "]");
-    return ProjectDetails(tree, compiler, cDetails.parallelType, cDetails, shouldUseExistingObj(cDetails.useExistingObj, tree), false, 0, invalidateCache);
+    import std.conv:to;
+    ProjectDetails ret = ProjectDetails(tree, compiler, cDetails.parallelType, cDetails, shouldUseExistingObj(cDetails.useExistingObj, tree), false, 0, invalidateCache);
+
+    infos(
+        "Dependencies resolved", " - ", (st.peek.total!"msecs"), " ms \"",
+        color(buildType, fg.magenta),"\" using ", compiler.binOrPath," v", compiler.version_,
+        color(" ["~ cInfo.targetOS.to!string~ "-"~cInfo.isa.to!string~ "]", fg.light_cyan),
+        " - ", color(inferParallel(ret).to!string~" parallel", fg.light_green)
+    );
+    return ret;
 }
 
 

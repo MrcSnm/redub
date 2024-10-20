@@ -5,6 +5,7 @@ import redub.logging;
 import redub.buildapi;
 import redub.package_searching.api;
 import redub.parsers.json;
+import redub.tree_generators.dub;
 
 
 struct ParseConfig
@@ -15,15 +16,14 @@ struct ParseConfig
     string subPackage;
     ///Which version this is
     string version_ = "~master";
-    ///Filter for Compiler
-    string compiler;
-    ///Filter for Arch
-    string arch;
-    ///Filter for OS
-    OS targetOS;
-    ///Filter for ISA
-    ISA isa;
+    ///Creates a filter for Compiler-Arch-OS-ISA
+    CompilationInfo cInfo;
+    ///Who required that package.
     string requiredBy;
+    ///If the current parse config is a sub package, it will have a parent
+    string parentName;
+    ///That information is important for assembling the name.
+    bool isParsingSubpackage;
     ///When first run is equals false, it won't do anything at "configurations"
     bool firstRun = true;
     ///When preGenerateRun is true, it will run the preGenerateRun
@@ -34,8 +34,13 @@ struct ParseConfig
 
 void setName(ref BuildRequirements req, string name, ParseConfig c)
 {
-    if(c.firstRun || req.cfg.name.length == 0)
+    if(c.firstRun)
+    {
+        if(c.parentName.length)
+            name = c.parentName~":"~name;
         req.cfg.name = name;
+        // if(name == "default") asm { int 3; }
+    }
 }
 void setTargetPath(ref BuildRequirements req, string path, ParseConfig c){req.cfg.outputDirectory = path;}
 void setTargetType(ref BuildRequirements req, string targetType, ParseConfig c){req.cfg.targetType = targetFrom(targetType);}
@@ -100,6 +105,7 @@ void addDependency(
     if(path.length && !isAbsolute(path)) 
         path = buildNormalizedPath(c.workingDir, path);
     Dependency dep = dependency(name, path, version_, req.name, c.workingDir, subConfiguration, visibility, info, isOptional);
+    vvlog("Added dependency ", dep.name, ":", dep.subPackage, " [", dep.version_, "] ", "to ", req.name);
     //If dependency already exists, use the existing one
     ptrdiff_t depIndex = countUntil!((a) => a.isSameAs(dep))(req.dependencies);
     if(depIndex == -1)
@@ -129,11 +135,8 @@ private Dependency dependency(
 )
 {
     string out_mainPackageName;
-    string subPackage = getSubPackageInfo(name, out_mainPackageName);
-    ///If subPackage was found, populate informations on it
-    if(out_mainPackageName.length)
-        name = out_mainPackageName;
-    
+    string subPackage = getSubPackageInfoRequiredBy(name, requirementName, out_mainPackageName);
+
     ///Inside this same package (requirementName:subPackage or :subPackage)
     if(subPackage && (out_mainPackageName == requirementName || out_mainPackageName.length == 0))
         path = workingDir;

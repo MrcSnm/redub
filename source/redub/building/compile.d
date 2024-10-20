@@ -417,7 +417,7 @@ private void buildSucceeded(ProjectNode node, CompilationResult res)
         string cfg = node.requirements.targetConfiguration ? (" ["~node.requirements.targetConfiguration~"]") : null;
         string ver = node.requirements.version_.length ? (" "~node.requirements.version_) : null;
 
-        infos("Built: ", node.name, ver, cfg, ". Took ", res.msNeeded, "ms");
+        infos("Built: ", node.name, ver, cfg, " - ", res.msNeeded, "ms");
         vlog("\n\t", res.compilationCommand, " \n");
     }
 
@@ -537,7 +537,7 @@ private bool doLink(ProjectNode root, CompilingSession info, string mainPackHash
         }
         else
         {
-            infos("Linked: ", root.name, " finished in ", result.msecs, "ms!");
+            infos("Linked: ", root.name, " - ", result.msecs, "ms");
             vlog("\n\t", linkRes.compilationCommand, " \n");
         }
     }

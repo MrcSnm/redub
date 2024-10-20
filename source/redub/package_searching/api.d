@@ -28,7 +28,7 @@ struct ReducedPackageInfo
  *   mainPackageName = In the case of redub:adv_diff, it will return redub
  * Returns: The subpackage name. In case of redub:adv_diff, returns adv_diff.
  */
-string getSubPackageInfo(string packageName, out string mainPackageName)
+private string getSubPackageInfo(string packageName, out string mainPackageName)
 {
     import std.string : indexOf;
 

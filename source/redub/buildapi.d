@@ -6,7 +6,7 @@ import redub.logging;
 import redub.package_searching.api;
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.12.1";
+enum RedubVersionOnly = "v1.13.0";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -500,16 +500,6 @@ struct Dependency
     }
 
     bool isSameAs(Dependency other) const{return isSameAs(other.name, other.subPackage);}
-
-    string fullName() const
-    {
-        // if(_fullName is null)
-        {
-            if(subPackage.length) return name~":"~subPackage;
-            // else _fullName = name;
-        }
-        return name;
-    }
 }
 
 struct PendingMergeConfiguration
@@ -781,7 +771,7 @@ class ProjectNode
         {
             foreach(dep; parent.requirements.dependencies)
             {
-                if(dep.visibility == Visibility.private_ && matches(dep.fullName, child.name))
+                if(dep.visibility == Visibility.private_ && matches(dep.name, child.name))
                     return true;
             }
             return false;
@@ -919,18 +909,6 @@ class ProjectNode
                 case executable: break;
                 case none: throw new Exception("TargetType: none as a root project: nothing to do");
                 case invalid: throw new Exception("No targetType was found.");
-                    // if(input.parent.length == 0)
-                    //     throw new Exception("targetType: none as a root project: nothing to do");
-                    // else
-                    // {
-                    //     foreach(dep; input.dependencies)
-                    //     {
-                    //         target.addDependency(dep);
-                    //         finishMerging(target, dep);
-                    //     }
-                    //     target.requirements = target.requirements.mergeDependencies(input.requirements);
-                    // }
-                    // break;
             }
         }
 

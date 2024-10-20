@@ -92,7 +92,7 @@ private void getProjectTreeImpl(
     {
         if(dep.isSubConfigurationOnly)
             continue;            
-        ProjectNode* visitedDep = dep.fullName in visited;
+        ProjectNode* visitedDep = dep.name in visited;
         ProjectNode depNode;
         if(dep.subConfiguration.isDefault && dep.name in subConfigurations)
             dep.subConfiguration = BuildRequirements.Configuration(subConfigurations[dep.name], false);
@@ -103,7 +103,7 @@ private void getProjectTreeImpl(
             if(!dep.isOptional && depNode.isOptional)
             {
                 depNode.makeRequired();
-                infos("Optional Included: ", dep.fullName);
+                infos("Optional Included: ", dep.name);
             }
             ///When found 2 different packages requiring a different dependency subConfiguration
             /// and the new is a default one.
@@ -131,7 +131,7 @@ private void getProjectTreeImpl(
         {
             depNode = new ProjectNode(parseDependency(dep, node.requirements, info), dep.isOptional);
             subConfigurations = depNode.requirements.mergeSubConfigurations(subConfigurations);
-            visited[dep.fullName] = depNode;
+            visited[dep.name] = depNode;
             queue~= depNode;
         }
         node.addDependency(depNode);
@@ -146,8 +146,7 @@ private BuildRequirements parseDependency(Dependency dep, BuildRequirements pare
 {
     import redub.package_searching.cache;
     vvlog("Dependency ", dep.name, " ", dep.version_, " ", dep.pkgInfo.bestVersion, " with parent ", parent.name);
-    BuildRequirements depReq = parseProject(dep.pkgInfo.path, info.compiler, info.arch, dep.subConfiguration, dep.subPackage, null, info.targetOS, info.isa);
-    depReq.cfg.name = dep.fullName;
+    BuildRequirements depReq = parseProject(dep.pkgInfo.path, info, dep.subConfiguration, dep.subPackage, null);
     return depReq;
 }
 

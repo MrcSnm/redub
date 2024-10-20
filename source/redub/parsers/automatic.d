@@ -6,6 +6,7 @@ static import redub.parsers.json;
 static import redub.parsers.sdl;
 static import redub.parsers.environment;
 import redub.command_generators.commons;
+import redub.tree_generators.dub;
 
 /** 
  * Parses an initial directory, not recursively. Currently only .sdl and .json are parsed.
@@ -24,13 +25,10 @@ import redub.command_generators.commons;
  */
 BuildRequirements parseProject(
     string projectWorkingDir, 
-    string compiler, 
-    string arch,
-    BuildRequirements.Configuration subConfiguration, 
+    CompilationInfo cInfo,
+    BuildRequirements.Configuration subConfiguration,
     string subPackage, 
     string recipe,
-    OS targetOS,
-    ISA isa,
     bool isRoot = false,
     string version_ = null
 )
@@ -39,7 +37,7 @@ BuildRequirements parseProject(
     import std.file;
     import redub.package_searching.entry;
     if(!std.file.exists(projectWorkingDir))
-        throw new Exception("Directory "~projectWorkingDir~"' does not exists.");
+        throw new Exception("Directory '"~projectWorkingDir~"' does not exists.");
     string projectFile = findEntryProjectFile(projectWorkingDir, recipe);
     BuildRequirements req;
 
@@ -47,14 +45,14 @@ BuildRequirements parseProject(
 
     switch(extension(projectFile))
     {
-        case ".sdl":   req = redub.parsers.sdl.parse(projectFile, projectWorkingDir, compiler, arch, version_, subConfiguration, subPackage, targetOS, isa, isRoot); break;
-        case ".json":  req = redub.parsers.json.parse(projectFile, projectWorkingDir, compiler, arch, version_, subConfiguration, subPackage, targetOS, isa, isRoot); break;
+        case ".sdl":   req = redub.parsers.sdl.parse(projectFile, projectWorkingDir, cInfo, version_, subConfiguration, subPackage, isRoot); break;
+        case ".json":  req = redub.parsers.json.parse(projectFile, projectWorkingDir, cInfo, version_, subConfiguration, subPackage, "", isRoot); break;
         default: throw new Exception("Unsupported project type "~projectFile~" at dir "~projectWorkingDir);
     }
 
     redub.parsers.environment.setupEnvironmentVariablesForPackage(req.cfg);
     req.cfg = redub.parsers.environment.parseEnvironment(req.cfg);
-    req.cfg.arch = arch;
+    req.cfg.arch = cInfo.arch;
     if(isRoot)
         req.cfg.outputsDeps = true;
 

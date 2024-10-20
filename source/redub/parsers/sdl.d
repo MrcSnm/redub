@@ -1,17 +1,15 @@
 module redub.parsers.sdl;
 public import redub.buildapi;
 public import std.system;
+import redub.tree_generators.dub;
 
 BuildRequirements parse(
     string filePath, 
     string workingDir,  
-    string compiler, 
-    string arch,
+    CompilationInfo cInfo,
     string version_, 
     BuildRequirements.Configuration subConfiguration, 
     string subPackage,
-    OS targetOS,
-    ISA isa,
     bool isRoot = false
 )
 {
@@ -33,7 +31,7 @@ BuildRequirements parse(
             throw new Exception("dub could not convert file at path "~filePath~" to json: "~exec.output);
         std.file.write(tempFile, exec.output);
     }
-    BuildRequirements ret = redub.parsers.json.parse(tempFile, workingDir, compiler, arch, version_, subConfiguration, subPackage, targetOS, isa, isRoot);
+    BuildRequirements ret = redub.parsers.json.parse(tempFile, workingDir, cInfo, version_, subConfiguration, subPackage, "", isRoot);
     chdir(currDir);
     return ret;
 }

@@ -8,6 +8,7 @@ import std.file;
 import redub.parsers.base;
 import redub.command_generators.commons;
 import core.runtime;
+import redub.tree_generators.dub;
 
 /** 
  * Those commands are independent of the selected target OS.
@@ -22,18 +23,16 @@ immutable string[] commandsWithHostFilters = [
 
 BuildRequirements parse(string filePath, 
     string projectWorkingDir, 
-    string compiler, 
-    string arch,
+    CompilationInfo cInfo,
     string version_, 
     BuildRequirements.Configuration subConfiguration,
     string subPackage,
-    OS targetOS,
-    ISA isa,
+    string parentName,
     bool isRoot = false
 )
 {
     import std.path;
-    ParseConfig c = ParseConfig(projectWorkingDir, subConfiguration, subPackage, version_, compiler, arch, targetOS, isa);
+    ParseConfig c = ParseConfig(projectWorkingDir, subConfiguration, subPackage, version_, cInfo, null, parentName);
     return parse(parseJSONCached(filePath), c, isRoot);
 }
 
@@ -68,7 +67,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
     import std.exception;
     cfg.isRoot = isRoot;
     ///Setup base of configuration before finding anything
-    if(cfg.firstRun)
+    if(!cfg.requiredBy)
     {
         enforce("name" in json, "Every package must contain a 'name'");
         cfg.requiredBy = json["name"].str;
@@ -126,7 +125,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
                         enforce(platforms.type == JSONType.array, 
                             "'platforms' on configuration "~name.str~" at project "~req.name
                         );
-                        if(!platformMatches(platforms.array, os, c.isa))
+                        if(!platformMatches(platforms.array, os, c.cInfo.isa))
                             continue;
                     }
                     if(preferredConfiguration == -1)
@@ -141,6 +140,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
                 {
                     configurationToUse = v.array[preferredConfiguration];
                     string cfgName = configurationToUse["name"].str;
+
                     c.subConfiguration = BuildRequirements.Configuration(cfgName, preferredConfiguration == 0);
                     c.firstRun = false;
                     BuildRequirements subCfgReq = parse(configurationToUse, c);
@@ -162,14 +162,14 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
             {
                 string version_, path, visibility;
                 string out_mainPackage;
-                string subPackage = getSubPackageInfoRequiredBy(depName, req.cfg.name, out_mainPackage);
+                string subPackage = getSubPackageInfoRequiredBy(depName, c.requiredBy, out_mainPackage);
                 bool isOptional = false;
-                bool isSubpackageDependency = false;
+                bool isInSameFile = false;
                 ///If the main package is the same as this dependency, then simply use the same json file.
-                if(subPackage && out_mainPackage == req.cfg.name)
+                if(subPackage && out_mainPackage == c.requiredBy)
                 {
                     path = req.cfg.workingDir;
-                    isSubpackageDependency = true;
+                    isInSameFile = true;
                 }
                 if(value.type == JSONType.object) ///Uses path style
                 {
@@ -193,7 +193,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
                 else if(value.type == JSONType.string) ///Version style
                     version_ = value.str;
 
-                if(isSubpackageDependency)
+                if(isInSameFile)
                 {
                     ///Match all dependencies which are subpackages should have the same version as the parent project.
                     if(SemVer(version_).isMatchAll())
@@ -209,6 +209,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
                 else
                     info = findPackage(depName, version_, c.requiredBy, path);
                 addDependency(req, c, depName, version_, BuildRequirements.Configuration.init, path, visibility, info, isOptional);
+
             }
         },
         "subConfigurations": (ref BuildRequirements req, JSONValue v, ParseConfig c)
@@ -228,47 +229,47 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
             "dub.json at "~cfg.workingDir~
             " which contains subPackages, must contain a name"
         );
-        enforce("subPackages" in json, 
+        JSONValue* subPackages = "subPackages" in json;
+        enforce(subPackages,
             "dub.json at "~cfg.workingDir~
             " must contain a subPackages property since it has a subPackage named "~cfg.subPackage
         );
-        enforce(json["subPackages"].type == JSONType.array,
-            "subPackages property must ben Array"
-        );
-        buildRequirements.cfg.name = json["name"].str;
-        bool isSubpackageInPackage = false;
-        foreach(JSONValue p; json["subPackages"].array)
+        enforce(subPackages.type == JSONType.array, "subPackages property must be an Array");
+
+        setName(buildRequirements, json["name"].str, cfg);
+
+        ///Iterate first all subpackages and add each of them inside the cache
+        foreach(JSONValue p; subPackages.array)
         {
-            import std.path;
-            import std.exception;
             import redub.package_searching.cache;
             enforce(p.type == JSONType.object || p.type == JSONType.string, "subPackages may only be either a string or an object");
+
+            string subPackageName;
             if(p.type == JSONType.object)
             {
                 const(JSONValue)* name = "name" in p;
                 enforce(name, "All subPackages entries must contain a name.");
-                redub.package_searching.cache.putPackageInCache(buildRequirements.cfg.name~":"~name.str, cfg.version_, cfg.workingDir);
+                subPackageName = name.str;
             }
             else
             {
+                import std.path;
                 string subPackagePath = p.str;
                 if(!std.path.isAbsolute(subPackagePath))
                     subPackagePath = buildNormalizedPath(cfg.workingDir, subPackagePath);
-                enforce(std.file.isDir(subPackagePath),
-                    "subPackage path '"~subPackagePath~"' must be a directory "
-                );
-                string subPackageName = pathSplitter(subPackagePath).back;
-                redub.package_searching.cache.putPackageInCache(buildRequirements.cfg.name~":"~subPackageName, cfg.version_, cfg.workingDir);
+                enforce(std.file.isDir(subPackagePath), "subPackage path '"~subPackagePath~"' must be a directory " );
+                subPackageName = pathSplitter(subPackagePath).back;
             }
+            redub.package_searching.cache.putPackageInCache(buildRequirements.name~":"~subPackageName, cfg.version_, cfg.workingDir);
         }
 
-        foreach(JSONValue p; json["subPackages"].array)
+        foreach(JSONValue p; subPackages.array)
         {
             if(p.type == JSONType.object) //subPackage is at same file
             {
                 const(JSONValue)* name = "name" in p;
                 if(name.str == cfg.subPackage)
-                    return parse(p, ParseConfig(cfg.workingDir, cfg.subConfiguration, null, cfg.version_, cfg.compiler, cfg.arch, cfg.targetOS, cfg.isa, cfg.requiredBy, true, true));
+                    return parse(p, ParseConfig(cfg.workingDir, cfg.subConfiguration, null, cfg.version_, cfg.cInfo, cfg.requiredBy, buildRequirements.name, true, true, true));
             }
             else ///Subpackage is on other file
             {
@@ -281,15 +282,12 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
                 if(subPackageName == cfg.subPackage)
                 {
                     import redub.parsers.automatic;
-                    isSubpackageInPackage = true;
-                    return parseProject(subPackagePath, cfg.compiler, cfg.arch, cfg.subConfiguration, null, null, cfg.targetOS, cfg.isa, false, cfg.version_);
+                    return parseProject(subPackagePath, cfg.cInfo, cfg.subConfiguration, null, null, false, cfg.version_);
                 }
             } 
         }
-        enforce(isSubpackageInPackage, 
-            "subPackage named '"~cfg.subPackage~"' could not be found " ~
-            "while looking inside the requested package '"~buildRequirements.name ~ "' "~
-            "in path "~cfg.workingDir
+        throw new Exception("subPackage named '"~cfg.subPackage~"' could not be found " ~
+            "while looking inside the requested package '"~buildRequirements.name ~ "' in path "~ cfg.workingDir
         );
     }
     string[] unusedKeys;
@@ -317,11 +315,11 @@ private void runHandlers(
             CommandWithFilter filtered = CommandWithFilter.fromKey(key);
             fn = filtered.command in handler;
             
-            OS osToMatch = cfg.targetOS;
+            OS osToMatch = cfg.cInfo.targetOS;
             ///If the command is inside the host filters, it will use host OS instead.
             if(commandsWithHostFilters.countUntil(filtered.command) != -1) osToMatch = std.system.os;
 
-            mustExecuteHandler = filtered.matchesPlatform(osToMatch, cfg.isa, cfg.compiler) && fn;
+            mustExecuteHandler = filtered.matchesPlatform(osToMatch, cfg.cInfo.isa, cfg.cInfo.compiler) && fn;
         }
         if(mustExecuteHandler)
             (*fn)(buildRequirements, v, cfg);
