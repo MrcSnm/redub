@@ -304,6 +304,25 @@ void putSourceFiles(
     }
 }
 
+
+///On Windows, when trying to rename in a different drive, it throws. Use copy instead
+void renameOrCopy(string from, string to)
+{
+    import std.file;
+    version(Windows)
+    {
+        import std.path;
+        if(driveName(from) != driveName(to))
+        {
+            std.file.copy(from, to);
+            std.file.remove(from);
+        }
+        else
+            std.file.rename(from, to);
+    }
+    else return std.file.rename(from, to);
+}
+
 ///DMD only when using -op
 void moveGeneratedObjectFiles(
     const string[] paths, 
@@ -334,14 +353,14 @@ void moveGeneratedObjectFiles(
                 string targetDir = dirName(targetPath);
                 if(!exists(targetDir))
                     mkdirRecurse(targetDir);
-                rename(e.name, targetPath);
+                renameOrCopy(e.name, targetPath);
             }
         }
     }
     foreach(i, file; files)
     {
         string targetPath = buildNormalizedPath(moveDir, baseName(setExtension(file, extension)));
-        rename(file, targetPath);
+        renameOrCopy(file, targetPath);
     }
 }
 

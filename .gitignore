@@ -1,4 +1,6 @@
 build
+.dub
+d_dependencies/simports/
 .history
 *.exe
 .vs

@@ -3,6 +3,8 @@
 	"versions": {
 		"adv_diff": {"path":"adv_diff"},
 		"colorize": {"path":"colorize"},
+		"d_dependencies": {"path":"d_dependencies"},
+		"hipjson": {"path":"hipjson"},
 		"semver": {"path":"semver"},
 		"xxhash3": "0.0.5"
 	}
