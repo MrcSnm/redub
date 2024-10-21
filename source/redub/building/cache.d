@@ -53,7 +53,7 @@ struct CompilationCache
     static CompilationCache make(string requirementCache, string mainPackHash, const BuildRequirements req, CompilingSession s,
         const(AdvCacheFormula)* existing, AdvCacheFormula* preprocessed)
     {
-        return CompilationCache(requirementCache, mainPackHash, getCompilationCacheFormula(req, s.os, existing, preprocessed), getCopyCacheFormula(mainPackHash, req, s, existing, preprocessed));
+        return CompilationCache(requirementCache, mainPackHash, getCompilationCacheFormula(req, mainPackHash, s, existing, preprocessed), getCopyCacheFormula(mainPackHash, req, s, existing, preprocessed));
     }
 
     /**
@@ -98,7 +98,7 @@ struct CompilationCache
     {
         if(requirementCache != hashFrom(req, s, false))
             return false;
-        AdvCacheFormula otherFormula = getCompilationCacheFormula(req, s.os, &formula, preprocessed);
+        AdvCacheFormula otherFormula = getCompilationCacheFormula(req, rootHash, s, &formula, preprocessed);
         diffs = formula.diffStatus(otherFormula, diffCount);
         return diffCount == 0;
     }
@@ -112,13 +112,12 @@ struct CompilationCache
      *   cache = Optional argument which stores precalculated results
      * Returns: isCompilationUpToDate
      */
-    bool needsNewCopy(const BuildRequirements req, CompilingSession s, AdvCacheFormula* preprocessed) const
+    bool needsNewCopy(const BuildRequirements req, CompilingSession s, AdvCacheFormula* preprocessed, out string[64] diffs, out size_t diffCount) const
     {
         if(copyFormula.isEmptyFormula)
             return false;
         AdvCacheFormula otherFormula = getCopyCacheFormula(rootHash, req, s, &formula, preprocessed);
-        size_t diffCount;
-        string[64] diffs = copyFormula.diffStatus(otherFormula, diffCount);
+        diffs = copyFormula.diffStatus(otherFormula, diffCount);
         return diffCount != 0 && !copyFormula.isEmptyFormula;
     }
 }
@@ -151,7 +150,7 @@ void invalidateCaches(ProjectNode root, CompilingSession s)
 {
     CompilationCache[] cacheStatus = cacheStatusForProject(root, s);
     ptrdiff_t i = cacheStatus.length;
-    AdvCacheFormula preprocessed = cacheStatus[0].copyFormula;
+    AdvCacheFormula preprocessed;
 
     string[64] dirtyFiles;
     size_t dirtyCount;
@@ -161,14 +160,14 @@ void invalidateCaches(ProjectNode root, CompilingSession s)
         --i;
         if (!n.isUpToDate)
             continue;
-        if(cacheStatus[i].needsNewCopy(n.requirements, s, &preprocessed))
-            n.setCopyEnough();
-
         if (!cacheStatus[i].isCompilationUpToDate(n.requirements, s, &preprocessed, dirtyFiles, dirtyCount))
         {
             n.setFilesDirty(dirtyFiles[0..dirtyCount]);
             n.invalidateCache();
+            continue;
         }
+        if(cacheStatus[i].needsNewCopy(n.requirements, s, &preprocessed, dirtyFiles, dirtyCount))
+            n.setCopyEnough(dirtyFiles[0..dirtyCount]);
     }
 }
 
@@ -256,7 +255,7 @@ string hashFrom(const BuildRequirements req, CompilingSession s, bool isRoot = t
  *   preprocessed = This will store calculations on an AdvCacheFormula, so, subsequent checks are much faster
  * Returns: A new AdvCacheFormula
  */
-AdvCacheFormula getCompilationCacheFormula(const BuildRequirements req, OS target, const(AdvCacheFormula)* existing, AdvCacheFormula* preprocessed)
+AdvCacheFormula getCompilationCacheFormula(const BuildRequirements req, string mainPackHash, CompilingSession s, const(AdvCacheFormula)* existing, AdvCacheFormula* preprocessed)
 {
     import std.algorithm.iteration, std.array, std.path;
 
@@ -264,11 +263,25 @@ AdvCacheFormula getCompilationCacheFormula(const BuildRequirements req, OS targe
         return hashFunction(cast(string) content, output);
     };
 
+    string cacheDir = getCacheOutputDir(mainPackHash, req.cfg, s);
+
+    string[] dirs = [cacheDir];
+    if(s.compiler.compiler == AcceptedCompiler.ldc2)
+    {
+        ///LDC object output directory
+        dirs~= cacheDir~ "_obj";
+    }
+    if(req.cfg.outputsDeps)
+        dirs~= getObjectDir(cacheDir);
+
+
+
     return AdvCacheFormula.make(
         contentHasher,//DO NOT use sourcePaths since importPaths is always custom + sourcePaths
         [
             DirectoriesWithFilter(req.cfg.importDirectories, true),
-            DirectoriesWithFilter(req.cfg.stringImportPaths, false)
+            DirectoriesWithFilter(req.cfg.stringImportPaths, false),
+            DirectoriesWithFilter(dirs, false)
         ], ///This is causing problems when using subPackages without output path, they may clash after
         // the compilation is finished. Solving this would require hash calculation after linking
         joiner([
@@ -312,27 +325,15 @@ AdvCacheFormula getCopyCacheFormula(string mainPackHash, const BuildRequirements
     static contentHasher = (ubyte[] content, ref ubyte[] output) {
         return hashFunction(cast(string) content, output);
     };
-    string cacheDir = getCacheOutputDir(mainPackHash, req.cfg, s);
-
-    string[] dirs = [cacheDir];
-    if(s.compiler.compiler == AcceptedCompiler.ldc2)
-    {
-        ///LDC object output directory
-        dirs~= cacheDir~ "_obj";
-    }
-    if(req.cfg.outputsDeps)
-        dirs~= getObjectDir(cacheDir);
-
 
     string[] extraRequirements = [];
     if (req.cfg.targetType.isLinkedSeparately)
         extraRequirements = req.extra.librariesFullPath.map!(
             (libPath) => getLibraryPath(libPath, req.cfg.outputDirectory, os)).array;
 
-
     return AdvCacheFormula.make(
         contentHasher,//DO NOT use sourcePaths since importPaths is always custom + sourcePaths
-        [DirectoriesWithFilter(dirs, false)],
+        [DirectoriesWithFilter([], false)],
         joiner([req.extra.expectedArtifacts, extraRequirements]),
         existing,
         preprocessed

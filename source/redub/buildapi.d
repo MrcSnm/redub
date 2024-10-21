@@ -6,7 +6,7 @@ import redub.logging;
 import redub.package_searching.api;
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.13.1";
+enum RedubVersionOnly = "v1.13.2";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -977,8 +977,10 @@ class ProjectNode
     }
 
 
-    void setCopyEnough()
+    void setCopyEnough(const string[] files)
     {
+        if(hasLogLevel(LogLevel.verbose))
+            warnTitle("Project "~ name ~ " copy files: ", files);
         needsCopyOnly = true;
     }
 
