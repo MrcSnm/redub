@@ -156,7 +156,7 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
 
         if(res.status == 0)
         {
-            if(executeCommands(cfg.postBuildCommands, "postBuildCommand", res, cfg.workingDir, env).status)
+            if(!cfg.targetType.isLinkedSeparately && executeCommands(cfg.postBuildCommands, "postBuildCommand", res, cfg.workingDir, env).status)
                 return res;
             if(!cfg.targetType.isLinkedSeparately && executeCommands(cfg.postGenerateCommands, "postGenerateCommand", res, cfg.workingDir, env).status)
                 return res;
@@ -219,7 +219,12 @@ CompilationResult link(ProjectNode root, string rootHash, const ThreadBuildData 
 
 
     if(data.cfg.targetType.isLinkedSeparately)
-        executeCommands(data.cfg.postGenerateCommands, "postGenerateCommand", ret, data.cfg.workingDir, env);
+    {
+        if(executeCommands(data.cfg.postBuildCommands, "postBuildCommand", ret, data.cfg.workingDir, env).status)
+            return ret;
+        if(executeCommands(data.cfg.postGenerateCommands, "postGenerateCommand", ret, data.cfg.workingDir, env).status)
+            return ret;
+    }
 
     return ret;
 }
