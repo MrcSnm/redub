@@ -1,0 +1,16 @@
+.dub
+docs.json
+__dummy.html
+docs/
+/subcfg
+subcfg.so
+subcfg.dylib
+subcfg.dll
+subcfg.a
+subcfg.lib
+subcfg-test-*
+*.exe
+*.pdb
+*.o
+*.obj
+*.lst

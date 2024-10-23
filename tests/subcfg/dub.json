@@ -1,0 +1,21 @@
+{
+	"authors": [
+		"Hipreme"
+	],
+	"sourcePaths": ["test"],
+	"importPaths": ["test"],
+	"subPackages": [
+		{
+			"name": "core",
+			"sourcePaths": [ "source" ],
+			"importPaths": [ "source", "test"]
+		}
+	],
+	"dependencies": {
+		":core": "*"
+	},
+	"copyright": "Copyright © 2024, Hipreme",
+	"description": "A minimal D application.",
+	"license": "proprietary",
+	"name": "subcfg"
+}

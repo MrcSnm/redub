@@ -6,7 +6,7 @@ import redub.logging;
 import redub.package_searching.api;
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.13.3";
+enum RedubVersionOnly = "v1.13.4";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -830,7 +830,7 @@ class ProjectNode
             ///Format from projects such as match-3 into Have_match_3
             node.requirements.cfg.versions.exclusiveMerge(["Have_"~node.requirements.cfg.name.replace("-", "_")]);
             if(node.requirements.cfg.targetType == TargetType.autodetect)
-                node.requirements.cfg.targetType = inferTargetType(node.requirements.cfg);
+                node.requirements.cfg.targetType = inferTargetType(node);
 
             ///Transforms every dependency into Have_dependency
             BuildConfiguration toMerge;
@@ -1165,15 +1165,15 @@ enum ProjectType
     CPP
 }
 
-private TargetType inferTargetType(BuildConfiguration cfg)
+private TargetType inferTargetType(const ProjectNode node)
 {
     static immutable string[] filesThatInfersExecutable = ["app.d", "main.d", "app.c", "main.c"];
     import std.path;
-    foreach(p; cfg.sourcePaths)
+    if(node.parent.length == 0) foreach(p; node.requirements.cfg.sourcePaths)
     {
         static import std.file;
         foreach(f; filesThatInfersExecutable)
-        if(std.file.exists(buildNormalizedPath(cfg.workingDir, p,f)))
+        if(std.file.exists(buildNormalizedPath(node.requirements.cfg.workingDir, p,f)))
             return TargetType.executable;
     }
     return TargetType.library;
