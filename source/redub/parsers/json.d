@@ -200,15 +200,18 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
                         version_ = c.version_;
                 }
                 PackageInfo* info;
+
+                string packageFullName = getPackageFullName(depName, c.requiredBy);
                 if(!path)
                 {
-                    info = redub.package_searching.cache.findPackage(depName, version_, c.requiredBy);
+                    info = redub.package_searching.cache.findPackage(packageFullName, version_, c.requiredBy);
                     path = info.path;
                     version_ = info.bestVersion.toString;
                 }
                 else
-                    info = findPackage(depName, version_, c.requiredBy, path);
-                addDependency(req, c, depName, version_, BuildRequirements.Configuration.init, path, visibility, info, isOptional);
+                    info = findPackage(packageFullName, version_, c.requiredBy, path);
+                
+                addDependency(req, c, packageFullName, version_, BuildRequirements.Configuration.init, path, visibility, info, isOptional);
 
             }
         },

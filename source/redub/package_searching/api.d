@@ -42,6 +42,20 @@ private string getSubPackageInfo(string packageName, out string mainPackageName)
     return packageName[ind + 1 .. $];
 }
 
+/** 
+ * Gets the full package name. Used for caching
+ * Params:
+ *   packageName = The package name specification
+ *   requiredBy = Which is requesting it
+ * Returns: The package full name. For example - (:gl, renderer) returns 'renderer:gl'
+ */
+string getPackageFullName(string packageName, string requiredBy)
+{
+    if(packageName.length && packageName[0] == ':')
+        return requiredBy~packageName;
+    return packageName;
+}
+
 
 /**
  * Same as getSubPackageInfo, but infer mainPackageName in case of sending a subPackage only, such as :adv_diff

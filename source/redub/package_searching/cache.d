@@ -38,7 +38,6 @@ private string getBetterPackageInfo(PackageInfo* input, string packageName)
 PackageInfo* findPackage(string packageName, string packageVersion, string requiredBy)
 {
     import redub.package_searching.dub;
-    if(packageName.length > 0 && packageName[0] == ':') packageName = packageName~":"~requiredBy;
     PackageInfo* pkg = packageName in packagesCache;
     if(!pkg)
     {
