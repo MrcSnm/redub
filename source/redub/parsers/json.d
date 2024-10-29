@@ -84,6 +84,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
 
     immutable static requirementsRun = [
         "name": (ref BuildRequirements req, JSONValue v, ParseConfig c){},
+        "targetName": (ref BuildRequirements req, JSONValue v, ParseConfig c){setTargetName(req, v.str, c);},
         "targetType": (ref BuildRequirements req, JSONValue v, ParseConfig c){setTargetType(req, v.str, c);},
         "targetPath": (ref BuildRequirements req, JSONValue v, ParseConfig c){setTargetPath(req, v.str, c);},
         "importPaths": (ref BuildRequirements req, JSONValue v, ParseConfig c){addImportPaths(req, v.strArr, c);},

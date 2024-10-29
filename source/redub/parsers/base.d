@@ -42,6 +42,7 @@ void setName(ref BuildRequirements req, string name, ParseConfig c)
         // if(name == "default") asm { int 3; }
     }
 }
+void setTargetName(ref BuildRequirements req, string name, ParseConfig c){req.cfg.name = name;}
 void setTargetPath(ref BuildRequirements req, string path, ParseConfig c){req.cfg.outputDirectory = path;}
 void setTargetType(ref BuildRequirements req, string targetType, ParseConfig c){req.cfg.targetType = targetFrom(targetType);}
 void addImportPaths(ref BuildRequirements req, JSONStringArray paths, ParseConfig c)

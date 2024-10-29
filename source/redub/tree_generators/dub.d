@@ -58,7 +58,7 @@ void detectCycle(ProjectNode t)
         
         foreach(n; node.dependencies)
         {
-            if(!(node in visited)) impl(n);
+            if(!(n in visited)) impl(n);
         }
         inStack.remove(node);
     }
