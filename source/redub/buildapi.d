@@ -1,12 +1,12 @@
 module redub.buildapi;
 
-public import std.system:OS, ISA;
+public import std.system:OS, ISA, instructionSetArchitecture;
 public import redub.compiler_identification: Compiler;
 import redub.logging;
 import redub.package_searching.api;
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.13.6";
+enum RedubVersionOnly = "v1.13.7";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -127,6 +127,7 @@ struct BuildConfiguration
     string[] postBuildCommands;
     ///Unused
     string sourceEntryPoint;
+    @cacheExclude string targetName;
 
     ///When having those files, the build will use them instead of sourcePaths + sourceFiles
     @cacheExclude string[] changedBuildFiles;
@@ -687,6 +688,22 @@ class ProjectNode
     private string[] dirtyFiles;
 
     string name() const { return requirements.name; }
+    string targetName() const { return requirements.cfg.targetName; }
+
+    string getOutputName(OS targetOS, ISA isa = instructionSetArchitecture) const
+    {
+        return getOutputName(requirements.cfg.targetType, targetOS, isa);
+    }
+
+    string getOutputName(TargetType targetType, OS targetOS, ISA isa = instructionSetArchitecture) const
+    {
+        import redub.command_generators.commons;
+        import std.path;
+        return buildNormalizedPath(
+            requirements.cfg.outputDirectory,
+            redub.command_generators.commons.getOutputName(targetType, requirements.cfg.targetName, targetOS, isa)
+        );
+    }
 
     this(BuildRequirements req, bool isOptional)
     {
@@ -827,6 +844,8 @@ class ProjectNode
             import std.string:replace;
             ///Format from Have_project:subpackage to Have_project_subpackage
             node.requirements.cfg.name = node.requirements.cfg.name.replace(":", "_");
+            node.requirements.cfg.targetName = node.requirements.cfg.targetName.replace(":", "_");
+
             ///Format from projects such as match-3 into Have_match_3
             node.requirements.cfg.versions.exclusiveMerge(["Have_"~node.requirements.cfg.name.replace("-", "_")]);
             if(node.requirements.cfg.targetType == TargetType.autodetect)
@@ -843,12 +862,7 @@ class ProjectNode
 
             
             ///Adds the output to the expectedArtifact. Those files will be considered on the cache formula.
-            import redub.command_generators.commons;
-
-            node.requirements.extra.expectedArtifacts~= buildNormalizedPath(
-                node.requirements.cfg.outputDirectory, 
-                getOutputName(node.requirements.cfg.targetType, node.requirements.cfg.name, targetOS, isa)
-            );
+            node.requirements.extra.expectedArtifacts~= node.getOutputName(targetOS, isa);
 
             ///Execute pkg-config for Posix
             version(Posix)
@@ -863,14 +877,13 @@ class ProjectNode
                 }
             }
 
+            import redub.command_generators.commons;
+
             ///When windows builds shared libraries and they aren't root, it also generates a static library (import library)
             ///This library will enter on the cache formula
             if(!node.isRoot && node.requirements.cfg.targetType == TargetType.dynamicLibrary && targetOS.isWindows)
             {
-                node.requirements.extra.expectedArtifacts~= buildNormalizedPath(
-                    node.requirements.cfg.outputDirectory,
-                    getOutputName(TargetType.staticLibrary, node.requirements.cfg.name, targetOS, isa)
-                );
+                node.requirements.extra.expectedArtifacts~= node.getOutputName(TargetType.staticLibrary, targetOS, isa);
             }
         }
         static void finishMerging(ProjectNode target, ProjectNode input)
@@ -895,7 +908,7 @@ class ProjectNode
                         BuildConfiguration other = input.requirements.cfg.clone;
                         ///Add the artifact full path to the target
                         target.requirements.extra.librariesFullPath.exclusiveMerge(
-                            [buildNormalizedPath(other.outputDirectory, other.name)]
+                            [buildNormalizedPath(other.outputDirectory, other.targetName)]
                         );
                         target.requirements.cfg = target.requirements.cfg.mergeLibraries(other);
                         target.requirements.cfg = target.requirements.cfg.mergeLibPaths(other);
@@ -1132,12 +1145,7 @@ void putLinkerFiles(const ProjectNode tree, out string[] dataContainer)
     import std.path;
     
     if(tree.requirements.cfg.targetType.isStaticLibrary)
-        dataContainer~= buildNormalizedPath(
-            tree.requirements.cfg.outputDirectory, 
-            getOutputName(
-                tree.requirements.cfg.targetType, 
-                tree.requirements.cfg.name, 
-                os));
+        dataContainer~= tree.getOutputName(os);
 
     dataContainer = dataContainer.append(tree.requirements.extra.librariesFullPath.map!((string libPath)
     {

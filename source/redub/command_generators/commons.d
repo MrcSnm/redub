@@ -79,8 +79,8 @@ string getConfigurationOutputName(const BuildConfiguration conf, OS os)
     with(conf)
     {
         if(targetType.isStaticLibrary)
-            return getOutputName(targetType, name, os);
-        return name~getObjectExtension(os);
+            return getOutputName(targetType, targetName, os);
+        return targetName~getObjectExtension(os);
     }
 }
 

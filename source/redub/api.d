@@ -54,7 +54,7 @@ struct ProjectDetails
 
         return buildNormalizedPath(
             tree.requirements.cfg.outputDirectory,
-            getOutputName(tree.requirements.cfg.targetType, tree.name, osFromArch(cDetails.arch), isaFromArch(cDetails.arch))
+            getOutputName(tree.requirements.cfg.targetType, tree.targetName, osFromArch(cDetails.arch), isaFromArch(cDetails.arch))
         );
     }
 }
@@ -220,10 +220,7 @@ bool cleanProject(ProjectDetails d, bool showMessages)
         import std.file;
         foreach(ProjectNode node; d.tree.collapse)
         {
-            string output = buildNormalizedPath(
-                node.requirements.cfg.outputDirectory,
-                getOutputName(node.requirements.cfg.targetType, node.name, os)
-            );
+            string output = node.getOutputName(node.requirements.cfg.targetType, os);
             if(std.file.exists(output))
             {
                 if(showMessages)
@@ -248,7 +245,7 @@ bool cleanProject(ProjectDetails d, bool showMessages)
             {
                 if(node.requirements.cfg.targetType.isLinkedSeparately)
                 {
-                    string outPath = buildNormalizedPath(node.requirements.cfg.outputDirectory, node.name);
+                    string outPath = buildNormalizedPath(node.requirements.cfg.outputDirectory, node.targetName);
                     foreach(ext; [".ilk", ".pdb"])
                     {
                         string genFile = outPath~ext;

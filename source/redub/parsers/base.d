@@ -39,10 +39,11 @@ void setName(ref BuildRequirements req, string name, ParseConfig c)
         if(c.parentName.length)
             name = c.parentName~":"~name;
         req.cfg.name = name;
-        // if(name == "default") asm { int 3; }
+        if(!req.cfg.targetName.length)
+            req.cfg.targetName = name;
     }
 }
-void setTargetName(ref BuildRequirements req, string name, ParseConfig c){req.cfg.name = name;}
+void setTargetName(ref BuildRequirements req, string name, ParseConfig c){req.cfg.targetName = name;}
 void setTargetPath(ref BuildRequirements req, string path, ParseConfig c){req.cfg.outputDirectory = path;}
 void setTargetType(ref BuildRequirements req, string targetType, ParseConfig c){req.cfg.targetType = targetFrom(targetType);}
 void addImportPaths(ref BuildRequirements req, JSONStringArray paths, ParseConfig c)

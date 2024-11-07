@@ -179,12 +179,12 @@ int testMain(string[] args)
     d.tree.requirements.cfg = d.tree.requirements.cfg.merge(parse(BuildType.unittest_, d.compiler.compiler));
     d.tree.requirements.cfg.dFlags~= "-main";
     d.tree.requirements.cfg.targetType = TargetType.executable;
-    d.tree.requirements.cfg.name~= "-test-";
+    d.tree.requirements.cfg.targetName~= "-test-";
 
     if(d.tree.requirements.configuration.name)
-        d.tree.requirements.cfg.name~= d.tree.requirements.configuration.name;
+        d.tree.requirements.cfg.targetName~= d.tree.requirements.configuration.name;
     else
-        d.tree.requirements.cfg.name~= "library";
+        d.tree.requirements.cfg.targetName~= "library";
 
     d = buildProject(d);
     if(d.error)
@@ -288,7 +288,7 @@ ProjectDetails resolveDependencies(string[] args)
     if(bArgs.targetPath)
         ret.tree.requirements.cfg.outputDirectory = bArgs.targetPath;
     if(bArgs.targetName)
-        ret.tree.requirements.cfg.name = bArgs.targetName;
+        ret.tree.requirements.cfg.targetName = bArgs.targetName;
 
     return ret;
 }

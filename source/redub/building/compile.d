@@ -140,7 +140,6 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
 
             copyDir(inDir, dirName(outDir));
 
-
             ///Shared Library(mostly?)
             if(isDCompiler(compiler) && isLinkedSeparately(data.cfg.targetType) && !pack.isRoot)
             {
