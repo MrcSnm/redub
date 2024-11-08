@@ -11,6 +11,11 @@ string[] parseLinkConfiguration(const ThreadBuildData data, CompilingSession s, 
     import redub.building.cache;
     string[] commands;
 
+    version(linux)
+        bool isUsingGNULinker = true;
+    else
+        bool isUsingGNULinker = false;
+
     const BuildConfiguration b = data.cfg;
     with(b)
     {
@@ -38,10 +43,13 @@ string[] parseLinkConfiguration(const ThreadBuildData data, CompilingSession s, 
         
         if (targetType.isLinkedSeparately)
         {
+            //Only linux supports start/end group. OSX does not
+            if(isUsingGNULinker)
+                commands~= "-L--start-group";
             ///Use library full path for the base file
-            commands~= "-L--start-group";
             commands = mapAppendReverse(commands, data.extra.librariesFullPath, (string l) => "-L"~getOutputName(TargetType.staticLibrary, l, s.os));
-            commands~= "-L--end-group";
+            if(isUsingGNULinker)
+                commands~= "-L--end-group";
             commands = mapAppendPrefix(commands, linkFlags, "-L", false);
             commands = mapAppendPrefix(commands, libraryPaths, "-L-L", true);
             commands~= getLinkFiles(b.sourceFiles);
