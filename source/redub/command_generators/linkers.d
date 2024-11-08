@@ -39,11 +39,13 @@ string[] parseLinkConfiguration(const ThreadBuildData data, CompilingSession s, 
         if (targetType.isLinkedSeparately)
         {
             ///Use library full path for the base file
-            commands = mapAppendReverse(commands, data.extra.librariesFullPath, (string l) => getOutputName(TargetType.staticLibrary, l, s.os));
+            commands~= "-L--start-group";
+            commands = mapAppendReverse(commands, data.extra.librariesFullPath, (string l) => "-L"~getOutputName(TargetType.staticLibrary, l, s.os));
+            commands~= "-L--end-group";
             commands = mapAppendPrefix(commands, linkFlags, "-L", false);
             commands = mapAppendPrefix(commands, libraryPaths, "-L-L", true);
-            commands = mapAppendReverse(commands, libraries, (string l) => "-L-l"~stripExtension(l));
             commands~= getLinkFiles(b.sourceFiles);
+            commands = mapAppend(commands, libraries, (string l) => "-L-l"~stripExtension(l));
             
         }
         else if(!s.compiler.isDCompiler) //Generates a static library using archiver. FIXME: BuildRequirements should know its files.
