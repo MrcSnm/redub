@@ -161,11 +161,11 @@ private string getActualCompilerToUse(string preferredCompiler, ref string actua
 /** 
  * Use this function to get extensive information about the Compiler to use.
  * Params:
- *   compilerOrPath = Can be used both as a global, such as `dmd` or a complete path to a compiler
+ *   compilerOrPath = Can be used both as a global, such as `dmd` or a complete path to a compiler. If null, defaults to DMD
  *   compilerAssumption = Optinal version string, such as `dmd v[2.105.0] f[2.106.0]`, v being its version, f being frontend version
  * Returns: The Compiler information that was found, or inferred if compilerAssumption was used.
  */
-Compiler getCompiler(string compilerOrPath, string compilerAssumption)
+Compiler getCompiler(string compilerOrPath = "dmd", string compilerAssumption = null)
 {
     import std.process;
     import std.algorithm.comparison:either;
@@ -235,7 +235,7 @@ Compiler getCompiler(string compilerOrPath, string compilerAssumption)
 }
 
 
-Compiler getCompilerFromCache(JSONValue allCompilersInfo, string compiler)
+private Compiler getCompilerFromCache(JSONValue allCompilersInfo, string compiler)
 {
     import std.exception;
     import std.file;

@@ -41,6 +41,7 @@ int main(string[] args)
     if(args.length == 1)
         return runMain(args, []);
 
+
     import std.algorithm:countUntil;
     ptrdiff_t execArgsInit = countUntil(args, "--");
 
@@ -57,6 +58,12 @@ int main(string[] args)
         case "build":
             args = args[0] ~ args[2..$];
             return buildMain(args);
+        case "ptest":
+            import redub.plugin.build;
+            setLogLevel(LogLevel.info);
+            // buildPlugin("getmodule", "getmodule.d");
+            buildPluginProject("C:\\Users\\Marcelo\\Documents\\D\\redub\\plugins\\getmodules");
+            return 0;
         case "clean":
             args = args[0] ~ args[2..$];
             return cleanMain(args);

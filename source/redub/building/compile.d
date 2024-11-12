@@ -1,4 +1,5 @@
 module redub.building.compile;
+import redub.building.utils;
 import redub.building.cache;
 import redub.logging;
 import redub.buildapi;
@@ -56,23 +57,6 @@ void execCompilationThread(immutable ThreadBuildData data, shared ProjectNode pa
     }
 }
 
-private auto execCompiler(const BuildConfiguration cfg, string compilerBin, string[] compileFlags, out string compilationCommands, bool isDCompiler)
-{
-    import std.system;
-    import std.process;
-    import std.file;
-    import redub.command_generators.commons;
-    if(std.system.os.isWindows && isDCompiler)
-    {
-        string cmdFile = createCommandFile(cfg, compileFlags, compilationCommands);
-        compilationCommands = compilerBin ~ " "~compilationCommands;
-        scope(exit)
-            std.file.remove(cmdFile);
-        return executeShell(compilerBin~ " @"~cmdFile, null, Config.none, size_t.max, cfg.workingDir);
-    }
-    compilationCommands = escapeCompilationCommands(compilerBin, compileFlags);
-    return executeShell(compilationCommands, null, Config.none, size_t.max, cfg.workingDir);
-}
 
 CompilationResult execCompilation(immutable ThreadBuildData data, shared ProjectNode pack, CompilingSession info, HashPair hash, immutable string[string] env)
 {
@@ -114,21 +98,12 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
         {
             import std.path;
             string inDir = getCacheOutputDir(hash.rootHash, cast()pack.requirements, info);
-            if(!exists(inDir))
-                mkdirRecurse(inDir);
-
-            ///Creates a folder to C output since it doesn't do automatically.
-            if(!isDCompiler(compiler))
-                createOutputDirFolder(cfg);
+            mkdirRecurse(inDir);
+            createOutputDirFolder(cfg);
 
             ExecutionResult ret;
             if(!pack.isCopyEnough)
-                ret = cast(ExecutionResult)execCompiler(cfg, compiler.binOrPath, getCompilationFlags(cfg, info, hash.rootHash), res.compilationCommand, compiler.isDCompiler);
-
-            //For working around bug 3541, 24748, dmd generates .obj files besides files, redub will move them out
-            //of there to the object directory
-            if(cfg.outputsDeps && cfg.preservePath && compiler.compiler == AcceptedCompiler.dmd)
-                moveGeneratedObjectFiles(cfg.sourcePaths, cfg.sourceFiles, cfg.excludeSourceFiles, getObjectDir(inDir),getObjectExtension(os));
+                ret = cast(ExecutionResult)execCompiler(cfg, compiler.binOrPath, getCompilationFlags(cfg, info, hash.rootHash), res.compilationCommand, compiler, inDir);
 
             if(!isDCompiler(compiler) && !ret.status) //Always requires link.
             {
@@ -187,14 +162,13 @@ CompilationResult link(ProjectNode root, string rootHash, const ThreadBuildData 
     import std.process;
     import std.file;
     import redub.command_generators.commons;
-    Compiler compiler = info.compiler;
     OS os = info.os;
 
     CompilationResult ret;
 
     if(!root.isCopyEnough)
     {
-        auto exec = execCompiler(data.cfg, getLinkerBin(compiler), getLinkFlags(data, info, rootHash), ret.compilationCommand, compiler.isDCompiler);
+        auto exec = linkBase(data, info, rootHash, ret.compilationCommand);
         ret.status = exec.status;
         ret.message = exec.output;
         if(exec.status != 0)

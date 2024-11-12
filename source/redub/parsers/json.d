@@ -84,6 +84,15 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
 
     immutable static requirementsRun = [
         "name": (ref BuildRequirements req, JSONValue v, ParseConfig c){},
+        "plugins": (ref BuildRequirements req, JSONValue v, ParseConfig c)
+        {
+            import redub.plugin.load;
+            foreach(key, value; v.object)
+            {
+                enforce(value.type == JSONType.string, "Plugin value must be a string to a path being either a .d file or a dub project.");
+                loadPlugin(key, value.str);
+            }
+        },
         "targetName": (ref BuildRequirements req, JSONValue v, ParseConfig c){setTargetName(req, v.str, c);},
         "targetType": (ref BuildRequirements req, JSONValue v, ParseConfig c){setTargetType(req, v.str, c);},
         "targetPath": (ref BuildRequirements req, JSONValue v, ParseConfig c){setTargetPath(req, v.str, c);},

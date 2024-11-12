@@ -2,6 +2,7 @@ module redub.buildapi;
 
 public import std.system:OS, ISA, instructionSetArchitecture;
 public import redub.compiler_identification: Compiler;
+public import redub.plugin.api;
 import redub.logging;
 import redub.package_searching.api;
 
@@ -180,6 +181,22 @@ struct BuildConfiguration
         ret.targetType = TargetType.autodetect;
         ret.sourceEntryPoint = "source/app.d";
         ret.outputDirectory = ".";
+        return ret;
+    }
+
+    RedubPluginData toRedubPluginData() const
+    {
+        RedubPluginData ret;
+        static foreach(mem; __traits(allMembers, RedubPluginData))
+            __traits(getMember, ret, mem) = __traits(getMember, this, mem).dup;
+        return ret;
+    }
+
+    BuildConfiguration mergeRedubPlugin(RedubPluginData pluginData) const
+    {
+        BuildConfiguration ret = clone;
+        static foreach(mem; __traits(allMembers, RedubPluginData))
+            __traits(getMember, ret, mem) = __traits(getMember, pluginData, mem);
         return ret;
     }
 
