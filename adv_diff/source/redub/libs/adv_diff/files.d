@@ -6,6 +6,7 @@
 module redub.libs.adv_diff.files;
 public import hipjson;
 import std.exception;
+import std.file;
 
 struct AdvFile
 {
@@ -252,6 +253,7 @@ struct AdvCacheFormula
 		if(fileBuffer.length == 0)
 			fileBuffer = uninitializedArray!(ubyte[])(1_000_000);
 		ubyte[] hashedContent;
+		ubyte[16] joinedHash;
 
 
 		foreach(filterDir; filteredDirectories) foreach(dir; filterDir.dirs)
@@ -262,7 +264,6 @@ struct AdvCacheFormula
 				continue;
 			}
 			AdvDirectory advDir;
-			ubyte[16] joinedHash;
 			const(AdvDirectory)* existingDir;
 			if(existing) existingDir = dir in existing.directories;
 
@@ -310,7 +311,9 @@ struct AdvCacheFormula
 			}
 			///May throw if it is a directory.
 			scope(failure) continue;
-			long time = std.file.timeLastModified(file).stdTime;
+
+			DirEntry e = DirEntry(file);
+			long time = e.timeLastModified.stdTime;
 
 			if(existing)
 			{
@@ -323,7 +326,8 @@ struct AdvCacheFormula
 					continue;
 				}
 			}
-			if(!hashContent(file, fileBuffer, hashedContent, contentHasher, isSimplified)) continue;
+
+			if(!hashContent(file, fileBuffer, hashedContent, contentHasher, isSimplified || inferSimplifiedFile(e))) continue;
 			ret.files[file] = AdvFile(time, hashedContent[0..8]);
 			if(cacheHolder !is null)
 				cacheHolder.files[file] = ret.files[file];
@@ -333,9 +337,17 @@ struct AdvCacheFormula
 		{
 			hashedContent[] = 0;
 			foreach(AdvDirectory dir; ret.directories)
-				hashedContent = contentHasher(joinFlattened(dir.contentHash, hashedContent), hashedContent)[0..8];
+			{
+				joinedHash[0..8] = dir.contentHash;
+				joinedHash[8..$] = hashedContent;
+				hashedContent = contentHasher(joinedHash, hashedContent)[0..8];
+			}
 			foreach(AdvFile file; ret.files)
-				hashedContent = contentHasher(joinFlattened(file.contentHash, hashedContent), hashedContent)[0..8];
+			{
+				joinedHash[0..8] = file.contentHash;
+				joinedHash[8..$] = hashedContent;
+				hashedContent = contentHasher(joinedHash, hashedContent)[0..8];
+			}
 			ret.contentHash = hashedContent[0..8];
 		}
 
@@ -458,6 +470,11 @@ ubyte[] fromHexString2(string hexStr)
 	foreach(i; 0..sz)
 		ret[i] = cast(ubyte)((getNumFromHexChar(hexStr[i*2])*16) + getNumFromHexChar(hexStr[i*2+1]));
 	return ret;
+}
+
+bool inferSimplifiedFile(DirEntry e)
+{
+	return e.size > 2_048_000;
 }
 
 T[] joinFlattened(T)(scope const T[][] args...)
