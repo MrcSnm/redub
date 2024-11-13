@@ -95,6 +95,9 @@ struct DirectoriesWithFilter
 	///Ends with filter, usually .d and .di. Since they are both starting with .d, function will use an optimized way to check
 	bool usesDFilters;
 
+	///Uses the simplified hashing whenever inside that dir. May be used on directories with bigger files
+	bool useSimplifiedHashing;
+
 	pragma(inline, true) bool shouldInclude(string target)
 	{
 		import std.path;
@@ -259,6 +262,7 @@ struct AdvCacheFormula
 				continue;
 			}
 			AdvDirectory advDir;
+			ubyte[16] joinedHash;
 			const(AdvDirectory)* existingDir;
 			if(existing) existingDir = dir in existing.directories;
 
@@ -278,14 +282,18 @@ struct AdvCacheFormula
 						if(existingFile.timeModified == time)
 						{
 							advDir.files[e.name] = existingFile.dup;
-							advDir.putContentHashInPlace(contentHasher(joinFlattened(advDir.contentHash, existingFile.contentHash), hashedContent)[0..8]);
+							joinedHash[0..8] = advDir.contentHash;
+							joinedHash[8..$] = existingFile.contentHash;
+							advDir.putContentHashInPlace(contentHasher(joinedHash, hashedContent)[0..8]);
 							continue;
 						}
 					}
 				}
-				if(!hashContent(e.name, fileBuffer, hashedContent, contentHasher, isSimplified)) continue;
+				if(!hashContent(e.name, fileBuffer, hashedContent, contentHasher, isSimplified || filterDir.useSimplifiedHashing)) continue;
 				advDir.files[e.name] = AdvFile(time, hashedContent[0..8]);
-				advDir.putContentHashInPlace(contentHasher(joinFlattened(advDir.contentHash, hashedContent), hashedContent)[0..8]);
+				joinedHash[0..8] = advDir.contentHash;
+				joinedHash[8..$] = hashedContent;
+				advDir.putContentHashInPlace(contentHasher(joinedHash, hashedContent)[0..8]);
             }
 			ret.directories[dir] = advDir;
 			if(cacheHolder !is null)

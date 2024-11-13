@@ -285,7 +285,7 @@ AdvCacheFormula getCompilationCacheFormula(const BuildRequirements req, string m
         [
             DirectoriesWithFilter(req.cfg.importDirectories, true),
             DirectoriesWithFilter(req.cfg.stringImportPaths, false),
-            DirectoriesWithFilter(dirs, false)
+            DirectoriesWithFilter(dirs, false, true)
         ], ///This is causing problems when using subPackages without output path, they may clash after
         // the compilation is finished. Solving this would require hash calculation after linking
         joiner([
