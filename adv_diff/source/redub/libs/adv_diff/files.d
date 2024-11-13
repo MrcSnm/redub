@@ -175,27 +175,46 @@ struct AdvCacheFormula
 	 *   buffer = A generic buffer to hold file name + file content data
 	 *   outputHash = Where the output will be sent
 	 *   contentHasher = The hash function
+	 *	 isSimplified = Hashes using file name + size + last modified time
 	 * Returns: If it could hash the file or not
 	 */
-	private static bool hashContent(string url, ref ubyte[] buffer, ref ubyte[] outputHash, ubyte[] function(ubyte[], ref ubyte[] output) contentHasher)
+	private static bool hashContent(string url, ref ubyte[] buffer, ref ubyte[] outputHash, ubyte[] function(ubyte[], ref ubyte[] output) contentHasher, bool isSimplified)
 	{
 		import std.file;
 		import std.array;
 		import std.stdio;
 		try
 		{
-			File f = File(url);
-			size_t fSize = f.size;
-			size_t bufferSize = fSize+url.length;
-			if(bufferSize > buffer.length)
+			if(!isSimplified)
 			{
-				import core.memory;
-				GC.free(buffer.ptr);
-				buffer = uninitializedArray!(ubyte[])(bufferSize);
+				File f = File(url);
+				size_t fSize = f.size;
+				size_t bufferSize = fSize+url.length;
+				if(bufferSize > buffer.length)
+				{
+					import core.memory;
+					GC.free(buffer.ptr);
+					buffer = uninitializedArray!(ubyte[])(bufferSize);
+				}
+				f.rawRead(buffer[0..fSize]);
+				buffer[fSize..bufferSize] = cast(ubyte[])url[];
+				contentHasher(buffer[0..bufferSize], outputHash);
 			}
-			f.rawRead(buffer[0..fSize]);
-			buffer[fSize..bufferSize] = cast(ubyte[])url[];
-			contentHasher(buffer[0..bufferSize], outputHash);
+			else
+			{
+				DirEntry e = DirEntry(url);
+				long timeMod = e.timeLastModified.stdTime;
+				ulong size = e.size;
+
+				contentHasher(
+					joinFlattened(
+						cast(ubyte[])url,
+						(cast(ubyte*)&timeMod)[0..8],
+						(cast(ubyte*)&size)[0..8],
+					),
+					outputHash
+				);
+			}
 		}
 		catch(Exception e) return false;
 		return true;
@@ -209,6 +228,7 @@ struct AdvCacheFormula
 	 *   files = Which files it should put on this formula
 	 *	 existing = Optional. If this is given and exists, it will compare dates and if they have a difference, a content hash will be generated.
 	 *   cacheHolder = Optional. If this is given, instead of looking into file system, it will use this cache holder instead. If no input is found on this cache holder, it will be populated with the new content.
+	 *   isSimplified = Optional. Generates a hash from the file name + size + lastTimeModified. This is useful when running for less relevant files that are also very big. Used for copy cache formula
 	 * Returns: A completely new AdvCacheFormula which may reference or not the cacheHolder fields.
 	 */
 	static AdvCacheFormula make(DirRange, FileRange)(
@@ -216,7 +236,8 @@ struct AdvCacheFormula
 		DirRange filteredDirectories,
 		FileRange files,
 		const(AdvCacheFormula)* existing = null,
-		AdvCacheFormula* cacheHolder = null
+		AdvCacheFormula* cacheHolder = null,
+		bool isSimplified = false
 	)
 	{
 		import std.file;
@@ -230,8 +251,7 @@ struct AdvCacheFormula
 		ubyte[] hashedContent;
 
 
-		foreach(filterDir; filteredDirectories)
-		foreach(dir; filterDir.dirs)
+		foreach(filterDir; filteredDirectories) foreach(dir; filterDir.dirs)
 		{
 			if(cacheHolder !is null && dir in cacheHolder.directories)
 			{
@@ -263,7 +283,7 @@ struct AdvCacheFormula
 						}
 					}
 				}
-				if(!hashContent(e.name, fileBuffer, hashedContent, contentHasher)) continue;
+				if(!hashContent(e.name, fileBuffer, hashedContent, contentHasher, isSimplified)) continue;
 				advDir.files[e.name] = AdvFile(time, hashedContent[0..8]);
 				advDir.putContentHashInPlace(contentHasher(joinFlattened(advDir.contentHash, hashedContent), hashedContent)[0..8]);
             }
@@ -271,6 +291,7 @@ struct AdvCacheFormula
 			if(cacheHolder !is null)
 				cacheHolder.directories[dir] = advDir;
 		}
+
 		foreach(file; files)
         {
 			//Check if the file was read already for taking the time it was modified.
@@ -294,7 +315,7 @@ struct AdvCacheFormula
 					continue;
 				}
 			}
-			if(!hashContent(file, fileBuffer, hashedContent, contentHasher)) continue;
+			if(!hashContent(file, fileBuffer, hashedContent, contentHasher, isSimplified)) continue;
 			ret.files[file] = AdvFile(time, hashedContent[0..8]);
 			if(cacheHolder !is null)
 				cacheHolder.files[file] = ret.files[file];

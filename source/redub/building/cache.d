@@ -340,7 +340,8 @@ AdvCacheFormula getCopyCacheFormula(string mainPackHash, const BuildRequirements
         [DirectoriesWithFilter([], false)],
         joiner([req.extra.expectedArtifacts, extraRequirements]),
         existing,
-        preprocessed
+        preprocessed,
+        true
     );
 }
 
