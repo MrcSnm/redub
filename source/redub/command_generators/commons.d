@@ -474,7 +474,7 @@ T[] reverseArray(Q, T = typeof(Q.front))(Q range)
 
 bool isWindows(OS os){return os == OS.win32 || os == OS.win64;}
 
-void createOutputDirFolder(immutable BuildConfiguration cfg)
+void createOutputDirFolder(const BuildConfiguration cfg)
 {
     import std.file;
     if(cfg.outputDirectory)

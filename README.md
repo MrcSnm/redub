@@ -44,7 +44,44 @@ void main()
 }
 ```
 
+## Redub Plugins
 
+Redub has now new additions, starting from v1.14.0. Those are called **plugins**.
+For using it, on the JSON, you **must** specify first the plugins that are usable. For doing that, you need to add:
+
+```json
+"plugins": {
+  "getmodules": "C:\\Users\\Hipreme\\redub\\plugins\\getmodules"
+}
+```
+
+That line will both build that project and load it inside the registered plugins (That means the same name can't be specified twice)
+
+The path may be either a .d module or a dub project
+> WARNING: This may be a subject of change and may also only support redub projects in the future, since that may only complicate code with a really low gain
+
+Redub will start distributing some build plugins in the future. Currently, getmodules plugins is inside this repo as an example only but may be better used.
+Only preBuild is currently supported since I haven't found situations yet to other cases.
+For it to be considered a redub plugin to be built, that is the minimal code:
+
+```d
+module getmodules;
+import redub.plugin.api;
+
+class GetModulePlugin : RedubPlugin {}
+mixin PluginEntrypoint!(GetModulePlugin);
+```
+
+For using it on prebuild, you simply specify the module and its arguments:
+```json
+"preBuildPlugins": {
+  "getmodules": ["source/imports.txt"]
+}
+```
+
+### Useful links regarding plugins:
+- [**GetModule plugin**](./plugins/getmodules/source/getmodules.d)
+- [**Example Usage**](./tests/plugin_test/dub.json)
 
 # Project Meta
 

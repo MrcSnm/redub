@@ -6,6 +6,7 @@
 */
 module redub.plugin.build;
 import redub.buildapi;
+import core.simd;
 
 
 private immutable string apiImport = import("redub/plugin/api.d");
@@ -91,12 +92,18 @@ void buildPlugin(string pluginName, string inputFile)
 void buildPluginProject(string pluginDir)
 {
     import redub.api;
+    import redub.logging;
     writePluginImport();
+
+    LogLevel level = getLogLevel();
+    setLogLevel(LogLevel.error);
+
+
     ProjectDetails pluginDetails = resolveDependencies(false, os, CompilationDetails.init, ProjectToParse(null, pluginDir));
     if(!pluginDetails.tree)
         throw new Exception("Could not build plugin at path "~pluginDir);
-    pluginDetails.tree.requirements.cfg = injectPluginCfg(pluginDetails.tree.requirements.cfg, pluginDetails.tree.name);
-    if(pluginDetails.tree.shouldEnterCompilationThread)
-        pluginDetails = buildProject(pluginDetails);
 
+    pluginDetails.tree.requirements.cfg = injectPluginCfg(pluginDetails.tree.requirements.cfg, pluginDetails.tree.name);
+    pluginDetails = buildProject(pluginDetails);
+    setLogLevel(level);
 }

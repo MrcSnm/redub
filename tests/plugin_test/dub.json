@@ -1,0 +1,19 @@
+{
+	"authors": [
+		"Marcelo"
+	],
+	"plugins": {
+		"getmodules": "../../plugins/getmodules"
+	},
+	"preBuildPlugins": {
+		"getmodules": ["source/imports.txt"]
+	},
+
+	"stringImportPaths": [
+		"source"
+	],
+	"copyright": "Copyright © 2024, Marcelo",
+	"description": "A minimal D application.",
+	"license": "proprietary",
+	"name": "plugin_test"
+}

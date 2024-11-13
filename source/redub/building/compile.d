@@ -81,7 +81,7 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
             return res;
         }
 
-        immutable BuildConfiguration cfg = data.cfg;
+        BuildConfiguration cfg = data.cfg.clone;
         Compiler compiler = info.compiler;
         OS os = info.os;
         ISA isa = info.isa;
@@ -92,6 +92,13 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
         
         if(executeCommands(cfg.preBuildCommands, "preBuildCommand", res, cfg.workingDir, env).status)
             return res;
+
+        import redub.plugin.load;
+
+        foreach(plugin; cfg.preBuildPlugins)
+        {
+            cfg = executePlugin(plugin.name, cfg, plugin.args);
+        }
 
 
         if(pack.requirements.cfg.targetType != TargetType.none)

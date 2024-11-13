@@ -32,6 +32,15 @@ struct ParseConfig
 }
 
 
+void baseLoadPlugin(string pluginName, string pluginPath, string workingDir)
+{
+    import redub.plugin.load;
+    import std.file;
+    import std.path;
+    if(!isAbsolute(pluginPath))
+        pluginPath = buildNormalizedPath(workingDir, pluginPath);
+    loadPlugin(pluginName, pluginPath);
+}
 void setName(ref BuildRequirements req, string name, ParseConfig c)
 {
     if(c.firstRun)
@@ -75,6 +84,11 @@ void addPreGenerateCommands(ref BuildRequirements req, JSONStringArray cmds, Par
     req.cfg.preGenerateCommands = req.cfg.preGenerateCommands.append(cmds);
 }
 void addPostGenerateCommands(ref BuildRequirements req, JSONStringArray cmds, ParseConfig c){req.cfg.postGenerateCommands = req.cfg.postGenerateCommands.append(cmds);}
+void addPreBuildPlugins(ref BuildRequirements req, string pluginName, JSONStringArray cmds, ParseConfig c)
+{
+    string[] output;
+    req.cfg.preBuildPlugins~= PluginExecution(pluginName, append(output, cmds));
+}
 void addPreBuildCommands(ref BuildRequirements req, JSONStringArray cmds, ParseConfig c){req.cfg.preBuildCommands = req.cfg.preBuildCommands.append(cmds);}
 void addPostBuildCommands(ref BuildRequirements req, JSONStringArray cmds, ParseConfig c){req.cfg.postBuildCommands = req.cfg.postBuildCommands.append(cmds);}
 void addSourcePaths(ref BuildRequirements req, JSONStringArray paths, ParseConfig c)

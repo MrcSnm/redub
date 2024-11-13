@@ -3,12 +3,29 @@ import redub.plugin.api;
 import redub.buildapi;
 
 
-RedubPlugin [string] registeredPlugins;
+private struct RegisteredPlugin
+{
+    RedubPlugin plugin;
+    string path;
+}
+
+RegisteredPlugin[string] registeredPlugins;
 void loadPlugin(string pluginName, string pluginPath)
 {
     import redub.plugin.build;
     import std.file;
     import std.path;
+
+    RegisteredPlugin* reg = pluginName in registeredPlugins;
+
+    if(reg)
+    {
+        if(reg.path != pluginPath)
+            throw new Exception("Attempt to register plugin with same name '"~pluginName~"' with different paths: '"~reg.path~"' vs '"~pluginPath~"'");
+        return;
+    }
+
+
 
     buildPlugin(pluginName, pluginPath);
 
@@ -20,26 +37,43 @@ void loadPlugin(string pluginName, string pluginPath)
     void* pluginFunc = loadSymbol(pluginDll, ("plugin_"~pluginName~"\0").ptr);
     if(!pluginFunc)
         throw new Exception("Plugin function 'plugin_"~pluginName~"' not found. Maybe you forgot to `import redub.plugin.api; mixin PluginEntrypoint!(YourPluginClassName)?`");
-    registeredPlugins[pluginName] = (cast(RedubPlugin function())pluginFunc)();
+
+    import redub.logging;
+
+    infos("Plugin Loaded: ", pluginName, " [", pluginPath, "]");
+    registeredPlugins[pluginName] = RegisteredPlugin((cast(RedubPlugin function())pluginFunc)(), pluginPath);
 }
 
 BuildConfiguration executePlugin(string pluginName, BuildConfiguration cfg, string[] args)
 {
     import redub.logging;
-    RedubPlugin plugin = registeredPlugins[pluginName];
+    RegisteredPlugin* reg = pluginName in registeredPlugins;
+    if(!reg)
+        throw new Exception("Could not find registered plugin named '"~pluginName~"'");
+
+    RedubPlugin plugin = reg.plugin;
     RedubPluginData preBuildResult;
-    RedubPluginStatus status = plugin.preBuild(cfg.toRedubPluginData, preBuildResult, args);
-    if(status.message)
+    RedubPluginStatus status;
+    try
     {
-        if(status.code == RedubPluginExitCode.success)
-            infos("Plugin '"~pluginName~"': ", status.message);
-        else
-            errorTitle("Plugin '"~pluginName~"': ", status.message);
+        status = plugin.preBuild(cfg.toRedubPluginData, preBuildResult, args, status);
+        if(status.message)
+        {
+            if(status.code == RedubPluginExitCode.success)
+                infos("Plugin '"~pluginName~"': ", status.message);
+            else
+                errorTitle("Plugin '"~pluginName~"': ", status.message);
+        }
+    }
+    catch (Exception e)
+    {
+        errorTitle("Plugin '"~pluginName~"' failed with an exception: ", e.msg);
     }
     if(status.code != RedubPluginExitCode.success)
         throw new Exception("Execute Plugin process Failed for "~cfg.name);
     if(preBuildResult != RedubPluginData.init)
         return cfg.mergeRedubPlugin(preBuildResult);
+
 
     return cfg;
 

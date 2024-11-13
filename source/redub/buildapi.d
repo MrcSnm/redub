@@ -7,7 +7,7 @@ import redub.logging;
 import redub.package_searching.api;
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.13.10";
+enum RedubVersionOnly = "v1.14.0";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -105,6 +105,18 @@ TargetType targetFrom(string s)
 enum excludeRoot;
 enum cacheExclude;
 
+struct PluginExecution
+{
+    string name;
+    string[] args;
+
+
+    immutable(PluginExecution) idup() const
+    {
+        return PluginExecution(name, args.dup);
+    }
+}
+
 struct BuildConfiguration
 {
     bool isDebug;
@@ -125,6 +137,7 @@ struct BuildConfiguration
     string[] preGenerateCommands;
     string[] postGenerateCommands;
     string[] preBuildCommands;
+    PluginExecution[] preBuildPlugins;
     string[] postBuildCommands;
     ///Unused
     string sourceEntryPoint;
@@ -200,13 +213,19 @@ struct BuildConfiguration
         return ret;
     }
 
-    immutable(BuildConfiguration) idup() inout
+    immutable(BuildConfiguration) idup() const
     {
+        import std.algorithm;
+        import std.array;
         BuildConfiguration ret;
         static foreach(i, value; BuildConfiguration.tupleof)
         {
             static if(is(typeof(ret.tupleof[i]) == string[]))
                 ret.tupleof[i] = cast(string[])this.tupleof[i].idup;
+            else static if(is(typeof(ret.tupleof[i]) == PluginExecution[]))
+            {
+                ret.tupleof[i] = cast(PluginExecution[])this.tupleof[i].map!((const PluginExecution p) => p.idup).array;
+            }
             else
                 ret.tupleof[i] = this.tupleof[i];
         }
@@ -251,6 +270,7 @@ struct BuildConfiguration
     BuildConfiguration mergeCommands(BuildConfiguration other) const
     {
         BuildConfiguration ret = clone;
+        ret.preBuildPlugins~= other.preBuildPlugins;
         ret.preBuildCommands~= other.preBuildCommands;
         ret.postBuildCommands~= other.postBuildCommands;
         ret.preGenerateCommands~= other.preGenerateCommands;

@@ -8,6 +8,9 @@
         "debugInfoC",
         "debugMode"
     ],
+    "stringImportPaths": [
+        "source"
+    ],
     "configurations": [
         {
             "name": "cli",

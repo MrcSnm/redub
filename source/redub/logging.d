@@ -11,6 +11,8 @@ enum LogLevel
 }
 private LogLevel level;
 
+LogLevel getLogLevel(){ return level; }
+
 bool hasLogLevel(LogLevel lvl)
 {
     return level >= lvl;
