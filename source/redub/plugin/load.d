@@ -34,7 +34,7 @@ void loadPlugin(string pluginName, string pluginPath)
 
     string fullPluginPath = buildNormalizedPath(pluginPath, pluginName);
 
-    void* pluginDll = loadLib((fullPluginPath~"\0").ptr);
+    void* pluginDll = loadLib((getDynamicLibraryName(fullPluginPath)~"\0").ptr);
     if(!pluginDll)
         throw new Exception("Plugin "~pluginName~" could not be loaded. Tried with path '"~fullPluginPath~"'. Error '"~sysError~"'");
     void* pluginFunc = loadSymbol(pluginDll, ("plugin_"~pluginName~"\0").ptr);
@@ -49,7 +49,6 @@ void loadPlugin(string pluginName, string pluginPath)
     {
         registeredPlugins[pluginName] = RegisteredPlugin((cast(RedubPlugin function())pluginFunc)(), pluginPath);
     }
-
 }
 
 BuildConfiguration executePlugin(string pluginName, BuildConfiguration cfg, string[] args)
@@ -141,7 +140,8 @@ private {
     {
         import core.sys.posix.dlfcn;
 
-        void* loadLib(const(char)* name){
+        void* loadLib(const(char)* name)
+        {
             return dlopen(name, RTLD_NOW);
         }
 
@@ -158,6 +158,21 @@ private {
             char* msg = dlerror();
             return cast(string)(msg ? msg[0..strlen(msg)] : "Unknown Error");
         }
+
     }
     else static assert(false, "No dll loading support for this platform");
+}
+
+string getDynamicLibraryName(string dynamicLibPath)
+{
+    import std.path;
+    string dir = dirName(dynamicLibPath);
+    string name = baseName(dynamicLibPath);
+    version(Windows)
+        return buildNormalizedPath(dir, name~".dll");
+    else version(linux)
+        return buildNormalizedPath(dir, name~".so");
+    else version(OSX)
+        return buildNormalizedPath(dir, name~".dynlib");
+    else static assert(false, "No support for dynamic libraries on that OS.");
 }
