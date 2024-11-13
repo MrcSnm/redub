@@ -156,7 +156,7 @@ private {
         string sysError(){
             import core.stdc.string;
             char* msg = dlerror();
-            return msg ? msg[0..strlen(msg)] : "Unknown Error";
+            return cast(string)(msg ? msg[0..strlen(msg)] : "Unknown Error");
         }
     }
     else static assert(false, "No dll loading support for this platform");
