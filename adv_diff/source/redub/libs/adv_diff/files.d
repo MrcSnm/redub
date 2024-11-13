@@ -4,10 +4,7 @@
  * Beyond that, it also provides a cache composition formula.
  */
 module redub.libs.adv_diff.files;
-public import std.int128;
 public import hipjson;
-// public import std.json;
-
 import std.exception;
 
 struct AdvFile
@@ -46,7 +43,6 @@ struct AdvFile
 
 struct AdvDirectory
 {
-	Int128 total;
 	ubyte[8] contentHash; //Since this structure is optimized for xxhash, it will use 8 bytes hash
 	AdvFile[string] files;
 
@@ -60,7 +56,7 @@ struct AdvDirectory
 			dir[fileName] = v;
 		}
 		import std.digest;
-		output[dirName] = JSONValue([JSONValue(total.data.hi), JSONValue(total.data.lo), JSONValue(toHexString(contentHash[])), dir]);
+		output[dirName] = JSONValue([JSONValue(toHexString(contentHash[])), dir]);
 	}
 
 	pragma(inline, true) package void putContentHashInPlace(const ubyte[8] newHash)
@@ -70,7 +66,7 @@ struct AdvDirectory
 
 	/**
 	 * Specification:
-	 * [$INT128_HI, $INT128_LOW, $CONTENT_HASH, {[FILENAME] : ADV_FILE_SPEC}]
+	 * [$CONTENT_HASH, {[FILENAME] : ADV_FILE_SPEC}]
 	 * Params:
 	 *   input =
 	 * Returns:
@@ -79,18 +75,17 @@ struct AdvDirectory
 	{
 		enforce(input.type == JSONType.array, "AdvDirectory input must be an array.");
 		JSONValue[] v = input.array;
-		enforce(v.length == 4, "AdvDirectory must contain 4 members.");
-		enforce(v[0].type.isInteger && v[1].type.isInteger, "Input of AdvDirectory must be first 2 integers.");
-		enforce(v[2].type == JSONType.string, "AdvDirectory index 2 must be a string");
-		enforce(v[3].type.isObject, "AdvDirectory index 3 must be an object");
+		enforce(v.length == 2, "AdvDirectory must contain 2 members.");
+		enforce(v[0].type == JSONType.string, "AdvDirectory index 0 must be a string");
+		enforce(v[1].type.isObject, "AdvDirectory index 1 must be an object");
 		AdvFile[string] files;
 
-		if(!v[3].isNull) foreach(string fileName, JSONValue advFile; v[3].object)
+		if(!v[1].isNull) foreach(string fileName, JSONValue advFile; v[1].object)
 		{
 			files[fileName] = AdvFile.deserialize(advFile);
 		}
 
-		return AdvDirectory(Int128(v[0].get!ulong, v[1].get!ulong), hashFromString(v[2].str), files);
+		return AdvDirectory(hashFromString(v[0].str), files);
 	}
 }
 
@@ -121,11 +116,11 @@ struct DirectoriesWithFilter
 
 struct AdvCacheFormula
 {
-	Int128 total;
+	ubyte[8] contentHash;
 	AdvDirectory[string] directories;
 	AdvFile[string] files;
 
-	bool isEmptyFormula() const { return total == Int128(0, 0); }
+	bool isEmptyFormula() const { return contentHash == ubyte[8].init; }
 
 
 
@@ -140,19 +135,20 @@ struct AdvCacheFormula
 		import std.conv:to;
 		enforce(input.type == JSONType.array, "AdvCacheFormula input must be an array");
 		JSONValue[] v = input.array;
-		enforce(v.length == 4, "AdvCacheFormula must contain a tuple of 4 values");
-		enforce(v[0].type.isInteger && v[1].type.isInteger, "AdvCacheFormula must contain 2 integers on its start, got types ["~v[0].type.to!string~", "~v[1].type.to!string~"]");
-		enforce(v[2].type.isObject && v[3].type.isObject, "AdvCacheFormula must contain objects on index 2 and 3, got types ["~v[2].type.to!string~", "~v[3].type.to!string~"]");
+		enforce(v.length == 3, "AdvCacheFormula must contain a tuple of 3 values");
+		enforce(v[0].type == JSONType.string, "AdvCacheFormula at index 0 must contain a string. got types ["~v[0].type.to!string);
+		enforce(v[1].type.isObject && v[2].type.isObject, "AdvCacheFormula must contain objects on index 1 and 2, got types ["~v[1].type.to!string~", "~v[2].type.to!string~"]");
 
 		AdvDirectory[string] dirs;
-		if(!v[2].isNull) foreach(string fileName, JSONValue advDir; v[2].object)
+		if(!v[1].isNull) foreach(string fileName, JSONValue advDir; v[1].object)
 			dirs[fileName] = AdvDirectory.deserialize(advDir);
 
 		AdvFile[string] files;
-		if(!v[3].isNull) foreach(string fileName, JSONValue advFile; v[3].object)
+		if(!v[2].isNull) foreach(string fileName, JSONValue advFile; v[2].object)
 			files[fileName] = AdvFile.deserialize(advFile);
 
-		return AdvCacheFormula(Int128(v[0].get!ulong, v[1].get!ulong), dirs, files);
+
+		return AdvCacheFormula(hashFromString(v[0].str), dirs, files);
 	}
 
 	void serialize(ref JSONValue output) const
@@ -168,9 +164,19 @@ struct AdvCacheFormula
 			advFile.serialize(v);
 			filesJson[fileName] = v;
 		}
-		output = JSONValue([JSONValue(total.data.hi), JSONValue(total.data.lo), dirsJson, filesJson]);
+		import std.digest;
+		output = JSONValue([JSONValue(toHexString(contentHash[])), dirsJson, filesJson]);
 	}
 
+	/**
+	 *
+	 * Params:
+	 *   url = The path of the file to hash
+	 *   buffer = A generic buffer to hold file name + file content data
+	 *   outputHash = Where the output will be sent
+	 *   contentHasher = The hash function
+	 * Returns: If it could hash the file or not
+	 */
 	private static bool hashContent(string url, ref ubyte[] buffer, ref ubyte[] outputHash, ubyte[] function(ubyte[], ref ubyte[] output) contentHasher)
 	{
 		import std.file;
@@ -178,23 +184,18 @@ struct AdvCacheFormula
 		import std.stdio;
 		try
 		{
-			size_t fSize;
 			File f = File(url);
-			//Does not exists
-			if(!f.isOpen)
-			{
-				outputHash = null;
-				return false;
-			}
-			fSize = f.size;
-			if(fSize > buffer.length)
+			size_t fSize = f.size;
+			size_t bufferSize = fSize+url.length;
+			if(bufferSize > buffer.length)
 			{
 				import core.memory;
 				GC.free(buffer.ptr);
-				buffer = uninitializedArray!(ubyte[])(fSize);
+				buffer = uninitializedArray!(ubyte[])(bufferSize);
 			}
 			f.rawRead(buffer[0..fSize]);
-			contentHasher(buffer[0..fSize], outputHash);
+			buffer[fSize..bufferSize] = cast(ubyte[])url[];
+			contentHasher(buffer[0..bufferSize], outputHash);
 		}
 		catch(Exception e) return false;
 		return true;
@@ -223,7 +224,6 @@ struct AdvCacheFormula
 		import std.stdio;
 		import redub.command_generators.commons;
 		AdvCacheFormula ret;
-		Int128 totalTime;
 		static ubyte[] fileBuffer;
 		if(fileBuffer.length == 0)
 			fileBuffer = uninitializedArray!(ubyte[])(1_000_000);
@@ -236,10 +236,8 @@ struct AdvCacheFormula
 			if(cacheHolder !is null && dir in cacheHolder.directories)
 			{
 				ret.directories[dir] = cacheHolder.directories[dir];
-				totalTime+= cacheHolder.directories[dir].total;
 				continue;
 			}
-            Int128 dirTime;
 			AdvDirectory advDir;
 			const(AdvDirectory)* existingDir;
 			if(existing) existingDir = dir in existing.directories;
@@ -252,7 +250,6 @@ struct AdvCacheFormula
 				if(e.isDir || !filterDir.shouldInclude(e.name) || isFileHidden(e)) continue;
 
 				long time = e.timeLastModified.stdTime;
-                dirTime+= time;
 				if(existingDir)
 				{
 					const(AdvFile)* existingFile = e.name in existingDir.files;
@@ -270,7 +267,6 @@ struct AdvCacheFormula
 				advDir.files[e.name] = AdvFile(time, hashedContent[0..8]);
 				advDir.putContentHashInPlace(contentHasher(joinFlattened(advDir.contentHash, hashedContent), hashedContent)[0..8]);
             }
-			totalTime+= advDir.total = dirTime;
 			ret.directories[dir] = advDir;
 			if(cacheHolder !is null)
 				cacheHolder.directories[dir] = advDir;
@@ -281,13 +277,11 @@ struct AdvCacheFormula
 			if(cacheHolder !is null && file in cacheHolder.files)
 			{
 				ret.files[file] = cacheHolder.files[file];
-				totalTime+= cacheHolder.files[file].timeModified;
 				continue;
 			}
 			///May throw if it is a directory.
 			scope(failure) continue;
 			long time = std.file.timeLastModified(file).stdTime;
-            totalTime+= time;
 
 			if(existing)
 			{
@@ -305,7 +299,13 @@ struct AdvCacheFormula
 			if(cacheHolder !is null)
 				cacheHolder.files[file] = ret.files[file];
         }
-		ret.total = totalTime;
+		hashedContent[0..8] = 0;
+		foreach(AdvDirectory dir; ret.directories)
+			hashedContent = contentHasher(joinFlattened(dir.contentHash, hashedContent), hashedContent)[0..8];
+		foreach(AdvFile file; ret.files)
+			hashedContent = contentHasher(joinFlattened(file.contentHash, hashedContent), hashedContent)[0..8];
+		ret.contentHash = hashedContent[0..8];
+
 		return ret;
 	}
 
@@ -336,7 +336,7 @@ struct AdvCacheFormula
 	 */
 	bool diffStatus(const ref AdvCacheFormula other, ref string[] diffs, out size_t diffCount) const @nogc
 	{
-		if(other.total == total) return true;
+		if(other.contentHash == contentHash) return true;
 
 		static size_t diffFiles(
 			const ref AdvFile[string] filesOther,

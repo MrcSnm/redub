@@ -100,6 +100,10 @@ struct CompilationCache
             return false;
         AdvCacheFormula otherFormula = getCompilationCacheFormula(req, rootHash, s, &formula, preprocessed);
         diffs = formula.diffStatus(otherFormula, diffCount);
+
+        // import std.stdio;
+
+        // writeln(otherFormula, "\n\n", formula);
         return diffCount == 0;
     }
 
