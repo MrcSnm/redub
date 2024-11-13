@@ -86,9 +86,10 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
         "name": (ref BuildRequirements req, JSONValue v, ParseConfig c){},
         "plugins": (ref BuildRequirements req, JSONValue v, ParseConfig c)
         {
+            enforce(v.type == JSONType.object, "\"plugins\" in json must be an object.");
             foreach(key, value; v.object)
             {
-                enforce(value.type == JSONType.string, "Plugin value must be a string to a path being either a .d file or a dub project.");
+                enforce(value.type == JSONType.string, "\"plugins\" entry key '"~key~"' must be a string to a path being either a .d file or a dub project.");
                 baseLoadPlugin(key, value.str, c.workingDir);
             }
         },

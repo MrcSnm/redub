@@ -368,7 +368,6 @@ ProjectDetails resolveDependencies(
     import redub.libs.colorize;    
     import std.conv:to;
     ProjectDetails ret = ProjectDetails(tree, compiler, cDetails.parallelType, cDetails, shouldUseExistingObj(cDetails.useExistingObj, tree), false, 0, invalidateCache);
-
     infos(
         "Dependencies resolved", " - ", (st.peek.total!"msecs"), " ms \"",
         color(buildType, fg.magenta),"\" using ", compiler.binOrPath," v", compiler.version_,

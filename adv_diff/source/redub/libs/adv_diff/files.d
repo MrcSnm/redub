@@ -299,12 +299,16 @@ struct AdvCacheFormula
 			if(cacheHolder !is null)
 				cacheHolder.files[file] = ret.files[file];
         }
-		hashedContent[0..8] = 0;
-		foreach(AdvDirectory dir; ret.directories)
-			hashedContent = contentHasher(joinFlattened(dir.contentHash, hashedContent), hashedContent)[0..8];
-		foreach(AdvFile file; ret.files)
-			hashedContent = contentHasher(joinFlattened(file.contentHash, hashedContent), hashedContent)[0..8];
-		ret.contentHash = hashedContent[0..8];
+
+		if(hashedContent.length)
+		{
+			hashedContent[] = 0;
+			foreach(AdvDirectory dir; ret.directories)
+				hashedContent = contentHasher(joinFlattened(dir.contentHash, hashedContent), hashedContent)[0..8];
+			foreach(AdvFile file; ret.files)
+				hashedContent = contentHasher(joinFlattened(file.contentHash, hashedContent), hashedContent)[0..8];
+			ret.contentHash = hashedContent[0..8];
+		}
 
 		return ret;
 	}

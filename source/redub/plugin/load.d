@@ -9,20 +9,23 @@ private struct RegisteredPlugin
     string path;
 }
 
-RegisteredPlugin[string] registeredPlugins;
+__gshared RegisteredPlugin[string] registeredPlugins;
 void loadPlugin(string pluginName, string pluginPath)
 {
     import redub.plugin.build;
     import std.file;
     import std.path;
 
-    RegisteredPlugin* reg = pluginName in registeredPlugins;
-
-    if(reg)
+    RegisteredPlugin* reg;
+    synchronized
     {
-        if(reg.path != pluginPath)
-            throw new Exception("Attempt to register plugin with same name '"~pluginName~"' with different paths: '"~reg.path~"' vs '"~pluginPath~"'");
-        return;
+        reg = pluginName in registeredPlugins;
+        if(reg)
+        {
+            if(reg.path != pluginPath)
+                throw new Exception("Attempt to register plugin with same name '"~pluginName~"' with different paths: '"~reg.path~"' vs '"~pluginPath~"'");
+            return;
+        }
     }
 
 
@@ -41,15 +44,27 @@ void loadPlugin(string pluginName, string pluginPath)
     import redub.logging;
 
     infos("Plugin Loaded: ", pluginName, " [", pluginPath, "]");
-    registeredPlugins[pluginName] = RegisteredPlugin((cast(RedubPlugin function())pluginFunc)(), pluginPath);
+
+    synchronized
+    {
+        registeredPlugins[pluginName] = RegisteredPlugin((cast(RedubPlugin function())pluginFunc)(), pluginPath);
+    }
+
 }
 
 BuildConfiguration executePlugin(string pluginName, BuildConfiguration cfg, string[] args)
 {
     import redub.logging;
-    RegisteredPlugin* reg = pluginName in registeredPlugins;
-    if(!reg)
-        throw new Exception("Could not find registered plugin named '"~pluginName~"'");
+    RegisteredPlugin* reg;
+    synchronized
+    {
+        reg = pluginName in registeredPlugins;
+        if(!reg)
+        {
+            import std.conv:to;
+            throw new Exception("Could not find registered plugin named '"~pluginName~"'. Registered Plugins: "~registeredPlugins.to!string);
+        }
+    }
 
     RedubPlugin plugin = reg.plugin;
     RedubPluginData preBuildResult;
