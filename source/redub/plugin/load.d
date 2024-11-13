@@ -171,8 +171,8 @@ string getDynamicLibraryName(string dynamicLibPath)
     version(Windows)
         return buildNormalizedPath(dir, name~".dll");
     else version(linux)
-        return buildNormalizedPath(dir, name~".so");
+        return buildNormalizedPath(dir, "lib"~name~".so");
     else version(OSX)
-        return buildNormalizedPath(dir, name~".dynlib");
+        return buildNormalizedPath(dir, "lib"~name~".dylib");
     else static assert(false, "No support for dynamic libraries on that OS.");
 }
