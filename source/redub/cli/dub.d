@@ -238,7 +238,7 @@ struct DubBuildArguments
         "no dependency is there"
     )
     @("use-existing-obj")
-    Inference useExistingObj;
+    bool useExistingObj;
 
     @("Tries to build the whole project in a single compiler run")
     bool combined;

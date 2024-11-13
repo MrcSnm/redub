@@ -21,6 +21,8 @@ import redub.tree_generators.dub;
  *   targetOS = Will be used to filter out some commands
  *   isa = Instruction Set Architexture to use for filtering commands
  *   isRoot = When the package is root, it is added to the package searching cache automatically with version 0.0.0
+ *   version = The actual version of that project, may be null on root
+ *   useExistingObj = Makes the project output dependencies if it is a root project. Disabled by default since compilation may be way slower
  * Returns: The build requirements to the project. Not recursive.
  */
 BuildRequirements parseProject(
@@ -30,7 +32,8 @@ BuildRequirements parseProject(
     string subPackage, 
     string recipe,
     bool isRoot = false,
-    string version_ = null
+    string version_ = null,
+    bool useExistingObj = false
 )
 {
     import std.path;
@@ -53,7 +56,7 @@ BuildRequirements parseProject(
     redub.parsers.environment.setupEnvironmentVariablesForPackage(req.cfg);
     req.cfg = redub.parsers.environment.parseEnvironment(req.cfg);
     req.cfg.arch = cInfo.arch;
-    if(isRoot)
+    if(isRoot && useExistingObj)
         req.cfg.outputsDeps = true;
 
     partiallyFinishBuildRequirements(req);

@@ -73,7 +73,7 @@ struct CompilationDetails
     ///Makes the build incremental or not
     Inference incremental;
     ///Makes the build use existing files
-    Inference useExistingObj;
+    bool useExistingObj;
     ///Whether the build should force single project
     bool combinedBuild;
     ///Whether the build should be fully parallel, simple, no or inferred
@@ -367,7 +367,7 @@ ProjectDetails resolveDependencies(
 
     import redub.libs.colorize;    
     import std.conv:to;
-    ProjectDetails ret = ProjectDetails(tree, compiler, cDetails.parallelType, cDetails, shouldUseExistingObj(cDetails.useExistingObj, tree), false, 0, invalidateCache);
+    ProjectDetails ret = ProjectDetails(tree, compiler, cDetails.parallelType, cDetails, cDetails.useExistingObj, false, 0, invalidateCache);
     infos(
         "Dependencies resolved", " - ", (st.peek.total!"msecs"), " ms \"",
         color(buildType, fg.magenta),"\" using ", compiler.binOrPath," v", compiler.version_,
@@ -394,24 +394,6 @@ bool isIncremental(Inference incremental, ProjectNode tree)
         case Inference.off: return false;
     }
 }
-/**
- *
- * Params:
- *   inf = If auto, it will disable inf when having a single compilation unit
- *   tree = The tree to find compilation units
- * Returns:
- */
-bool shouldUseExistingObj(Inference inf, ProjectNode tree)
-{
-    return false;
-    // final switch(inf)
-    // {
-    //     case Inference.auto_: return tree.collapse.length == 1;
-    //     case Inference.on: return true;
-    //     case Inference.off: return false;
-    // }
-}
-
 
 string getDubWorkspacePath()
 {
