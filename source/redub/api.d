@@ -78,6 +78,12 @@ struct CompilationDetails
     bool combinedBuild;
     ///Whether the build should be fully parallel, simple, no or inferred
     ParallelType parallelType;
+    /**
+    *  Whenever true, it will parse the environment and merge with the configurations with the project.
+    *  Details on that can be found on redub.parsers.environment.parse()
+    *  This flag is currently used only for plugin building.
+    */
+    bool includeEnvironmentVariables = true;
 }
 /** 
  * Project in which should be parsed.
@@ -351,10 +357,14 @@ ProjectDetails resolveDependencies(
         BuildRequirements.Configuration(proj.configuration, false), 
         proj.subPackage,
         proj.recipe,
-        true
+        true,
+        null,
+        cDetails.useExistingObj
     );
     redub.parsers.environment.setupEnvironmentVariablesForRootPackage(cast(immutable)req);
-    req.cfg = req.cfg.merge(redub.parsers.environment.parse());
+    if(cDetails.includeEnvironmentVariables)
+        req.cfg = req.cfg.merge(redub.parsers.environment.parse());
+
     req.cfg = req.cfg.merge(redub.parsers.build_type.parse(buildType, compiler.compiler));
 
 

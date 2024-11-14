@@ -99,7 +99,7 @@ void buildPluginProject(string pluginDir)
     setLogLevel(LogLevel.error);
 
 
-    ProjectDetails pluginDetails = resolveDependencies(false, os, CompilationDetails.init, ProjectToParse(null, pluginDir));
+    ProjectDetails pluginDetails = resolveDependencies(false, os, CompilationDetails(includeEnvironmentVariables: false), ProjectToParse(null, pluginDir));
     if(!pluginDetails.tree)
         throw new Exception("Could not build plugin at path "~pluginDir);
 
