@@ -31,7 +31,7 @@ string[] parseLinkConfiguration(const ThreadBuildData data, CompilingSession s, 
                 if(b.outputsDeps)
                     putSourceFiles(commands, null, [getObjectDir(cacheDir)], null, null, objExtension);
                 else
-                    commands~= buildNormalizedPath(outputDirectory, name~objExtension).escapePath;
+                    commands~= buildNormalizedPath(outputDirectory, targetName~objExtension).escapePath;
             }
             string arch = mapArch(s.compiler.compiler, b.arch);
             if(arch)
@@ -87,7 +87,7 @@ string[] parseLinkConfigurationMSVC(const ThreadBuildData data, CompilingSession
         if(b.outputsDeps)
             putSourceFiles(commands, null, [getObjectDir(cacheDir)], null, null, objExtension);
         else
-            commands~= buildNormalizedPath(outputDirectory, name~objExtension).escapePath;
+            commands~= buildNormalizedPath(outputDirectory, targetName~objExtension).escapePath;
 
         if(s.compiler.isDCompiler)
         {

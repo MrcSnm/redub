@@ -72,7 +72,13 @@ string getLibraryPath(string libName, string outputDir, OS os)
     }
     
 }
-
+/** 
+ * 
+ * Params:
+ *   conf = The configuration
+ *   os = OS in which is being built for
+ * Returns: A name with an extension that should be used for compiling
+ */
 string getConfigurationOutputName(const BuildConfiguration conf, OS os)
 {
     import redub.building.cache;
@@ -96,7 +102,13 @@ string getDepsFilePath(string cacheDir)
     return cacheDir~".deps";
 }
 
-
+/** 
+ * 
+ * Params:
+ *   conf = The configuration
+ *   os = OS in which is being built for
+ * Returns: A path with an extension that should be used for compiling
+ */
 string getConfigurationOutputPath(const BuildConfiguration conf, OS os)
 {
     import std.path;
@@ -195,7 +207,6 @@ void copyDir(string fromDir, string toDir, bool shallow = true)
 }
 
 /** 
- * 
  * Params:
  *   t = The target type
  *   name = Base library name or path
@@ -217,13 +228,60 @@ string getOutputName(TargetType t, string name, OS os, ISA isa = std.system.inst
     return outputName;
 }
 
-string getOutputName(const BuildConfiguration cfg, OS os)
+/** 
+ * Params:
+ *   cfg = The configuration to read target name and type
+ *   os = Which OS is this running on   
+ *   isa = ISA which it is being built for
+ * Returns: For a given library path (e.g: /some/path/a), will make it /some/path/a.[lib|dll] on Windows and /some/path/liba.[a|so] on POSIX
+ */
+string getOutputName(const BuildConfiguration cfg, OS os, ISA isa = std.system.instructionSetArchitecture)
 {
     import std.string;
     if(cfg.arch.indexOf("wasm") != -1)
-        return cfg.name~".wasm";
-    return getOutputName(cfg.targetType, cfg.name, os);
+        return cfg.targetName~".wasm";
+    return getOutputName(cfg.targetType, cfg.targetName, os, isa);
 }
+
+/** 
+ * 
+ * Params:
+ *   cfg = The configuration to get the output path
+ *   type = Which is the target type. This gives more flexibility
+ *   os = The OS in which it is being built for
+ *   isa = The ISA it is being built for
+ * Returns: The output path for the given arguments
+ */
+string getOutputPath(const BuildConfiguration cfg, TargetType type, OS os, ISA isa = std.system.instructionSetArchitecture)
+{
+    import std.path;
+    return buildNormalizedPath(cfg.outputDirectory, getOutputName(type, cfg.targetName, os, isa));
+}
+/** 
+ * 
+ * Params:
+ *   cfg = The configuration to get the output path
+ *   os = The OS in which it is being built for
+ *   isa = The ISA it is being built for
+ * Returns: The output path for the given arguments
+ */
+string getOutputPath(const BuildConfiguration cfg, OS os, ISA isa = std.system.instructionSetArchitecture)
+{
+    return getOutputPath(cfg, cfg.targetType, os, isa);
+}
+
+string[] getExpectedArtifacts(const BuildRequirements req, OS targetOS, ISA isa)
+{
+    import redub.command_generators.commons;
+    ///Adds the output to the expectedArtifact. Those files will be considered on the cache formula.
+    string[] ret = [getOutputPath(req.cfg, targetOS, isa)];
+    ///When windows builds shared libraries and they aren't root, it also generates a static library (import library)
+    ///This library will enter on the cache formula
+    if(targetOS.isWindows && req.cfg.targetType == TargetType.dynamicLibrary)
+        ret ~= getOutputPath(req.cfg, TargetType.staticLibrary, targetOS, isa);
+    return ret; 
+}
+
 
 string escapePath(string sourceFile)
 {

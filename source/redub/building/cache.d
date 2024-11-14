@@ -338,7 +338,7 @@ AdvCacheFormula getCopyCacheFormula(string mainPackHash, const BuildRequirements
     return AdvCacheFormula.make(
         contentHasher,//DO NOT use sourcePaths since importPaths is always custom + sourcePaths
         [DirectoriesWithFilter([], false)],
-        joiner([req.extra.expectedArtifacts, extraRequirements]),
+        joiner([getExpectedArtifacts(req, s.os, s.isa), extraRequirements]),
         existing,
         preprocessed,
         true

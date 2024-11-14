@@ -185,16 +185,13 @@ CompilationResult link(ProjectNode root, string rootHash, const ThreadBuildData 
     import std.path;
 
     string inDir = getCacheOutputDir(rootHash, cast()root.requirements, info);
-    string outDir = getConfigurationOutputPath(data.cfg, os);
-    copyDir(inDir, dirName(outDir));
-
     if(root.requirements.cfg.targetType == TargetType.executable && std.system.os.isPosix && info.isa != ISA.webAssembly)
     {
-        //TODO: Make it executable
-        string execPath = buildNormalizedPath(dirName(outDir), getOutputName(root.requirements.cfg, os));
+        string execPath = buildNormalizedPath(inDir, getOutputName(data.cfg, os));
         if(!makeFileExecutable(execPath))
             throw new Exception("Could not make the output file as executable "~execPath);
     }
+    copyDir(inDir, data.cfg.outputDirectory);
 
 
 

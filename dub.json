@@ -3,11 +3,6 @@
     "description": "Dub Based Build System, with parallelization per packages and easier to contribute",
     "authors": ["Hipreme"],
     "targetPath": "build",
-    "buildOptions": [
-        "debugInfo",
-        "debugInfoC",
-        "debugMode"
-    ],
     "stringImportPaths": [
         "source"
     ],

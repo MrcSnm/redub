@@ -95,11 +95,8 @@ int executeProgram(ProjectNode tree, string[] args)
     import std.array:join;
     import std.process;
     import redub.command_generators.commons;
-
     return wait(spawnShell(
-        escapeShellCommand(
-            buildNormalizedPath(tree.requirements.cfg.outputDirectory, 
-            tree.requirements.cfg.name~getExecutableExtension(os))) ~ " "~ join(args, " ")
+        escapeShellCommand(getOutputPath(tree.requirements.cfg, os)) ~ " "~ join(args, " ")
         )
     );
 }

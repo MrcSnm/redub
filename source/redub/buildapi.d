@@ -7,7 +7,7 @@ import redub.logging;
 import redub.package_searching.api;
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.14.8";
+enum RedubVersionOnly = "v1.14.9";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -562,8 +562,6 @@ struct PendingMergeConfiguration
 struct ExtraInformation
 {
     string[] librariesFullPath;
-    string[] expectedArtifacts;
-
     immutable(ExtraInformation) idup() inout
     {
         return immutable ExtraInformation(
@@ -897,10 +895,6 @@ class ProjectNode
             }
             node.requirements.cfg = node.requirements.cfg.mergeVersions(toMerge);
 
-            
-            ///Adds the output to the expectedArtifact. Those files will be considered on the cache formula.
-            node.requirements.extra.expectedArtifacts~= node.getOutputName(targetOS, isa);
-
             ///Execute pkg-config for Posix
             version(Posix)
             {
@@ -914,14 +908,6 @@ class ProjectNode
                 }
             }
 
-            import redub.command_generators.commons;
-
-            ///When windows builds shared libraries and they aren't root, it also generates a static library (import library)
-            ///This library will enter on the cache formula
-            if(!node.isRoot && node.requirements.cfg.targetType == TargetType.dynamicLibrary && targetOS.isWindows)
-            {
-                node.requirements.extra.expectedArtifacts~= node.getOutputName(TargetType.staticLibrary, targetOS, isa);
-            }
         }
         static void finishMerging(ProjectNode target, ProjectNode input)
         {
@@ -1014,7 +1000,6 @@ class ProjectNode
         privatesToMerge = null;
     }
 
-    
     bool isUpToDate() const { return !shouldRebuild; }
     bool isUpToDate() const shared { return !shouldRebuild; }
 

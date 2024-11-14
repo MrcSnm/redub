@@ -80,7 +80,8 @@ bool hardLinkFile(string from, string to, bool overwrite = false)
 	// fallback to copy
     try
     {
-	    std.file.copy(from, to);        
+	    std.file.copy(from, to);      
+        std.file.setAttributes(to, attr);
     }
     catch(Exception e)
     {
