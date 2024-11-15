@@ -7,6 +7,7 @@
 module redub.plugin.build;
 import redub.buildapi;
 import core.simd;
+import redub.tree_generators.dub;
 
 
 private immutable string apiImport = import("redub/plugin/api.d");
@@ -52,7 +53,7 @@ BuildConfiguration injectPluginCfg(BuildConfiguration base, string pluginName)
     return base;
 }
 
-void buildPlugin(string pluginName, string inputFile)
+void buildPlugin(string pluginName, string inputFile, CompilationInfo cInfo)
 {
     import redub.command_generators.automatic;
     import redub.command_generators.commons;
@@ -67,7 +68,7 @@ void buildPlugin(string pluginName, string inputFile)
 
     if(exists(inputFile) && isDir(inputFile))
     {
-        buildPluginProject(inputFile);
+        buildPluginProject(inputFile, cInfo);
         return;
     }
 
@@ -89,17 +90,19 @@ void buildPlugin(string pluginName, string inputFile)
 }
 
 
-void buildPluginProject(string pluginDir)
+void buildPluginProject(string pluginDir, CompilationInfo cInfo)
 {
     import redub.api;
     import redub.logging;
     writePluginImport();
 
+    errorTitle("Building plugin with ", cInfo.compiler);
+
     LogLevel level = getLogLevel();
     setLogLevel(LogLevel.error);
 
 
-    ProjectDetails pluginDetails = resolveDependencies(false, os, CompilationDetails(includeEnvironmentVariables: false), ProjectToParse(null, pluginDir));
+    ProjectDetails pluginDetails = resolveDependencies(false, os, CompilationDetails(cInfo.compiler, includeEnvironmentVariables: false), ProjectToParse(null, pluginDir));
     if(!pluginDetails.tree)
         throw new Exception("Could not build plugin at path "~pluginDir);
 

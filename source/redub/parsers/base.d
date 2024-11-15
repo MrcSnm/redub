@@ -32,14 +32,14 @@ struct ParseConfig
 }
 
 
-void baseLoadPlugin(string pluginName, string pluginPath, string workingDir)
+void baseLoadPlugin(string pluginName, string pluginPath, string workingDir, CompilationInfo cInfo)
 {
     import redub.plugin.load;
     import std.file;
     import std.path;
     if(!isAbsolute(pluginPath))
         pluginPath = buildNormalizedPath(workingDir, pluginPath);
-    loadPlugin(pluginName, pluginPath);
+    loadPlugin(pluginName, pluginPath, cInfo);
 }
 void setName(ref BuildRequirements req, string name, ParseConfig c)
 {

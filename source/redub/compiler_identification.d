@@ -172,6 +172,8 @@ Compiler getCompiler(string compilerOrPath = "dmd", string compilerAssumption = 
     import redub.misc.find_executable;
     import redub.meta;
     import std.exception;
+    import std.path;
+
 
     JSONValue compilersInfo = getRedubMeta();
     bool isDefault;
@@ -184,22 +186,26 @@ Compiler getCompiler(string compilerOrPath = "dmd", string compilerAssumption = 
     if(compilerOrPath == null)
         compilerOrPath = "dmd";
 
-    string locCompiler = tryGetCompilerOnCwd(compilerOrPath);
-    bool isGlobal = locCompiler == compilerOrPath;
-    if(!isGlobal)
-        compilerOrPath = locCompiler;
-    else
+    bool isGlobal;
+    if(!isAbsolute(compilerOrPath))
     {
-        if(JSONValue* globalPaths = "globalPaths" in compilersInfo)
+        string locCompiler = tryGetCompilerOnCwd(compilerOrPath);
+        isGlobal = locCompiler == compilerOrPath;
+        if(!isGlobal)
+            compilerOrPath = locCompiler;
+        else
         {
-            if(JSONValue* cachedPath = compilerOrPath in *globalPaths)
+            if(JSONValue* globalPaths = "globalPaths" in compilersInfo)
             {
-                Compiler ret = getCompilerFromCache(compilersInfo, cachedPath.str);
-                if(ret != Compiler.init)
-                    return ret;
+                if(JSONValue* cachedPath = compilerOrPath in *globalPaths)
+                {
+                    Compiler ret = getCompilerFromCache(compilersInfo, cachedPath.str);
+                    if(ret != Compiler.init)
+                        return ret;
+                }
             }
+            compilerOrPath = findExecutable(compilerOrPath);
         }
-        compilerOrPath = findExecutable(compilerOrPath);
     }
 
     Compiler ret = getCompilerFromCache(compilersInfo, compilerOrPath);
@@ -289,6 +295,8 @@ private Compiler getCompilerFromCache(JSONValue allCompilersInfo, string compile
  * Params:
  *   allCompilersInfo = The JSON value of the current redub compilers info
  *   compiler = The new compiler to add
+ *   isDefault = saves the compiler as the default compiler
+ *   isGlobal = Saves the compiler as a globalPath. For example, it will use the path whenever expected to find in global path when "dmd" is sent or "ldc2" (i.e: no real path)
  */
 private void saveCompilerInfo(JSONValue allCompilersInfo, Compiler compiler, bool isDefault, bool isGlobal)
 {
@@ -370,7 +378,12 @@ private bool tryInferLdc(string compilerOrPath, string vString, out Compiler com
     ptrdiff_t indexRight = 0;
     string ldcVerStr = inBetween(vString, "LDC - the LLVM D compiler (", ")", indexRight);
     ///Identify LDC and its version
-    if(indexRight == -1) return false;
+    if(indexRight == -1)
+    {
+        ldcVerStr = inBetween(vString, "LDC - the LLVM Open D compiler (", " ", indexRight);
+        if(indexRight == -1)
+            return false;
+    }
     ///Find DMD ver
     string frontEndVer = inBetweenAny(vString, "based on DMD v", [' ', '\t', '\n', '\r'], indexRight);
     enforce(indexRight != -1, "Found LDC but coult not find DMD Frontend version");

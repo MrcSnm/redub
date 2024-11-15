@@ -52,30 +52,28 @@ int main(string[] args)
         args = args[0..execArgsInit];
     }
 
-    string action = args.length > 1 ? args[1] : "";
-    switch(action)
+
+    int function(string[])[string] entryPoints = [
+        "build": &buildMain,
+        "clean": &cleanMain,
+        "describe": &describeMain,
+        "deps": &depsMain,
+        "test": &testMain,
+        "run": cast(int function(string[]))null
+    ];
+
+    foreach(cmd; entryPoints.byKey)
     {
-        case "build":
-            args = args[0] ~ args[2..$];
-            return buildMain(args);
-        case "clean":
-            args = args[0] ~ args[2..$];
-            return cleanMain(args);
-        case "describe":
-            args = args[0] ~ args[2..$];
-            return describeMain(args);
-        case "deps":
-            args = args[0] ~ args[2..$];
-            return depsMain(args);
-        case "test":
-            args = args[0] ~ args[2..$];
-            return testMain(args);
-        case "run":
-            args = args[0] ~ args[2..$];
-            goto default;
-        default:
-            return runMain(args, runArgs);
+        ptrdiff_t cmdPos = countUntil(args, cmd);
+        if(cmdPos != -1)
+        {
+            args = args[0..cmdPos] ~ args[cmdPos+1..$];
+            if(cmd == "run")
+                return runMain(args, runArgs);
+            return entryPoints[cmd](args);
+        }
     }
+    return runMain(args, runArgs);
 }
 
 
@@ -263,7 +261,7 @@ ProjectDetails resolveDependencies(string[] args)
         return ProjectDetails(null, Compiler.init, ParallelType.auto_, CompilationDetails.init, false, true, status);
     }
 
-    if(bArgs.arch) bArgs.compiler = "ldc2";
+    if(bArgs.arch && !bArgs.compiler) bArgs.compiler = "ldc2";
     DubCommonArguments cArgs = bArgs.cArgs;
     if(cArgs.root)
         workingDir = cArgs.getRoot(workingDir);

@@ -90,13 +90,17 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
             foreach(key, value; v.object)
             {
                 enforce(value.type == JSONType.string, "\"plugins\" entry key '"~key~"' must be a string to a path being either a .d file or a dub project.");
-                baseLoadPlugin(key, value.str, c.workingDir);
+                baseLoadPlugin(key, value.str, c.workingDir, c.cInfo);
             }
         },
         "preBuildPlugins": (ref BuildRequirements req, JSONValue v, ParseConfig c)
         {
             foreach(key, value; v.object)
                 addPreBuildPlugins(req, key, value.strArr, c);
+        },
+        "buildTypes": (ref BuildRequirements req, JSONValue v, ParseConfig c)
+        {
+            enforce(false, "Redub does not support buildTypes and has no plan to support it. Use \"configurations\" for achieving the same thing.");
         },
         "targetName": (ref BuildRequirements req, JSONValue v, ParseConfig c){setTargetName(req, v.str, c);},
         "targetType": (ref BuildRequirements req, JSONValue v, ParseConfig c){setTargetType(req, v.str, c);},

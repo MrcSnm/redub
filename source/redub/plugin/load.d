@@ -1,6 +1,7 @@
 module redub.plugin.load;
 import redub.plugin.api;
 import redub.buildapi;
+import redub.tree_generators.dub;
 
 
 private struct RegisteredPlugin
@@ -10,7 +11,7 @@ private struct RegisteredPlugin
 }
 
 __gshared RegisteredPlugin[string] registeredPlugins;
-void loadPlugin(string pluginName, string pluginPath)
+void loadPlugin(string pluginName, string pluginPath, CompilationInfo cInfo)
 {
     import redub.plugin.build;
     import std.file;
@@ -30,7 +31,7 @@ void loadPlugin(string pluginName, string pluginPath)
 
 
 
-    buildPlugin(pluginName, pluginPath);
+    buildPlugin(pluginName, pluginPath, cInfo);
 
     string fullPluginPath = buildNormalizedPath(pluginPath, pluginName);
 
