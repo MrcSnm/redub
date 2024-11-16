@@ -40,7 +40,7 @@ private void writePluginImport()
     std.file.write(buildNormalizedPath(importPath, "api.d"), apiImport);
 }
 
-BuildConfiguration injectPluginCfg(BuildConfiguration base, string pluginName)
+BuildConfiguration injectPluginCfg(BuildConfiguration base, string pluginName, CompilationInfo cInfo)
 {
     import redub.building.cache;
     base.targetName = base.name = pluginName;
@@ -74,7 +74,7 @@ void buildPlugin(string pluginName, string inputFile, CompilationInfo cInfo)
 
 
 
-    BuildConfiguration b = injectPluginCfg(BuildConfiguration.init, pluginName);
+    BuildConfiguration b = injectPluginCfg(BuildConfiguration.init, pluginName, cInfo);
     b.sourceFiles = [inputFile];
 
 
@@ -96,17 +96,19 @@ void buildPluginProject(string pluginDir, CompilationInfo cInfo)
     import redub.logging;
     writePluginImport();
 
-    errorTitle("Building plugin with ", cInfo.compiler);
-
     LogLevel level = getLogLevel();
     setLogLevel(LogLevel.error);
 
+    version(LDC)
+        enum preferredCompiler = "ldc";
+    else
+        enum preferredCompiler = "dmd";
 
-    ProjectDetails pluginDetails = resolveDependencies(false, os, CompilationDetails(cInfo.compiler, includeEnvironmentVariables: false), ProjectToParse(null, pluginDir));
+    ProjectDetails pluginDetails = resolveDependencies(false, os, CompilationDetails(preferredCompiler, includeEnvironmentVariables: false), ProjectToParse(null, pluginDir));
     if(!pluginDetails.tree)
         throw new Exception("Could not build plugin at path "~pluginDir);
 
-    pluginDetails.tree.requirements.cfg = injectPluginCfg(pluginDetails.tree.requirements.cfg, pluginDetails.tree.name);
+    pluginDetails.tree.requirements.cfg = injectPluginCfg(pluginDetails.tree.requirements.cfg, pluginDetails.tree.name, cInfo);
     pluginDetails = buildProject(pluginDetails);
     setLogLevel(level);
 }

@@ -147,13 +147,19 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
                         if(!platformMatches(platforms.array, os, c.cInfo.isa))
                             continue;
                     }
-                    if(preferredConfiguration == -1)
-                        preferredConfiguration = i.to!int;
                     if(name.str == c.subConfiguration.name)
                     {
                         preferredConfiguration = i.to!int;
                         break;
                     }
+                    if(preferredConfiguration == -1)
+                        preferredConfiguration = i.to!int;
+                }
+                if(c.subConfiguration.name && v.array[preferredConfiguration]["name"].str != c.subConfiguration.name)
+                {
+                    import std.algorithm:map;
+                    import std.array:join;
+                    throw new Exception("Configuration '"~c.subConfiguration.name~"' specified for dependency '"~req.name~"' but wasn't found. Avaiable Configurations:\n\t"~v.array.map!((JSONValue v) => v["name"].str).join("\n\t"));
                 }
                 if(preferredConfiguration != -1)
                 {

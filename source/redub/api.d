@@ -129,6 +129,21 @@ ParallelType inferParallel(ProjectDetails d)
     return d.parallelType;
 }
 
+class RedubException : Exception
+{
+    this(string msg, string file = __FILE__, size_t line = __LINE__, Throwable nextInChain = null)
+    {
+        super(msg, file, line, nextInChain);
+    }
+}
+class BuildException : Exception
+{
+    this(string file = __FILE__, size_t line = __LINE__, Throwable nextInChain = null)
+    {
+        super(null, file, line, nextInChain );
+    }
+}
+
 /** 
  * Unchanged Files can't deal with directories at that moment.
  * Params:
@@ -142,7 +157,7 @@ string[] getChangedBuildFiles(ProjectNode root, CompilingSession s)
     import std.array : array;
     import redub.command_generators.commons;
     if(!root.isRoot)
-        throw new Exception("Can only exclude unchanged files from root at this moment.");
+        throw new RedubException("Can only exclude unchanged files from root at this moment.");
 
     string depsPath = getDepsFilePath(root, s);
     if(!exists(depsPath))
@@ -180,7 +195,7 @@ ProjectDetails buildProject(ProjectDetails d)
     if(d.forceRebuild)
     {
         if(!cleanProject(d, false))
-            throw new Exception("Could not clean project ", d.tree.name);
+            throw new RedubException("Could not clean project ", d.tree.name);
         d.tree.invalidateCacheOnTree();
     }
     else
@@ -201,12 +216,12 @@ ProjectDetails buildProject(ProjectDetails d)
             case ParallelType.no:
                 return buildProjectSingleThread(tree, session);
             default: 
-                throw new Exception(`Unsupported parallel type in this step.`);
+                throw new RedubException(`Unsupported parallel type in this step.`);
         }
     });
     bool buildSucceeded = result.value;
     if(!buildSucceeded)
-        throw new Exception("Build failure");
+        throw new BuildException();
     infos("Finished ", d.tree.name, " - ", result.msecs, "ms - To force a rebuild of up-to-date targets, run again with --force");
 
     return d;
@@ -348,7 +363,7 @@ ProjectDetails resolveDependencies(
     }
 
     redub.parsers.environment.setupBuildEnvironmentVariables(dubVars);
-    CompilationInfo cInfo = CompilationInfo(compiler.getCompilerString, cDetails.arch, osFromArch(cDetails.arch), isaFromArch(cDetails.arch));
+    CompilationInfo cInfo = CompilationInfo(compiler.getCompilerString, cDetails.arch, osFromArch(cDetails.arch), isaFromArch(cDetails.arch), compiler.binOrPath);
 
 
     BuildRequirements req = parseProject(

@@ -6,12 +6,20 @@ public import redub.plugin.api;
 import redub.logging;
 import redub.package_searching.api;
 
+
 ///vX.X.X
-enum RedubVersionOnly = "v1.14.11";
+enum RedubVersionOnly = "v1.14.12";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
-enum RedubVersion = RedubVersionShort ~ " - A reimagined DUB";
+enum RedubVersion = RedubVersionShort ~ " - A reimagined DUB. Built With "~__VENDOR__~" v"~getDFrontendVersion~" at "~__DATE__;
+
+private string getDFrontendVersion()
+{
+    import std.conv:to;
+    string ret = __VERSION__.to!string;
+    return ret[0..$-3]~"."~ret[$-3..$];
+}
 
 /**
  * CompilingSession is important for the hash calculation and thus is passed all around while building.

@@ -38,42 +38,55 @@ string formatError(string err)
 */
 int main(string[] args)
 {
-    if(args.length == 1)
-        return runMain(args, []);
-
-
-    import std.algorithm:countUntil;
-    ptrdiff_t execArgsInit = countUntil(args, "--");
-
-    string[] runArgs;
-    if(execArgsInit != -1)
+    try
     {
-        runArgs = args[execArgsInit+1..$];
-        args = args[0..execArgsInit];
-    }
+        if(args.length == 1)
+            return runMain(args, []);
 
+        import std.algorithm:countUntil;
+        ptrdiff_t execArgsInit = countUntil(args, "--");
 
-    int function(string[])[string] entryPoints = [
-        "build": &buildMain,
-        "clean": &cleanMain,
-        "describe": &describeMain,
-        "deps": &depsMain,
-        "test": &testMain,
-        "run": cast(int function(string[]))null
-    ];
-
-    foreach(cmd; entryPoints.byKey)
-    {
-        ptrdiff_t cmdPos = countUntil(args, cmd);
-        if(cmdPos != -1)
+        string[] runArgs;
+        if(execArgsInit != -1)
         {
-            args = args[0..cmdPos] ~ args[cmdPos+1..$];
-            if(cmd == "run")
-                return runMain(args, runArgs);
-            return entryPoints[cmd](args);
+            runArgs = args[execArgsInit+1..$];
+            args = args[0..execArgsInit];
         }
+
+
+        int function(string[])[string] entryPoints = [
+            "build": &buildMain,
+            "clean": &cleanMain,
+            "describe": &describeMain,
+            "deps": &depsMain,
+            "test": &testMain,
+            "run": cast(int function(string[]))null
+        ];
+
+
+        foreach(cmd; entryPoints.byKey)
+        {
+            ptrdiff_t cmdPos = countUntil(args, cmd);
+            if(cmdPos != -1)
+            {
+                args = args[0..cmdPos] ~ args[cmdPos+1..$];
+                if(cmd == "run")
+                    return runMain(args, runArgs);
+                return entryPoints[cmd](args);
+            }
+        }
+        return runMain(args, runArgs);
     }
-    return runMain(args, runArgs);
+    catch(RedubException e)
+    {
+        errorTitle("Redub Error: ", e.msg);
+        return 1;
+    }
+    catch(BuildException e)
+    {
+        errorTitle("Build Failure");
+        return 1;
+    }
 }
 
 
@@ -238,7 +251,7 @@ ProjectDetails resolveDependencies(string[] args)
     if(res.helpWanted)
     {
         import std.getopt;
-        defaultGetoptPrinter("redub build information\n\t", res.options);
+        defaultGetoptPrinter(RedubVersionShort~" build information: \n\t", res.options);
         return ProjectDetails.init;
     }
     if(bArgs.version_)

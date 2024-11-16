@@ -510,7 +510,8 @@ private bool doLink(ProjectNode root, CompilingSession info, string mainPackHash
         if(linkRes.status)
         {
             import redub.misc.github_tag_check;
-            errorTitle("Linking Error at \"", root.name, "\". \n\t"~ RedubVersionShort~ "\n\t" ~ compiler.getCompilerWithVersion ~ "\n\tFailed with flags: \n\n\t",
+            import redub.libs.colorize;
+            errorTitle("Linking Error ", "at \"", root.name.color(fg.light_red), "\". \n\t"~ RedubVersionShort~ "\n\t" ~ compiler.getCompilerWithVersion ~ "\n\tFailed with flags: \n\n\t",
                 linkRes.compilationCommand,"\n\t\t  :\n\t",
                 linkRes.message,
             );

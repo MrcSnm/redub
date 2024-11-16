@@ -13,6 +13,8 @@ struct CompilationInfo
     OS targetOS;
     ///Target Instruction Set Architecture
     ISA isa;
+    ///Where the actual compiler is. Used for plugin building
+    string binPath;
 }
 
 
