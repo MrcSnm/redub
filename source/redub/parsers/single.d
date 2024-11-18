@@ -49,7 +49,7 @@ BuildRequirements parseProject(
     BuildRequirements req;
     switch(extension(singleInfo.fileName))
     {
-        case ".sdl":   req = redub.parsers.sdl.parseWithData(recipe, singleInfo.recipe, projectWorkingDir, cInfo, singleInfo.defaultPackageName, version_, subConfiguration, subPackage, false, isRoot); break;
+        case ".sdl":   req = redub.parsers.sdl.parseWithData(recipe, singleInfo.recipe, projectWorkingDir, cInfo, singleInfo.defaultPackageName, version_, subConfiguration, subPackage, "", false, isRoot); break;
         case ".json":  req = redub.parsers.json.parseWithData(recipe, singleInfo.recipe, projectWorkingDir, cInfo, singleInfo.defaultPackageName ,version_, subConfiguration, subPackage, "", false, isRoot); break;
         default: throw new Exception("Unsupported project type "~recipe~" at dir "~projectWorkingDir);
     }

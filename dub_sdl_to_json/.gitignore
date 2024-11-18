@@ -1,0 +1,16 @@
+.dub
+docs.json
+__dummy.html
+docs/
+/dub_sdl_to_json
+dub_sdl_to_json.so
+dub_sdl_to_json.dylib
+dub_sdl_to_json.dll
+dub_sdl_to_json.a
+dub_sdl_to_json.lib
+dub_sdl_to_json-test-*
+*.exe
+*.pdb
+*.o
+*.obj
+*.lst

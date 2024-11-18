@@ -34,7 +34,13 @@ struct JSONArray
 		self.length++;
 		return self;
 	}
-
+	auto opOpAssign(string op, T)(T value) if(op == "~")
+	{
+		static if(is(T == JSONValue))
+			return append(&this, value);
+		else
+			return append(&this, JSONValue(value));
+	}
 	private static JSONArray* trim(JSONArray* self)
 	{
 		import core.memory;
@@ -181,7 +187,8 @@ struct JSONValue
     ///Returns an array range.
     auto array() const
     {
-        assert(type == JSONType.array, "Tried to iterate a non array object of type "~getTypeName);
+		import std.exception;
+        enforce(type == JSONType.array, "Tried to iterate a non array object of type "~getTypeName);
         struct JSONValueArrayIterator
         {
             private const(JSONArray*) arr;
@@ -195,15 +202,22 @@ struct JSONValue
         return JSONValueArrayIterator(data.array);
     }
 
+	ref JSONArray jsonArray()
+	{
+		return *data.array;
+	}
+
 	JSONValue[] array()
 	{
-		assert(type == JSONType.array, "Tried to iterate a non array object of type "~getTypeName);
+		import std.exception;
+		enforce(type == JSONType.array, "Tried to iterate a non array object of type "~getTypeName);
 		return data.array.getArray();
 	}
 
     JSONValue object() const
     {
-        assert(type == JSONType.object, "Tried to get type object but value is of type "~getTypeName); 
+		import std.exception;
+        enforce(type == JSONType.object, "Tried to get type object but value is of type "~getTypeName);
 		JSONValue ret;
 		ret.data = data;
 		ret.error = error;
@@ -229,35 +243,35 @@ struct JSONValue
 	T get(T)() const
 	{
 		import std.traits;
-
+		import std.exception;
 		static if(isIntegral!T)
 		{
-			assert(type == JSONType.int_, "Tried to get type "~T.stringof~" but value is of type "~getTypeName);
+			enforce(type == JSONType.int_, "Tried to get type "~T.stringof~" but value is of type "~getTypeName);
 			return cast(Unqual!T)data._int;
 		}
 		else static if(isFloatingPoint!T)
 		{
-			assert(type == JSONType.float_, "Tried to get type "~T.stringof~" but value is of type "~getTypeName);
+			enforce(type == JSONType.float_, "Tried to get type "~T.stringof~" but value is of type "~getTypeName);
 			return cast(Unqual!T)data._float;
 		}
 		else static if(is(T == bool))
 		{
-			assert(type == JSONType.bool_, "Tried to get type "~T.stringof~" but value is of type "~getTypeName);
+			enforce(type == JSONType.bool_, "Tried to get type "~T.stringof~" but value is of type "~getTypeName);
 			return cast(Unqual!T)data._bool;
 		}
 		else static if(is(T == string))
 		{
-			assert(type == JSONType.string_, "Tried to get type "~T.stringof~" but value is of type "~getTypeName);
+			enforce(type == JSONType.string_, "Tried to get type "~T.stringof~" but value is of type "~getTypeName);
 			return data._string;
 		}
 		else static if(is(T == JSONObject))
 		{
-			assert(type == JSONType.object, "Tried to get type "~T.stringof~" but value is of type "~getTypeName);
+			enforce(type == JSONType.object, "Tried to get type "~T.stringof~" but value is of type "~getTypeName);
 			return *data.object;
 		}
 		else static if(is(T == JSONArray))
 		{
-			assert(type == JSONType.array, "Tried to get type "~T.stringof~" but value is of type "~getTypeName);
+			enforce(type == JSONType.array, "Tried to get type "~T.stringof~" but value is of type "~getTypeName);
 			return *data.array;
 		}
 	}
@@ -277,6 +291,13 @@ struct JSONValue
 		JSONValue ret;
 		ret.type = JSONType.object;
 		ret.data.object = new JSONObject();
+		return ret;
+	}
+	static JSONValue emptyArray()
+	{
+		JSONValue ret;
+		ret.type = JSONType.array;
+		ret.data.array = new JSONArray();
 		return ret;
 	}
 

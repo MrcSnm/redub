@@ -69,20 +69,22 @@ void addFilesToCopy(ref BuildRequirements req, JSONStringArray files, ParseConfi
 void addPreGenerateCommands(ref BuildRequirements req, JSONStringArray cmds, ParseConfig c)
 {
     import hipjson;
-    infos("Pre-gen ", "Running commands for ", c.requiredBy);
     if(c.preGenerateRun)
-    foreach(JSONValue cmd; cmds.save)
     {
-        import std.process;
-        import std.stdio;
-        import std.conv:to;
+        infos("Pre-gen ", "Running commands for ", c.requiredBy);
+        foreach(JSONValue cmd; cmds.save)
+        {
+            import std.process;
+            import std.stdio;
+            import std.conv:to;
 
-        if(hasLogLevel(LogLevel.verbose))
-            vlog("Executing: ", executeShell("echo "~cmd.str, environment.toAA, Config.none, size_t.max, c.workingDir).output, " at dir ", c.workingDir);
+            if(hasLogLevel(LogLevel.verbose))
+                vlog("Executing: ", executeShell("echo "~cmd.str, environment.toAA, Config.none, size_t.max, c.workingDir).output, " at dir ", c.workingDir);
 
-        auto status = wait(spawnShell(cmd.str, stdin, stdout, stderr, environment.toAA, Config.none, c.workingDir));
-        if(status)
-            throw new Exception("preGenerateCommand '"~cmd.str~"' exited with code "~status.to!string);
+            auto status = wait(spawnShell(cmd.str, stdin, stdout, stderr, environment.toAA, Config.none, c.workingDir));
+            if(status)
+                throw new Exception("preGenerateCommand '"~cmd.str~"' exited with code "~status.to!string);
+        }
     }
     req.cfg.preGenerateCommands = req.cfg.preGenerateCommands.append(cmds);
 }

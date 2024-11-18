@@ -14,6 +14,7 @@ import redub.tree_generators.dub;
  *   version_ = Version being used
  *   subConfiguration = The configuration to use
  *   subPackage = The sub package to use
+ *   parentName = Used as metadata
  *   isDescribeOnly = Used for not running the preGenerate commands
  *   isRoot = metadata
  * Returns: The new build requirements
@@ -26,6 +27,7 @@ BuildRequirements parse(
     string version_, 
     BuildRequirements.Configuration subConfiguration, 
     string subPackage,
+    string parentName,
     bool isDescribeOnly = false,
     bool isRoot = false
 )
@@ -39,6 +41,7 @@ BuildRequirements parse(
         version_,
         subConfiguration,
         subPackage,
+        parentName,
         isDescribeOnly,
         isRoot,
     );
@@ -55,6 +58,7 @@ BuildRequirements parse(
  *   version_ = Version being used
  *   subConfiguration = The configuration to use
  *   subPackage = The sub package to use
+ *   parentName = Metadata
  *   isDescribeOnly = Used for not running preGenerate commands
  *   isRoot = metadata
  * Returns: The new build requirements
@@ -68,34 +72,29 @@ BuildRequirements parseWithData(
     string version_,
     BuildRequirements.Configuration subConfiguration,
     string subPackage,
+    string parentName,
     bool isDescribeOnly = false,
     bool isRoot = false
 )
 {
     static import redub.parsers.json;
-    import std.process;
-    import std.file;
-    import std.path;
+    import redub.parsers.base;
+    import dub_sdl_to_json;
 
-    string currDir = getcwd();
-    string tempFile = filePath~".redub_cache_json"; //.sdl.redub_cache_json
-    chdir(workingDir);
-
-    ///If the dub.sdl is newer than the json generated or if it does not exists.
-    if(!std.file.exists(tempFile) || timeLastModified(tempFile).stdTime < timeLastModified(filePath).stdTime)
-    {
-        auto exec = execDubConvert(fileData);
-        if(exec.status)
-            throw new Exception("dub could not convert file at path "~filePath~" to json: "~exec.output);
-        std.file.write(tempFile, exec.output);
-    }
-    BuildRequirements ret = redub.parsers.json.parse(tempFile, workingDir, cInfo, defaultPackageName, version_, subConfiguration, subPackage, "", isDescribeOnly, isRoot);
-    chdir(currDir);
+    ParseConfig c = ParseConfig(workingDir, subConfiguration, subPackage, version_, cInfo, defaultPackageName, null, parentName, preGenerateRun: !isDescribeOnly);
+    fileData = fixSDLParsingBugs(fileData);
+    JSONValue json = sdlToJSON(parseSDL(filePath, fixSDLParsingBugs(fileData)));
+    BuildRequirements ret = redub.parsers.json.parse(json, c, isRoot);
     return ret;
 }
 
 
-
+/**
+ * Fixes SDL for being converted to JSON
+ * Params:
+ *   sdlData = Some SDL data may input extra \n. Those are currently in the process of being ignored by the JSON parsing as it may break.
+ * Returns: SDL parse fixed.
+ */
 string fixSDLParsingBugs(string sdlData)
 {
     import std.file;
@@ -106,19 +105,4 @@ string fixSDLParsingBugs(string sdlData)
     else
         enum lb = "\n";
     return sdlData.replace("\\"~lb, " ").replace("`"~lb, "`");
-}
-
-auto execDubConvert(string sdlData)
-{
-    import std.file;
-    import std.path;
-    import std.process;
-
-    mkdirRecurse("redub_convert_temp");
-    std.file.write(buildNormalizedPath("redub_convert_temp", "dub.sdl"), fixSDLParsingBugs(sdlData));
-    scope(exit)
-    {
-        std.file.rmdirRecurse("redub_convert_temp");
-    }
-    return executeShell("dub convert -f json -s ", null, Config.none, size_t.max, buildNormalizedPath(getcwd, "redub_convert_temp"));
 }

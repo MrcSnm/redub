@@ -24,6 +24,7 @@
         "adv_diff": {"path": "adv_diff", "version": "*"},
         "hipjson": {"path": "hipjson", "version": "*"},
         "d_dependencies": {"path": "d_dependencies", "version": "*"},
+        "dub_sdl_to_json": {"path": "dub_sdl_to_json", "version": "*"},
         "xxhash3": "~>0.0.5"
     }
 

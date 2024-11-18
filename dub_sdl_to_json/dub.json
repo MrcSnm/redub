@@ -1,0 +1,13 @@
+{
+	"authors": [
+		"Marcelo"
+	],
+	"dependencies": {
+		"sdlite": "~>1.3.0",
+		"hipjson": {"path": "../hipjson"}
+	},
+	"copyright": "Copyright © 2024, Marcelo",
+	"description": "A minimal D application.",
+	"license": "proprietary",
+	"name": "dub_sdl_to_json"
+}
