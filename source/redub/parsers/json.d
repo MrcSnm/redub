@@ -21,29 +21,94 @@ immutable string[] commandsWithHostFilters = [
     "postGenerateCommands"
 ];
 
+/**
+ * Parses a .json file into a BuildRequirements
+ * Params:
+ *   filePath = The JSON file path
+ *   projectWorkingDir = Working directory to parse with it
+ *   cInfo = Compilation Info for being used as filters while parsing
+ *   defaultPackageName = Package name to use if no name is found inside the recipe.
+ *   version_ = Version of the current one being parsed. May be used to decide which version to use
+ *   subConfiguration = The configuration that were specified in the parsing process
+ *   subPackage = The subpackage that is actually being used
+ *   parentName = Used as metadata
+ *   isRoot = Used as metadata
+ * Returns:
+ */
 BuildRequirements parse(string filePath, 
     string projectWorkingDir, 
     CompilationInfo cInfo,
+    string defaultPackageName,
     string version_, 
     BuildRequirements.Configuration subConfiguration,
     string subPackage,
     string parentName,
+    bool isDescribeOnly = false,
     bool isRoot = false
 )
 {
     import std.path;
-    ParseConfig c = ParseConfig(projectWorkingDir, subConfiguration, subPackage, version_, cInfo, null, parentName);
+    ParseConfig c = ParseConfig(projectWorkingDir, subConfiguration, subPackage, version_, cInfo, defaultPackageName, null, parentName, preGenerateRun: !isDescribeOnly);
     return parse(parseJSONCached(filePath), c, isRoot);
+}
+
+/**
+ *
+ * Params:
+ *   filePath = The JSON file path
+ *   fileData = The actual data to use as JSON. This were created for --single builds
+ *   projectWorkingDir = Working directory to parse with it
+ *   cInfo = Compilation Info for being used as filters while parsing
+ *   defaultPackageName = Package name to use if no name is found inside the recipe
+ *   version_ = Version of the current one being parsed. May be used to decide which version to use
+ *   subConfiguration = The configuration that were specified in the parsing process
+ *   subPackage = The subpackage that is actually being used
+ *   parentName = Used as metadata
+ *   isRoot = Used as metadata
+ * Returns:
+ */
+BuildRequirements parseWithData(string filePath,
+    string fileData,
+    string projectWorkingDir,
+    CompilationInfo cInfo,
+    string defaultPackageName,
+    string version_,
+    BuildRequirements.Configuration subConfiguration,
+    string subPackage,
+    string parentName,
+    bool isDescribeOnly = false,
+    bool isRoot = false
+)
+{
+    import std.path;
+    ParseConfig c = ParseConfig(projectWorkingDir, subConfiguration, subPackage, version_, cInfo, defaultPackageName, null, parentName, preGenerateRun: !isDescribeOnly);
+    return parse(parseJSONCached(filePath, fileData), c, isRoot);
 }
 
 
 private JSONValue[string] jsonCache;
-///Optimization to be used when dealing with subPackages
+/**
+ *
+ * Params:
+ *   filePath = Uses filePath as the file data for parsing. Better API
+ * Returns: Same as parseJSONCache
+ */
 private JSONValue parseJSONCached(string filePath)
+{
+    return parseJSONCached(filePath, std.file.readText(filePath));
+}
+
+/**
+* Optimization to be used when dealing with subPackages.
+* Params:
+*   filePath = The path to use for getting it from cache, used simply as a key to the jsonCache
+*   fileData = The actual content to be used for parsing.
+*/
+private JSONValue parseJSONCached(string filePath, string fileData)
 {
     JSONValue* cached = filePath in jsonCache;
     if(cached) return *cached;
-    jsonCache[filePath] = parseJSON(std.file.readText(filePath));
+    jsonCache[filePath] = parseJSON(fileData);
     if(jsonCache[filePath].hasErrorOccurred)
         throw new Exception(jsonCache[filePath].error);
     return jsonCache[filePath];
@@ -69,8 +134,9 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
     ///Setup base of configuration before finding anything
     if(!cfg.requiredBy)
     {
-        enforce("name" in json, "Every package must contain a 'name'");
-        cfg.requiredBy = json["name"].str;
+        string name = "name" in json ? json["name"].str : cfg.defaultPackageName;
+        enforce(name.length, "Every package must contain a 'name' or have a defaultPackageName");
+        cfg.requiredBy = name;
         if("version" in json)
             cfg.version_ = json["version"].str;
     }
@@ -297,7 +363,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
             {
                 const(JSONValue)* name = "name" in p;
                 if(name.str == cfg.subPackage)
-                    return parse(p, ParseConfig(cfg.workingDir, cfg.subConfiguration, null, cfg.version_, cfg.cInfo, cfg.requiredBy, buildRequirements.name, true, true, true));
+                    return parse(p, ParseConfig(cfg.workingDir, cfg.subConfiguration, null, cfg.version_, cfg.cInfo, null, cfg.requiredBy, buildRequirements.name, true, true, true));
             }
             else ///Subpackage is on other file
             {
@@ -320,7 +386,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
     }
     string[] unusedKeys;
 
-    setName(buildRequirements, json["name"].str, cfg);
+    setName(buildRequirements, "name" in json ? json["name"].str : cfg.defaultPackageName, cfg);
     runHandlers(requirementsRun, buildRequirements, cfg, json, false, unusedKeys);
 
     if(cfg.firstRun && unusedKeys.length) warn("Unused Keys -> ", unusedKeys);
@@ -561,7 +627,8 @@ private bool platformMatches(JSONValue[] platforms, OS os, ISA isa)
 BuildRequirements getDefaultBuildRequirement(ParseConfig cfg)
 {
     BuildRequirements req;
-    if(cfg.firstRun) req = BuildRequirements.defaultInit(cfg.workingDir);
+    ///defaultPackageName is only ever sent whenever --single is being used.
+    if(cfg.firstRun && !cfg.defaultPackageName) req = BuildRequirements.defaultInit(cfg.workingDir);
     req.version_ = cfg.version_;
     req.configuration = cfg.subConfiguration;
     req.cfg.workingDir = cfg.workingDir;

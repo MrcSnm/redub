@@ -23,6 +23,7 @@ import redub.tree_generators.dub;
  *   isRoot = When the package is root, it is added to the package searching cache automatically with version 0.0.0
  *   version = The actual version of that project, may be null on root
  *   useExistingObj = Makes the project output dependencies if it is a root project. Disabled by default since compilation may be way slower
+ *   isDescribeOnly = Do not execute preGenerate commands when true
  * Returns: The build requirements to the project. Not recursive.
  */
 BuildRequirements parseProject(
@@ -33,7 +34,8 @@ BuildRequirements parseProject(
     string recipe,
     bool isRoot = false,
     string version_ = null,
-    bool useExistingObj = false
+    bool useExistingObj = false,
+    bool isDescribeOnly = false
 )
 {
     import std.path;
@@ -48,11 +50,26 @@ BuildRequirements parseProject(
 
     switch(extension(projectFile))
     {
-        case ".sdl":   req = redub.parsers.sdl.parse(projectFile, projectWorkingDir, cInfo, version_, subConfiguration, subPackage, isRoot); break;
-        case ".json":  req = redub.parsers.json.parse(projectFile, projectWorkingDir, cInfo, version_, subConfiguration, subPackage, "", isRoot); break;
+        case ".sdl":   req = redub.parsers.sdl.parse(projectFile, projectWorkingDir, cInfo, null, version_, subConfiguration, subPackage, isDescribeOnly, isRoot); break;
+        case ".json":  req = redub.parsers.json.parse(projectFile, projectWorkingDir, cInfo, null, version_, subConfiguration, subPackage, "", isDescribeOnly, isRoot); break;
         default: throw new Exception("Unsupported project type "~projectFile~" at dir "~projectWorkingDir);
     }
+    return postProcessBuildRequirements(req, cInfo, isRoot, useExistingObj);
+}
 
+/**
+ * Post process for the parseProject operation.
+ * Required for merge pending configuration, setup environment variables, parse environment variables inside its content
+ * and define its current arch
+ * Params:
+ *   req = Input requirement
+ *   cInfo = Compilation Info for setting the configuration arch
+ *   isRoot = Decides whether to output objects or not
+ *   useExistingObj = Decides whether to output objects or not
+ * Returns: Post processed build requirements and now ready to use
+ */
+BuildRequirements postProcessBuildRequirements(BuildRequirements req, CompilationInfo cInfo, bool isRoot, bool useExistingObj)
+{
     redub.parsers.environment.setupEnvironmentVariablesForPackage(req.cfg);
     req.cfg.arch = cInfo.arch;
     if(isRoot && useExistingObj)
@@ -61,7 +78,6 @@ BuildRequirements parseProject(
     partiallyFinishBuildRequirements(req);
     ///Merge need to happen after partial finish, since other configuration will be merged
     req.cfg = redub.parsers.environment.parseEnvironment(req.cfg);
-    
     return req;
 }
 

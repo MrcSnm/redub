@@ -126,7 +126,7 @@ int describeMain(string[] args)
         }
     }
     catch(GetOptException e){}
-    ProjectDetails d = resolveDependencies(args);
+    ProjectDetails d = resolveDependencies(args, true);
     if(!d.tree)
         return 1;
     
@@ -234,7 +234,14 @@ string findProgramPath(string program)
 }
 
 
-ProjectDetails resolveDependencies(string[] args)
+/**
+ *
+ * Params:
+ *   args = All the arguments to parse
+ *   isDescribeOnly = Used to not run the preGenerate commands
+ * Returns:
+ */
+ProjectDetails resolveDependencies(string[] args, bool isDescribeOnly = false)
 {
     import std.file;
     import std.algorithm.comparison:either;
@@ -260,26 +267,37 @@ ProjectDetails resolveDependencies(string[] args)
         writeln(RedubVersion);
         return ProjectDetails(null, Compiler.init, ParallelType.auto_, CompilationDetails.init, false, true);
     }
-    if(bArgs.single)
-    {
-        import std.process;
-        import std.stdio;
-        import std.array;
-        string dubCommand = "dub "~join(unmodArgs[1..$], " ");
-        environment["DUB_EXE"] = environment["DUB"] = "dub";
-        string cwd = getcwd;
-        warn(RedubVersionShort~ " does not handle --single. Forwarding '"~dubCommand~"' to dub with working dir "~cwd);
+    // if(bArgs.single)
+    // {
+    //     import std.process;
+    //     import std.stdio;
+    //     import std.array;
+    //     string dubCommand = "dub "~join(unmodArgs[1..$], " ");
+    //     environment["DUB_EXE"] = environment["DUB"] = "dub";
+    //     string cwd = getcwd;
+    //     warn(RedubVersionShort~ " does not handle --single. Forwarding '"~dubCommand~"' to dub with working dir "~cwd);
 
-        int status = wait(spawnShell(dubCommand, stdin, stdout, stderr, environment.toAA, Config.none, cwd));
-        return ProjectDetails(null, Compiler.init, ParallelType.auto_, CompilationDetails.init, false, true, status);
-    }
+    //     int status = wait(spawnShell(dubCommand, stdin, stdout, stderr, environment.toAA, Config.none, cwd));
+    //     return ProjectDetails(null, Compiler.init, ParallelType.auto_, CompilationDetails.init, false, true, status);
+    // }
 
     if(bArgs.arch && !bArgs.compiler) bArgs.compiler = "ldc2";
     DubCommonArguments cArgs = bArgs.cArgs;
     if(cArgs.root)
         workingDir = cArgs.getRoot(workingDir);
+
+    if(bArgs.single && cArgs.recipe)
+        throw new RedubException("Can't set both --single and --recipe");
     if(cArgs.recipe)
         recipe = cArgs.getRecipe(workingDir);
+    if(bArgs.single)
+    {
+        import std.path;
+        if(!isAbsolute(bArgs.single))
+            recipe = buildNormalizedPath(workingDir, bArgs.single);
+        else
+            recipe = bArgs.single;
+    }
 
 
     BuildType bt = BuildType.debug_;
@@ -289,7 +307,7 @@ ProjectDetails resolveDependencies(string[] args)
         bArgs.build.force,
         os,
         CompilationDetails(bArgs.compiler, bArgs.arch, bArgs.compilerAssumption, bArgs.build.incremental, bArgs.build.useExistingObj, bArgs.build.combined, bArgs.build.parallel),
-        ProjectToParse(bArgs.config, workingDir, subPackage, recipe),
+        ProjectToParse(bArgs.config, workingDir, subPackage, recipe, bArgs.single.length != 0, isDescribeOnly),
         getInitialDubVariablesFromArguments(bArgs, DubBuildArguments.init, os, args),
         bt
     );

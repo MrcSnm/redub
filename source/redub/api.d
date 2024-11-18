@@ -2,7 +2,6 @@ module redub.api;
 import redub.cli.dub;
 import redub.logging;
 import redub.tree_generators.dub;
-import redub.parsers.automatic;
 import redub.command_generators.automatic;
 public import redub.cli.dub: ParallelType, Inference;
 public import redub.parsers.environment;
@@ -98,6 +97,10 @@ struct ProjectToParse
     string subPackage;
     ///Optinal recipe to use instead of workingDir's dub.json
     string recipe;
+    ///Optional single argument. Used for parsing D files
+    bool isSingle;
+    ///Optional single argument. Used for not running preGenerate commands
+    bool isDescribeOnly;
 }
 
 
@@ -340,6 +343,8 @@ ProjectDetails resolveDependencies(
     import redub.building.cache;
     import std.algorithm.comparison;
     import redub.command_generators.commons;
+    static import redub.parsers.single;
+    static import redub.parsers.automatic;
     static import redub.parsers.environment;
     static import redub.parsers.build_type;
 
@@ -366,16 +371,30 @@ ProjectDetails resolveDependencies(
     CompilationInfo cInfo = CompilationInfo(compiler.getCompilerString, cDetails.arch, osFromArch(cDetails.arch), isaFromArch(cDetails.arch), compiler.binOrPath);
 
 
-    BuildRequirements req = parseProject(
-        proj.workingDir, 
-        cInfo,
-        BuildRequirements.Configuration(proj.configuration, false), 
-        proj.subPackage,
-        proj.recipe,
-        true,
-        null,
-        cDetails.useExistingObj
-    );
+    BuildRequirements req;
+    if(proj.isSingle)
+        req = redub.parsers.single.parseProject(
+            proj.workingDir,
+            cInfo,
+            BuildRequirements.Configuration(proj.configuration, false),
+            proj.subPackage,
+            proj.recipe,
+            true,
+            null,
+            cDetails.useExistingObj
+        );
+    else
+        req = redub.parsers.automatic.parseProject(
+            proj.workingDir,
+            cInfo,
+            BuildRequirements.Configuration(proj.configuration, false),
+            proj.subPackage,
+            proj.recipe,
+            true,
+            null,
+            cDetails.useExistingObj,
+            proj.isDescribeOnly
+        );
     redub.parsers.environment.setupEnvironmentVariablesForRootPackage(cast(immutable)req);
     if(cDetails.includeEnvironmentVariables)
         req.cfg = req.cfg.merge(redub.parsers.environment.parse());

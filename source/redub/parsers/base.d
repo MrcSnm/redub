@@ -18,6 +18,8 @@ struct ParseConfig
     string version_ = "~master";
     ///Creates a filter for Compiler-Arch-OS-ISA
     CompilationInfo cInfo;
+    ///The package name to use if recipe has no name
+    string defaultPackageName;
     ///Who required that package.
     string requiredBy;
     ///If the current parse config is a sub package, it will have a parent
@@ -68,6 +70,7 @@ void addPreGenerateCommands(ref BuildRequirements req, JSONStringArray cmds, Par
 {
     import hipjson;
     infos("Pre-gen ", "Running commands for ", c.requiredBy);
+    if(c.preGenerateRun)
     foreach(JSONValue cmd; cmds.save)
     {
         import std.process;
@@ -75,7 +78,7 @@ void addPreGenerateCommands(ref BuildRequirements req, JSONStringArray cmds, Par
         import std.conv:to;
 
         if(hasLogLevel(LogLevel.verbose))
-            vlog("Executing: ", executeShell("echo "~cmd.str, environment.toAA).output);
+            vlog("Executing: ", executeShell("echo "~cmd.str, environment.toAA, Config.none, size_t.max, c.workingDir).output, " at dir ", c.workingDir);
 
         auto status = wait(spawnShell(cmd.str, stdin, stdout, stderr, environment.toAA, Config.none, c.workingDir));
         if(status)
