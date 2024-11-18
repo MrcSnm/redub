@@ -8,7 +8,7 @@ import redub.package_searching.api;
 
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.14.14";
+enum RedubVersionOnly = "v1.14.15";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -994,14 +994,25 @@ class ProjectNode
             }
         }
 
-
+        import std.datetime.stopwatch;
+        StopWatch sw = StopWatch(AutoStart.no);
+        if(hasLogLevel(LogLevel.vverbose))
+            sw.start();
         mergeParentInDependencies(this);
+        inLogLevel(LogLevel.vverbose, vvlog("mergeParentInDependencies finished at ", sw.peek.total!"msecs", "ms"));
+
         string[] removedOptionals;
         transferDependenciesAndClearOptional(this, removedOptionals);
+        inLogLevel(LogLevel.vverbose, vvlog("transferDependenciesAndClearOptional finished at ", sw.peek.total!"msecs", "ms"));
+
         if(removedOptionals.length)
             warn("Optional Dependencies ", removedOptionals, " not included since they weren't requested as non optional from other places.");
         finishPublic(this, visitedBuffer, privatesToMerge, dependenciesToRemove, targetOS, isa);
+        inLogLevel(LogLevel.vverbose, vvlog("finishPublic finished at ", sw.peek.total!"msecs", "ms"));
+
         finishPrivate(privatesToMerge, dependenciesToRemove);
+        inLogLevel(LogLevel.vverbose,  vvlog("finishPrivate finished at ", sw.peek.total!"msecs", "ms"));
+
         visitedBuffer.clear();
 
         dependenciesToRemove = null;

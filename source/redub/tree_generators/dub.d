@@ -35,13 +35,20 @@ struct CompilationInfo
 ProjectNode getProjectTree(BuildRequirements req, CompilationInfo info)
 {
     import redub.parsers.json;
+    import std.datetime.stopwatch;
     ProjectNode tree = new ProjectNode(req, false);
     string[string] subConfigs = req.getSubConfigurations;
     ProjectNode[string] visited;
     ProjectNode[] queue = [tree];
     getProjectTreeImpl(queue, info, subConfigs, visited);
     detectCycle(tree);
+
+    StopWatch sw = StopWatch(AutoStart.no);
+    if(hasLogLevel(LogLevel.vverbose))
+        sw.start();
     tree.finish(info.targetOS, info.isa);
+    if(hasLogLevel(LogLevel.vverbose))
+        infos("Tree Merged: '", tree.name, "' merged in ", sw.peek.total!"msecs", "ms");
     clearJsonCache();
     return tree;
 }   
@@ -147,8 +154,21 @@ private void getProjectTreeImpl(
 private BuildRequirements parseDependency(Dependency dep, BuildRequirements parent, CompilationInfo info)
 {
     import redub.package_searching.cache;
-    vvlog("Dependency ", dep.name, " ", dep.version_, " ", dep.pkgInfo.bestVersion, " with parent ", parent.name);
+    import redub.logging;
+    import std.datetime.stopwatch;
+
+    StopWatch sw = StopWatch(AutoStart.no);
+
+    if(getLogLevel() >= LogLevel.vverbose)
+    {
+        sw.start();
+        vvlog("Parsing ",parent.name, "->", dep.name, " ", dep.version_);
+    }
     BuildRequirements depReq = parseProject(dep.pkgInfo.path, info, dep.subConfiguration, dep.subPackage, null);
+    if(getLogLevel() >= LogLevel.vverbose)
+    {
+        infos(dep.name, " parsed in ", sw.peek.total!"msecs", "ms");
+    }
     return depReq;
 }
 

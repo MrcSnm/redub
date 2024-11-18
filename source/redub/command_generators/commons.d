@@ -445,6 +445,8 @@ BuildConfiguration getConfigurationFromLibsWithPkgConfig(string[] libs, out stri
     import std.string: strip;
     import std.array : split;
     import std.process;
+    import std.parallelism;
+
 
     bool existsPkgConfig = true;
 
@@ -452,29 +454,46 @@ BuildConfiguration getConfigurationFromLibsWithPkgConfig(string[] libs, out stri
 
     static string[] pkgconfig_bin = ["pkg-config", "--libs"];
 
-    BuildConfiguration ret;
-    foreach(l; libs)
+    struct LinkCommand
     {
-        string pkgConfigFlags;
+        string flags;
+        bool isLibrary;
+    }
+
+    LinkCommand[] commands = new LinkCommand[](libs.length);
+
+    BuildConfiguration ret;
+    foreach(i, l; parallel(libs))
+    {
+        commands[i] = LinkCommand(l, true);
         if(l in pkgConfigCache)
-            pkgConfigFlags = pkgConfigCache[l];
+            commands[i] = LinkCommand(pkgConfigCache[l], false);
         else if(existsPkgConfig)
         {
             try
             {
-                auto flags = execute(pkgconfig_bin~l);
-                if(flags.status != 0)
-                    flags = execute(pkgconfig_bin~("lib"~l));
-                if(flags.status == 0 && flags.output.strip.length != 0)
-                    pkgConfigCache[l] = pkgConfigFlags = flags.output;
+                foreach(cmd; parallel([l, "lib"~l]))
+                {
+                    auto flags = execute(pkgconfig_bin~cmd);
+                    if(flags.status == 0 && flags.output.strip.length != 0)
+                    {
+                        pkgConfigCache[cmd] = flags.output;
+                        commands[i] = LinkCommand(flags.output, false);
+                    }
+                }
             }
             catch(ProcessException e)
                 existsPkgConfig = false;
         }
-        if(pkgConfigFlags.length)        
+    }
+    foreach(cmd; commands)
+    {
+        if(cmd.isLibrary)
+            ret.libraries~= cmd.flags;
+        else if(cmd.flags.length)        
         {
-            modifiedFlagsFromPkgConfig~= l;
-            foreach (string f; splitter(pkgConfigFlags))
+            modifiedFlagsFromPkgConfig~= cmd.flags;
+            foreach (string f; splitter(cmd.flags))
             {
                 if (f.startsWith("-L-L"))
                     ret.linkFlags ~= f[2 .. $];
@@ -492,8 +511,6 @@ BuildConfiguration getConfigurationFromLibsWithPkgConfig(string[] libs, out stri
                     ret.linkFlags~= f;
             }
         }
-        else
-            ret.libraries~= l;
     }
     return ret;
 }

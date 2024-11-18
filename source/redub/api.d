@@ -382,8 +382,8 @@ ProjectDetails resolveDependencies(
 
     req.cfg = req.cfg.merge(redub.parsers.build_type.parse(buildType, compiler.compiler));
 
-
     ProjectNode tree = getProjectTree(req, cInfo);
+
     if(cDetails.combinedBuild)
         tree.combine();
     compiler.usesIncremental = isIncremental(cDetails.incremental, tree);

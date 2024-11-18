@@ -13,6 +13,12 @@ private LogLevel level;
 
 LogLevel getLogLevel(){ return level; }
 
+void inLogLevel(T)(LogLevel lvl, scope lazy T action)
+{
+    if(hasLogLevel(lvl))
+        action;
+}
+
 bool hasLogLevel(LogLevel lvl)
 {
     return level >= lvl;
