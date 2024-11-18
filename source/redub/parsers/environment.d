@@ -307,7 +307,9 @@ string parseStringWithEnvironment(string str)
 
 unittest
 {
+    import std.process;
     assert(parseStringWithEnvironment("$$ORIGIN") == "$ORIGIN");
+    assert(parseStringWithEnvironment("'-rpath=$$ORIGIN'") == "'-rpath=$ORIGIN'");
     environment["HOME"] = "test";
     assert(parseStringWithEnvironment("$HOME") == "test");
     assert(parseStringWithEnvironment("$HOME $$ORIGIN") == "test $ORIGIN");

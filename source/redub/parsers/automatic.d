@@ -54,12 +54,13 @@ BuildRequirements parseProject(
     }
 
     redub.parsers.environment.setupEnvironmentVariablesForPackage(req.cfg);
-    req.cfg = redub.parsers.environment.parseEnvironment(req.cfg);
     req.cfg.arch = cInfo.arch;
     if(isRoot && useExistingObj)
         req.cfg.outputsDeps = true;
 
     partiallyFinishBuildRequirements(req);
+    ///Merge need to happen after partial finish, since other configuration will be merged
+    req.cfg = redub.parsers.environment.parseEnvironment(req.cfg);
     
     return req;
 }
