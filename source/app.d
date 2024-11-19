@@ -217,6 +217,43 @@ int buildMain(string[] args)
     return buildProject(resolveDependencies(args)).getReturnCode;
 }
 
+version(OSX)
+    extern(C) extern int _NSGetExecutablePath(char* outputPath, uint* pathSize);
+
+string getRedubExePath()
+{
+    char[4096] path;
+    version(OSX)
+    {
+        import core.stdc.string;
+        uint length = path.length;
+        if(_NSGetExecutablePath(path.ptr, &length) == -1)
+        {
+            char[] ret = new char[length];
+            if(_NSGetExecutablePath(ret.ptr, &length) != 0)
+                return null;
+            return cast(string)ret;
+        }
+        length = cast(uint)strlen(path.ptr);
+
+        return path[0..length].idup;
+    }
+    else version(Posix)
+    {
+        import core.sys.posix.unistd;
+        import core.sys.posix.stdlib;
+        ssize_t length = readlink("/proc/self/exe", path.ptr, path.length);
+        if(length == -1)
+            return null;
+        return path[0..length].idup;
+    }
+    else version(Windows)
+    {
+        import core.runtime;
+        return Runtime.args[0];
+    }
+}
+
 int updateMain(string[] args)
 {
     import core.runtime;
@@ -226,7 +263,8 @@ int updateMain(string[] args)
     import std.path;
     import redub.misc.github_tag_check;
     import redub.libs.package_suppliers.utils;
-    string currentRedubDir = dirName(Runtime.args[0]);
+    string redubExePath = getRedubExePath();
+    string currentRedubDir = dirName(getRedubExePath);
     string redubPath = buildNormalizedPath(currentRedubDir, "..");
     string latest;
 
@@ -283,15 +321,18 @@ int updateMain(string[] args)
 
         version(Windows)
         {
-            spawnShell(`start cmd /c "`~buildNormalizedPath(currentRedubDir, "..", "replace_redub.bat")~" "~d.getOutputFile~" "~Runtime.args[0]~'"');
+            spawnShell(`start cmd /c "`~buildNormalizedPath(currentRedubDir, "..", "replace_redub.bat")~" "~d.getOutputFile~" "~redubExePath~'"');
         }
         else version(Posix)
         {
             import core.sys.posix.unistd;
+            import std.conv:to;
+            string pid = getpid().to!string;
             string script = "./replace_redub.sh";
-            spawnShell(`chmod +x `~script~` && nohup bash `~replaceRedub~" "~getpid()~" "~d.getOutputFile~" "~Runtime.args[0]~" > /dev/null 2>&1 & disown");
+            string exec = `chmod +x `~script~` && nohup bash `~script~" "~pid~" "~d.getOutputFile~" "~redubExePath~" > /dev/null 2>&1 & disown";
+            spawnShell(exec);
         }
-        // else assert(false, "Your system does not have any command right now for auto copying the new content.");
+        else assert(false, "Your system does not have any command right now for auto copying the new content.");
         return 0;
     }
     warn("Your redub version '", RedubVersionOnly, "' is already greater or equal than the latest redub version '", latest);
