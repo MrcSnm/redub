@@ -249,8 +249,16 @@ string getRedubExePath()
     }
     else version(Windows)
     {
-        import core.runtime;
-        return Runtime.args[0];
+        import core.sys.windows.winbase;
+        uint length = GetModuleFileNameA(null, path.ptr, path.length);
+        if(length > path.length)
+        {
+            char[] ret = new char[length];
+            if(GetModuleFileNameA(null, ret.ptr, length) == 0)
+                return null;
+            return cast(string)ret;
+        }
+        return path[0..length].idup;
     }
 }
 

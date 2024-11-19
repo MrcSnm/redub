@@ -4,8 +4,12 @@
 		"adv_diff": {"path":"adv_diff"},
 		"colorize": {"path":"colorize"},
 		"d_dependencies": {"path":"d_dependencies"},
+		"dub_sdl_to_json": {"path":"dub_sdl_to_json"},
 		"hipjson": {"path":"hipjson"},
+		"package_suppliers": {"path":"package_suppliers"},
+		"sdlite": "1.3.0",
 		"semver": {"path":"semver"},
+		"taggedalgebraic": "0.11.23",
 		"xxhash3": "0.0.5"
 	}
 }
