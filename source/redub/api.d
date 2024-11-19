@@ -329,7 +329,7 @@ bool cleanProject(ProjectDetails d, bool showMessages)
  */
 ProjectDetails resolveDependencies(
     bool invalidateCache,
-    OS os = std.system.os,
+    const OS os = std.system.os,
     CompilationDetails cDetails = CompilationDetails.init,
     ProjectToParse proj = ProjectToParse.init,
     InitialDubVariables dubVars = InitialDubVariables.init,
@@ -363,9 +363,13 @@ ProjectDetails resolveDependencies(
         DUB_PLATFORM = either(DUB_PLATFORM, redub.parsers.environment.str(os));
         DUB_FORCE = either(DUB_FORCE, redub.parsers.environment.str(invalidateCache));
     }
-
     redub.parsers.environment.setupBuildEnvironmentVariables(dubVars);
     CompilationInfo cInfo = CompilationInfo(compiler.getCompilerString, cDetails.arch, osFromArch(cDetails.arch), isaFromArch(cDetails.arch), compiler.binOrPath);
+    if(proj.workingDir == null)
+    {
+        import std.file;
+        proj.workingDir = std.file.getcwd;
+    }
 
 
     BuildRequirements req;

@@ -56,6 +56,7 @@ int main(string[] args)
 
         int function(string[])[string] entryPoints = [
             "build": &buildMain,
+            "update": &updateMain,
             "clean": &cleanMain,
             "describe": &describeMain,
             "deps": &depsMain,
@@ -214,6 +215,87 @@ int cleanMain(string[] args)
 int buildMain(string[] args)
 {
     return buildProject(resolveDependencies(args)).getReturnCode;
+}
+
+int updateMain(string[] args)
+{
+    import core.runtime;
+    import std.stdio;
+    import std.process;
+    import std.file;
+    import std.path;
+    import redub.misc.github_tag_check;
+    import redub.libs.package_suppliers.utils;
+    string currentRedubDir = dirName(Runtime.args[0]);
+    string redubPath = buildNormalizedPath(currentRedubDir, "..");
+    string latest;
+
+    setLogLevel(LogLevel.info);
+
+    int gitCode = executeShell("git --help", null, Config.none, size_t.max, redubPath).status;
+    enum isNotGitRepo = 128;
+    enum hasNoGitWindows = 9009;
+    enum hasNoGitPosix = 127;
+
+    bool replaceRedub = false;
+    if(gitCode == 0)
+    {
+        info("Checking for git repo at ", redubPath);
+        auto ret = executeShell("git pull", null, Config.none, size_t.max, redubPath);
+        gitCode = ret.status;
+        if(gitCode != 0 && gitCode != isNotGitRepo)
+        {
+            errorTitle("Git Pull Error: \n", ret.output);
+            return 1;
+        }
+        replaceRedub = true;
+    }
+
+    if(gitCode == isNotGitRepo || gitCode == hasNoGitWindows || gitCode == hasNoGitPosix)
+    {
+        latest = getLatestVersion();
+        if(SemVer(latest[1..$]) > SemVer(RedubVersionOnly[1..$]))
+        {
+            replaceRedub = true;
+            string redubLink = getRedubDownloadLink(latest);
+            info("Downloading redub from '", redubLink, "'");
+            ubyte[] redubZip = downloadFile(redubLink);
+            redubPath = tempDir;
+            mkdirRecurse(redubPath);
+            extractZipToFolder(redubZip, redubPath);
+            redubPath = buildNormalizedPath(redubPath, "redub-"~latest[1..$]);
+        }
+    }
+
+
+    if(replaceRedub)
+    {
+        import redub.api;
+        import std.exception;
+        info("Preparing to build redub at ", redubPath);
+        ProjectDetails d = redub.api.resolveDependencies(false, os, CompilationDetails("ldc2"), ProjectToParse(null, redubPath), InitialDubVariables.init, BuildType.release_debug);
+        enforce(d.tree.name == "redub", "Redub update should only be used to update redub.");
+        d.tree.requirements.cfg.outputDirectory = buildNormalizedPath(tempDir, "redub_build");
+        d = buildProject(d);
+        if(d.error)
+            return 1;
+        info("Replacing current redub at path ", currentRedubDir, " with the built file: ", d.getOutputFile);
+
+        version(Windows)
+        {
+            spawnShell(`start cmd /c "`~buildNormalizedPath(currentRedubDir, "..", "replace_redub.bat")~" "~d.getOutputFile~" "~Runtime.args[0]~'"');
+        }
+        else version(Posix)
+        {
+            import core.sys.posix.unistd;
+            string script = "./replace_redub.sh";
+            spawnShell(`chmod +x `~script~` && nohup bash `~replaceRedub~" "~getpid()~" "~d.getOutputFile~" "~Runtime.args[0]~" > /dev/null 2>&1 & disown");
+        }
+        // else assert(false, "Your system does not have any command right now for auto copying the new content.");
+        return 0;
+    }
+    warn("Your redub version '", RedubVersionOnly, "' is already greater or equal than the latest redub version '", latest);
+    return 0;
 }
 
 string findProgramPath(string program)

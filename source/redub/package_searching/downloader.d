@@ -1,5 +1,5 @@
 module redub.package_searching.downloader;
-import package_suppliers;
+import redub.libs.package_suppliers.dub_registry;
 import redub.libs.semver;
 RegistryPackageSupplier supplier;
 

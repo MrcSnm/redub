@@ -2,9 +2,6 @@
 	"authors": [
 		"Marcelo"
 	],
-	"dflags": [
-		"-deps=simports/deps_file"
-	],
 	"configurations": [
 		{
 			"name": "library",
@@ -12,6 +9,9 @@
 		},
 		{
 			"name": "test",
+			"dflags": [
+				"-deps=simports/deps_file"
+			],
 			"stringImportPaths": [
 				"simports"
 			],

@@ -16,7 +16,7 @@ void showNewerVersionMessage()
         {
             warnTitle(
                 "Redub "~ ver~ " available. \n\t",
-                "Maybe try updating or running dub fetch redub@"~ver[1..$]~" if you think this compilation error is a redub bug."
+                "Maybe try updating it with 'redub update 'or running dub fetch redub@"~ver[1..$]~" if you think this compilation error is a redub bug."
             );
             return;
         }
@@ -27,7 +27,7 @@ void showNewerVersionMessage()
     );
 }
 
-private string getLatestVersion()
+string getLatestVersion()
 {
     import std.net.curl;
     import hipjson;
@@ -36,6 +36,11 @@ private string getLatestVersion()
     if(tagsContent.length == 0)
         return null;
     return parseJSON(cast(string)tagsContent).array[0]["name"].str;
+}
+
+string getRedubDownloadLink(string ver)
+{
+    return "https://github.com/"~RedubUserRepository~"/archive/refs/tags/"~ver~".zip";
 }
 
 string getCreateIssueURL(){return CreateIssueURL;}
