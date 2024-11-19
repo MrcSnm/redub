@@ -104,7 +104,7 @@ struct SemVer
     private bool isUsingRange;
     private string rangeMax;
 
-    this(string v) 
+    this(string v)
     {
         import std.string;
         import std.ascii:isDigit;
@@ -207,7 +207,7 @@ struct SemVer
         return ver.opCmp(other.ver);
     }
 
-    bool satisfies(const SemVer requirement) const 
+    bool satisfies(const SemVer requirement) const
     {
         if(comparison == ComparisonTypes.any || requirement.isMatchAll) return true;
         if(invalid) return false;
@@ -408,6 +408,13 @@ unittest
 unittest
 {
     assert(SemVer("0.10.1").satisfies(SemVer(">0.10.0")));
+}
+
+@("Compare using >=")
+unittest
+{
+    assert(SemVer("11.5.1").satisfies(SemVer(">=11.0.0")));
+    assert(!SemVer("11.5.1").satisfies(SemVer("~>11.4.0")));
 }
 
 @("Compare using Ranges")

@@ -234,63 +234,67 @@ ProjectDetails buildProject(ProjectDetails d)
 
 bool cleanProject(ProjectDetails d, bool showMessages)
 {
+    import std.file;
     import std.path;
     import redub.command_generators.commons;
+
+    static void removeFile(string filePath, bool show,  string message = null)
+    {
+        if(std.file.exists(filePath))
+        {
+            if(show)
+            {
+                if(message)
+                    vlog("Removing ", filePath);
+                else
+                    vlog(message);
+            }
+            if(std.file.isFile(filePath))
+                std.file.remove(filePath);
+            else
+                std.file.rmdirRecurse(filePath);
+        }
+    }
     
     auto res = timed(()
     {
         if(showMessages)
             info("Cleaning project ", d.tree.name);
-        import std.file;
         foreach(ProjectNode node; d.tree.collapse)
         {
-            string output = node.getOutputName(node.requirements.cfg.targetType, os);
-            if(std.file.exists(output))
+            foreach(type; ["", "-test-library"])
             {
-                if(showMessages)
-                    vlog("Removing ", output);
-                remove(output);
-            }
-            string redubJsonCache = buildNormalizedPath(node.requirements.cfg.workingDir, "dub.sdl.redub_cache_json");
-            if(std.file.exists(redubJsonCache))
-            {
-                if(showMessages)
-                    vlog("Removing redub json cache file.");
-                std.file.remove(redubJsonCache);
-            }
-            string ldc2Cache = buildNormalizedPath(node.requirements.cfg.workingDir, ".ldc2_cache");
-            if(std.file.exists(ldc2Cache))
-            {
-                if(showMessages)
-                    vlog("Removing ldc2cache");
-                rmdirRecurse(ldc2Cache);
-            }
-            version(Windows)
-            {
-                if(node.requirements.cfg.targetType.isLinkedSeparately)
+                string output = node.getOutputName(node.requirements.cfg.targetType, os);
                 {
-                    string outPath = buildNormalizedPath(node.requirements.cfg.outputDirectory, node.targetName);
-                    foreach(ext; [".ilk", ".pdb"])
+                    string ext = extension(output);
+                    string base = baseName(output, ext);
+                    output = buildNormalizedPath(dirName(output), base~type~ext);
+                }
+                foreach(ext; ["", getObjectExtension(os)])
+                {
+                    if(ext.length)
+                        output = output.setExtension(ext);
+                    removeFile(output, showMessages);
+                }
+
+                version(Windows)
+                {
+                    if(node.requirements.cfg.targetType.isLinkedSeparately)
                     {
-                        string genFile = outPath~ext;
-                        if(std.file.exists(genFile))
+                        foreach(ext; [".ilk", ".pdb"])
                         {
-                            if(showMessages)
-                                vlog("Removing ", genFile);
-                            std.file.remove(genFile);
+                            removeFile(output.setExtension(ext), showMessages);
                         }
                     }
                 }
             }
+
+            removeFile(buildNormalizedPath(node.requirements.cfg.workingDir, "dub.sdl.redub_cache_json"), showMessages, "Removing redub json cache file");
+            removeFile(buildNormalizedPath(node.requirements.cfg.workingDir, ".ldc2_cache"), showMessages, "Removing ldc2 cache");
             foreach(copiedFile; node.requirements.cfg.filesToCopy)
             {
                 string outFile = buildNormalizedPath(d.tree.requirements.cfg.outputDirectory, isAbsolute(copiedFile) ? baseName(copiedFile) : copiedFile);
-                if(std.file.exists(outFile))
-                {
-                    if(showMessages)
-                        vlog("Removing ", outFile);
-                    std.file.remove(outFile);
-                }
+                removeFile(outFile, showMessages);
             }
         }
         
@@ -301,18 +305,9 @@ bool cleanProject(ProjectDetails d, bool showMessages)
         string cacheOutput = buildNormalizedPath(getCacheFolder, hash);
         string cacheFile = getCacheFilePath(hash);
 
-        if(exists(cacheOutput))
-        {
-            if(showMessages)
-                vlog("Removing cache output dir ", cacheOutput);
-            rmdirRecurse(cacheOutput);
-        }
-        if(exists(cacheFile))
-        {
-            if(showMessages)
-                vlog("Removing cache reference file ", cacheFile);
-            remove(cacheFile);
-        }
+        removeFile(cacheOutput, showMessages, "Removing cache output dir "~cacheOutput);
+        removeFile(cacheFile, showMessages, "Removing cache reference file" ~ cacheFile);
+
         return true;
     });
 

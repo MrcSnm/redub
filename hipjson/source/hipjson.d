@@ -641,6 +641,11 @@ struct JSONValue
 		return (*data.object)[key];
 	}
 
+	JSONValue opIndexAssign(T)(T value, string key) if(!is(T == JSONValue))
+	{
+		return opIndexAssign(JSONValue(value), key);
+	}
+
 	const(JSONValue)* opBinaryRight(string op)(string key) const
 	if(op == "in")
 	{

@@ -68,6 +68,8 @@ JSONValue sdlToJSON(SDLNode[] sdl)
 	JSONValue subConfigurations = JSONValue.emptyObject;
 	JSONValue configurations = JSONValue.emptyArray;
 	JSONValue subPackages = JSONValue.emptyArray;
+	JSONValue buildTypes = JSONValue.emptyArray;
+
 	foreach(SDLNode v; sdl)
 	{
 		switch(v.name)
@@ -96,10 +98,18 @@ JSONValue sdlToJSON(SDLNode[] sdl)
 				}
 				break;
 			case "configuration":
-				import std.stdio;
 				enforce(v.values.length == 1, "A configuration can only have a single value, which is the configuration name");
 				enforce(v.values[0].isText, "The configuration value must be a string.");
-				configurations.jsonArray~= sdlToJSON(v.children);
+				JSONValue configSdl = sdlToJSON(v.children);
+				configSdl["name"] = v.values[0].textValue;
+				configurations.jsonArray~= configSdl;
+				break;
+			case "buildType":
+				enforce(v.values.length == 1, "A buildType can only have a single value, which is the buildType name");
+				enforce(v.values[0].isText, "The buildType value must be a string.");
+				JSONValue configSdl = sdlToJSON(v.children);
+				configSdl["name"] = v.values[0].textValue;
+				buildTypes.jsonArray~= configSdl;
 				break;
 			case "subConfiguration":
 				enforce(v.values.length == 2, "subConfiguration must contain a two values.");
@@ -157,6 +167,8 @@ JSONValue sdlToJSON(SDLNode[] sdl)
 	}
 	if(configurations.array.length != 0)
 		ret["configurations"] = configurations;
+	if(buildTypes.array.length != 0)
+		ret["buildTypes"] = buildTypes;
 	if(subConfigurations != JSONValue.emptyObject)
 		ret["subConfigurations"] = subConfigurations;
 	if(dependencies != JSONValue.emptyObject)

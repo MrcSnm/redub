@@ -90,6 +90,67 @@ BuildRequirements parseWithData(
 
 
 /**
+*   Strips single and multi line comments (C style)
+*/
+string stripComments(string str)
+{
+    string ret;
+    size_t i = 0;
+    size_t length = str.length;
+    ret.reserve(str.length);
+
+    while(i < length)
+    {
+        //Don't parse comments inside strings
+        if(str[i] == '"')
+        {
+            size_t left = i;
+            i++;
+            while(i < length && str[i] != '"')
+            {
+                if(str[i] == '\\')
+                    i++;
+                i++;
+            }
+            i++; //Skip '"'
+            ret~= str[left..i];
+        }
+        //Parse single liner comments
+        else if(str[i] == '/' && i+1 < length && str[i+1] == '/')
+        {
+            i+=2;
+            while(i < length && str[i] != '\n')
+                i++;
+        }
+        //Single line #
+        else if(str[i] == '#')
+        {
+            i++;
+            while(i < length && str[i] != '\n')
+                i++;
+        }
+        //Parse multi line comments
+        else if(str[i] == '/' && i+1 < length && str[i+1] == '*')
+        {
+            i+= 2;
+            while(i < length)
+            {
+                if(str[i] == '*' && i+1 < length && str[i+1] == '/')
+                    break;
+                i++;
+            }
+            i+= 2;
+        }
+        //Safe check to see if it is in range
+        if(i < length)
+            ret~= str[i];
+        i++;
+    }
+    return ret;
+}
+
+
+/**
  * Fixes SDL for being converted to JSON
  * Params:
  *   sdlData = Some SDL data may input extra \n. Those are currently in the process of being ignored by the JSON parsing as it may break.
@@ -104,5 +165,5 @@ string fixSDLParsingBugs(string sdlData)
         enum lb = "\r\n";
     else
         enum lb = "\n";
-    return sdlData.replace("\\"~lb, " ").replace("`"~lb, "`");
+    return stripComments(sdlData).replace("\\"~lb, " ").replace("`"~lb, "`");
 }
