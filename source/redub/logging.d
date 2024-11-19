@@ -1,5 +1,6 @@
 module redub.logging;
 import redub.libs.colorize;
+
 enum LogLevel
 {
     none,

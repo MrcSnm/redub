@@ -3,33 +3,48 @@ import redub.package_searching.api;
 import redub.logging;
 import redub.api;
 import hipjson;
+import core.sync.mutex;
 
-bool dubHook_PackageManagerDownloadPackage(string packageName, string packageVersion, string requiredBy = "")
+
+
+struct FetchedPackage
 {
-    import std.process;
+    string name;
+    string reqBy;
+    string version_;
+}
 
-    SemVer sv = SemVer(packageVersion);
-    string dubFetchVersion = sv.toString;
-    if (SemVer(0, 0, 0).satisfies(sv))
-        packageVersion = null;
-    else if (!sv.ver.major.isNull)
-        dubFetchVersion = sv.toString;
-    string cmd = "dub fetch " ~ packageName;
-    if (packageVersion)
-        cmd ~= "@\"" ~ dubFetchVersion ~ "\"";
+__gshared FetchedPackage[] fetchedPackages;
+ReducedPackageInfo redubDownloadPackage(string packageName, string packageVersion, string requiredBy = "")
+{
+    import redub.package_searching.downloader;
+    import core.sync.mutex;
+    import std.stdio;
+    import std.path;
+    SemVer out_bestVersion;
+    string downloadedPackagePath = downloadPackageTo(
+        buildNormalizedPath(getDefaultLookupPathForPackages(), packageName),
+        packageName,
+        SemVer(packageVersion),
+        out_bestVersion
+    );
 
-    info("Fetching ", packageName, " with command ", cmd, ". This was required by ", requiredBy);
+    synchronized
+    {
+        fetchedPackages~= FetchedPackage(packageName, requiredBy, out_bestVersion.toString);
+    }
 
-    // writeln("dubHook_PackageManagerDownloadPackage with arguments (", packageName, ", ", packageVersion,") " ~
-    // "required by '", requiredBy, "' is not implemented yet.");
-    return wait(spawnShell(cmd)) == 0;
-    // return false;
+    return ReducedPackageInfo(
+        out_bestVersion.toString,
+        downloadedPackagePath,
+        [out_bestVersion]
+    );
 }
 
 /** 
  * Gets the best matching version on the specified folder
  * Params:
- *   folder = The folder containing the packageName versionentries
+ *   folder = The folder containing the packageName versionentrie   s
  *   packageName = Used to build the path
  *   subPackage = Currently used only for warning
  *   packageVersion = The version required (SemVer)
@@ -94,7 +109,6 @@ PackageInfo getPackage(string packageName, string packageVersion, string require
     PackageInfo pack = basePackage(packageName, packageVersion , requiredBy);
     packageName = pack.packageName;
     vlog("Getting package ", packageName, ":", pack.subPackage, "@", packageVersion);
-
     ReducedPackageInfo localPackage = getPackageInLocalPackages(packageName, packageVersion);
     if (localPackage != ReducedPackageInfo.init)
     {
@@ -105,15 +119,12 @@ PackageInfo getPackage(string packageName, string packageVersion, string require
     
     ///If no version was downloaded yet, download before looking
     string downloadedPackagePath = buildNormalizedPath(getDefaultLookupPathForPackages(), packageName);
+    ReducedPackageInfo info;
     if (!std.file.exists(downloadedPackagePath))
-    {
-        if (!dubHook_PackageManagerDownloadPackage(packageName, packageVersion, requiredBy))
-        {
-            errorTitle("Dub Fetch Error: ", "Could not fetch ", packageName, "@\"", packageVersion, "\" required by ", requiredBy);
-            return PackageInfo.init;
-        }
-    }
-    ReducedPackageInfo info = getPackageInFolder(downloadedPackagePath, packageName, pack.subPackage, packageVersion);
+        info = redubDownloadPackage(packageName, packageVersion, requiredBy);
+    else
+        info = getPackageInFolder(downloadedPackagePath, packageName, pack.subPackage, packageVersion);
+
     if(info != ReducedPackageInfo.init)
     {
         pack.bestVersion = SemVer(info.bestVersion);
@@ -122,8 +133,9 @@ PackageInfo getPackage(string packageName, string packageVersion, string require
     }
 
     ///If no matching version was found, try downloading it.
-    if (dubHook_PackageManagerDownloadPackage(packageName, packageVersion, requiredBy))
-        return getPackage(packageName, packageVersion, requiredBy);
+    info = redubDownloadPackage(packageName, packageVersion, requiredBy);
+    return getPackage(packageName, packageVersion, requiredBy);
+
     throw new Exception(
         "Could not find any package named " ~
             packageName ~ " with version " ~ packageVersion ~

@@ -248,18 +248,23 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
             import std.algorithm.comparison;
             import redub.package_searching.api;
             import redub.package_searching.cache;
-            
-            foreach(string depName, JSONValue value; v.object)
+            import std.parallelism;
+
+            string[] keys = v.keys;
+
+            Dependency[] foundPackages = new Dependency[](keys.length);
+
+            static Dependency parseDep(JSONValue value, string depName, string workingDir, string requiredBy, string configVersion)
             {
                 string version_, path, visibility;
                 string out_mainPackage;
-                string subPackage = getSubPackageInfoRequiredBy(depName, c.requiredBy, out_mainPackage);
+                string subPackage = getSubPackageInfoRequiredBy(depName, requiredBy, out_mainPackage);
                 bool isOptional = false;
                 bool isInSameFile = false;
                 ///If the main package is the same as this dependency, then simply use the same json file.
-                if(subPackage && out_mainPackage == c.requiredBy)
+                if(subPackage && out_mainPackage == requiredBy)
                 {
-                    path = req.cfg.workingDir;
+                    path = workingDir;
                     isInSameFile = true;
                 }
                 if(value.type == JSONType.object) ///Uses path style
@@ -268,8 +273,8 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
                     const(JSONValue)* depVer = "version" in value;
                     const(JSONValue)* depRep = "repository" in value;
                     visibility = value.tryStr("visibility");
-                    enforce(depPath || depVer, 
-                        "Dependency named "~ depName ~ 
+                    enforce(depPath || depVer,
+                        "Dependency named "~ depName ~
                         " must contain at least a \"path\" or \"version\" property."
                     );
                     if("optional" in value && value["optional"].boolean == true)
@@ -278,7 +283,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
                             isOptional = true;
                     }
                     if(depPath)
-                        path = isAbsolute(depPath.str) ? depPath.str : buildNormalizedPath(req.cfg.workingDir, depPath.str);
+                        path = isAbsolute(depPath.str) ? depPath.str : buildNormalizedPath(workingDir, depPath.str);
                     version_ = depVer ? depVer.str : null;
                 }
                 else if(value.type == JSONType.string) ///Version style
@@ -288,23 +293,40 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
                 {
                     ///Match all dependencies which are subpackages should have the same version as the parent project.
                     if(SemVer(version_).isMatchAll())
-                        version_ = c.version_;
+                        version_ = configVersion;
                 }
                 PackageInfo* info;
 
-                string packageFullName = getPackageFullName(depName, c.requiredBy);
+                string packageFullName = getPackageFullName(depName, requiredBy);
                 if(!path)
                 {
-                    info = redub.package_searching.cache.findPackage(packageFullName, version_, c.requiredBy);
+                    info = redub.package_searching.cache.findPackage(packageFullName, version_, requiredBy);
                     path = info.path;
                     version_ = info.bestVersion.toString;
                 }
                 else
-                    info = findPackage(packageFullName, version_, c.requiredBy, path);
-                
-                addDependency(req, c, packageFullName, version_, BuildRequirements.Configuration.init, path, visibility, info, isOptional);
-
+                    info = findPackage(packageFullName, version_, requiredBy, path);
+                return Dependency(packageFullName, path, version_, BuildRequirements.Configuration.init, null, VisibilityFrom(visibility), info, isOptional);
             }
+
+
+            //Having a separate branch for not doing in parallel actually reduced the time needed to resolve dependencies
+            //Unfortunately, this code makes dependency resolution a little slower (4ms in case of hipreme engine)
+            //But it may cut fetch time to 25% of the time required
+            if(keys.length > 1)
+            {
+                foreach(size_t i, string depName; parallel(keys))
+                    foundPackages[i] = parseDep(v[depName], depName, req.cfg.workingDir, c.requiredBy, c.version_);
+                foreach(pkg; foundPackages)
+                    addDependency(req, c, pkg.name, pkg.version_, BuildRequirements.Configuration.init, pkg.path, getVisibilityString(pkg.visibility), pkg.pkgInfo, pkg.isOptional);
+            }
+            else if(keys.length == 1)
+            {
+                string depName = keys[0];
+                Dependency pkg = parseDep(v[depName], depName, req.cfg.workingDir, c.requiredBy, c.version_);
+                addDependency(req, c, pkg.name, pkg.version_, BuildRequirements.Configuration.init, pkg.path, getVisibilityString(pkg.visibility), pkg.pkgInfo, pkg.isOptional);
+            }
+
         },
         "subConfigurations": (ref BuildRequirements req, JSONValue v, ParseConfig c)
         {

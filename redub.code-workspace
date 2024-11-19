@@ -1,0 +1,12 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings":
+	{
+		"d.manyProjectsThreshold": 12,
+		"d.disabledRootGlobs": ["tests/*"]
+	}
+}

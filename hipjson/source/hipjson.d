@@ -79,7 +79,6 @@ struct JSONArray
 struct JSONObject
 {
 	JSONValue[string] value;
-
 	alias value this;
 }
 private enum JSONState
@@ -225,6 +224,19 @@ struct JSONValue
 		ret.type = JSONType.object;
         return ret;
     }
+
+	string[] keys()
+	{
+		import std.exception;
+        enforce(type == JSONType.object, "Tried to get type object but value is of type "~getTypeName);
+		return data.object.value.keys;
+	}
+	JSONValue[] values()
+	{
+		import std.exception;
+        enforce(type == JSONType.object, "Tried to get type object but value is of type "~getTypeName);
+		return data.object.value.values;
+	}
 
 	string getTypeName() const
 	{

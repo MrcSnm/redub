@@ -1,0 +1,13 @@
+{
+	"authors": [
+		"Marcelo"
+	],
+	"dependencies": {
+		"hipjson": {"path": "../hipjson"},
+		"semver": {"path": "../semver"}
+	},
+	"copyright": "Copyright © 2024, Marcelo",
+	"description": "A minimal D application.",
+	"license": "proprietary",
+	"name": "package_suppliers"
+}

@@ -245,9 +245,9 @@ bool cleanProject(ProjectDetails d, bool showMessages)
             if(show)
             {
                 if(message)
-                    vlog("Removing ", filePath);
-                else
                     vlog(message);
+                else
+                    vlog("Removing ", filePath);
             }
             if(std.file.isFile(filePath))
                 std.file.remove(filePath);
@@ -258,17 +258,19 @@ bool cleanProject(ProjectDetails d, bool showMessages)
     
     auto res = timed(()
     {
+        import std.typecons;
         if(showMessages)
             info("Cleaning project ", d.tree.name);
         foreach(ProjectNode node; d.tree.collapse)
         {
-            foreach(type; ["", "-test-library"])
+
+            foreach(type; [tuple("", node.requirements.cfg.targetType), tuple("-test-library", TargetType.executable)])
             {
-                string output = node.getOutputName(node.requirements.cfg.targetType, os);
+                string output = node.getOutputName(type[1], os);
                 {
                     string ext = extension(output);
                     string base = baseName(output, ext);
-                    output = buildNormalizedPath(dirName(output), base~type~ext);
+                    output = buildNormalizedPath(dirName(output), base~type[0]~ext);
                 }
                 foreach(ext; ["", getObjectExtension(os)])
                 {
@@ -279,7 +281,7 @@ bool cleanProject(ProjectDetails d, bool showMessages)
 
                 version(Windows)
                 {
-                    if(node.requirements.cfg.targetType.isLinkedSeparately)
+                    if(type[1].isLinkedSeparately)
                     {
                         foreach(ext; [".ilk", ".pdb"])
                         {
@@ -404,9 +406,17 @@ ProjectDetails resolveDependencies(
     redub.parsers.environment.setupEnvironmentVariablesForPackageTree(tree);
 
 
-    import redub.libs.colorize;    
+    import redub.libs.colorize;
+    import redub.package_searching.dub;
     import std.conv:to;
     ProjectDetails ret = ProjectDetails(tree, compiler, cDetails.parallelType, cDetails, cDetails.useExistingObj, false, 0, invalidateCache);
+
+    foreach(pkg; fetchedPackages)
+    {
+        infos("Fetch Success: ", pkg.name, " v",pkg.version_, " required by ", pkg.reqBy);
+    }
+
+
     infos(
         "Dependencies resolved", " - ", (st.peek.total!"msecs"), " ms \"",
         color(buildType, fg.magenta),"\" using ", compiler.binOrPath," v", compiler.version_,

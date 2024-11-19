@@ -182,7 +182,7 @@ struct AdvCacheFormula
 	 *	 isSimplified = Hashes using file name + size + last modified time
 	 * Returns: If it could hash the file or not
 	 */
-	private static bool hashContent(string url, ref ubyte[] buffer, ref ubyte[] outputHash, ubyte[] function(ubyte[], ref ubyte[] output) contentHasher, bool isSimplified)
+	private static bool hashContent(string url, ref ubyte[] buffer, ref ubyte[8] outputHash, ubyte[] function(ubyte[], ref ubyte[8] output) contentHasher, bool isSimplified)
 	{
 		import std.file;
 		import std.array;
@@ -236,7 +236,7 @@ struct AdvCacheFormula
 	 * Returns: A completely new AdvCacheFormula which may reference or not the cacheHolder fields.
 	 */
 	static AdvCacheFormula make(DirRange, FileRange)(
-		ubyte[] function(ubyte[], ref ubyte[] output) contentHasher,
+		ubyte[] function(ubyte[], ref ubyte[8] output) contentHasher,
 		DirRange filteredDirectories,
 		FileRange files,
 		const(AdvCacheFormula)* existing = null,
@@ -252,7 +252,7 @@ struct AdvCacheFormula
 		static ubyte[] fileBuffer;
 		if(fileBuffer.length == 0)
 			fileBuffer = uninitializedArray!(ubyte[])(1_000_000);
-		ubyte[] hashedContent;
+		ubyte[8] hashedContent;
 		ubyte[16] joinedHash;
 
 
@@ -321,6 +321,7 @@ struct AdvCacheFormula
 				if(existingFile && existingFile.timeModified == time)
 				{
 					ret.files[file] = existingFile.dup;
+					hashedContent = ret.files[file].contentHash;
 					if(cacheHolder !is null)
 						cacheHolder.files[file] = ret.files[file];
 					continue;

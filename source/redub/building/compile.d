@@ -275,6 +275,7 @@ bool buildProjectFullyParallelized(ProjectNode root, CompilingSession s)
 
     size_t i = 0;
     size_t sentPackages = 0;
+    printCachedBuildInfo(root);
     foreach(ProjectNode pack; root.collapse)
     {
         if(pack.shouldEnterCompilationThread)
@@ -291,8 +292,6 @@ bool buildProjectFullyParallelized(ProjectNode root, CompilingSession s)
         }
         i++;
     }
-
-    printCachedBuildInfo(root);
 
     AdvCacheFormula formulaCache;
     foreach(_; 0..sentPackages)

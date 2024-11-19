@@ -100,10 +100,6 @@ struct CompilationCache
             return false;
         AdvCacheFormula otherFormula = getCompilationCacheFormula(req, rootHash, s, &formula, preprocessed);
         diffs = formula.diffStatus(otherFormula, diffCount);
-
-        // import std.stdio;
-
-        // writeln(otherFormula, "\n\n", formula);
         return diffCount == 0;
     }
 
@@ -175,7 +171,7 @@ void invalidateCaches(ProjectNode root, CompilingSession s)
     }
 }
 
-ubyte[] hashFunction(const char[] input, ref ubyte[] output)
+ubyte[] hashFunction(const char[] input, ref ubyte[8] output)
 {
     import xxhash3;
 
@@ -183,8 +179,6 @@ ubyte[] hashFunction(const char[] input, ref ubyte[] output)
     xxh.put(cast(const ubyte[]) input);
 
     auto hash = xxh.finish;
-    if (output.length < hash.length)
-        output.length = hash.length;
     output[] = hash[];
     return output;
 }
@@ -263,7 +257,7 @@ AdvCacheFormula getCompilationCacheFormula(const BuildRequirements req, string m
 {
     import std.algorithm.iteration, std.array, std.path;
 
-    static contentHasher = (ubyte[] content, ref ubyte[] output) {
+    static contentHasher = (ubyte[] content, ref ubyte[8] output) {
         return hashFunction(cast(string) content, output);
     };
 
@@ -326,7 +320,7 @@ AdvCacheFormula getCopyCacheFormula(string mainPackHash, const BuildRequirements
 {
     import std.algorithm.iteration, std.array, std.path;
 
-    static contentHasher = (ubyte[] content, ref ubyte[] output) {
+    static contentHasher = (ubyte[] content, ref ubyte[8] output) {
         return hashFunction(cast(string) content, output);
     };
 

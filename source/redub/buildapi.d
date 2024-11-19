@@ -8,7 +8,7 @@ import redub.package_searching.api;
 
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.16.0";
+enum RedubVersionOnly = "v1.17.0";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -518,12 +518,23 @@ enum Visibility
 }
 Visibility VisibilityFrom(string vis)
 {
-    final switch(vis)
+    switch(vis)
     {
+        default: return Visibility.public_;
         case "private": return Visibility.private_;
         case "public":  return Visibility.public_;
     }
 }
+
+string getVisibilityString(Visibility vis)
+{
+    final switch(vis)
+    {
+        case Visibility.private_: return "private";
+        case Visibility.public_: return "public";
+    }
+}
+
 struct Dependency
 {
     string name;

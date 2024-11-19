@@ -1,0 +1,16 @@
+.dub
+docs.json
+__dummy.html
+docs/
+/package_manager
+package_manager.so
+package_manager.dylib
+package_manager.dll
+package_manager.a
+package_manager.lib
+package_manager-test-*
+*.exe
+*.pdb
+*.o
+*.obj
+*.lst

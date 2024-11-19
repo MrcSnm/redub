@@ -1,4 +1,5 @@
 module redub.package_searching.cache;
+import core.sync.mutex;
 public import redub.package_searching.api;
 
 
@@ -8,6 +9,12 @@ public import redub.package_searching.api;
  * Those different versions are used to identify the best compatible version among them.
  */
 private __gshared PackageInfo[string] packagesCache;
+private __gshared Mutex cacheMtx;
+
+static this()
+{
+    cacheMtx = new Mutex;
+}
 
 
 PackageInfo* findPackage(string packageName, string packageVersion, string requiredBy, string path)
@@ -18,7 +25,10 @@ PackageInfo* findPackage(string packageName, string packageVersion, string requi
 
     PackageInfo localPackage = basePackage(packageName, packageVersion, requiredBy);
     localPackage.path = path;
-    packagesCache[packageName] = localPackage;
+    synchronized(cacheMtx)
+    {
+        packagesCache[packageName] = localPackage;
+    }
     return packageName in packagesCache;
 }
 
@@ -42,7 +52,10 @@ PackageInfo* findPackage(string packageName, string packageVersion, string requi
     if(!pkg)
     {
         PackageInfo info = getPackage(packageName, packageVersion, requiredBy);
-        packagesCache[packageName] = info;
+        synchronized(cacheMtx)
+        {
+            packagesCache[packageName] = info;
+        }
     }
     else
     {
@@ -77,12 +90,18 @@ PackageInfo* findPackage(string packageName, string packageVersion, string requi
  */
 void putRootPackageInCache(string packageName, string path)
 {
-    packagesCache[packageName] = PackageInfo(packageName, null, SemVer(0,0,0), SemVer(0,0,0), path, null);
+    synchronized(cacheMtx)
+    {
+        packagesCache[packageName] = PackageInfo(packageName, null, SemVer(0,0,0), SemVer(0,0,0), path, null);
+    }
 }
 
 void putPackageInCache(string packageName, string version_, string path)
 {
-    packagesCache[packageName] = PackageInfo(packageName, null, SemVer(version_), SemVer(version_), path, null);
+    synchronized(cacheMtx)
+    {
+        packagesCache[packageName] = PackageInfo(packageName, null, SemVer(version_), SemVer(version_), path, null);
+    }
 }
 
 string getPackagePath(string packageName, string packageVersion, string requiredBy)
