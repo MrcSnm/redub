@@ -329,7 +329,7 @@ int updateMain(string[] args)
             import std.conv:to;
             string pid = getpid().to!string;
             string script = "./replace_redub.sh";
-            string exec = `chmod +x `~script~` && nohup bash `~script~" "~pid~" "~d.getOutputFile~" "~redubExePath~" > /dev/null 2>&1 & disown";
+            string exec = `chmod +x `~script~` && nohup bash `~script~" "~pid~" "~d.getOutputFile~" "~redubExePath~" > /dev/null 2>&1";
             spawnShell(exec);
         }
         else assert(false, "Your system does not have any command right now for auto copying the new content.");
