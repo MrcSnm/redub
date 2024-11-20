@@ -291,7 +291,7 @@ int updateMain(string[] args)
             import core.sys.posix.unistd;
             import std.conv:to;
             string pid = getpid().to!string;
-            string script = "./replace_redub.sh";
+            string script = buildNormalizedPath(currentRedubDir, "..", "replace_redub.sh");
             string exec = `chmod +x `~script~` && nohup bash `~script~" "~pid~" "~d.getOutputFile~" "~redubExePath~" > /dev/null 2>&1";
             spawnShell(exec);
         }
