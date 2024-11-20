@@ -64,12 +64,15 @@ JSONValue sdlToJSON(SDLNode[] sdl)
 {
 	import std.exception;
 	import std.algorithm.searching:countUntil;
+
 	JSONValue ret = JSONValue.emptyObject;
+
 	JSONValue dependencies = JSONValue.emptyObject;
 	JSONValue subConfigurations = JSONValue.emptyObject;
+	JSONValue buildTypes = JSONValue.emptyObject;
+
 	JSONValue configurations = JSONValue.emptyArray;
 	JSONValue subPackages = JSONValue.emptyArray;
-	JSONValue buildTypes = JSONValue.emptyArray;
 
 	foreach(SDLNode v; sdl)
 	{
@@ -108,9 +111,8 @@ JSONValue sdlToJSON(SDLNode[] sdl)
 			case "buildType":
 				enforce(v.values.length == 1, "A buildType can only have a single value, which is the buildType name");
 				enforce(v.values[0].isText, "The buildType value must be a string.");
-				JSONValue configSdl = sdlToJSON(v.children);
-				configSdl["name"] = v.values[0].textValue;
-				buildTypes.jsonArray~= configSdl;
+				JSONValue buildTypeSDL = sdlToJSON(v.children);
+				buildTypes[v.values[0].textValue] = buildTypeSDL;
 				break;
 			case "subConfiguration":
 				enforce(v.values.length == 2, "subConfiguration must contain a two values.");
@@ -167,16 +169,19 @@ JSONValue sdlToJSON(SDLNode[] sdl)
 		}
 		// ret[v.name] = v.values[0]
 	}
+	if(dependencies.data.object.value !is null)
+		ret["dependencies"] = dependencies;
+	if(subConfigurations.data.object.value !is null)
+		ret["subConfigurations"] = subConfigurations;
+	if(buildTypes.data.object.value !is null)
+		ret["buildTypes"] = buildTypes;
+
 	if(configurations.array.length != 0)
 		ret["configurations"] = configurations;
-	if(buildTypes.array.length != 0)
-		ret["buildTypes"] = buildTypes;
-	if(subConfigurations != JSONValue.emptyObject)
-		ret["subConfigurations"] = subConfigurations;
-	if(dependencies != JSONValue.emptyObject)
-		ret["dependencies"] = dependencies;
 	if(subPackages.array.length != 0)
 		ret["subPackages"] = subPackages;
+
+
 	return ret;
 }
 

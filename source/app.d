@@ -253,7 +253,7 @@ int updateMain(string[] args)
 
     setLogLevel(update.vverbose ? LogLevel.vverbose : LogLevel.info);
 
-    int gitCode = executeShell("git --help", null, Config.none, size_t.max, redubPath).status;
+    int gitCode = executeShell("git --help").status;
     enum isNotGitRepo = 128;
     enum hasNoGitWindows = 9009;
     enum hasNoGitPosix = 127;
@@ -261,7 +261,6 @@ int updateMain(string[] args)
     bool replaceRedub = false;
     if(gitCode == 0)
     {
-        info("Checking for git repo at ", redubPath);
         auto ret = executeShell("git pull", null, Config.none, size_t.max, redubPath);
         gitCode = ret.status;
         if(gitCode != 0 && gitCode != isNotGitRepo)
@@ -269,7 +268,11 @@ int updateMain(string[] args)
             errorTitle("Git Pull Error: \n", ret.output);
             return 1;
         }
-        replaceRedub = true;
+        else if(gitCode == 0)
+        {
+            info("Redub will be rebuilt using git repo found at ", redubPath);
+            replaceRedub = true;
+        }
     }
 
     if(gitCode == isNotGitRepo || gitCode == hasNoGitWindows || gitCode == hasNoGitPosix)
@@ -308,17 +311,28 @@ int updateMain(string[] args)
             return 1;
         info("Replacing current redub at path ", currentRedubDir, " with the built file: ", d.getOutputFile);
 
+        string redubScriptPath;
+        version(Windows)
+            redubScriptPath = buildNormalizedPath(redubPath, "replace_redub.bat");
+        else
+            redubScriptPath = buildNormalizedPath(redubPath, "replace_redub.sh");
+
+        if(!exists(redubScriptPath))
+        {
+            error("Redub Script not found at path ", redubScriptPath);
+            return 1;
+        }
+
         version(Windows)
         {
-            spawnShell(`start cmd /c "`~buildNormalizedPath(currentRedubDir, "..", "replace_redub.bat")~" "~d.getOutputFile~" "~redubExePath~'"');
+            spawnShell(`start cmd /c "`~redubScriptPath~" "~d.getOutputFile~" "~redubExePath~'"');
         }
         else version(Posix)
         {
             import core.sys.posix.unistd;
             import std.conv:to;
             string pid = getpid().to!string;
-            string script = buildNormalizedPath(currentRedubDir, "..", "replace_redub.sh");
-            string exec = `chmod +x `~script~` && nohup bash `~script~" "~pid~" "~d.getOutputFile~" "~redubExePath~" > /dev/null 2>&1";
+            string exec = `chmod +x `~redubScriptPath~` && nohup bash `~redubScriptPath~" "~pid~" "~d.getOutputFile~" "~redubExePath~" > /dev/null 2>&1";
             spawnShell(exec);
         }
         else assert(false, "Your system does not have any command right now for auto copying the new content.");
