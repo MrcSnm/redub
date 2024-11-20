@@ -217,51 +217,6 @@ int buildMain(string[] args)
     return buildProject(resolveDependencies(args)).getReturnCode;
 }
 
-version(OSX)
-    extern(C) extern int _NSGetExecutablePath(char* outputPath, uint* pathSize);
-
-string getRedubExePath()
-{
-    char[4096] path;
-    version(OSX)
-    {
-        import core.stdc.string;
-        uint length = path.length;
-        if(_NSGetExecutablePath(path.ptr, &length) == -1)
-        {
-            char[] ret = new char[length];
-            if(_NSGetExecutablePath(ret.ptr, &length) != 0)
-                return null;
-            return cast(string)ret;
-        }
-        length = cast(uint)strlen(path.ptr);
-
-        return path[0..length].idup;
-    }
-    else version(Posix)
-    {
-        import core.sys.posix.unistd;
-        import core.sys.posix.stdlib;
-        ssize_t length = readlink("/proc/self/exe", path.ptr, path.length);
-        if(length == -1)
-            return null;
-        return path[0..length].idup;
-    }
-    else version(Windows)
-    {
-        import core.sys.windows.winbase;
-        uint length = GetModuleFileNameA(null, path.ptr, path.length);
-        if(length > path.length)
-        {
-            char[] ret = new char[length];
-            if(GetModuleFileNameA(null, ret.ptr, length) == 0)
-                return null;
-            return cast(string)ret;
-        }
-        return path[0..length].idup;
-    }
-}
-
 int updateMain(string[] args)
 {
     import core.runtime;
@@ -271,8 +226,8 @@ int updateMain(string[] args)
     import std.path;
     import redub.misc.github_tag_check;
     import redub.libs.package_suppliers.utils;
-    string redubExePath = getRedubExePath();
-    string currentRedubDir = dirName(getRedubExePath);
+    string redubExePath = thisExePath;
+    string currentRedubDir = dirName(redubExePath);
     string redubPath = buildNormalizedPath(currentRedubDir, "..");
     string latest;
 
@@ -389,7 +344,17 @@ ProjectDetails resolveDependencies(string[] args, bool isDescribeOnly = false)
     if(res.helpWanted)
     {
         import std.getopt;
-        defaultGetoptPrinter(RedubVersionShort~" build information: \n\t", res.options);
+        string newCommands =
+`
+
+Additions to redub commands --
+
+update
+    Usage: redub update
+    Description: Updates with 'git pull' redub if the current redub is a git repository. If it is not, it will download the newest git tag from redub
+        repository. After updating the source, it will also optimally rebuild redub and replace the current one with the new build.
+`;
+        defaultGetoptPrinter(RedubVersionShort~" build information: \n\t"~newCommands, res.options);
         return ProjectDetails.init;
     }
     if(bArgs.version_)
@@ -398,19 +363,6 @@ ProjectDetails resolveDependencies(string[] args, bool isDescribeOnly = false)
         writeln(RedubVersion);
         return ProjectDetails(null, Compiler.init, ParallelType.auto_, CompilationDetails.init, false, true);
     }
-    // if(bArgs.single)
-    // {
-    //     import std.process;
-    //     import std.stdio;
-    //     import std.array;
-    //     string dubCommand = "dub "~join(unmodArgs[1..$], " ");
-    //     environment["DUB_EXE"] = environment["DUB"] = "dub";
-    //     string cwd = getcwd;
-    //     warn(RedubVersionShort~ " does not handle --single. Forwarding '"~dubCommand~"' to dub with working dir "~cwd);
-
-    //     int status = wait(spawnShell(dubCommand, stdin, stdout, stderr, environment.toAA, Config.none, cwd));
-    //     return ProjectDetails(null, Compiler.init, ParallelType.auto_, CompilationDetails.init, false, true, status);
-    // }
 
     if(bArgs.arch && !bArgs.compiler) bArgs.compiler = "ldc2";
     DubCommonArguments cArgs = bArgs.cArgs;
