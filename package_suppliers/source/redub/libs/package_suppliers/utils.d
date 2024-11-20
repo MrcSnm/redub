@@ -1,5 +1,14 @@
 module redub.libs.package_suppliers.utils;
 
+string getFirstFileInDirectory(string inputDir)
+{
+	import std.file;
+	if(!std.file.exists(inputDir))
+		return null;
+	auto entries = dirEntries(inputDir,SpanMode.shallow);
+	return entries.front;
+}
+
 ubyte[] downloadFile(string file)
 {
 	import std.net.curl;
@@ -22,7 +31,7 @@ bool extractZipToFolder(ubyte[] data, string outputDirectory)
 	ZipArchive zip = new ZipArchive(data);
 	if(!std.file.exists(outputDirectory))
 		std.file.mkdirRecurse(outputDirectory);
-	foreach(fileName, archiveMember; zip.directory)
+	foreach(string fileName, ArchiveMember archiveMember; zip.directory)
 	{
 		string outputFile = buildNormalizedPath(outputDirectory, fileName);
 		if(!std.file.exists(outputFile))

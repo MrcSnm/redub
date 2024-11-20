@@ -238,6 +238,9 @@ int updateMain(string[] args)
 
         @("Sets the compiler to build redub")
         string compiler = "ldc2";
+
+        @("Makes the update very verbose")
+        bool vverbose;
     }
     import std.getopt;
     UpdateArgs update;
@@ -248,7 +251,7 @@ int updateMain(string[] args)
         return 0;
     }
 
-    setLogLevel(LogLevel.info);
+    setLogLevel(update.vverbose ? LogLevel.vverbose : LogLevel.info);
 
     int gitCode = executeShell("git --help", null, Config.none, size_t.max, redubPath).status;
     enum isNotGitRepo = 128;

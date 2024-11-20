@@ -30,6 +30,14 @@ void info(T...)(T args){if(level >= LogLevel.info) cwriteln(args);}
 void infos(T...)(string greenMsg, T args){if(level >= LogLevel.info) cwriteln(greenMsg.color(fg.green) ,args);}
 void vlog(T...)(T args){if(level >= LogLevel.verbose) cwriteln(args);}
 void vvlog(T...)(T args){if(level >= LogLevel.vverbose) cwriteln(args);}
+void flush()
+{
+    if(level != LogLevel.none)
+    {
+        import std.stdio;
+        stdout.flush;
+    }
+}
 void warn(T...)(T args){if(level >= LogLevel.warn)cwriteln("Warning: ".color(fg.yellow), args);}
 void warnTitle(T...)(string yellowMsg, T args){if(level >= LogLevel.warn)cwriteln(yellowMsg.color(fg.yellow), args);}
 void error(T...)(T args){if(level >= LogLevel.error)cwriteln("ERROR! ".color(fg.red), args);}

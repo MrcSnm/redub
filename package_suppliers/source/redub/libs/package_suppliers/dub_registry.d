@@ -54,18 +54,18 @@ class RegistryPackageSupplier
 	}
 
 
-	private ubyte[] fetchPackage(string packageName, SemVer requirement, out SemVer out_actualVersion)
+	private ubyte[] fetchPackage(string packageName, SemVer requirement, out SemVer out_actualVersion, out string url)
 	{
-		string url = getBestPackageDownloadUrl(packageName, requirement, out_actualVersion);
+		url = getBestPackageDownloadUrl(packageName, requirement, out_actualVersion);
 		if(!url)
 			return null;
 		return downloadFile(url);
 	}
 
-	string downloadPackageTo(return string path, string packageName, SemVer requirement, out SemVer out_actualVersion)
+	string downloadPackageTo(return string path, string packageName, SemVer requirement, out SemVer out_actualVersion, out string url)
 	{
 		import std.zip;
-		ubyte[] zipContent = fetchPackage(packageName, requirement, out_actualVersion);
+		ubyte[] zipContent = fetchPackage(packageName, requirement, out_actualVersion, url);
 		if(!extractZipToFolder(zipContent, path))
 			throw new Exception("Error while trying to extract zip to path "~path);
 		return path;

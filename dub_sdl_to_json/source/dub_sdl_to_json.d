@@ -259,3 +259,29 @@ string fixSDLParsingBugs(string sdlData)
         enum lb = "\n";
     return stripComments(sdlData).replace("\\"~lb, " ").replace("`"~lb, "`");
 }
+
+
+///Test conversion of a
+unittest
+{
+enum testSdl =
+q"ED
+name "taggedalgebraic"
+description `A "tagged union" implementation with transparent operator forwarding.`
+authors "Sönke Ludwig"
+copyright "Copyright © 2015, Sönke Ludiwg"
+license "BSL-1.0"
+
+buildType "unittest" {
+    buildOptions "unittests" "debugMode" "debugInfo"
+    dflags "-preview=dip1000"
+}
+ED";
+	import hipjson;
+
+	JSONValue v = sdlToJSON(parseSDL(null, testSdl));
+
+	import std.stdio;
+	writeln = v["description"].toString;
+
+}

@@ -646,8 +646,9 @@ struct JSONValue
 	}
 	JSONValue opIndexAssign(JSONValue v, string key)
 	{
-		assert(type == JSONType.object, "Can't get a member from a non object.");
-		assert(data.object !is null, "Can't access a null object");
+		import std.exception;
+		enforce(type == JSONType.object, "Can't get a member from a non object.");
+		enforce(data.object !is null, "Can't access a null object");
 		(*data.object)[key] = v;
 		v.key = key;
 		return (*data.object)[key];
@@ -702,7 +703,7 @@ struct JSONValue
 			size_t length = input.length;
 			foreach(ch; input)
 			{
-				if(ch == '\\' || ch == '\n' || ch == '\t' || ch == '\r') length++;
+				if(ch == '\\' || ch == '\n' || ch == '\t' || ch == '\r' || ch == '"') length++;
 			}
 			if(length == input.length) return input;
 			char[] escaped = new char[](length);
@@ -711,6 +712,10 @@ struct JSONValue
 			{
 				switch(input[i])
 				{
+					case '"':
+						escaped[length] = '\\';
+						escaped[++length] = '"';
+						break;
 					case '\\':
 						escaped[length] = '\\';
 						escaped[++length] = '\\';

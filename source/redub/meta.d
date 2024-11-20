@@ -20,6 +20,10 @@ private string getRedubMetaFileName()
 void saveRedubMeta(string content)
 {
     import std.file;
+    import std.path;
+    string dir = dirName(getRedubMetaFileName);
+    if(!std.file.exists(dir))
+        mkdirRecurse(dir);
     std.file.write(getRedubMetaFileName, content);
 }
 

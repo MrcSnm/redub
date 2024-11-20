@@ -14,47 +14,51 @@ RegistryPackageSupplier supplier;
 string downloadPackageTo(return string path, string packageName, SemVer requirement, out SemVer actualVersion)
 {
     import hipjson;
+    import redub.libs.package_suppliers.utils;
     import std.path;
     import std.file;
+    import redub.logging;
     //Supplier will download packageName-version. While dub actually creates packagename/version/
-    string toPlace = supplier.downloadPackageTo(path, packageName, requirement, actualVersion);
-    string installPath = buildNormalizedPath(toPlace, packageName~"-"~actualVersion.toString);
+    string url;
+    string toPlace = supplier.downloadPackageTo(path, packageName, requirement, actualVersion, url);
+
+    string installPath = getFirstFileInDirectory(toPlace);
+    if(!installPath)
+        throw new Exception("No file was extracted to directory "~toPlace);
     toPlace = buildNormalizedPath(toPlace, actualVersion.toString);
     mkdirRecurse(toPlace);
     toPlace = buildNormalizedPath(toPlace, packageName);
-    rename(installPath, toPlace);
 
+    string toPlaceDir = dirName(toPlace);
+    if(!std.file.exists(toPlaceDir))
+        mkdirRecurse(toPlaceDir);
+
+
+    rename(installPath, toPlace);
 
     string sdlPath = buildNormalizedPath(toPlace, "dub.sdl");
     string jsonPath = buildNormalizedPath(toPlace, "dub.json");
+    JSONValue json;
     if(std.file.exists(sdlPath))
     {
         import dub_sdl_to_json;
-        JSONValue json = sdlToJSON(parseSDL(sdlPath));
-        json["version"] = actualVersion.toString;
-        std.file.write(
-            jsonPath,
-            json.toString,
-        );
+        json = sdlToJSON(parseSDL(sdlPath));
         std.file.remove(sdlPath);
     }
     else
     {
         if(!std.file.exists(jsonPath))
             throw new Exception("Downloaded a dub package which has no dub configuration?");
-        std.file.write(
-            jsonPath,
-            injectJSONVersion(std.file.readText(jsonPath), actualVersion.toString)
-        );
+        json = parseJSON(std.file.readText(jsonPath));
     }
 
+    //Inject version as `dub` itself requires that
+    json["version"] = actualVersion.toString;
+    std.file.write(
+        jsonPath,
+        json.toString,
+    );
     return toPlace;
-}
-
-
-string injectJSONVersion(string jsonData, string version_)
-{
-    return jsonData[0..$-2] ~ `,"version": "`~version_~"\"\n}";
 }
 
 static this()
