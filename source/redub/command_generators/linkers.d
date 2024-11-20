@@ -53,7 +53,7 @@ string[] parseLinkConfiguration(const ThreadBuildData data, CompilingSession s, 
             commands = mapAppendPrefix(commands, linkFlags, "-L", false);
             commands = mapAppendPrefix(commands, libraryPaths, "-L-L", true);
             commands~= getLinkFiles(b.sourceFiles);
-            commands = mapAppend(commands, libraries, (string l) => "-L-l"~stripExtension(l));
+            commands = mapAppend(commands, libraries, (string l) => "-L-l"~stripLibraryExtension(l));
             
         }
         else if(!s.compiler.isDCompiler) //Generates a static library using archiver. FIXME: BuildRequirements should know its files.
@@ -111,7 +111,7 @@ string[] parseLinkConfigurationMSVC(const ThreadBuildData data, CompilingSession
 
         commands = mapAppendPrefix(commands, libraryPaths, "-L/LIBPATH:", true);
         commands~= getLinkFiles(b.sourceFiles);
-        commands = mapAppend(commands, libraries, (string l) => "-L"~stripExtension(l)~".lib");
+        commands = mapAppend(commands, libraries, (string l) => "-L"~stripLibraryExtension(l)~".lib");
 
     }
     return commands;

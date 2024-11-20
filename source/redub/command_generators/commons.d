@@ -50,6 +50,18 @@ string getObjectDir(string cacheDir)
     return objDir;
 }
 
+string stripLibraryExtension(string libpath)
+{
+    import std.path;
+    switch(extension(libpath))
+    {
+        case ".a", ".lib", ".so", ".dll", ".dylib":
+            return stripExtension(libpath);
+        default:
+            return libpath;
+    }
+}
+
 
 string getLibraryPath(string libName, string outputDir, OS os)
 {

@@ -231,6 +231,23 @@ int updateMain(string[] args)
     string redubPath = buildNormalizedPath(currentRedubDir, "..");
     string latest;
 
+    struct UpdateArgs
+    {
+        @("Builds redub using dmd -b debug for faster iteration on redub")
+        bool fast;
+
+        @("Sets the compiler to build redub")
+        string compiler = "ldc2";
+    }
+    import std.getopt;
+    UpdateArgs update;
+    GetoptResult res = betterGetopt(args, update);
+    if(res.helpWanted)
+    {
+        defaultGetoptPrinter(RedubVersionShort~" update information: \n", res.options);
+        return 0;
+    }
+
     setLogLevel(LogLevel.info);
 
     int gitCode = executeShell("git --help", null, Config.none, size_t.max, redubPath).status;
@@ -274,7 +291,13 @@ int updateMain(string[] args)
         import redub.api;
         import std.exception;
         info("Preparing to build redub at ", redubPath);
-        ProjectDetails d = redub.api.resolveDependencies(false, os, CompilationDetails("ldc2"), ProjectToParse(null, redubPath), InitialDubVariables.init, BuildType.release_debug);
+        BuildType bt = BuildType.release_debug;
+        if(update.fast)
+        {
+            update.compiler = "dmd";
+        }
+        
+        ProjectDetails d = redub.api.resolveDependencies(false, os, CompilationDetails(update.compiler), ProjectToParse(null, redubPath), InitialDubVariables.init, bt);
         enforce(d.tree.name == "redub", "Redub update should only be used to update redub.");
         d.tree.requirements.cfg.outputDirectory = buildNormalizedPath(tempDir, "redub_build");
         d = buildProject(d);
