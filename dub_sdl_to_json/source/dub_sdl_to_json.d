@@ -159,9 +159,16 @@ JSONValue sdlToJSON(SDLNode[] sdl)
 				JSONValue* json = name in ret;
 				if(json)
 				{
-					enforce(json.type == JSONType.array, "Can only show twice on SDL's '"~name~"' if it is an array type.");
-					foreach(jsonValue; toJSONValue(v.values, true).array)
-						json.jsonArray~= jsonValue;
+					if(json.type != JSONType.array)
+					{
+						import std.stdio;
+						stderr.writeln("Warning: Can only show twice on SDL's '"~name~"' if it is an array type.");
+					}
+					else
+					{
+						foreach(jsonValue; toJSONValue(v.values, true).array)
+							json.jsonArray~= jsonValue;
+					}
 				}
 				else
 					ret[getName(v)] = toJSONValue(v.values, shouldForceArray);
