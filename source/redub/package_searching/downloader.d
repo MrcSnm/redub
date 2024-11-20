@@ -42,7 +42,15 @@ string downloadPackageTo(return string path, string packageName, SemVer requirem
     if(std.file.exists(sdlPath))
     {
         import dub_sdl_to_json;
-        json = sdlToJSON(parseSDL(sdlPath));
+        try
+        {
+            json = sdlToJSON(parseSDL(sdlPath));
+        }
+        catch(Exception e)
+        {
+            errorTitle("Could not convert SDL->JSON The package '"~packageName~"'. Exception\n"~e.msg);
+            throw e;
+        }
         std.file.remove(sdlPath);
     }
     else
