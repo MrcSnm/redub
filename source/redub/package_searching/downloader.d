@@ -13,6 +13,7 @@ RegistryPackageSupplier supplier;
 */
 string downloadPackageTo(return string path, string packageName, SemVer requirement, out SemVer actualVersion)
 {
+    import core.thread;
     import hipjson;
     import redub.libs.package_suppliers.utils;
     import std.path;
@@ -20,24 +21,41 @@ string downloadPackageTo(return string path, string packageName, SemVer requirem
     import redub.logging;
     //Supplier will download packageName-version. While dub actually creates packagename/version/
     string url;
-    string toPlace = supplier.downloadPackageTo(path, packageName, requirement, actualVersion, url);
+
+    ///Create a temporary directory for outputting downloaded version. This will ensure a single version is found on getFirstFile
+    string tempPath = buildNormalizedPath(path, "temp");
+    size_t timeout = 10_0000;
+    while(std.file.exists(tempPath))
+    {
+        ///If exists a temporary path at that same directory, simply wait until it is removed
+        import core.time;
+        Thread.sleep(dur!"msecs"(50));
+        timeout-= 50;
+        if(timeout == 0)
+        {
+            errorTitle("Redub Fetch Timeout: ", "Wait time of 10 seconds for package "~packageName~" temp folder to be removed has been exceeded");
+            throw new Exception("Timeout while waiting for removing "~tempPath);
+        }
+    }
+    scope(exit)
+        rmdirRecurse(tempPath);
+
+    string toPlace = supplier.downloadPackageTo(tempPath, packageName, requirement, actualVersion, url);
 
     string installPath = getFirstFileInDirectory(toPlace);
     if(!installPath)
-        throw new Exception("No file was extracted to directory "~toPlace);
-    toPlace = buildNormalizedPath(toPlace, actualVersion.toString);
-    mkdirRecurse(toPlace);
-    toPlace = buildNormalizedPath(toPlace, packageName);
+        throw new Exception("No file was extracted to directory "~toPlace~" while extracting package "~packageName);
 
-    string toPlaceDir = dirName(toPlace);
-    if(!std.file.exists(toPlaceDir))
-        mkdirRecurse(toPlaceDir);
+    path = getOutputDirectoryForPackage(path, packageName, actualVersion.toString);
 
+    ///The download might have happen while downloading ourselves
+    if(std.file.exists(path))
+        return path;
 
-    rename(installPath, toPlace);
+    rename(installPath, path);
 
-    string sdlPath = buildNormalizedPath(toPlace, "dub.sdl");
-    string jsonPath = buildNormalizedPath(toPlace, "dub.json");
+    string sdlPath = buildNormalizedPath(path, "dub.sdl");
+    string jsonPath = buildNormalizedPath(path, "dub.json");
     JSONValue json;
     if(std.file.exists(sdlPath))
     {
@@ -59,6 +77,8 @@ string downloadPackageTo(return string path, string packageName, SemVer requirem
             throw new Exception("Downloaded a dub package which has no dub configuration?");
         json = parseJSON(std.file.readText(jsonPath));
     }
+    if(json.hasErrorOccurred)
+        throw new Exception("Redub Json Parsing Error while reading json '"~jsonPath~"': "~json.error);
 
     //Inject version as `dub` itself requires that
     json["version"] = actualVersion.toString;
@@ -66,7 +86,19 @@ string downloadPackageTo(return string path, string packageName, SemVer requirem
         jsonPath,
         json.toString,
     );
-    return toPlace;
+    return path;
+}
+
+string getOutputDirectoryForPackage(string baseDir, string packageName, string packageVersion)
+{
+    import std.path;
+    import std.file;
+    string output = buildNormalizedPath(baseDir, packageVersion, packageName);
+    string outputDir = dirName(output);
+    if(!std.file.exists(outputDir))
+        mkdirRecurse(outputDir);
+
+    return output;
 }
 
 static this()
