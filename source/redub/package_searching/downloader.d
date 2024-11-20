@@ -54,7 +54,7 @@ string downloadPackageTo(return string path, string packageName, SemVer requirem
 
 string injectJSONVersion(string jsonData, string version_)
 {
-    return jsonData[0..$-1] ~ `"version": "`~version_~"\"\n}";
+    return jsonData[0..$-2] ~ `,"version": "`~version_~"\"\n}";
 }
 
 static this()
