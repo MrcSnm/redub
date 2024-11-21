@@ -1,0 +1,8 @@
+{
+	"fileVersion": 1,
+	"versions": {
+		"hipjson": {"path":"../hipjson"},
+		"sdlite": "1.3.0",
+		"taggedalgebraic": "0.11.23"
+	}
+}

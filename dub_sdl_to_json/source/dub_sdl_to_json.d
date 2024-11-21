@@ -85,13 +85,16 @@ JSONValue sdlToJSON(SDLNode[] sdl)
 				string depVer;
 
 				enforce(v.attributes.length > 0, "A dependency must have at least one attribute. (Parsing "~depName~")");
-				if(v.attributes.length == 1)
+
+				SDLValue pathValue = v.getAttribute("path");
+				SDLValue versionValue = v.getAttribute("version");
+
+
+				if(pathValue.isNull_)
 				{
-					enforce(v.attributes[0].name == "version", "Whenever dependency has a single attribute, it must be a version. (Parsing "~depName~")");
-					SDLValue versionValue = v.getAttribute("version");
-					enforce(versionValue.isText, "version must be a string.");
-					depVer = versionValue.textValue;
-					dependencies[depName]  = JSONValue(depVer);
+					enforce(!versionValue.isNull_, "If no path is present in a .sdl file, a version must be present. (Parsing "~depName~")");
+					enforce(versionValue.isText, "version must be a string. Parsing ("~depName~")");
+					dependencies[depName] = JSONValue(versionValue.textValue);
 				}
 				else
 				{
@@ -296,4 +299,15 @@ ED";
 	import std.stdio;
 	writeln = v["description"].toString;
 
+}
+
+unittest
+{
+	import std.stdio;
+	enum testSdl =
+`
+dependency "yyjson-d" path="../yyjson-d"
+`;
+	JSONValue v = sdlToJSON(parseSDL(null, testSdl));
+	writeln = v["dependencies"];
 }
