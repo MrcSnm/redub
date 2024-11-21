@@ -168,7 +168,7 @@ void setupEnvironmentVariablesForRootPackage(immutable BuildRequirements root)
     import std.process;
     import std.conv:to;
     environment["DUB_ROOT_PACKAGE"] = root.name;
-    environment["DUB_ROOT_PACKAGE_DIR"] = root.cfg.workingDir;
+    environment["DUB_ROOT_PACKAGE_DIR"] = root.cfg.workingDir.forceTrailingDirSeparator;
     environment["DUB_ROOT_PACKAGE_TARGET_TYPE"] = root.cfg.targetType.to!string;
     environment["DUB_ROOT_PACKAGE_TARGET_PATH"] = root.cfg.outputDirectory;
     environment["DUB_ROOT_PACKAGE_TARGET_NAME"] = root.cfg.name;
@@ -189,7 +189,7 @@ void setupEnvironmentVariablesForPackageTree(ProjectNode root)
     // <PKG>_PACKAGE_DIR ;
     import std.process;
     foreach(ProjectNode mem; root.collapse)
-        environment[mem.name.toUppercase~"_PACKAGE_DIR"] = mem.requirements.cfg.workingDir;
+        environment[mem.name.toUppercase~"_PACKAGE_DIR"] = mem.requirements.cfg.workingDir.forceTrailingDirSeparator;
 }
 
 /** 
@@ -203,9 +203,11 @@ void setupEnvironmentVariablesForPackageTree(ProjectNode root)
 PackageDubVariables getEnvironmentVariablesForPackage(const BuildConfiguration cfg)
 {
     import std.conv:to;
+
+    string dir = cfg.workingDir.forceTrailingDirSeparator;
     return PackageDubVariables(
-        PACKAGE_DIR: cfg.workingDir,
-        DUB_PACKAGE_DIR: cfg.workingDir,
+        PACKAGE_DIR: dir,
+        DUB_PACKAGE_DIR: dir,
         DUB_TARGET_TYPE: cfg.targetType.to!string,
         DUB_TARGET_PATH: cfg.outputDirectory,
         DUB_TARGET_NAME: cfg.name,
@@ -360,6 +362,13 @@ private string toUppercase(string a)
     for(int i = 0; i < a.length; i++)
         ret[i] = a[i].toUpper;
     return cast(string)ret;
+}
+
+string forceTrailingDirSeparator(string input)
+{
+    import std.path;
+    import std.string;
+    return input.endsWith(dirSeparator) ? input : input~dirSeparator;
 }
 
 
