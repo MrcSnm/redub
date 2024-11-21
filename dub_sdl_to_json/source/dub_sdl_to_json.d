@@ -82,7 +82,6 @@ JSONValue sdlToJSON(SDLNode[] sdl)
 				enforce(v.values.length == 1, "Can only have a single value for dependency");
 				enforce(v.values[0].isText, "Value for dependency must be a text.");
 				string depName = v.values[0].textValue;
-				string depVer;
 
 				enforce(v.attributes.length > 0, "A dependency must have at least one attribute. (Parsing "~depName~")");
 
@@ -126,11 +125,17 @@ JSONValue sdlToJSON(SDLNode[] sdl)
 
 				break;
 			case "subPackage":
-				enforce(v.values.length > 0, "subPackage must have at least one value.");
-				if(v.values.length == 1)
+				if(v.values.length > 0)
 				{
+					enforce(v.values.length == 1, "subPackage containing a value, must be a single value.");
 					enforce(v.values[0].isText, "Whenever a subPackage has a single value, it must be a text.");
 					subPackages.jsonArray~= JSONValue(v.values[0].textValue);
+				}
+				else
+				{
+					JSONValue subPkg = sdlToJSON(v.children);
+					enforce("name" in subPkg, "SDL->JSON subPackage must contain a name");
+					subPackages.jsonArray~= subPkg;
 				}
 				break;
 			default:
@@ -265,7 +270,6 @@ string stripComments(string str)
  */
 string fixSDLParsingBugs(string sdlData)
 {
-    import std.file;
     import std.string:replace;
 
     version(Windows)
@@ -293,11 +297,8 @@ buildType "unittest" {
 }
 ED";
 	import hipjson;
-
 	JSONValue v = sdlToJSON(parseSDL(null, testSdl));
-
-	import std.stdio;
-	writeln = v["description"].toString;
+	assert(!parseJSON(v["description"].toString).hasErrorOccurred);
 
 }
 
@@ -309,5 +310,169 @@ unittest
 dependency "yyjson-d" path="../yyjson-d"
 `;
 	JSONValue v = sdlToJSON(parseSDL(null, testSdl));
-	writeln = v["dependencies"];
+	assert("dependencies" in v);
+}
+
+
+///Dmd package
+unittest
+{
+enum testSdl =
+q"ED
+name "dmd"
+description "The DMD compiler"
+authors "Walter Bright"
+copyright "Copyright © 1999-2018, The D Language Foundation"
+license "BSL-1.0"
+
+targetType "none"
+dependency ":frontend" version="*"
+
+subPackage {
+  name "compiler"
+  targetType "executable"
+  targetName "dmd"
+  sourcePaths "compiler/src/dmd"
+  importPaths "compiler/src"
+  stringImportPaths "compiler/src/dmd/res" "."
+  dflags "-L/STACK:16777216" platform="windows"
+  dflags "-preview=dip1000"
+  preGenerateCommands "echo -n /etc > SYSCONFDIR.imp" platform="posix"
+}
+
+subPackage {
+  name "root"
+  targetType "library"
+  importPaths "compiler/src"
+  sourcePaths "compiler/src/dmd/common" "compiler/src/dmd/root"
+}
+
+subPackage {
+  name "lexer"
+  targetType "library"
+  importPaths "compiler/src"
+  sourcePaths
+
+  sourceFiles \
+    "compiler/src/dmd/console.d" \
+    "compiler/src/dmd/entity.d" \
+    "compiler/src/dmd/errors.d" \
+    "compiler/src/dmd/file_manager.d" \
+    "compiler/src/dmd/globals.d" \
+    "compiler/src/dmd/id.d" \
+    "compiler/src/dmd/identifier.d" \
+    "compiler/src/dmd/lexer.d" \
+    "compiler/src/dmd/location.d" \
+    "compiler/src/dmd/tokens.d" \
+    "compiler/src/dmd/utils.d" \
+    "compiler/src/dmd/errorsink.d"
+
+  versions \
+    "CallbackAPI" \
+    "DMDLIB"
+
+  preGenerateCommands `
+    "$${DUB_EXE}" \
+    --arch=$${DUB_ARCH} \
+    --compiler=$${DC} \
+    --single "$${DUB_PACKAGE_DIR}config.d" \
+    -- "$${DUB_PACKAGE_DIR}generated/dub" \
+    "$${DUB_PACKAGE_DIR}VERSION" \
+    /etc
+   ` platform="posix"
+
+  preGenerateCommands `"%DUB_EXE%" --arch=%DUB_ARCH% --compiler="%DC%" --single "%DUB_PACKAGE_DIR%config.d" -- "%DUB_PACKAGE_DIR%generated/dub" "%DUB_PACKAGE_DIR%VERSION"` platform="windows"
+
+  stringImportPaths \
+    "compiler/src/dmd/res" \
+    "generated/dub"
+
+  dependency "dmd:root" version="*"
+}
+
+subPackage {
+  name "parser"
+  targetType "library"
+  importPaths "compiler/src"
+  sourcePaths
+
+  sourceFiles \
+    "compiler/src/dmd/astbase.d" \
+    "compiler/src/dmd/parse.d" \
+    "compiler/src/dmd/transitivevisitor.d" \
+    "compiler/src/dmd/permissivevisitor.d" \
+    "compiler/src/dmd/strictvisitor.d"
+
+  versions "CallbackAPI"
+
+  dependency "dmd:lexer" version="*"
+}
+
+subPackage {
+  name "frontend"
+  targetType "library"
+  importPaths "compiler/src"
+  sourcePaths "compiler/src/dmd"
+  stringImportPaths "compiler/src/dmd/res"
+
+  versions \
+    "NoBackend" \
+    "GC" \
+    "NoMain" \
+    "MARS" \
+    "CallbackAPI"
+
+  excludedSourceFiles "compiler/src/dmd/backend/*"
+  excludedSourceFiles "compiler/src/dmd/root/*"
+  excludedSourceFiles "compiler/src/dmd/common/*"
+  excludedSourceFiles "compiler/src/dmd/{\
+    astbase,\
+    console,\
+    entity,\
+    errors,\
+    file_manager,\
+    globals,\
+    id,\
+    identifier,\
+    lexer,\
+    parse,\
+    permissivevisitor,\
+    strictvisitor,\
+    tokens,\
+    transitivevisitor,\
+    utf,\
+    utils\
+  }.d"
+  excludedSourceFiles "compiler/src/dmd/{\
+    dmsc,\
+    e2ir,\
+    eh,\
+    glue,\
+    iasmdmd,\
+    iasmgcc,\
+    irstate,\
+    lib,\
+    libelf,\
+    libmach,\
+    libmscoff,\
+    libomf,\
+    link,\
+    objc_glue,\
+    s2ir,\
+    scanelf,\
+    scanmach,\
+    scanmscoff,\
+    scanomf,\
+    tocsym,\
+    toctype,\
+    tocvdebug,\
+    toobj,\
+    todt,\
+    toir\
+  }.d"
+
+  dependency "dmd:parser" version="*"
+}
+ED";
+	sdlToJSON(parseSDL(null, testSdl));
 }
