@@ -4,11 +4,13 @@
 ## Running redub without having it on path
 - Change directory to the project you want to build and enter in terminal `dub run redub`
 - You may also get help by running `dub run redub -- --help`
+- If you're unsure on how to update redub to the latest version using dub, you may also do `dub run redub -- update`
 
 ## Building redub
 - Enter in terminal and execute `dub`
 - Highly recommended that you build it with `dub build -b release-debug --compiler=ldc2` since this will also improve its speed on dependency resolution
 - I would also add redub/bin to the environment variables, with that, you'll be able to simply execute `redub` in the folder you're in and get your project built and running
+- After having your first redub version, you may also update redub by entering on terminal `redub update`. This will download the latest version, rebuild redub with optimizations and replace your current redub executable
 
 ## Using its library API
 
