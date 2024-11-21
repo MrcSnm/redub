@@ -40,6 +40,7 @@ string downloadPackageTo(return string path, string packageName, SemVer requirem
     scope(exit)
         rmdirRecurse(tempPath);
 
+    warnTitle("Fetching Package: ", packageName, " version ", requirement.toString);
     string toPlace = supplier.downloadPackageTo(tempPath, packageName, requirement, actualVersion, url);
 
     string installPath = getFirstFileInDirectory(toPlace);
