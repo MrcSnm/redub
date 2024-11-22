@@ -50,6 +50,8 @@ class RegistryPackageSupplier
 		if(meta.type == JSONType.null_)
 			return null;
 		out_actualVersion = getBestVersion(packageName, requirement);
+		if(out_actualVersion == SemVer.init)
+			return null;
 		return getPackageDownloadURL(packageName, out_actualVersion.toString);
 	}
 
@@ -62,6 +64,18 @@ class RegistryPackageSupplier
 		return downloadFile(url);
 	}
 
+	/**
+	 * Downloads the package to a specific folder and extract it.
+	 * If no version actually matched existing versions, both out_actualVersionRequirement and url will be empty
+	 *
+	 * Params:
+	 *   path = The path expected to extract the package to
+	 *   packageName = Package name for assembling the link
+	 *   requirement = Which is the requirement that it must attend
+	 *   out_actualVersion = The version that matched the required
+	 *   url = The URL that was built for downloading the package
+	 * Returns: The path after the extraction
+	 */
 	string downloadPackageTo(return string path, string packageName, SemVer requirement, out SemVer out_actualVersion, out string url)
 	{
 		import std.zip;

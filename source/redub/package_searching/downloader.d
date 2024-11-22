@@ -42,6 +42,8 @@ string downloadPackageTo(return string path, string packageName, SemVer requirem
 
     warnTitle("Fetching Package: ", packageName, " version ", requirement.toString);
     string toPlace = supplier.downloadPackageTo(tempPath, packageName, requirement, actualVersion, url);
+    if(!url)
+        throw new Exception("No version with requirement '"~requirement.toString~"' was found when looking for package "~packageName);
 
     string installPath = getFirstFileInDirectory(toPlace);
     if(!installPath)
