@@ -39,6 +39,26 @@ class RegistryPackageSupplier
 		}
 		return ret;
 	}
+
+	/**
+	 * Used for diagnostics when the user typed a wrong version or inexistent packageName.
+	 *
+	 * Params:
+	 *   packageName = The package to look for versions
+	 * Returns: An array of versions found
+	 */
+	SemVer[] getExistingVersions(string packageName)
+	{
+		JSONValue md = getMetadata(packageName);
+		if(md.type == JSONType.null_)
+			return null;
+		SemVer[] ret;
+
+		foreach(json; md["versions"].array)
+			ret~= SemVer(json["version"].str);
+		return ret;
+	}
+
 	string getPackageDownloadURL(string packageName, string version_)
 	{
 		return registryUrl~"packages/"~packageName~"/"~version_~".zip";
@@ -80,6 +100,8 @@ class RegistryPackageSupplier
 	{
 		import std.zip;
 		ubyte[] zipContent = fetchPackage(packageName, requirement, out_actualVersion, url);
+		if(!zipContent)
+			return null;
 		if(!extractZipToFolder(zipContent, path))
 			throw new Exception("Error while trying to extract zip to path "~path);
 		return path;

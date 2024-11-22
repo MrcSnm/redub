@@ -34,7 +34,7 @@ string downloadPackageTo(return string path, string packageName, SemVer requirem
         if(timeout == 0)
         {
             errorTitle("Redub Fetch Timeout: ", "Wait time of 10 seconds for package "~packageName~" temp folder to be removed has been exceeded");
-            throw new Exception("Timeout while waiting for removing "~tempPath);
+            throw new NetworkException("Timeout while waiting for removing "~tempPath);
         }
     }
     scope(exit)
@@ -43,7 +43,17 @@ string downloadPackageTo(return string path, string packageName, SemVer requirem
     warnTitle("Fetching Package: ", packageName, " version ", requirement.toString);
     string toPlace = supplier.downloadPackageTo(tempPath, packageName, requirement, actualVersion, url);
     if(!url)
-        throw new Exception("No version with requirement '"~requirement.toString~"' was found when looking for package "~packageName);
+    {
+        import redub.libs.semver;
+        string existing = "'. Existing Versions: ";
+        SemVer[] vers = supplier.getExistingVersions(packageName);
+        if(vers is null) existing = "'. This package does not exists in the registry.";
+        else
+            foreach(v; vers) existing~= "\n\t"~v.toString;
+
+
+        throw new NetworkException("No version with requirement '"~requirement.toString~"' was found when looking for package "~packageName~existing);
+    }
 
     string installPath = getFirstFileInDirectory(toPlace);
     if(!installPath)
@@ -77,7 +87,7 @@ string downloadPackageTo(return string path, string packageName, SemVer requirem
     else
     {
         if(!std.file.exists(jsonPath))
-            throw new Exception("Downloaded a dub package which has no dub configuration?");
+            throw new NetworkException("Downloaded a dub package which has no dub configuration?");
         json = parseJSON(std.file.readText(jsonPath));
     }
     if(json.hasErrorOccurred)

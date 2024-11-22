@@ -7,6 +7,7 @@ import redub.parsers.automatic;
 import redub.tree_generators.dub;
 import redub.cli.dub;
 import redub.command_generators.commons;
+import redub.libs.package_suppliers.utils;
 
 
 extern(C) __gshared string[] rt_options = [ "gcopt=initReserve:200" ];
@@ -86,6 +87,16 @@ int main(string[] args)
     catch(BuildException e)
     {
         errorTitle("Build Failure");
+        return 1;
+    }
+    catch(NetworkException e)
+    {
+        errorTitle("Network Error: ", e.msg);
+        return 1;
+    }
+    catch(Exception e)
+    {
+        errorTitle("Internal Error: ", e.msg);
         return 1;
     }
 }
