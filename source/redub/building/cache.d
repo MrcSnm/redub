@@ -360,10 +360,11 @@ void updateCacheOnDisk(string rootCache)
     std.file.write(getCacheFilePath(rootCache), getCache(rootCache).toString());
 }
 
+
+private __gshared JSONValue[string] cacheJson;
 private JSONValue* getCache(string rootCache)
 {
     static import std.file;
-    static JSONValue[string] cacheJson;
     string folder = getCacheFolder;
     import redub.meta;
     import redub.logging;
@@ -398,6 +399,14 @@ private JSONValue* getCache(string rootCache)
     return &cacheJson[rootCache];
 }
 
+/**
+*   Clears memory cache. This will allow to redub correctly identify files that changed in subsequent runs.
+*/
+void clearJsonCache()
+{
+    cacheJson = null;
+}
+
 string getCacheFolder()
 {
     static string cacheFolder;
@@ -410,3 +419,4 @@ string getCacheFilePath(string rootCache)
 {
     return buildNormalizedPath(getCacheFolder, rootCache ~ ".json");
 }
+
