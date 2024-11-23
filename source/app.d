@@ -82,21 +82,25 @@ int main(string[] args)
     catch(RedubException e)
     {
         errorTitle("Redub Error: ", e.msg);
+        version(Developer) throw e;
         return 1;
     }
     catch(BuildException e)
     {
         errorTitle("Build Failure");
+        version(Developer) throw e;
         return 1;
     }
     catch(NetworkException e)
     {
         errorTitle("Network Error: ", e.msg);
+        version(Developer) throw e;
         return 1;
     }
     catch(Exception e)
     {
         errorTitle("Internal Error: ", e.msg);
+        version(Developer) throw e;
         return 1;
     }
 }
@@ -247,6 +251,9 @@ int updateMain(string[] args)
         @("Builds redub using dmd -b debug for faster iteration on redub")
         bool fast;
 
+        @("Throws stack instead of simply pretty-printing the message")
+        bool dev;
+
         @("Sets the compiler to build redub")
         string compiler = "ldc2";
 
@@ -314,7 +321,7 @@ int updateMain(string[] args)
             update.compiler = "dmd";
         }
         
-        ProjectDetails d = redub.api.resolveDependencies(false, os, CompilationDetails(update.compiler), ProjectToParse(null, redubPath), InitialDubVariables.init, bt);
+        ProjectDetails d = redub.api.resolveDependencies(false, os, CompilationDetails(update.compiler), ProjectToParse(update.dev ? "cli-dev" : null, redubPath), InitialDubVariables.init, bt);
         enforce(d.tree.name == "redub", "Redub update should only be used to update redub.");
         d.tree.requirements.cfg.outputDirectory = buildNormalizedPath(tempDir, "redub_build");
         d = buildProject(d);

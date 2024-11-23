@@ -16,7 +16,6 @@ class RegistryPackageSupplier
 {
 
 	import std.uri : encodeComponent;
-	import std.datetime : Clock, Duration, hours, SysTime, UTC;
 	string registryUrl;
 
  	this(string registryUrl = "https://code.dlang.org/")
@@ -74,39 +73,6 @@ class RegistryPackageSupplier
 			return null;
 		return getPackageDownloadURL(packageName, out_actualVersion.toString);
 	}
-
-
-	private ubyte[] fetchPackage(string packageName, SemVer requirement, out SemVer out_actualVersion, out string url)
-	{
-		url = getBestPackageDownloadUrl(packageName, requirement, out_actualVersion);
-		if(!url)
-			return null;
-		return downloadFile(url);
-	}
-
-	/**
-	 * Downloads the package to a specific folder and extract it.
-	 * If no version actually matched existing versions, both out_actualVersionRequirement and url will be empty
-	 *
-	 * Params:
-	 *   path = The path expected to extract the package to
-	 *   packageName = Package name for assembling the link
-	 *   requirement = Which is the requirement that it must attend
-	 *   out_actualVersion = The version that matched the required
-	 *   url = The URL that was built for downloading the package
-	 * Returns: The path after the extraction
-	 */
-	string downloadPackageTo(return string path, string packageName, SemVer requirement, out SemVer out_actualVersion, out string url)
-	{
-		import std.zip;
-		ubyte[] zipContent = fetchPackage(packageName, requirement, out_actualVersion, url);
-		if(!zipContent)
-			return null;
-		if(!extractZipToFolder(zipContent, path))
-			throw new Exception("Error while trying to extract zip to path "~path);
-		return path;
-	}
-
 
 
 

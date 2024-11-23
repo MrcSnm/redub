@@ -3,6 +3,87 @@ import redub.libs.package_suppliers.dub_registry;
 import redub.libs.semver;
 RegistryPackageSupplier supplier;
 
+string getGitDownloadLink(string packageName, string repo, string branch)
+{
+    import std.algorithm.searching;
+    import std.uri;
+    if(repo.startsWith("git+"))
+        repo = repo[4..$];
+    string downloadLink;
+    if(repo[$-1] == '/')
+        repo = repo[0..$-1];
+
+    if(repo.canFind("gitlab.com"))
+        downloadLink = repo~"/-/archive/"~branch~"/"~encodeComponent(packageName)~"-"~branch~".zip";
+    else if(repo.canFind("bitbucket.com"))
+        downloadLink = repo~"/get/"~encodeComponent(packageName)~"-"~branch~".zip";
+    else
+    {
+        ///Github, Gitea and GitBucket all use the same style
+        downloadLink = repo~"/archive/"~branch~".zip";
+    }
+    return downloadLink;
+}
+
+string getDownloadLink(string packageName, string repo, SemVer requirement, out SemVer actualVer)
+{
+    if(requirement.isInvalid)
+    {
+        if(!repo)
+            throw new Exception("Can't have invalid requirement '"~requirement.toString~"' and have no 'repo' information.");
+        actualVer = requirement;
+        return getGitDownloadLink(packageName, repo, requirement.toString);
+    }
+    return supplier.getBestPackageDownloadUrl(packageName, requirement, actualVer);
+}
+
+/**
+ * Downloads a .zip containing a package with the specified requirement
+ *
+ * Params:
+ *   packageName = The package name to find
+ *   repo = Null whenever a valid requirement exists. An invalid SemVer is used for git branches
+ *   requirement = Required. When valid, uses dub registry, when invalid, uses git repo
+ *   out_actualVersion = Actual version is for the best package found. Only relevant when a valid SemVer is in place
+ *   url = Actual URL from which the download was made
+ * Returns: The downloaded content
+ */
+ubyte[] fetchPackage(string packageName, string repo, SemVer requirement, out SemVer out_actualVersion, out string url)
+{
+    import redub.libs.package_suppliers.utils;
+    url = getDownloadLink(packageName, repo, requirement, out_actualVersion);
+    if(!url)
+        return null;
+    return downloadFile(url);
+}
+
+/**
+* Downloads the package to a specific folder and extract it.
+* If no version actually matched existing versions, both out_actualVersionRequirement and url will be empty
+*
+* Params:
+*   path = The path expected to extract the package to
+*   repo = Required when an invalid semver is sent.
+*   packageName = Package name for assembling the link
+*   requirement = Which is the requirement that it must attend
+*   out_actualVersion = The version that matched the required
+*   url = The URL that was built for downloading the package
+* Returns: The path after the extraction
+*/
+string downloadPackageTo(return string path, string packageName, string repo,  SemVer requirement, out SemVer out_actualVersion, out string url)
+{
+    import redub.libs.package_suppliers.utils;
+    ubyte[] zipContent = fetchPackage(packageName, repo, requirement, out_actualVersion, url);
+    if(!zipContent)
+        return null;
+    if(!extractZipToFolder(zipContent, path))
+        throw new Exception("Error while trying to extract zip to path "~path);
+    return path;
+}
+
+
+
+
 
 /**
 *   Dub downloads to a path, usually packagename-version
@@ -11,7 +92,7 @@ RegistryPackageSupplier supplier;
 *   If it uses .sdl, convert it to .json and add a version to it
 *   If it uses .json, append a "version" to it
 */
-string downloadPackageTo(return string path, string packageName, SemVer requirement, out SemVer actualVersion)
+string downloadPackageTo(return string path, string packageName, string repo, SemVer requirement, out SemVer actualVersion)
 {
     import core.thread;
     import hipjson;
@@ -21,6 +102,7 @@ string downloadPackageTo(return string path, string packageName, SemVer requirem
     import redub.logging;
     //Supplier will download packageName-version. While dub actually creates packagename/version/
     string url;
+
 
     ///Create a temporary directory for outputting downloaded version. This will ensure a single version is found on getFirstFile
     string tempPath = buildNormalizedPath(path, "temp");
@@ -40,8 +122,8 @@ string downloadPackageTo(return string path, string packageName, SemVer requirem
     scope(exit)
         rmdirRecurse(tempPath);
 
-    warnTitle("Fetching Package: ", packageName, " version ", requirement.toString);
-    string toPlace = supplier.downloadPackageTo(tempPath, packageName, requirement, actualVersion, url);
+    warnTitle("Fetching Package: ", packageName, " ", repo, " version ", requirement.toString);
+    string toPlace = downloadPackageTo(tempPath, packageName, repo, requirement, actualVersion, url);
     if(!url)
     {
         import redub.libs.semver;

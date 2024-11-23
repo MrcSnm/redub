@@ -256,7 +256,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
 
             static Dependency parseDep(JSONValue value, string depName, string workingDir, string requiredBy, string configVersion)
             {
-                string version_, path, visibility;
+                string version_, path, visibility, repo;
                 string out_mainPackage;
                 string subPackage = getSubPackageInfoRequiredBy(depName, requiredBy, out_mainPackage);
                 bool isOptional = false;
@@ -269,11 +269,11 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
                 }
                 if(value.type == JSONType.object) ///Uses path style
                 {
-                    const(JSONValue)* depPath = "path" in value;
-                    const(JSONValue)* depVer = "version" in value;
-                    const(JSONValue)* depRep = "repository" in value;
+                    path = tryStr(value, "path");
+                    version_ = tryStr(value, "version");
+                    repo = tryStr(value, "repository");
                     visibility = value.tryStr("visibility");
-                    enforce(depPath || depVer,
+                    enforce(version_ || path,
                         "Dependency named "~ depName ~
                         " must contain at least a \"path\" or \"version\" property."
                     );
@@ -282,9 +282,8 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
                         if(!("default" in value) || value["default"].boolean == false)
                             isOptional = true;
                     }
-                    if(depPath)
-                        path = isAbsolute(depPath.str) ? depPath.str : buildNormalizedPath(workingDir, depPath.str);
-                    version_ = depVer ? depVer.str : null;
+                    if(path)
+                        path = isAbsolute(path) ? path : buildNormalizedPath(workingDir, path);
                 }
                 else if(value.type == JSONType.string) ///Version style
                     version_ = value.str;
@@ -300,12 +299,12 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
                 string packageFullName = getPackageFullName(depName, requiredBy);
                 if(!path)
                 {
-                    info = redub.package_searching.cache.findPackage(packageFullName, version_, requiredBy);
+                    info = redub.package_searching.cache.findPackage(packageFullName, repo, version_, requiredBy);
                     path = info.path;
                     version_ = info.bestVersion.toString;
                 }
                 else
-                    info = findPackage(packageFullName, version_, requiredBy, path);
+                    info = findPackage(packageFullName, repo, version_, requiredBy, path);
                 return Dependency(packageFullName, path, version_, BuildRequirements.Configuration.init, null, VisibilityFrom(visibility), info, isOptional);
             }
 

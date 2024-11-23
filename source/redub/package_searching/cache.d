@@ -16,12 +16,21 @@ static this()
     cacheMtx = new Mutex;
 }
 
-
-PackageInfo* findPackage(string packageName, string packageVersion, string requiredBy, string path)
+/**
+ *
+ * Params:
+ *   packageName = The package name to find
+ *   repo = Repo information that is only ever used whenever the version is invalid
+ *   packageVersion = The version of the package, may be both a SemVer or a branch
+ *   requiredBy = Metadata information
+ *   path = The path on which this package may be. Used whenever not in the cache
+ * Returns: The package information
+ */
+PackageInfo* findPackage(string packageName, string repo, string packageVersion, string requiredBy, string path)
 {
     PackageInfo* pkg = packageName in packagesCache;
     if(pkg) return pkg;
-    if(path.length == 0) return findPackage(packageName, packageVersion, requiredBy);
+    if(path.length == 0) return findPackage(packageName, repo, packageVersion, requiredBy);
 
     PackageInfo localPackage = basePackage(packageName, packageVersion, requiredBy);
     localPackage.path = path;
@@ -45,13 +54,22 @@ private string getBetterPackageInfo(PackageInfo* input, string packageName)
     return ret;
 }
 
-PackageInfo* findPackage(string packageName, string packageVersion, string requiredBy)
+/**
+ *
+ * Params:
+ *   packageName = The package name to find
+ *   repo = The repo information. Used when the package version is invalid. Information only used to fetch
+ *   packageVersion = The SemVer version to look for. Or a git branch
+ *   requiredBy = Meta information on whom is requiring it.
+ * Returns:
+ */
+PackageInfo* findPackage(string packageName, string repo, string packageVersion, string requiredBy)
 {
     import redub.package_searching.dub;
     PackageInfo* pkg = packageName in packagesCache;
     if(!pkg)
     {
-        PackageInfo info = getPackage(packageName, packageVersion, requiredBy);
+        PackageInfo info = getPackage(packageName, repo, packageVersion, requiredBy);
         synchronized(cacheMtx)
         {
             packagesCache[packageName] = info;
@@ -65,7 +83,7 @@ PackageInfo* findPackage(string packageName, string packageVersion, string requi
         {
             if(newPkg.satisfies(pkg.requiredVersion))
             {
-                PackageInfo newPkgInfo = getPackage(packageName, packageVersion, requiredBy);
+                PackageInfo newPkgInfo = getPackage(packageName, repo, packageVersion, requiredBy);
                 pkg.bestVersion = newPkgInfo.bestVersion;
                 pkg.path = newPkgInfo.path;
                 import redub.logging;
@@ -104,7 +122,7 @@ void putPackageInCache(string packageName, string version_, string path)
     }
 }
 
-string getPackagePath(string packageName, string packageVersion, string requiredBy)
+string getPackagePath(string packageName, string repo, string packageVersion, string requiredBy)
 {
-    return findPackage(packageName, packageVersion, requiredBy).path;
+    return findPackage(packageName, repo ,packageVersion, requiredBy).path;
 }

@@ -12,6 +12,11 @@
             "targetType": "executable"
         },
         {
+            "name": "cli-dev",
+            "versions": ["Developer"],
+            "targetType": "executable"
+        },
+        {
             "name": "library",
             "targetType": "staticLibrary",
             "excludedSourceFiles": ["source/app.d"]

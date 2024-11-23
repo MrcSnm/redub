@@ -21,6 +21,9 @@ nint[3] parseVersion(string verString, out ptrdiff_t currIndex)
               i++;
         if(i != 0)
 			ret[retIndex] = value[0..i].to!int;
+        else
+            return ret;
+
 		retIndex++;
         if(retIndex == 3)
         {
@@ -29,7 +32,7 @@ nint[3] parseVersion(string verString, out ptrdiff_t currIndex)
         }
         else 
         {
-            currIndex+= value.length;
+            currIndex+= i;
             if(currIndex < verString.length) 
                 currIndex+= 1; //Advance the dot
         }

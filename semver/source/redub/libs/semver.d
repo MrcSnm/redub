@@ -170,6 +170,12 @@ struct SemVer
             rangeMax = v[rangesSeparator..$];
             v = v[0..rangesSeparator];
         }
+
+        if(v.length > 0)
+        {
+            setInvalid("Could not parse completely.");
+            return;
+        }
     }
 
     /** 
@@ -423,4 +429,11 @@ unittest
     assert(SemVer("2.0.5").satisfies(SemVer(">=2.0.5 < 3.0.0")));
     assert(!SemVer("0.10.0").satisfies(SemVer(">=0.9.7-alpha.3 < 0.10.0")));
     assert(SemVer("0.9.8").satisfies(SemVer(">=0.9.0 <0.10.0")));
+}
+
+
+@("Check invalid ")
+unittest
+{
+    assert(SemVer("69e6c80").isInvalid);
 }

@@ -15,7 +15,16 @@ struct FetchedPackage
 }
 
 __gshared FetchedPackage[] fetchedPackages;
-ReducedPackageInfo redubDownloadPackage(string packageName, string packageVersion, string requiredBy = "")
+/**
+ *
+ * Params:
+ *   packageName = The package in which will be looked for
+ *   repo = Optional repository, used when an invalid version is sent.
+ *   packageVersion = Package version my be both a branch or a valid semver
+ *   requiredBy = Metadata info
+ * Returns: Package information
+ */
+ReducedPackageInfo redubDownloadPackage(string packageName, string repo, string packageVersion, string requiredBy = "")
 {
     import redub.package_searching.downloader;
     import core.sync.mutex;
@@ -25,6 +34,7 @@ ReducedPackageInfo redubDownloadPackage(string packageName, string packageVersio
     string downloadedPackagePath = downloadPackageTo(
         buildNormalizedPath(getDefaultLookupPathForPackages(), packageName),
         packageName,
+        repo,
         SemVer(packageVersion),
         out_bestVersion
     );
@@ -99,7 +109,7 @@ private ReducedPackageInfo getPackageInFolder(string folder, string packageName,
  *   packageVersion = "version" inside dub.json. SemVer matches are also accepted
  * Returns: The package path when found. null when not.
  */
-PackageInfo getPackage(string packageName, string packageVersion, string requiredBy)
+PackageInfo getPackage(string packageName, string repo, string packageVersion, string requiredBy)
 {
     import std.file;
     import std.path;
@@ -121,7 +131,7 @@ PackageInfo getPackage(string packageName, string packageVersion, string require
     string downloadedPackagePath = buildNormalizedPath(getDefaultLookupPathForPackages(), packageName);
     ReducedPackageInfo info;
     if (!std.file.exists(downloadedPackagePath))
-        info = redubDownloadPackage(packageName, packageVersion, requiredBy);
+        info = redubDownloadPackage(packageName, repo, packageVersion, requiredBy);
     else
         info = getPackageInFolder(downloadedPackagePath, packageName, pack.subPackage, packageVersion);
 
@@ -133,8 +143,8 @@ PackageInfo getPackage(string packageName, string packageVersion, string require
     }
 
     ///If no matching version was found, try downloading it.
-    info = redubDownloadPackage(packageName, packageVersion, requiredBy);
-    return getPackage(packageName, packageVersion, requiredBy);
+    info = redubDownloadPackage(packageName, repo, packageVersion, requiredBy);
+    return getPackage(packageName, repo, packageVersion, requiredBy);
 
     throw new Exception(
         "Could not find any package named " ~
@@ -148,9 +158,9 @@ PackageInfo getPackage(string packageName, string packageVersion, string require
 
 
 
-string getPackagePath(string packageName, string packageVersion, string requiredBy)
+string getPackagePath(string packageName, string repo, string packageVersion, string requiredBy)
 {
-    return getPackage(packageName, packageVersion, requiredBy).path;
+    return getPackage(packageName, repo, packageVersion, requiredBy).path;
 }
 
 
