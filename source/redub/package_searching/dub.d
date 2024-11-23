@@ -28,7 +28,6 @@ ReducedPackageInfo redubDownloadPackage(string packageName, string repo, string 
 {
     import redub.package_searching.downloader;
     import core.sync.mutex;
-    import std.stdio;
     import std.path;
     SemVer out_bestVersion;
     string downloadedPackagePath = downloadPackageTo(
@@ -41,7 +40,9 @@ ReducedPackageInfo redubDownloadPackage(string packageName, string repo, string 
 
     synchronized
     {
-        fetchedPackages~= FetchedPackage(packageName, requiredBy, out_bestVersion.toString);
+        import std.algorithm.searching;
+        if(!canFind!("a.name == b.name")(fetchedPackages, FetchedPackage(packageName)))
+            fetchedPackages~= FetchedPackage(packageName, requiredBy, out_bestVersion.toString);
     }
 
     return ReducedPackageInfo(

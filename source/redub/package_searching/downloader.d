@@ -82,9 +82,6 @@ string downloadPackageTo(return string path, string packageName, string repo,  S
 }
 
 
-
-
-
 /**
 *   Dub downloads to a path, usually packagename-version
 *   After that, it replaces it to packagename/version
@@ -95,6 +92,8 @@ string downloadPackageTo(return string path, string packageName, string repo,  S
 string downloadPackageTo(return string path, string packageName, string repo, SemVer requirement, out SemVer actualVersion)
 {
     import core.thread;
+    import core.sync.mutex;
+    import core.sync.condition;
     import hipjson;
     import redub.libs.package_suppliers.utils;
     import std.path;
@@ -103,10 +102,36 @@ string downloadPackageTo(return string path, string packageName, string repo, Se
     //Supplier will download packageName-version. While dub actually creates packagename/version/
     string url;
 
+    struct DownloadData
+    {
+        Mutex mtx;
+        string ver;
+    }
+
 
     ///Create a temporary directory for outputting downloaded version. This will ensure a single version is found on getFirstFile
     string tempPath = buildNormalizedPath(path, "temp");
     size_t timeout = 10_0000;
+    __gshared DownloadData[string] downloadedPackages;
+
+    bool willDownload;
+
+    synchronized
+    {
+        if((packageName in downloadedPackages) is null)
+        {
+            downloadedPackages[packageName] = DownloadData(new Mutex, null);
+            willDownload = true;
+        }
+        downloadedPackages[packageName].mtx.lock;
+    }
+
+    scope(exit)
+    {
+        downloadedPackages[packageName].mtx.unlock;
+    }
+
+
     while(std.file.exists(tempPath))
     {
         ///If exists a temporary path at that same directory, simply wait until it is removed
@@ -119,35 +144,52 @@ string downloadPackageTo(return string path, string packageName, string repo, Se
             throw new NetworkException("Timeout while waiting for removing "~tempPath);
         }
     }
-    scope(exit)
-        rmdirRecurse(tempPath);
 
-    warnTitle("Fetching Package: ", packageName, " ", repo, " version ", requirement.toString);
-    string toPlace = downloadPackageTo(tempPath, packageName, repo, requirement, actualVersion, url);
-    if(!url)
+
+
+    if(!willDownload)
     {
-        import redub.libs.semver;
-        string existing = "'. Existing Versions: ";
-        SemVer[] vers = supplier.getExistingVersions(packageName);
-        if(vers is null) existing = "'. This package does not exists in the registry.";
-        else
-            foreach(v; vers) existing~= "\n\t"~v.toString;
+        return getOutputDirectoryForPackage(path, packageName, downloadedPackages[packageName].ver);
+    }
+    else
+    {
+        warnTitle("Fetching Package: ", packageName, " ", repo, " version ", requirement.toString);
+        tempPath = downloadPackageTo(tempPath, packageName, repo, requirement, actualVersion, url);
+        if(!url)
+        {
+            import redub.libs.semver;
+            string existing = "'. Existing Versions: ";
+            SemVer[] vers = supplier.getExistingVersions(packageName);
+            if(vers is null) existing = "'. This package does not exists in the registry.";
+            else
+                foreach(v; vers) existing~= "\n\t"~v.toString;
 
 
-        throw new NetworkException("No version with requirement '"~requirement.toString~"' was found when looking for package "~packageName~existing);
+            throw new NetworkException("No version with requirement '"~requirement.toString~"' was found when looking for package "~packageName~existing);
+        }
+        synchronized
+        {
+            downloadedPackages[packageName].ver = actualVersion.toString;
+        }
+        path = getOutputDirectoryForPackage(path, packageName, actualVersion.toString);
+        string installPath = getFirstFileInDirectory(tempPath);
+        if(!installPath)
+            throw new Exception("No file was extracted to directory "~tempPath~" while extracting package "~packageName);
+        ///The download might have happen while downloading ourselves
+
+
+        if(std.file.exists(path))
+            return path;
+
+        string outputDir = dirName(path);
+        if(!std.file.exists(outputDir))
+            mkdirRecurse(outputDir);
+        rename(installPath, path);
+        rmdirRecurse(tempPath);
     }
 
-    string installPath = getFirstFileInDirectory(toPlace);
-    if(!installPath)
-        throw new Exception("No file was extracted to directory "~toPlace~" while extracting package "~packageName);
 
-    path = getOutputDirectoryForPackage(path, packageName, actualVersion.toString);
 
-    ///The download might have happen while downloading ourselves
-    if(std.file.exists(path))
-        return path;
-
-    rename(installPath, path);
 
     string sdlPath = buildNormalizedPath(path, "dub.sdl");
     string jsonPath = buildNormalizedPath(path, "dub.json");
@@ -187,13 +229,9 @@ string downloadPackageTo(return string path, string packageName, string repo, Se
 string getOutputDirectoryForPackage(string baseDir, string packageName, string packageVersion)
 {
     import std.path;
-    import std.file;
-    string output = buildNormalizedPath(baseDir, packageVersion, packageName);
-    string outputDir = dirName(output);
-    if(!std.file.exists(outputDir))
-        mkdirRecurse(outputDir);
-
-    return output;
+    if(packageVersion is null)
+        throw new Exception("Can't create output directory for package "~ packageName~" because its version is null.");
+    return buildNormalizedPath(baseDir, packageVersion, packageName);
 }
 
 static this()
