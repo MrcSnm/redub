@@ -8,7 +8,7 @@ import redub.package_searching.api;
 
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.17.16";
+enum RedubVersionOnly = "v1.17.17";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -255,6 +255,7 @@ struct BuildConfiguration
         import std.algorithm.comparison:either;
         BuildConfiguration ret = clone;
         ret.targetType = either(other.targetType, ret.targetType);
+        ret.targetName = either(other.targetName, ret.targetName);
         ret.outputDirectory = either(other.outputDirectory, ret.outputDirectory);
         ret = ret.mergeCommands(other);
         ret.compilerVerbose = other.compilerVerbose;
