@@ -257,6 +257,10 @@ int updateMain(string[] args)
         @("Sets the compiler to build redub")
         string compiler = "ldc2";
 
+        @("Does not execute git pull")
+        @("no-pull")
+        bool noPull;
+
         @("Makes the update very verbose")
         bool vverbose;
     }
@@ -276,8 +280,8 @@ int updateMain(string[] args)
     enum hasNoGitWindows = 9009;
     enum hasNoGitPosix = 127;
 
-    bool replaceRedub = false;
-    if(gitCode == 0)
+    bool replaceRedub = false || update.noPull;
+    if(gitCode == 0 && !update.noPull)
     {
         auto ret = executeShell("git pull", null, Config.none, size_t.max, redubPath);
         gitCode = ret.status;

@@ -49,7 +49,7 @@ ProjectNode getProjectTree(BuildRequirements req, CompilationInfo info)
     tree.finish(info.targetOS, info.isa);
     if(hasLogLevel(LogLevel.vverbose))
         infos("Tree Merged: '", tree.name, "' merged in ", sw.peek.total!"msecs", "ms");
-    clearJsonCache();
+    clearJsonRecipeCache();
     return tree;
 }   
 

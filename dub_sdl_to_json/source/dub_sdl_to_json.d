@@ -13,8 +13,6 @@ SDLNode[] parseSDL(string fileName, string sdlData)
 {
 	SDLNode[] result;
 	sdlData = fixSDLParsingBugs(sdlData);
-  import std.stdio;
-  writeln = sdlData;
 	parseSDLDocument!((n){result~= n;})(sdlData, fileName);
 	return result;
 }

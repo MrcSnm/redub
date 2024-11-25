@@ -275,7 +275,6 @@ bool buildProjectFullyParallelized(ProjectNode root, CompilingSession s)
 
     size_t i = 0;
     size_t sentPackages = 0;
-    printCachedBuildInfo(root);
     foreach(ProjectNode pack; root.collapse)
     {
         if(pack.shouldEnterCompilationThread)
@@ -288,10 +287,10 @@ bool buildProjectFullyParallelized(ProjectNode root, CompilingSession s)
                 HashPair(mainPackHash, hashFrom(pack.requirements, s)),
                 getEnvForProject(pack)
             );
-
         }
         i++;
     }
+    printCachedBuildInfo(root);
 
     AdvCacheFormula formulaCache;
     foreach(_; 0..sentPackages)
@@ -374,6 +373,7 @@ private void printCachedBuildInfo(ProjectNode root)
 {
     string upToDate;
     string copyEnough;
+    string willBuild;
     foreach(ProjectNode node; root.collapse)
     {
         string cfg = node.requirements.targetConfiguration ? (" ["~node.requirements.targetConfiguration~"]") : null;
@@ -383,11 +383,15 @@ private void printCachedBuildInfo(ProjectNode root)
             copyEnough~= cfg;
         else if(node.isUpToDate)
             upToDate~= cfg;
+        else
+            willBuild~= cfg;
     }
     if(copyEnough.length)
         infos("Copy Enough: ", copyEnough);
     if(upToDate.length)
         infos("Up-to-Date: ", upToDate);
+    if(willBuild.length)
+        infos("Will Build: ", willBuild);
 }
 
 

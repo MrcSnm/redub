@@ -226,7 +226,7 @@ ProjectDetails buildProject(ProjectDetails d)
     if(!buildSucceeded)
         throw new BuildException();
     infos("Finished ", d.tree.name, " - ", result.msecs, "ms - To force a rebuild of up-to-date targets, run again with --force");
-    clearJsonCache();
+    clearJsonCompilationInfoCache();
 
     return d;
 }

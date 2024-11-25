@@ -1,6 +1,7 @@
 module redub.package_searching.downloader;
 import redub.libs.package_suppliers.dub_registry;
 import redub.libs.semver;
+import core.sync.mutex;
 RegistryPackageSupplier supplier;
 
 string getGitDownloadLink(string packageName, string repo, string branch)
@@ -82,6 +83,9 @@ string downloadPackageTo(return string path, string packageName, string repo,  S
 }
 
 
+///Uses that mutex for printing and managing downloader cache, thus, avoiding also more than a single package to be downloaded twice
+private Mutex downloaderMutex;
+
 /**
 *   Dub downloads to a path, usually packagename-version
 *   After that, it replaces it to packagename/version
@@ -114,9 +118,10 @@ string downloadPackageTo(return string path, string packageName, string repo, Se
     size_t timeout = 10_0000;
     __gshared DownloadData[string] downloadedPackages;
 
+
     bool willDownload;
 
-    synchronized
+    synchronized(downloaderMutex)
     {
         if((packageName in downloadedPackages) is null)
         {
@@ -153,7 +158,12 @@ string downloadPackageTo(return string path, string packageName, string repo, Se
     }
     else
     {
-        warnTitle("Fetching Package: ", packageName, " ", repo, " version ", requirement.toString);
+        synchronized(downloaderMutex)
+        {
+            warnTitle("Fetching Package: ", packageName, " ", repo, " version ", requirement.toString);
+            import std.stdio;
+            stdout.flush;
+        }
         tempPath = downloadPackageTo(tempPath, packageName, repo, requirement, actualVersion, url);
         if(!url)
         {
@@ -167,7 +177,7 @@ string downloadPackageTo(return string path, string packageName, string repo, Se
 
             throw new NetworkException("No version with requirement '"~requirement.toString~"' was found when looking for package "~packageName~existing);
         }
-        synchronized
+        synchronized(downloaderMutex)
         {
             downloadedPackages[packageName].ver = actualVersion.toString;
         }
@@ -237,4 +247,5 @@ string getOutputDirectoryForPackage(string baseDir, string packageName, string p
 static this()
 {
     supplier = new RegistryPackageSupplier();
+    downloaderMutex = new Mutex;
 }

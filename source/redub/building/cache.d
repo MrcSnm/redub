@@ -402,7 +402,7 @@ private JSONValue* getCache(string rootCache)
 /**
 *   Clears memory cache. This will allow to redub correctly identify files that changed in subsequent runs.
 */
-void clearJsonCache()
+void clearJsonCompilationInfoCache()
 {
     cacheJson = null;
 }
