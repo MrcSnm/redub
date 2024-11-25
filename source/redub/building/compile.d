@@ -28,6 +28,15 @@ struct ExecutionResult
     int status;
     string output;
 }
+
+/**
+ * Returns: The current environment. Used for caching environment and not executing it per project.
+ */
+string[string] getCurrentEnv()
+{
+    import std.process:environment;
+    return environment.toAA;
+}
 /**
 *   If any command has status, it will stop executing them and return
 */
@@ -214,6 +223,7 @@ bool buildProjectParallelSimple(ProjectNode root, CompilingSession s)
     ProjectNode[] finishedBuilds;
     string mainPackHash = hashFrom(root.requirements, s);
     bool[ProjectNode] spawned;
+    string[string] env = getCurrentEnv();
 
     AdvCacheFormula formulaCache;
 
@@ -230,7 +240,7 @@ bool buildProjectParallelSimple(ProjectNode root, CompilingSession s)
                     spawn(&execCompilationThread,
                         dep.requirements.buildData, cast(shared)dep, 
                         s, HashPair(mainPackHash, hashFrom(dep.requirements, s)),
-                        getEnvForProject(dep)
+                        getEnvForProject(dep, env)
                     );
                 }
                 else
@@ -263,7 +273,7 @@ bool buildProjectParallelSimple(ProjectNode root, CompilingSession s)
                 break;
         }
     }
-    return doLink(root, s, mainPackHash, &formulaCache) && copyFiles(root);
+    return doLink(root, s, mainPackHash, &formulaCache, env) && copyFiles(root);
 }
 
 
@@ -272,6 +282,7 @@ bool buildProjectFullyParallelized(ProjectNode root, CompilingSession s)
     import std.concurrency;
     ProjectNode[] finishedBuilds;
     string mainPackHash = hashFrom(root.requirements, s);
+    string[string] env = getCurrentEnv();
 
     size_t i = 0;
     size_t sentPackages = 0;
@@ -285,7 +296,7 @@ bool buildProjectFullyParallelized(ProjectNode root, CompilingSession s)
                 cast(shared)pack, 
                 s,
                 HashPair(mainPackHash, hashFrom(pack.requirements, s)),
-                getEnvForProject(pack)
+                getEnvForProject(pack, env)
             );
         }
         i++;
@@ -318,7 +329,7 @@ bool buildProjectFullyParallelized(ProjectNode root, CompilingSession s)
             }
         }
     }
-    return doLink(root, s, mainPackHash, &formulaCache) && copyFiles(root);
+    return doLink(root, s, mainPackHash, &formulaCache, env) && copyFiles(root);
 }
 
 /** 
@@ -335,6 +346,8 @@ bool buildProjectSingleThread(ProjectNode root, CompilingSession s)
     ProjectNode[] dependencyFreePackages = root.findLeavesNodes();
     ProjectNode[] finishedBuilds;
     string mainPackHash = hashFrom(root.requirements, s);
+    string[string] env = getCurrentEnv();
+
 
     printCachedBuildInfo(root);
     while(true)
@@ -346,7 +359,7 @@ bool buildProjectSingleThread(ProjectNode root, CompilingSession s)
             {
                 CompilationResult res = execCompilation(dep.requirements.buildData, cast(shared)dep, 
                     s,
-                    HashPair(mainPackHash,  hashFrom(dep.requirements, s)), getEnvForProject(dep)
+                    HashPair(mainPackHash,  hashFrom(dep.requirements, s)), getEnvForProject(dep, env)
                 );
                 if(res.status)
                 {
@@ -366,7 +379,7 @@ bool buildProjectSingleThread(ProjectNode root, CompilingSession s)
         if(finishedPackage is root)
             break;
     }
-    return doLink(root, s, mainPackHash) && copyFiles(root);
+    return doLink(root, s, mainPackHash, null, env) && copyFiles(root);
 }
 
 private void printCachedBuildInfo(ProjectNode root)
@@ -463,12 +476,18 @@ private bool copyFiles(ProjectNode root)
     return true;
 }
 
-immutable(string[string]) getEnvForProject(const ProjectNode node)
+/**
+ *
+ * Params:
+ *   node = The node in which it will build new environment variables
+ *   currEnv = The current environment before building it
+ * Returns: A new associative array containing environment variables for the node
+ */
+immutable(string[string]) getEnvForProject(const ProjectNode node, const string[string] currEnv)
 {
     import redub.parsers.environment;
-    import std.process:environment;
     PackageDubVariables vars = getEnvironmentVariablesForPackage(node.requirements.cfg);
-    string[string] env = environment.toAA;
+    string[string] env = cast(string[string])currEnv.dup;
     static foreach(mem; __traits(allMembers, PackageDubVariables))
         env[mem] = __traits(getMember, vars, mem);
     return cast(immutable)env;
@@ -497,7 +516,7 @@ private void saveFinishedBuilds(ProjNodeRange)(ProjNodeRange finishedProjects, s
     ///TODO: Start comparing current build time with the last one
 }
 
-private bool doLink(ProjectNode root, CompilingSession info, string mainPackHash, AdvCacheFormula* formulaCache = null)
+private bool doLink(ProjectNode root, CompilingSession info, string mainPackHash, AdvCacheFormula* formulaCache = null, const string[string] env = null)
 {
     Compiler compiler = info.compiler;
     bool isUpToDate = root.isUpToDate;
@@ -507,7 +526,7 @@ private bool doLink(ProjectNode root, CompilingSession info, string mainPackHash
     {
         CompilationResult linkRes;
         auto result = timed(() {
-             linkRes = link(root, mainPackHash, root.requirements.buildData, info, getEnvForProject(root));
+             linkRes = link(root, mainPackHash, root.requirements.buildData, info, getEnvForProject(root, env ? env : cast(const)getCurrentEnv()));
              return true;
         });
         if(linkRes.status)
