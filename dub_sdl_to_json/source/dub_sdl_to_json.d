@@ -13,6 +13,8 @@ SDLNode[] parseSDL(string fileName, string sdlData)
 {
 	SDLNode[] result;
 	sdlData = fixSDLParsingBugs(sdlData);
+  import std.stdio;
+  writeln = sdlData;
 	parseSDLDocument!((n){result~= n;})(sdlData, fileName);
 	return result;
 }
@@ -276,7 +278,75 @@ string fixSDLParsingBugs(string sdlData)
         enum lb = "\r\n";
     else
         enum lb = "\n";
-    return stripComments(sdlData).replace("\\"~lb, " ").replace("`"~lb, "`");
+    
+    sdlData = stripComments(sdlData);
+    sdlData = sdlData.replace("\\"~lb, " ");
+    
+
+    /*
+      Now replace things like:
+      test `
+      lala`
+      Since that will produce "test": "\nlala"
+
+      This was also replacing more common things such as
+      name "taggedalgebraic"
+      description `something like that`
+      author "sonke"
+    */
+
+
+    /** 
+     * '\\' is considered a escape for the tags
+     * Params:
+     *   input = A string with '`' to match, for example description `test` - match the brackets
+     *   startIndex = 
+     * Returns: 
+     */
+    static bool findMatchingEnd(string input, out ptrdiff_t start, out ptrdiff_t end, ptrdiff_t startIndex = 0)
+    {
+      start = -1;
+      end = -1;
+      for(ptrdiff_t i = startIndex; i < input.length; i++)
+      {
+        switch(input[i])
+        {
+          case '\\':
+            i++;
+            break;
+          case '`': //The implementation is also 
+            if(start == -1)
+              start = i;
+            else
+            {
+              end = i;
+              return true;
+            }
+            break;
+          default:break;
+        }
+      }
+      return false;
+    }
+
+    static string fixSdlStringLiteralBug(string input)
+    {
+      ptrdiff_t start, end;
+      ptrdiff_t idx;
+      string ret;
+      while(findMatchingEnd(input, start, end, idx))
+      {
+        ret~= input[idx..start];
+        ret~= input[start..end].replace('`'~lb, "` ");
+        idx = end+1;
+      }
+      if(idx == 0) return input;
+      else if(idx != input.length)
+        ret~= input[idx-1..$];
+      return ret;
+    }
+
+    return fixSdlStringLiteralBug(sdlData);
 }
 
 
@@ -297,7 +367,8 @@ buildType "unittest" {
 }
 ED";
 	import hipjson;
-	JSONValue v = sdlToJSON(parseSDL(null, testSdl));
+	SDLNode[] nodes = parseSDL(null, testSdl);
+	JSONValue v = sdlToJSON(nodes);
 	assert(!parseJSON(v["description"].toString).hasErrorOccurred);
 
 }
