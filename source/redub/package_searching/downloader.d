@@ -84,7 +84,7 @@ string downloadPackageTo(return string path, string packageName, string repo,  S
 
 
 ///Uses that mutex for printing and managing downloader cache, thus, avoiding also more than a single package to be downloaded twice
-private Mutex downloaderMutex;
+private __gshared Mutex downloaderMutex;
 
 /**
 *   Dub downloads to a path, usually packagename-version
@@ -123,7 +123,7 @@ string downloadPackageTo(return string path, string packageName, string repo, Se
 
     synchronized(downloaderMutex)
     {
-        if((packageName in downloadedPackages) is null)
+        if(downloadedPackages is null || (packageName in downloadedPackages) is null)
         {
             downloadedPackages[packageName] = DownloadData(new Mutex, null);
             willDownload = true;
@@ -244,8 +244,12 @@ string getOutputDirectoryForPackage(string baseDir, string packageName, string p
     return buildNormalizedPath(baseDir, packageVersion, packageName);
 }
 
-shared static this()
+static this()
 {
     supplier = new RegistryPackageSupplier();
+}
+
+shared static this()
+{
     downloaderMutex = new Mutex;
 }

@@ -958,17 +958,7 @@ void popScope(ref ptrdiff_t stackLength, ref JSONValue[] stack, ref JSONValue* c
 	{
 		JSONValue* next = &stack[stackLength-1];
 		if(current.type == JSONType.array)
-		{
 			current.data.array = JSONArray.trim(current.data.array);
-			if(next.type == JSONType.array)
-				JSONArray.append(next.data.array, *current);
-		// 	else if(next.type == JSONType.object)
-		// 	{
-		// 		JSONValue* v = current.key in next.data.object.value;
-		// 		current.data.array = JSONArray.trim(current.data.array);
-		// 		*v = *current;
-		// 	}
-		}
 		current = next;
 		import std.conv;
 		assert(current.type == JSONType.object || current.type == JSONType.array, "Unexpected value in stack. (Typed "~(cast(size_t)(current.type)).to!string);
@@ -997,10 +987,7 @@ void pushToStack(JSONValue val, ref JSONValue* current, ref JSONValue lastValue)
 
 unittest
 {
-	import std.file;
-	import std.stdio;
-
-	writeln = parseJSON(`
+	assert(parseJSON(`
 	{
     "name": "redub",
     "description": "Dub Based Build System, with parallelization per packages and easier to contribute",
@@ -1031,6 +1018,22 @@ unittest
         "xxhash3": "~>0.0.5"
     }
 
-}`)["configurations"].array.capacity;
+}`)["configurations"].array.length == 2);
 
+}
+
+unittest
+{
+	enum json = `
+{
+    "D5F04185E96CC720": [
+        [
+			"First Value"
+        ],
+        [
+			"Second Value"
+        ]
+    ]
+}`;
+	assert(parseJSON(json)["D5F04185E96CC720"].array[1].array[0].toString == `"Second Value"`);
 }

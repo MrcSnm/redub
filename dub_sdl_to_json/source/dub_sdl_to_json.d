@@ -334,17 +334,30 @@ string fixSDLParsingBugs(string sdlData)
       string ret;
       while(findMatchingEnd(input, start, end, idx))
       {
+        import std.stdio;
         ret~= input[idx..start];
         ret~= input[start..end].replace('`'~lb, "` ");
-        idx = end+1;
+        idx = end;
       }
       if(idx == 0) return input;
       else if(idx != input.length)
-        ret~= input[idx-1..$];
+        ret~= input[idx..$];
       return ret;
     }
 
     return fixSdlStringLiteralBug(sdlData);
+}
+
+
+unittest
+{
+enum testSdl =
+q"ED
+	preGenerateCommands `$DC -run scripts/generate_version.d` platform="posix-ldc"
+	preGenerateCommands `$DC -run scripts/generate_version.d` platform="posix-dmd"
+
+ED";
+sdlToJSON(parseSDL(null, testSdl));
 }
 
 

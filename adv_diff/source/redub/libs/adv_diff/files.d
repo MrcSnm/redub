@@ -130,7 +130,7 @@ struct AdvCacheFormula
 
 	/**
 	* JSON specification:
-	* [$ADV_TOTAL_HI, $ADV_TOTAL_LO, {DIRS}, {FILES}]
+	* ["$CONTENT_HASH", {DIRS}, {FILES}]
 	*
 	* Returns: AdvCacheFormula
 	*/

@@ -117,7 +117,7 @@ struct CompilationCache
             return false;
         AdvCacheFormula otherFormula = getCopyCacheFormula(rootHash, req, s, &formula, preprocessed);
         diffs = copyFormula.diffStatus(otherFormula, diffCount);
-        return diffCount != 0 && !copyFormula.isEmptyFormula;
+        return diffCount != 0;
     }
 }
 
