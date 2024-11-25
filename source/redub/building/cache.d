@@ -81,7 +81,6 @@ struct CompilationCache
         if (!targetCache || targetCache.type != JSONType.array)
             return CompilationCache(reqCache, rootHash);
 
-
         return CompilationCache(reqCache, rootHash, AdvCacheFormula.deserialize(targetCache.array[0]), AdvCacheFormula.deserialize(targetCache.array[1]));
     }
 

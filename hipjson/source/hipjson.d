@@ -7,31 +7,80 @@ JSONValue parseJSON(string jsonData)
 
 struct JSONArray
 {
-	size_t length;
-	// size_t capacity;
-	private JSONValue[] value;
+	size_t length() const { return value.length; }
+	private CacheArray!(JSONValue, 8) value;
+
+	/**
+	 * Small array that holds up to N members in static memory. Whenever bigger than N,
+	 * uses default D dynamic array.
+	 */
+	private static struct CacheArray(T, size_t N)
+	{
+		private T[N] staticData;
+		private T[] dynData;
+		private size_t actualLength;
+
+		this(T[] value)
+		{
+			this.set(value);
+		}
+
+		private void set(T[] values)
+		{
+			if(values.length <= N)
+				staticData[0..values.length] = values[];
+			else
+				dynData = values.dup;
+			actualLength = values.length;
+		}
+		private void append(T value)
+		{
+			append((&value)[0..1]);
+		}
+		private void append(T[] values)
+		{
+			if(actualLength + values.length <= N)
+				staticData[actualLength..actualLength+values.length] = values[];
+			else
+			{
+				import std.array:uninitializedArray;
+				if(dynData is null)
+				{
+					dynData = uninitializedArray!(T[])(actualLength+values.length);
+					dynData[0..actualLength] = staticData[0..actualLength];
+				}
+				else if (dynData.length < actualLength + values.length)
+				{
+					size_t newSize = actualLength+values.length > actualLength*2 ? actualLength+values.length : actualLength*2;
+					dynData.length = newSize;
+				}
+				dynData[actualLength..actualLength+values.length] = values[];
+			}
+			actualLength+= values.length;
+		}
+
+		void trim()
+		{
+			if(dynData !is null)
+				dynData.length = actualLength;
+		}
+		size_t length() const { return actualLength; }
+		inout(T)[] getArray() inout
+		{
+			if(actualLength <= N)
+				return staticData[0..actualLength];
+			return dynData[0..actualLength];
+		}
+	}
 
 	this(JSONValue[] v)
 	{
-		this.value = v;
-		this.length = v.length;
+		this.value = CacheArray!(JSONValue, 8)(v);
 	}
 
 	static JSONArray* append(JSONArray* self, JSONValue v)
 	{
-		import core.memory;
-		if(v.type == JSONType.array)
-			v.data.array = JSONArray.trim(v.data.array);
-		size_t capacity = self.length;
-
-		if(self.length >= capacity)
-		{
-			// self.capacity = cast(size_t)((self.length+1)*1.5);
-			self.value.length++;
-			// self = cast(JSONArray*)GC.realloc(self, JSONArray.sizeof + JSONValue.sizeof*(self.capacity));
-		}
-		self.value.ptr[self.length] = v;
-		self.length++;
+		self.value.append(v);
 		return self;
 	}
 	auto opOpAssign(string op, T)(T value) if(op == "~")
@@ -43,38 +92,24 @@ struct JSONArray
 	}
 	private static JSONArray* trim(JSONArray* self)
 	{
-		import core.memory;
-		size_t selfLength = self.length;
-		self.value.length = selfLength;
-		// if(self.length != self.capacity)
-		// 	self = cast(JSONArray*)GC.realloc(self, JSONArray.sizeof + JSONValue.sizeof*selfLength);
-		// self.capacity = selfLength;
-		// self.length = selfLength;
+		self.value.trim();
 		return self;
 	}
 
-	static JSONArray* createNew(size_t initialSize = 8)
+	static JSONArray* createNew()
 	{
-		import core.memory;
-		JSONArray* ret = new JSONArray();
-		ret.value.length = initialSize;
-
-		// JSONArray* ret = cast(JSONArray*)GC.malloc(JSONArray.sizeof + JSONValue.sizeof*initialSize, GC.BlkAttr.APPENDABLE);
-		// ret.length = 0;
-		// ret.capacity = initialSize;
-		return ret;
+		return new JSONArray([]);
 	}
+
 	static JSONArray* createNew(JSONValue[] data)
 	{
-		JSONArray* ret = createNew(data.length);
-		ret.value.ptr[0..data.length] = data[];
-		ret.length = data.length;
+		JSONArray* ret = new JSONArray(data);
 		return ret;
 	}
 
 
-	JSONValue[] getArray(){return value.ptr[0..length];}
-	const(JSONValue)[] getArray() const {return value.ptr[0..length];}
+	JSONValue[] getArray(){return value.getArray;}
+	const(JSONValue)[] getArray() const {return value.getArray;}
 }
 struct JSONObject
 {
@@ -164,7 +199,7 @@ struct JSONValue
 		}
 		else static if(is(T == JSONValue[]))
 		{
-			data.array = new JSONArray(value);
+			data.array = JSONArray.createNew(value);
 			type = JSONType.array;
 		}
 		else static if(is(T == JSONValue))
@@ -309,7 +344,7 @@ struct JSONValue
 	{
 		JSONValue ret;
 		ret.type = JSONType.array;
-		ret.data.array = new JSONArray();
+		ret.data.array = JSONArray.createNew();
 		return ret;
 	}
 
@@ -804,7 +839,7 @@ struct JSONValue
         }
         else if(type == JSONType.array)
         {
-            foreach(v; data.array.value)
+            foreach(v; data.array.value.getArray)
                 v.dispose();
         }
         
@@ -926,9 +961,7 @@ void popScope(ref ptrdiff_t stackLength, ref JSONValue[] stack, ref JSONValue* c
 		{
 			current.data.array = JSONArray.trim(current.data.array);
 			if(next.type == JSONType.array)
-			{
-				next.data.array.getArray[$-1] = *current;
-			}
+				JSONArray.append(next.data.array, *current);
 		// 	else if(next.type == JSONType.object)
 		// 	{
 		// 		JSONValue* v = current.key in next.data.object.value;

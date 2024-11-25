@@ -11,7 +11,7 @@ public import redub.package_searching.api;
 private __gshared PackageInfo[string] packagesCache;
 private __gshared Mutex cacheMtx;
 
-static this()
+shared static this()
 {
     cacheMtx = new Mutex;
 }

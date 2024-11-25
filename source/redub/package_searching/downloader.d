@@ -244,7 +244,7 @@ string getOutputDirectoryForPackage(string baseDir, string packageName, string p
     return buildNormalizedPath(baseDir, packageVersion, packageName);
 }
 
-static this()
+shared static this()
 {
     supplier = new RegistryPackageSupplier();
     downloaderMutex = new Mutex;
