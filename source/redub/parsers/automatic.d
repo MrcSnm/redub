@@ -129,14 +129,21 @@ private void partiallyFinishBuildRequirements(ref BuildRequirements req)
     req.cfg.sourceFiles = inPlaceFilter(req.cfg.sourceFiles, (string file) => !file.extension.isLibraryExtension);
 
 
-    //Unused
-    // if(!isAbsolute(req.cfg.sourceEntryPoint))
-        // req.cfg.sourceEntryPoint = buildNormalizedPath(req.cfg.workingDir, req.cfg.sourceEntryPoint);
-
 
     import std.algorithm.sorting;
     ///Sort dependencies for predictability
-    sort!((Dependency a, Dependency b) => a.name < b.name)(req.dependencies);
-    sort!((Dependency a, Dependency b) => !a.subConfiguration.isDefault && b.subConfiguration.isDefault)(req.dependencies);
+    sort!((Dependency a, Dependency b)
+    {
+        if(a.name != b.name) return a.name < b.name;
+        return !a.subConfiguration.isDefault && b.subConfiguration.isDefault;
+    })(req.dependencies);
 
+}
+
+
+
+void clearRecipeCaches()
+{
+    redub.parsers.json.clearJsonRecipeCache();
+    redub.parsers.sdl.clearSdlRecipeCache();
 }

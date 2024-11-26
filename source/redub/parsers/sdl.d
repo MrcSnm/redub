@@ -1,6 +1,7 @@
 module redub.parsers.sdl;
 public import redub.buildapi;
 public import std.system;
+import hipjson;
 import redub.tree_generators.dub;
 
 /**
@@ -79,10 +80,25 @@ BuildRequirements parseWithData(
 {
     static import redub.parsers.json;
     import redub.parsers.base;
-    import dub_sdl_to_json;
 
     ParseConfig c = ParseConfig(workingDir, subConfiguration, subPackage, version_, cInfo, defaultPackageName, null, parentName, preGenerateRun: !isDescribeOnly);
-    JSONValue json = sdlToJSON(parseSDL(filePath, fileData));
+    JSONValue json = parseSdlCached(filePath, fileData);
     BuildRequirements ret = redub.parsers.json.parse(json, c, isRoot);
     return ret;
 }
+
+
+
+private JSONValue[string] sdlJsonCache;
+JSONValue parseSdlCached(string filePath, string fileData)
+{
+    import dub_sdl_to_json;
+    JSONValue* cached = filePath in sdlJsonCache;
+    if(cached) return *cached;
+    JSONValue ret = sdlToJSON(parseSDL(filePath, fileData));
+    if(ret.hasErrorOccurred)
+        throw new Exception(ret.error);
+    return sdlJsonCache[filePath] = ret;
+}
+
+void clearSdlRecipeCache(){sdlJsonCache = null;}

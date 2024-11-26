@@ -16,9 +16,9 @@ struct JSONArray
 	 */
 	private static struct CacheArray(T, size_t N)
 	{
-		private T[N] staticData;
-		private T[] dynData;
-		private size_t actualLength;
+		private T[N] staticData = void;
+		private T[] dynData = void;
+		private size_t actualLength = void;
 
 		this(T[] value)
 		{

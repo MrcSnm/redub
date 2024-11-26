@@ -1,6 +1,7 @@
 module dub_sdl_to_json;
 public import hipjson;
 import sdlite;
+import core.stdc.math;
 
 SDLNode[] parseSDL(string fileName)
 {
@@ -88,13 +89,19 @@ JSONValue sdlToJSON(SDLNode[] sdl)
 				SDLValue pathValue = v.getAttribute("path");
 				SDLValue versionValue = v.getAttribute("version");
 
-
-				if(pathValue.isNull_)
-				{
+        if(pathValue.isNull_)
+        {
 					enforce(!versionValue.isNull_, "If no path is present in a .sdl file, a version must be present. (Parsing "~depName~")");
 					enforce(versionValue.isText, "version must be a string. Parsing ("~depName~")");
+        }
+        else if(versionValue.isNull)
+        {
+          enforce(!versionValue.isNull_, "If no version is present in a .sdl file, a path must be present. (Parsing "~depName~")");
+					enforce(pathValue.isText, "path must be a string. Parsing ("~depName~")");
+        }
+
+        if(v.attributes.length == 1 && !versionValue.isNull_)
 					dependencies[depName] = JSONValue(versionValue.textValue);
-				}
 				else
 				{
 					JSONValue dep = JSONValue.emptyObject;
