@@ -96,7 +96,7 @@ JSONValue sdlToJSON(SDLNode[] sdl)
         }
         else if(versionValue.isNull)
         {
-          enforce(!versionValue.isNull_, "If no version is present in a .sdl file, a path must be present. (Parsing "~depName~")");
+          enforce(!pathValue.isNull_, "If no version is present in a .sdl file, a path must be present. (Parsing "~depName~")");
 					enforce(pathValue.isText, "path must be a string. Parsing ("~depName~")");
         }
 

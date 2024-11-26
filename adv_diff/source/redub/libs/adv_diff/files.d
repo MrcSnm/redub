@@ -249,9 +249,6 @@ struct AdvCacheFormula
 		import std.stdio;
 		import redub.command_generators.commons;
 		AdvCacheFormula ret;
-		static ubyte[] fileBuffer;
-		if(fileBuffer.length == 0)
-			fileBuffer = uninitializedArray!(ubyte[])(1_000_000);
 		ubyte[8] hashedContent;
 		ubyte[16] joinedHash;
 		ubyte[16] advCacheHashJoin;
@@ -575,5 +572,26 @@ bool isFileHidden(string name, uint attr)
 	else
 	{
 		return name.length == 0 || name[0] == '.';
+	}
+}
+
+
+import core.attribute;
+version(AsLibrary)
+{
+	ubyte[] fileBuffer;
+	@trusted @standalone static this()
+	{
+		import std.array;
+		fileBuffer = uninitializedArray!(ubyte[])(1_000_000);
+	}
+}
+else
+{
+	__gshared ubyte[] fileBuffer;
+	@trusted @standalone shared static this()
+	{
+		import std.array;
+		fileBuffer = uninitializedArray!(ubyte[])(1_000_000);
 	}
 }
