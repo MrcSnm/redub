@@ -123,13 +123,13 @@ string downloadPackageTo(return string path, string packageName, string repo, Se
 
     synchronized(downloaderMutex)
     {
-        if(downloadedPackages is null || (packageName in downloadedPackages) is null)
+        if((packageName in downloadedPackages) is null)
         {
             downloadedPackages[packageName] = DownloadData(new Mutex, null);
             willDownload = true;
         }
-        downloadedPackages[packageName].mtx.lock;
     }
+    downloadedPackages[packageName].mtx.lock;
 
     scope(exit)
     {

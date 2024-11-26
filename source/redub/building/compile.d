@@ -387,24 +387,31 @@ private void printCachedBuildInfo(ProjectNode root)
     string upToDate;
     string copyEnough;
     string willBuild;
+    size_t upToDateCount = 0;
     foreach(ProjectNode node; root.collapse)
-    {
-        string cfg = node.requirements.targetConfiguration ? (" ["~node.requirements.targetConfiguration~"]") : null;
-        cfg = node.name~ cfg~"; ";
+        if(node.isUpToDate) upToDateCount++;
 
-        if(node.isCopyEnough)
-            copyEnough~= cfg;
-        else if(node.isUpToDate)
-            upToDate~= cfg;
-        else
-            willBuild~= cfg;
+    if(upToDateCount != root.collapse.length)
+    {
+        foreach(ProjectNode node; root.collapse)
+        {
+            string cfg = node.requirements.targetConfiguration ? (" ["~node.requirements.targetConfiguration~"]") : null;
+            cfg = node.name~ cfg~"; ";
+
+            if(node.isCopyEnough)
+                copyEnough~= cfg;
+            else if(node.isUpToDate)
+                upToDate~= cfg;
+            else
+                willBuild~= cfg;
+        }
+        if(copyEnough.length)
+            infos("Copy Enough: ", copyEnough);
+        if(upToDate.length)
+            infos("Up-to-Date: ", upToDate);
+        if(willBuild.length)
+            infos("Will Build: ", willBuild);
     }
-    if(copyEnough.length)
-        infos("Copy Enough: ", copyEnough);
-    if(upToDate.length)
-        infos("Up-to-Date: ", upToDate);
-    if(willBuild.length)
-        infos("Will Build: ", willBuild);
 }
 
 
