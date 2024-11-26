@@ -34,8 +34,8 @@ struct ExecutionResult
  */
 string[string] getCurrentEnv()
 {
-    import std.process:environment;
-    return environment.toAA;
+    import redub.parsers.environment;
+    return redubEnv.dup;
 }
 /**
 *   If any command has status, it will stop executing them and return

@@ -1,5 +1,6 @@
 module redub.package_searching.cache;
 import core.sync.mutex;
+import core.attribute;
 public import redub.package_searching.api;
 
 
@@ -11,6 +12,7 @@ public import redub.package_searching.api;
 private __gshared PackageInfo[string] packagesCache;
 private __gshared Mutex cacheMtx;
 
+@standalone @trusted
 shared static this()
 {
     cacheMtx = new Mutex;

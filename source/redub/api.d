@@ -453,9 +453,10 @@ string getDubWorkspacePath()
 {
     import std.path;
     import std.process;
+    import redub.parsers.environment;
 
     version (Windows)
-        return buildNormalizedPath(environment["LOCALAPPDATA"], "dub");
+        return buildNormalizedPath(redubEnv["LOCALAPPDATA"], "dub");
     else
-        return buildNormalizedPath(environment["HOME"], ".dub");
+        return buildNormalizedPath(redubEnv["HOME"], ".dub");
 }

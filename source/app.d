@@ -366,6 +366,7 @@ int updateMain(string[] args)
 
 string findProgramPath(string program)
 {
+    import redub.parsers.environment;
 	import std.algorithm:countUntil;
 	import std.process;
 	string searcher;
@@ -374,7 +375,7 @@ string findProgramPath(string program)
 	else static assert(false, "No searcher program found in this OS.");
 	auto shellRes = executeShell(searcher ~" " ~ program,
 	[
-		"PATH": environment["PATH"]
+		"PATH": redubEnv["PATH"]
 	]);
     if(shellRes.status == 0)
 		return shellRes.output[0..shellRes.output.countUntil("\n")];

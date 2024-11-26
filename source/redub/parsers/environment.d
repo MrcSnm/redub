@@ -1,7 +1,9 @@
 module redub.parsers.environment;
 import redub.cli.dub;
 import redub.buildapi;
+import core.sync.mutex;
 import std.system;
+
 
 
 /** 
@@ -33,8 +35,9 @@ BuildConfiguration parse()
    
     foreach(string key, fn; handlers)
     {
-        if(key in environment)
-            fn(ret, environment[key]);
+        string* v = key in redubEnv;
+        if(v)
+            fn(ret, *v);
     }
     return ret;
 }
@@ -128,7 +131,7 @@ void setupBuildEnvironmentVariables(InitialDubVariables dubVars)
     import std.process;
     static foreach(member; __traits(allMembers, InitialDubVariables))
     {
-        environment[member] = mixin("dubVars.",member);
+        setEnvVariable(member, mixin("dubVars.",member));
     }
 }
 
@@ -167,11 +170,11 @@ void setupEnvironmentVariablesForRootPackage(immutable BuildRequirements root)
 {
     import std.process;
     import std.conv:to;
-    environment["DUB_ROOT_PACKAGE"] = root.name;
-    environment["DUB_ROOT_PACKAGE_DIR"] = root.cfg.workingDir.forceTrailingDirSeparator;
-    environment["DUB_ROOT_PACKAGE_TARGET_TYPE"] = root.cfg.targetType.to!string;
-    environment["DUB_ROOT_PACKAGE_TARGET_PATH"] = root.cfg.outputDirectory;
-    environment["DUB_ROOT_PACKAGE_TARGET_NAME"] = root.cfg.name;
+    setEnvVariable("DUB_ROOT_PACKAGE", root.name);
+    setEnvVariable("DUB_ROOT_PACKAGE_DIR",  root.cfg.workingDir.forceTrailingDirSeparator);
+    setEnvVariable("DUB_ROOT_PACKAGE_TARGET_TYPE",  root.cfg.targetType.to!string);
+    setEnvVariable("DUB_ROOT_PACKAGE_TARGET_PATH",  root.cfg.outputDirectory);
+    setEnvVariable("DUB_ROOT_PACKAGE_TARGET_NAME",  root.cfg.name);
 }
 
 
@@ -187,9 +190,8 @@ void setupEnvironmentVariablesForPackageTree(ProjectNode root)
 {
     ///Path to a specific package that is part of the package's dependency graph. $ must be in uppercase letters without the semver string.
     // <PKG>_PACKAGE_DIR ;
-    import std.process;
     foreach(ProjectNode mem; root.collapse)
-        environment[mem.name.toUppercase~"_PACKAGE_DIR"] = mem.requirements.cfg.workingDir.forceTrailingDirSeparator;
+        setEnvVariable(mem.name.toUppercase~"_PACKAGE_DIR",  mem.requirements.cfg.workingDir.forceTrailingDirSeparator);
 }
 
 /** 
@@ -228,7 +230,7 @@ void setupEnvironmentVariablesForPackage(const BuildConfiguration cfg)
     import std.process;
     PackageDubVariables pack = getEnvironmentVariablesForPackage(cfg);
     static foreach(mem; __traits(allMembers, PackageDubVariables))
-        environment[mem] = __traits(getMember, pack, mem);
+        setEnvVariable(mem, __traits(getMember, pack, mem));
 }
 string parseStringWithEnvironment(string str)
 {
@@ -263,13 +265,13 @@ string parseStringWithEnvironment(string str)
         diffLength-= 1+strVar.length; //$.length + (abcd).length
         if(strVar.length == 0) //$
             continue;
-        else if(!(strVar in environment))
+        else if(!(strVar in redubEnv))
         {
             variables = variables[0..i] ~ variables[i+1..$];
             i--;
             continue;
         }
-        diffLength+= environment[strVar].length;
+        diffLength+= redubEnv[strVar].length;
     }
 	if(variables.length == 0) return str;
 	
@@ -295,7 +297,7 @@ string parseStringWithEnvironment(string str)
 
         ///Insert the variable value
         if(envVar.length)
-            appendToRet(environment[envVar]);
+            appendToRet(redubEnv[envVar]);
 
         ///Move the start pointer past the variable
 		srcStart = v.end;
@@ -384,3 +386,26 @@ string str(OS os)
     }
 }
 string str(bool b){return b ? "TRUE" : null;}
+
+
+
+__gshared string[string] redubEnv;
+private __gshared Mutex envMutex;
+
+void setEnvVariable(string key, string value)
+{
+    synchronized(envMutex)
+    {
+        redubEnv[key] = value;
+    }
+}
+
+
+
+shared static this()
+{
+    import std.process;
+    import std.stdio;
+    envMutex = new Mutex;
+    redubEnv = environment.toAA;
+}
