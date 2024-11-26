@@ -494,8 +494,9 @@ bool inferSimplifiedFile(DirEntry e)
 T[] joinFlattened(T)(scope const T[][] args...)
 {
 	size_t length;
+	import std.array;
 	foreach(a; args) length+= a.length;
-	T[] ret = new T[](length);
+	T[] ret = uninitializedArray!(T[])(length);
 	length = 0;
 	foreach(a; args) ret[length..length+=a.length] = a[];
 	return ret;
