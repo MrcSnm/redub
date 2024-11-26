@@ -387,7 +387,7 @@ private JSONValue* getCache(string rootCache)
     if (!(rootCache in cacheJson))
     {
         try
-            cacheJson[rootCache] = parseJSON(std.file.readText(file));
+            cacheJson[rootCache] = parseJSON(cast(string)std.file.read(file));
         catch (Exception e)
         {
             std.file.write(file, "{}");

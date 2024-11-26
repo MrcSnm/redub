@@ -35,7 +35,7 @@ struct ExecutionResult
 string[string] getCurrentEnv()
 {
     import redub.parsers.environment;
-    return redubEnv.dup;
+    return getRedubEnv;
 }
 /**
 *   If any command has status, it will stop executing them and return

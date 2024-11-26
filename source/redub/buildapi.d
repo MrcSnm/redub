@@ -8,7 +8,7 @@ import redub.package_searching.api;
 
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.18.2";
+enum RedubVersionOnly = "v1.18.3";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -175,7 +175,7 @@ struct BuildConfiguration
         string initialStringImport;
         foreach(sourceFolder; inferredSourceFolder)
         {
-            if(exists(buildNormalizedPath(workingDir, sourceFolder)))
+            if(exists(asNormalizedPath(chainPath(workingDir, sourceFolder))))
             {
                 initialSource = sourceFolder;
                 break;
@@ -184,7 +184,7 @@ struct BuildConfiguration
 
         foreach(striFolder; inferredStringImportFolder)
         {
-            if(exists(buildNormalizedPath(workingDir, striFolder)))
+            if(exists(asNormalizedPath(chainPath(workingDir, striFolder))))
             {
                 initialStringImport = striFolder;
                 break;
@@ -390,53 +390,26 @@ private auto save(TRange)(TRange input)
 }
 
 /**
-*   Optimized for direct memory allocation.
+*   This version is actually faster than the other one
 */
 ref string[] exclusiveMerge(StringRange)(return scope ref string[] a, StringRange b, scope const string[] excludeFromMerge = null)
 {
     import std.algorithm.searching:countUntil;
-
-    size_t notFoundCount;
-    foreach(bV; save(b))
+    size_t length = a.length;
+    outer: foreach(bV; save(b))
     {
-        bool found = false;
         if(bV.length == 0) continue;
         if(countUntil(excludeFromMerge, bV) != -1) continue;
-        foreach(aV; a)
+        foreach(i; 0..length)
         {
-            if(aV == bV)
-            {
-                found = true;
-                break;
-            }
+            if(a[i] == bV)
+                continue outer;
         }
-        if(!found) notFoundCount++;
-    }
-
-    if(notFoundCount)
-    {
-        size_t length = a.length;
-        size_t index = length;
-        a.length+= notFoundCount;
-        foreach(bV; save(b))
-        {
-            bool found = false;
-            if(bV.length == 0) continue;
-            if(countUntil(excludeFromMerge, bV) != -1) continue;
-            foreach(i; 0..length)
-            {
-                if(a[i] == bV)
-                {
-                    found = true;
-                    break;
-                }
-            }
-            if(!found)
-                a[index++] = bV;
-        }
+        a~= bV;
     }
     return a;
 }
+
 
 /** 
  * Used when dealing with paths. It normalizes them for not getting the same path twice.
@@ -444,12 +417,12 @@ ref string[] exclusiveMerge(StringRange)(return scope ref string[] a, StringRang
  */
 ref string[] exclusiveMergePaths(StringRange)(return scope ref string[] a, StringRange b)
 {
-    static string noTrailingSlash(string input)
+    static string noTrailingSlash(string input) @nogc
     {
         if(input.length > 0 && (input[$-1] == '\\' || input[$-1] == '/')) return input[0..$-1];
         return input;
     }
-    static string noInitialDot(string input)
+    static string noInitialDot(string input) @nogc
     {
         if(input.length > 1 && input[0] == '.' && (input[1] == '/' || input[1] == '\\')) return input[2..$];
         return input;
@@ -458,35 +431,15 @@ ref string[] exclusiveMergePaths(StringRange)(return scope ref string[] a, Strin
     {
         return noTrailingSlash(noInitialDot(input));
     }
-    size_t countToMerge;
-    foreach(bPath; save(b))
+    size_t length = a.length ;
+    outer: foreach(bPath; save(b) )
     {
-        bool found;
-        foreach(aPath; a)
+        foreach(i; 0..length)
         {
-            found = fixPath(bPath) == fixPath(aPath);
-            if(found)
-                break;
+            if(fixPath(bPath) == fixPath(a[i]))
+                continue outer;
         }
-        if(!found)
-            countToMerge++;
-    } 
-    if(countToMerge > 0)
-    {
-        size_t putStart = a.length, length = a.length ;
-        a.length+= countToMerge;
-        foreach(bPath; save(b) )
-        {
-            bool found;
-            foreach(i; 0..length)
-            {
-                found = fixPath(bPath) == fixPath(a[i]);
-                if(found)
-                    break;
-            }
-            if(!found)
-                a[putStart++] = bPath;
-        }
+        a~= bPath;
     }
     return a;
 }

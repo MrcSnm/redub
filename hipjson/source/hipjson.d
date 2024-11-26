@@ -28,7 +28,7 @@ struct JSONArray
 		private void set(T[] values)
 		{
 			if(values.length <= N)
-				staticData[0..values.length] = values[];
+				staticData.ptr[0..values.length] = values[];
 			else
 				dynData = values.dup;
 			actualLength = values.length;
@@ -40,21 +40,21 @@ struct JSONArray
 		private void append(T[] values)
 		{
 			if(actualLength + values.length <= N)
-				staticData[actualLength..actualLength+values.length] = values[];
+				staticData.ptr[actualLength..actualLength+values.length] = values[];
 			else
 			{
 				import std.array:uninitializedArray;
 				if(dynData is null)
 				{
 					dynData = uninitializedArray!(T[])(actualLength+values.length);
-					dynData[0..actualLength] = staticData[0..actualLength];
+					dynData.ptr[0..actualLength] = staticData.ptr[0..actualLength];
 				}
 				else if (dynData.length < actualLength + values.length)
 				{
 					size_t newSize = actualLength+values.length > actualLength*2 ? actualLength+values.length : actualLength*2;
 					dynData.length = newSize;
 				}
-				dynData[actualLength..actualLength+values.length] = values[];
+				dynData.ptr[actualLength..actualLength+values.length] = values[];
 			}
 			actualLength+= values.length;
 		}

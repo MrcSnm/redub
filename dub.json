@@ -19,6 +19,7 @@
         {
             "name": "library",
             "targetType": "staticLibrary",
+            "versions": ["AsLibrary"],
             "excludedSourceFiles": ["source/app.d"]
         }
     ],

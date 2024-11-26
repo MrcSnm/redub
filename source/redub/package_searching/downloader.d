@@ -115,7 +115,7 @@ string downloadPackageTo(return string path, string packageName, string repo, Se
 
     ///Create a temporary directory for outputting downloaded version. This will ensure a single version is found on getFirstFile
     string tempPath = buildNormalizedPath(path, "temp");
-    size_t timeout = 10_0000;
+    size_t timeout = 10_000;
     __gshared DownloadData[string] downloadedPackages;
 
 
@@ -133,6 +133,8 @@ string downloadPackageTo(return string path, string packageName, string repo, Se
 
     scope(exit)
     {
+        if(std.file.exists(tempPath))
+            std.file.rmdirRecurse((tempPath));
         downloadedPackages[packageName].mtx.unlock;
     }
 

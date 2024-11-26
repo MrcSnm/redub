@@ -80,9 +80,9 @@ void addPreGenerateCommands(ref BuildRequirements req, JSONStringArray cmds, Par
             import std.conv:to;
 
             if(hasLogLevel(LogLevel.verbose))
-                vlog("Executing: ", executeShell("echo "~cmd.str, redubEnv, Config.none, size_t.max, c.workingDir).output, " at dir ", c.workingDir);
+                vlog("Executing: ", executeShell("echo "~cmd.str, getRedubEnv, Config.none, size_t.max, c.workingDir).output, " at dir ", c.workingDir);
 
-            auto status = wait(spawnShell(cmd.str, stdin, stdout, stderr, redubEnv, Config.none, c.workingDir));
+            auto status = wait(spawnShell(cmd.str, stdin, stdout, stderr, getRedubEnv, Config.none, c.workingDir));
             if(status)
                 throw new Exception("preGenerateCommand '"~cmd.str~"' exited with code "~status.to!string);
         }

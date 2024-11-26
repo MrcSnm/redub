@@ -35,9 +35,9 @@ BuildConfiguration parse()
    
     foreach(string key, fn; handlers)
     {
-        string* v = key in redubEnv;
+        string v = getEnvVariable(key);
         if(v)
-            fn(ret, *v);
+            fn(ret, v);
     }
     return ret;
 }
@@ -389,23 +389,59 @@ string str(bool b){return b ? "TRUE" : null;}
 
 
 
-__gshared string[string] redubEnv;
-private __gshared Mutex envMutex;
 
-void setEnvVariable(string key, string value)
+import std.process;
+version(AsLibrary) //Library version will use environment instead of redubEnv since it will become easier to interop
 {
-    synchronized(envMutex)
+    alias redubEnv = std.process.environment;
+    /**
+     * Sets the environment variable. Use std.process.environment if it is being used as a library
+     * Params:
+     *   key =
+     *   value =
+     */
+    void setEnvVariable(string key, string value){environment[key] = value;}
+    /**
+     * Gets the environment as a string[string] to be used inside a function
+     * Returns:
+     */
+    string[string] getRedubEnv(){return environment.toAA;}
+    /**
+     * Gets the environment from within the environment if used as a library, else, use internal associative array
+     * with caching
+     * Params:
+     *   key =
+     * Returns:
+     */
+    string getEnvVariable(string key)
     {
-        redubEnv[key] = value;
+        if(key in environment)
+            return environment[key];
+        return null;
     }
 }
-
-
-
-shared static this()
+else
 {
-    import std.process;
-    import std.stdio;
-    envMutex = new Mutex;
-    redubEnv = environment.toAA;
+    __gshared string[string] redubEnv;
+    private __gshared Mutex envMutex;
+
+    void setEnvVariable(string key, string value)
+    {
+        synchronized(envMutex)
+        {
+            redubEnv[key] = value;
+        }
+    }
+    string[string] getRedubEnv(){return redubEnv;}
+    string getEnvVariable(string key)
+    {
+        string* ret = key in redubEnv;
+        if(ret) return *ret;
+        return null;
+    }
+    shared static this()
+    {
+        envMutex = new Mutex;
+        redubEnv = environment.toAA;
+    }
 }
