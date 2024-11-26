@@ -153,6 +153,7 @@ void invalidateCaches(ProjectNode root, CompilingSession s)
 
     string[64] dirtyFiles;
     size_t dirtyCount;
+    import redub.logging;
 
     foreach_reverse (ProjectNode n; root.collapse)
     {

@@ -41,9 +41,9 @@ BuildRequirements parseProject(
     import std.path;
     import std.file;
     import redub.package_searching.entry;
-    if(!std.file.exists(projectWorkingDir))
-        throw new Exception("Directory '"~projectWorkingDir~"' does not exists.");
     string projectFile = findEntryProjectFile(projectWorkingDir, recipe);
+    if(!projectFile)
+        throw new Exception("Directory '"~projectWorkingDir~"' has no recipe or does not exists.");
     BuildRequirements req;
 
     vlog("Parsing ", projectFile, " at ", projectWorkingDir, " with :",  subPackage, " -c ", subConfiguration.name);

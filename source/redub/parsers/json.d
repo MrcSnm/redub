@@ -134,11 +134,10 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
     ///Setup base of configuration before finding anything
     if(!cfg.requiredBy)
     {
-        string name = "name" in json ? json["name"].str : cfg.defaultPackageName;
+        string name = tryStr(json, "name", cfg.defaultPackageName);
         enforce(name.length, "Every package must contain a 'name' or have a defaultPackageName");
         cfg.requiredBy = name;
-        if("version" in json)
-            cfg.version_ = json["version"].str;
+        cfg.version_ = tryStr(json, "version", cfg.version_);
     }
     if(isRoot)
     {
@@ -225,7 +224,8 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
                 {
                     import std.algorithm:map;
                     import std.array:join;
-                    throw new Exception("Configuration '"~c.subConfiguration.name~"' specified for dependency '"~req.name~"' but wasn't found. Avaiable Configurations:\n\t"~v.array.map!((JSONValue v) => v["name"].str).join("\n\t"));
+                    string availableConfigs = v.array.map!((JSONValue v) => v["name"].str).join("\n\t");
+                    throw new Exception("Configuration '"~c.subConfiguration.name~"' specified for dependency '"~req.name~"' but wasn't found or its platform didn't match. Avaiable Configurations:\n\t"~availableConfigs);
                 }
                 if(preferredConfiguration != -1)
                 {
@@ -277,11 +277,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
                         "Dependency named "~ depName ~
                         " must contain at least a \"path\" or \"version\" property."
                     );
-                    if("optional" in value && value["optional"].boolean == true)
-                    {
-                        if(!("default" in value) || value["default"].boolean == false)
-                            isOptional = true;
-                    }
+                    isOptional = tryBool(value, "optional") && !tryBool(value, "default");
                     if(path)
                         path = isAbsolute(path) ? path : buildNormalizedPath(workingDir, path);
                 }
@@ -618,12 +614,20 @@ struct CommandWithFilter
     }
 }
 
-private string tryStr(JSONValue input, string prop)
+private bool tryBool(JSONValue input, string prop)
+{
+    const(JSONValue)* v = prop in input;
+    if(v) return v.boolean;
+    return false;
+}
+
+private string tryStr(JSONValue input, string prop, string defStr = null)
 {
     const(JSONValue)* v = prop in input;
     if(v) return v.str;
-    return null;
+    return defStr;
 }
+
 
 private void swap(T)(ref T a, ref T b)
 {

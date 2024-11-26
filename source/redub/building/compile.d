@@ -266,7 +266,6 @@ bool buildProjectParallelSimple(ProjectNode root, CompilingSession s)
             {
                 CompilationCache existingCache = CompilationCache.get(mainPackHash, finishedPackage.requirements, s);
                 const AdvCacheFormula existingFormula = existingCache.getFormula();
-                CompilationCache.make(existingCache.requirementCache, mainPackHash, finishedPackage.requirements, s, &existingFormula, &formulaCache);
                 updateCache(mainPackHash, CompilationCache.make(existingCache.requirementCache, mainPackHash, finishedPackage.requirements, s, &existingFormula, &formulaCache));
             }
             if(finishedPackage is root)

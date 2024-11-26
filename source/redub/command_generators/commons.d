@@ -318,7 +318,7 @@ bool isFileHidden(DirEntry e)
     }
     else
     {
-        return e.name.length >= 0 && e.name[0] == '.';
+        return e.name.length == 0 || e.name[0] == '.';
     }
 }
 

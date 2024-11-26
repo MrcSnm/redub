@@ -254,25 +254,40 @@ struct AdvCacheFormula
 			fileBuffer = uninitializedArray!(ubyte[])(1_000_000);
 		ubyte[8] hashedContent;
 		ubyte[16] joinedHash;
+		ubyte[16] advCacheHashJoin;
+		ubyte[8]  advCacheHash;
 
 
 		foreach(filterDir; filteredDirectories) foreach(dir; filterDir.dirs)
 		{
-			if(cacheHolder !is null && dir in cacheHolder.directories)
+			if(cacheHolder !is null)
 			{
-				ret.directories[dir] = cacheHolder.directories[dir];
-				continue;
+				AdvDirectory* cacheDir = dir in cacheHolder.directories;
+				if(cacheDir !is null)
+				{
+					ret.directories[dir] = *cacheDir;
+					advCacheHashJoin[0..8] = cacheDir.contentHash;
+					advCacheHashJoin[8..$] = advCacheHash;
+					advCacheHash = contentHasher(advCacheHashJoin, advCacheHash)[0..8];
+					continue;
+				}
 			}
 			AdvDirectory advDir;
 			const(AdvDirectory)* existingDir;
 			if(existing) existingDir = dir in existing.directories;
 
-			if(!std.file.exists(dir) ||isFileHidden(DirEntry(dir))) continue;
-			enforce(std.file.isDir(dir), "Path sent is not a directory: "~dir);
+			if(!existingDir)
+			{
+				bool dirExists;
+				uint attr = getAttributesNothrow(dir, dirExists);
+				if(!dirExists || .isFileHidden(dir, attr))
+					continue;
+				enforce(.isDir(attr), "Path sent is not a directory: "~dir);
+			}
 
 			foreach(DirEntry e; dirEntries(dir, SpanMode.depth))
             {
-				if(e.isDir || !filterDir.shouldInclude(e.name) || isFileHidden(e)) continue;
+				if(e.isDir || redub.command_generators.commons.isFileHidden(e) || !filterDir.shouldInclude(e.name)) continue;
 
 				long time = e.timeLastModified.stdTime;
 				if(existingDir)
@@ -299,15 +314,25 @@ struct AdvCacheFormula
 			ret.directories[dir] = advDir;
 			if(cacheHolder !is null)
 				cacheHolder.directories[dir] = advDir;
+			advCacheHashJoin[0..8] = advDir.contentHash;
+			advCacheHashJoin[8..$] = advCacheHash;
+			advCacheHash = contentHasher(advCacheHashJoin, advCacheHash)[0..8];
 		}
 
 		foreach(file; files)
         {
 			//Check if the file was read already for taking the time it was modified.
-			if(cacheHolder !is null && file in cacheHolder.files)
+			if(cacheHolder !is null)
 			{
-				ret.files[file] = cacheHolder.files[file];
-				continue;
+				AdvFile* fileInCache = file in cacheHolder.files;
+				if(fileInCache)
+				{
+					ret.files[file] = *fileInCache;
+					advCacheHashJoin[0..8] = fileInCache.contentHash;
+					advCacheHashJoin[8..$] = advCacheHash;
+					advCacheHash = contentHasher(advCacheHashJoin, advCacheHash)[0..8];
+					continue;
+				}
 			}
 			///May throw if it is a directory.
 			scope(failure) continue;
@@ -321,36 +346,23 @@ struct AdvCacheFormula
 				if(existingFile && existingFile.timeModified == time)
 				{
 					ret.files[file] = existingFile.dup;
-					hashedContent = ret.files[file].contentHash;
+					hashedContent = existingFile.contentHash;
 					if(cacheHolder !is null)
-						cacheHolder.files[file] = ret.files[file];
+						cacheHolder.files[file] = *existingFile;
 					continue;
 				}
 			}
 
 			if(!hashContent(file, fileBuffer, hashedContent, contentHasher, isSimplified || inferSimplifiedFile(e))) continue;
-			ret.files[file] = AdvFile(time, hashedContent[0..8]);
+			AdvFile f = AdvFile(time, hashedContent[0..8]);
+			ret.files[file] = f;
 			if(cacheHolder !is null)
-				cacheHolder.files[file] = ret.files[file];
+				cacheHolder.files[file] = f;
+			advCacheHashJoin[0..8] = f.contentHash;
+			advCacheHashJoin[8..$] = advCacheHash;
+			advCacheHash = contentHasher(advCacheHashJoin, advCacheHash)[0..8];
         }
-
-		if(hashedContent.length)
-		{
-			hashedContent[] = 0;
-			foreach(AdvDirectory dir; ret.directories)
-			{
-				joinedHash[0..8] = dir.contentHash;
-				joinedHash[8..$] = hashedContent;
-				hashedContent = contentHasher(joinedHash, hashedContent)[0..8];
-			}
-			foreach(AdvFile file; ret.files)
-			{
-				joinedHash[0..8] = file.contentHash;
-				joinedHash[8..$] = hashedContent;
-				hashedContent = contentHasher(joinedHash, hashedContent)[0..8];
-			}
-			ret.contentHash = hashedContent[0..8];
-		}
+		ret.contentHash = advCacheHash[0..8];
 
 		return ret;
 	}
@@ -416,17 +428,21 @@ struct AdvCacheFormula
 			if(advDir is null)
 			{
 				if(diffCount + 1 < diffs.length)
+				{
 					diffs[diffCount++] = dirName;
+				}
 			}
 			else
 			{
 				if(otherAdvDir.contentHash != advDir.contentHash)
 				{
 					//If directory total is different, check per file
-					diffCount = diffFiles(otherAdvDir.files, advDir.files, diffs, diffCount);
+					diffCount+= diffFiles(otherAdvDir.files, advDir.files, diffs, diffCount);
 				}
 			}
 		}
+		import std.stdio;
+		debug writeln(diffCount);
 		return diffCount == 0;
 	}
 }
@@ -510,3 +526,54 @@ unittest
 
 private bool isInteger(JSONType type){return type == JSONType.integer || type == JSONType.uinteger;}
 private bool isObject(JSONType type){return type == JSONType.object || type == JSONType.null_;}
+
+
+uint getAttributesNothrow(string name, out bool exists) nothrow
+{
+	import std.internal.cstring;
+	version(Windows)
+	{
+		import core.sys.windows.winbase;
+		const wchar* fileName = name.tempCString!wchar();
+		auto ret = GetFileAttributesW(fileName);
+		exists = ret != 0xFFFFFFFF;
+		return ret;
+	}
+	else version(Posix)
+	{
+		import core.sys.posix.sys.stat;
+		const char* fileName = name.tempCString!char();
+		stat_t statbuf = void;
+		exists = stat(fileName, &statbuf) == 0;
+		return statbuf.st_mode;
+	}
+	else assert(false, "No getAttributes support on that OS");
+}
+
+
+bool isDir(uint attr)
+{
+	version(Windows)
+	{
+		import core.sys.windows.winnt;
+		return (attr & FILE_ATTRIBUTE_DIRECTORY) != 0;
+	}
+	else version(Posix)
+	{
+		import core.sys.posix.sys.stat;
+		return (attr & S_IFMT) == S_IFDIR;
+	}
+}
+
+bool isFileHidden(string name, uint attr)
+{
+	version(Windows)
+	{
+		import core.sys.windows.winnt;
+		return (attr & FILE_ATTRIBUTE_HIDDEN) != 0;
+	}
+	else
+	{
+		return name.length == 0 || name[0] == '.';
+	}
+}

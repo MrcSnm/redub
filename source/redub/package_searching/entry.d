@@ -15,11 +15,22 @@ string findEntryProjectFile(string workingDir, string recipe = null)
         return recipe;
     if(!workingDir.length)
         return null;
+
     foreach(entry; validEntryFiles)
     {
-        string entryPath = buildNormalizedPath(workingDir, entry);
+        string entryPath = getCachedNormalizedPath(workingDir, entry);
         if(std.file.exists(entryPath))
             return entryPath;
     }
     return null;
+}
+
+private scope string getCachedNormalizedPath(string dir, string file) @nogc
+{
+    import std.path;
+    static char[4096] entryCache;
+    size_t returnSize;
+    foreach(ch; asNormalizedPath(chainPath(dir, file)))
+        entryCache.ptr[returnSize++] = ch;
+    return cast(string)entryCache[0..returnSize];
 }
