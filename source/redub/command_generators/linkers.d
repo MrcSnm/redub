@@ -43,9 +43,12 @@ string[] parseLinkConfiguration(const ThreadBuildData data, CompilingSession s, 
         
         if (targetType.isLinkedSeparately)
         {
-            //Only linux supports start/end group. OSX does not
+            //Only linux supports start/end group and no-as-needed. OSX does not
             if(isUsingGNULinker)
+            {
+                commands~= "-L--no-as-needed";
                 commands~= "-L--start-group";
+            }
             ///Use library full path for the base file
             commands = mapAppendReverse(commands, data.extra.librariesFullPath, (string l) => "-L"~getOutputName(TargetType.staticLibrary, l, s.os));
             if(isUsingGNULinker)

@@ -100,7 +100,7 @@ void buildPluginProject(string pluginDir, CompilationInfo cInfo)
     setLogLevel(LogLevel.error);
 
     version(LDC)
-        enum preferredCompiler = "ldc";
+        enum preferredCompiler = "ldc2";
     else
         enum preferredCompiler = "dmd";
 

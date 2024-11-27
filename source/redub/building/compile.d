@@ -84,11 +84,7 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
     try
     {
         if(pack.isUpToDate && !pack.isCopyEnough)
-        {
-            import std.stdio;
-            writeln("Copy is not necessary for ", (cast()pack).name);
             return res;
-        }
 
         BuildConfiguration cfg = data.cfg.clone;
         Compiler compiler = info.compiler;

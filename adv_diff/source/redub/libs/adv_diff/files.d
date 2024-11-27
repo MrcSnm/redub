@@ -195,11 +195,7 @@ struct AdvCacheFormula
 				size_t fSize = f.size;
 				size_t bufferSize = fSize+url.length;
 				if(bufferSize > buffer.length)
-				{
-					import core.memory;
-					GC.free(buffer.ptr);
-					buffer = uninitializedArray!(ubyte[])(bufferSize);
-				}
+					buffer.length = bufferSize;
 				f.rawRead(buffer[0..fSize]);
 				buffer[fSize..bufferSize] = cast(ubyte[])url[];
 				contentHasher(buffer[0..bufferSize], outputHash);
@@ -438,8 +434,6 @@ struct AdvCacheFormula
 				}
 			}
 		}
-		import std.stdio;
-		debug writeln(diffCount);
 		return diffCount == 0;
 	}
 }
@@ -577,11 +571,10 @@ bool isFileHidden(string name, uint attr)
 }
 
 
-import core.attribute;
 version(AsLibrary)
 {
 	ubyte[] fileBuffer;
-	@trusted @standalone static this()
+	static this()
 	{
 		import std.array;
 		fileBuffer = uninitializedArray!(ubyte[])(1_000_000);
@@ -589,6 +582,7 @@ version(AsLibrary)
 }
 else
 {
+	import core.attribute;
 	__gshared ubyte[] fileBuffer;
 	@trusted @standalone shared static this()
 	{

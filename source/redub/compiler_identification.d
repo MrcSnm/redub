@@ -191,6 +191,7 @@ Compiler getCompiler(string compilerOrPath = "dmd", string compilerAssumption = 
     {
         string locCompiler = tryGetCompilerOnCwd(compilerOrPath);
         isGlobal = locCompiler == compilerOrPath;
+
         if(!isGlobal)
             compilerOrPath = locCompiler;
         else
