@@ -726,7 +726,7 @@ struct JSONValue
 	bool hasErrorOccurred() const { return error.length != 0; }
 
 	//selfPrintKey is only used for object.
-	string toString(bool selfPrintkey = false) const
+	string toString(bool compressed = false, bool selfPrintkey = false) const
 	{
 		if(hasErrorOccurred)
 			return error;
@@ -800,9 +800,9 @@ struct JSONValue
 				foreach(v; data.array.getArray)
 				{
 					if(!isFirst)
-						ret~=", ";
+						ret~= compressed ? "," : ", ";
 					isFirst = false;
-					ret~= v.toString(false);
+					ret~= v.toString(compressed, false);
 				}
 				ret~= "]";
 				break;
@@ -811,16 +811,22 @@ struct JSONValue
 			{
 				if(selfPrintkey)
 				{
-					ret = '"'~escapeCharacters(key)~"\": ";
+					if(compressed)
+						ret = '"'~escapeCharacters(key)~"\":";
+					else
+						ret = '"'~escapeCharacters(key)~"\": ";
 				}
 				ret~= '{';
 				bool isFirst = true;
 				foreach(k, v; data.object.value)
 				{
 					if(!isFirst)
-						ret~= ", ";
+						ret~= compressed ? ",": ", ";
 					isFirst = false;
-					ret~= '"'~escapeCharacters(k)~"\" : "~v.toString(false);
+					if(compressed)
+						ret~= '"'~escapeCharacters(k)~"\":"~v.toString(false);
+					else
+						ret~= '"'~escapeCharacters(k)~"\" : "~v.toString(false);
 				}
 				ret~= '}';
 				break;

@@ -357,7 +357,7 @@ string[] updateCache(string rootCache, const CompilationCache cache, bool writeT
 void updateCacheOnDisk(string rootCache)
 {
     static import std.file;
-    std.file.write(getCacheFilePath(rootCache), getCache(rootCache).toString());
+    std.file.write(getCacheFilePath(rootCache), getCache(rootCache).toString(true));
 }
 
 
