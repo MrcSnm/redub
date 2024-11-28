@@ -37,15 +37,12 @@ string normalizePath(return ref char[] output, scope string[] paths...)
 			output = normalized[0].dup;
 		else
 			output[0..normalized[0].length] = normalized[0];
-		return cast(string)output[0..normalized.length];
+		return cast(string)output[0..normalized[0].length];
 	}
 
-    size_t totalLength;
+    size_t totalLength = (length - start) - 1;
     for(int i = cast(int)start; i < length; i++)
-    {
         totalLength+= normalized[i].length;
-        if(i + 1 < length) totalLength++;
-    }
 
 	if(output.length == 0)
 		output = (cast(char*)GC.malloc(totalLength, GC.BlkAttr.NO_SCAN))[0..totalLength];

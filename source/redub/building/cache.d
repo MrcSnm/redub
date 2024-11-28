@@ -156,6 +156,7 @@ CompilationCache[] cacheStatusForProject(ProjectNode root, CompilingSession s, o
 void invalidateCaches(ProjectNode root, CompilingSession s, out AdvCacheFormula sharedFormula)
 {
     CompilationCache[] cacheStatus = cacheStatusForProject(root, s, sharedFormula);
+    import std.algorithm.comparison: min;
     ptrdiff_t i = cacheStatus.length;
     AdvCacheFormula preprocessed;
 
@@ -170,12 +171,12 @@ void invalidateCaches(ProjectNode root, CompilingSession s, out AdvCacheFormula 
             continue;
         if (!cacheStatus[i].isCompilationUpToDate(n.requirements, s, &preprocessed, dirtyFiles, dirtyCount))
         {
-            n.setFilesDirty(dirtyFiles[0..dirtyCount]);
+            n.setFilesDirty(dirtyFiles[0..min(dirtyCount, 64)]);
             n.invalidateCache();
             continue;
         }
         if(cacheStatus[i].needsNewCopy(n.requirements, s, &preprocessed, dirtyFiles, dirtyCount))
-            n.setCopyEnough(dirtyFiles[0..dirtyCount]);
+            n.setCopyEnough(dirtyFiles[0..min(dirtyCount, 64)]);
     }
 }
 
