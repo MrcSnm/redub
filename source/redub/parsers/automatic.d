@@ -96,9 +96,10 @@ BuildRequirements postProcessBuildRequirements(BuildRequirements req, Compilatio
 private void partiallyFinishBuildRequirements(ref BuildRequirements req)
 {
     import std.path;
+    import redub.misc.path;
     req = req.mergePending();
     if(!isAbsolute(req.cfg.outputDirectory))
-        req.cfg.outputDirectory = buildNormalizedPath(req.cfg.workingDir, req.cfg.outputDirectory);
+        req.cfg.outputDirectory = redub.misc.path.buildNormalizedPath(req.cfg.workingDir, req.cfg.outputDirectory);
 
     alias StringArrayRef = string[]*;
     scope StringArrayRef[] toAbsolutize = [
@@ -117,7 +118,7 @@ private void partiallyFinishBuildRequirements(ref BuildRequirements req)
         {
             import redub.command_generators.commons : escapePath;
             if(!isAbsolute(dir)) 
-                dir = buildNormalizedPath(req.cfg.workingDir, dir);
+                dir = redub.misc.path.buildNormalizedPath(req.cfg.workingDir, dir);
         }
     }
 

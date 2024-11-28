@@ -4,10 +4,11 @@ public import std.file:DirEntry;
 auto globDirEntriesShallow(string dirGlob)
 {
     import std.path;
+    import redub.misc.path;
     import std.file;
     import std.traits:ReturnType;
     import std.string:indexOf;
-            import std.stdio;
+    import std.stdio;
 
 
     struct ShallowGlob
@@ -47,7 +48,7 @@ auto globDirEntriesShallow(string dirGlob)
 
     import std.exception : enforce;
     enforce(indexOf(dirGlob[idx+1..$], '*') == -1, "Only shallow dir entries can be used from that function, received " ~ dirGlob);
-    string initialPath = buildNormalizedPath(dirGlob[0..idx]);
+    string initialPath = redub.misc.path.buildNormalizedPath(dirGlob[0..idx]);
     string theGlob = dirGlob[idx..$];
     enforce(isDir(initialPath), "Path "~initialPath~" is not a directory to iterate.");
 

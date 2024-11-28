@@ -95,11 +95,12 @@ immutable string[] searchableCompilers = [
  */
 private string tryGetCompilerOnCwd(string compilerOrPath)
 {
+    import redub.misc.path;
     import std.path;
     if(!isAbsolute(compilerOrPath))
     {
         import std.file;
-        string tempPath = buildNormalizedPath(getcwd(), compilerOrPath);
+        string tempPath = redub.misc.path.buildNormalizedPath(getcwd(), compilerOrPath);
         version(Windows) enum targetExtension = ".exe";
         else enum targetExtension = string.init;
         //If it does not, simply assume global

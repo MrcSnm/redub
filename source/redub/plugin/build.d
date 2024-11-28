@@ -15,12 +15,12 @@ private immutable string apiImport = import("redub/plugin/api.d");
 string getPluginImportDir()
 {
     import redub.building.cache;
-    import std.path;
+    import redub.misc.path;
     return buildNormalizedPath(getCacheFolder(), "plugins", "import");
 }
 private void writePluginImport()
 {
-    import std.path;
+    import redub.misc.path;
     import std.file;
     string importPath = buildNormalizedPath(getPluginImportDir(), "redub", "plugin");
     if(!exists(importPath))

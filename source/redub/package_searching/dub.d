@@ -28,10 +28,10 @@ ReducedPackageInfo redubDownloadPackage(string packageName, string repo, string 
 {
     import redub.package_searching.downloader;
     import core.sync.mutex;
-    import std.path;
+    import redub.misc.path;
     SemVer out_bestVersion;
     string downloadedPackagePath = downloadPackageTo(
-        buildNormalizedPath(getDefaultLookupPathForPackages(), packageName),
+        redub.misc.path.buildNormalizedPath(getDefaultLookupPathForPackages(), packageName),
         packageName,
         repo,
         SemVer(packageVersion),
@@ -64,6 +64,7 @@ ReducedPackageInfo redubDownloadPackage(string packageName, string repo, string 
 private ReducedPackageInfo getPackageInFolder(string folder, string packageName, string subPackage, string packageVersion)
 {
     import std.path;
+    import redub.misc.path;
     import std.file;
     import std.algorithm.sorting;
     import std.algorithm.iteration;
@@ -79,7 +80,7 @@ private ReducedPackageInfo getPackageInFolder(string folder, string packageName,
             {
                 string fileName = e.name.baseName;
                 if (fileName == requirement.toString)
-                    return ReducedPackageInfo(fileName, buildNormalizedPath(folder, requirement.toString, packageName));
+                    return ReducedPackageInfo(fileName, redub.misc.path.buildNormalizedPath(folder, requirement.toString, packageName));
             }
         }
         error("Invalid package version requirement ", requirement);
@@ -94,7 +95,7 @@ private ReducedPackageInfo getPackageInFolder(string folder, string packageName,
         foreach_reverse (SemVer v; sort(semVers)) ///Sorts version from the highest to lowest
         {
             if (v.satisfies(requirement))
-                return ReducedPackageInfo(v.toString, buildNormalizedPath(folder, v.toString, packageName), semVers);
+                return ReducedPackageInfo(v.toString, redub.misc.path.buildNormalizedPath(folder, v.toString, packageName), semVers);
         }
     }
     return ReducedPackageInfo.init;
@@ -114,6 +115,7 @@ PackageInfo getPackage(string packageName, string repo, string packageVersion, s
 {
     import std.file;
     import std.path;
+    import redub.misc.path;
     import std.algorithm;
     import std.array;
 
@@ -129,7 +131,7 @@ PackageInfo getPackage(string packageName, string repo, string packageVersion, s
     }
     
     ///If no version was downloaded yet, download before looking
-    string downloadedPackagePath = buildNormalizedPath(getDefaultLookupPathForPackages(), packageName);
+    string downloadedPackagePath = redub.misc.path.buildNormalizedPath(getDefaultLookupPathForPackages(), packageName);
     ReducedPackageInfo info;
     if (!std.file.exists(downloadedPackagePath))
         info = redubDownloadPackage(packageName, repo, packageVersion, requiredBy);
@@ -193,7 +195,7 @@ private ReducedPackageInfo getPackageInJSON(JSONValue json, string packageName, 
  */
 private ReducedPackageInfo getPackageInLocalPackages(string packageName, string packageVersion)
 {
-    import std.path;
+    import redub.misc.path;
     static import std.file;
 
     static JSONValue localCache;
@@ -214,7 +216,7 @@ private ReducedPackageInfo getPackageInLocalPackages(string packageName, string 
 
 private string getDefaultLookupPathForPackages()
 {
-    import std.path;
+    import redub.misc.path;
     return buildNormalizedPath(getDubWorkspacePath, "packages");
 }
 

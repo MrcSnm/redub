@@ -277,9 +277,10 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
                         "Dependency named "~ depName ~
                         " must contain at least a \"path\" or \"version\" property."
                     );
+                    import redub.misc.path;
                     isOptional = tryBool(value, "optional") && !tryBool(value, "default");
                     if(path)
-                        path = isAbsolute(path) ? path : buildNormalizedPath(workingDir, path);
+                        path = isAbsolute(path) ? path : redub.misc.path.buildNormalizedPath(workingDir, path);
                 }
                 else if(value.type == JSONType.string) ///Version style
                     version_ = value.str;
@@ -365,9 +366,10 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
             else
             {
                 import std.path;
+                import redub.misc.path;
                 string subPackagePath = p.str;
                 if(!std.path.isAbsolute(subPackagePath))
-                    subPackagePath = buildNormalizedPath(cfg.workingDir, subPackagePath);
+                    subPackagePath = redub.misc.path.buildNormalizedPath(cfg.workingDir, subPackagePath);
                 enforce(std.file.isDir(subPackagePath), "subPackage path '"~subPackagePath~"' must be a directory " );
                 subPackageName = pathSplitter(subPackagePath).back;
             }
@@ -385,10 +387,11 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
             else ///Subpackage is on other file
             {
                 import std.path;
+                import redub.misc.path;
                 import std.range:back;
                 string subPackagePath = p.str;
                 if(!std.path.isAbsolute(subPackagePath))
-                    subPackagePath = buildNormalizedPath(cfg.workingDir, subPackagePath);
+                    subPackagePath = redub.misc.path.buildNormalizedPath(cfg.workingDir, subPackagePath);
                 string subPackageName = pathSplitter(subPackagePath).back;
                 if(subPackageName == cfg.subPackage)
                 {

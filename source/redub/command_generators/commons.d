@@ -403,6 +403,7 @@ void moveGeneratedObjectFiles(
 )
 {
     import std.file;
+    import redub.misc.path;
     import std.path;
     import std.string:endsWith;
     import std.algorithm.searching;
@@ -419,7 +420,7 @@ void moveGeneratedObjectFiles(
                 continue;
             if(e.name.endsWith(extension))
             {
-                string targetPath = buildNormalizedPath(moveDir, e.name[basePath.length+1..$]);
+                string targetPath = redub.misc.path.buildNormalizedPath(moveDir, e.name[basePath.length+1..$]);
                 string targetDir = dirName(targetPath);
                 if(!exists(targetDir))
                     mkdirRecurse(targetDir);
@@ -429,7 +430,7 @@ void moveGeneratedObjectFiles(
     }
     foreach(i, file; files)
     {
-        string targetPath = buildNormalizedPath(moveDir, baseName(setExtension(file, extension)));
+        string targetPath = redub.misc.path.buildNormalizedPath(moveDir, baseName(setExtension(file, extension)));
         renameOrCopy(file, targetPath);
     }
 }
@@ -629,7 +630,7 @@ string createCommandFile(const BuildConfiguration cfg, string[] flags, out strin
     import std.string;
     import std.file;
     import std.conv;
-    import std.path;
+    import redub.misc.path;
     Random seed = Random(unpredictableSeed);
     uint num = uniform(0, int.max, seed);
     joinedFlags = join(flags, " ");

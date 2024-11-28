@@ -94,6 +94,7 @@ bool hardLinkFile(string from, string to, bool overwrite = false)
 bool hardLinkDir(string dir, string to, bool overwrite = false)
 {
     import std.exception;
+    import redub.misc.path;
     import std.path;
     import std.file;
 
@@ -101,7 +102,7 @@ bool hardLinkDir(string dir, string to, bool overwrite = false)
     {
         if(e.isDir)
             continue;
-        string output = buildNormalizedPath(to, e.name[dir.length+1..$]);
+        string output = redub.misc.path.buildNormalizedPath(to, e.name[dir.length+1..$]);
         string outputDir = dirName(output);
         if(!exists(outputDir))
             mkdirRecurse(outputDir);

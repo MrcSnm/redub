@@ -25,12 +25,11 @@ string findEntryProjectFile(string workingDir, string recipe = null)
     return null;
 }
 
-private scope string getCachedNormalizedPath(string dir, string file) @nogc
+private scope string getCachedNormalizedPath(string dir, string file)
 {
-    import std.path;
     static char[4096] entryCache;
-    size_t returnSize;
-    foreach(ch; asNormalizedPath(chainPath(dir, file)))
-        entryCache.ptr[returnSize++] = ch;
-    return cast(string)entryCache[0..returnSize];
+    char[] temp = entryCache;
+    import redub.misc.path;
+    string ret = normalizePath(temp, dir, file);
+    return ret;
 }

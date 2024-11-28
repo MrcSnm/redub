@@ -15,7 +15,7 @@ void loadPlugin(string pluginName, string pluginPath, CompilationInfo cInfo)
 {
     import redub.plugin.build;
     import std.file;
-    import std.path;
+    import redub.misc.path;
 
     RegisteredPlugin* reg;
     synchronized

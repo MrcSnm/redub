@@ -39,8 +39,9 @@ void baseLoadPlugin(string pluginName, string pluginPath, string workingDir, Com
     import redub.plugin.load;
     import std.file;
     import std.path;
+    import redub.misc.path;
     if(!isAbsolute(pluginPath))
-        pluginPath = buildNormalizedPath(workingDir, pluginPath);
+        pluginPath = redub.misc.path.buildNormalizedPath(workingDir, pluginPath);
     loadPlugin(pluginName, pluginPath, cInfo);
 }
 void setName(ref BuildRequirements req, string name, ParseConfig c)
@@ -123,9 +124,10 @@ void addDependency(
 )
 {
     import std.path;
+    import redub.misc.path;
     import std.algorithm.searching:countUntil;
     if(path.length && !isAbsolute(path)) 
-        path = buildNormalizedPath(c.workingDir, path);
+        path = redub.misc.path.buildNormalizedPath(c.workingDir, path);
     Dependency dep = dependency(name, path, version_, req.name, c.workingDir, subConfiguration, visibility, info, isOptional);
     vvlog("Added dependency ", dep.name, ":", dep.subPackage, " [", dep.version_, "] ", "to ", req.name);
     //If dependency already exists, use the existing one

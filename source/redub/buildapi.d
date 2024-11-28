@@ -8,7 +8,7 @@ import redub.package_searching.api;
 
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.19.0";
+enum RedubVersionOnly = "v1.19.1";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -167,15 +167,19 @@ struct BuildConfiguration
 
     static BuildConfiguration defaultInit(string workingDir)
     {
-        import std.path;
+        import redub.misc.path;
         import std.file;
         static immutable inferredSourceFolder = ["source", "src"];
         static immutable inferredStringImportFolder = ["views"];
+
+        static char[4096] normalizeBuffer;
+        char[] temp = normalizeBuffer;
+
         string initialSource;
         string initialStringImport;
         foreach(sourceFolder; inferredSourceFolder)
         {
-            if(exists(asNormalizedPath(chainPath(workingDir, sourceFolder))))
+            if(exists(normalizePath(temp, workingDir, sourceFolder)))
             {
                 initialSource = sourceFolder;
                 break;
@@ -184,7 +188,7 @@ struct BuildConfiguration
 
         foreach(striFolder; inferredStringImportFolder)
         {
-            if(exists(asNormalizedPath(chainPath(workingDir, striFolder))))
+            if(exists(normalizePath(temp, workingDir, striFolder)))
             {
                 initialStringImport = striFolder;
                 break;
@@ -709,7 +713,7 @@ class ProjectNode
     string getOutputName(TargetType targetType, OS targetOS, ISA isa = instructionSetArchitecture) const
     {
         import redub.command_generators.commons;
-        import std.path;
+        import redub.misc.path;
         return buildNormalizedPath(
             requirements.cfg.outputDirectory,
             redub.command_generators.commons.getOutputName(targetType, requirements.cfg.targetName, targetOS, isa)
@@ -887,7 +891,7 @@ class ProjectNode
         }
         static void finishMerging(ProjectNode target, ProjectNode input)
         {
-            import std.path;
+            import redub.misc.path;
             vvlog("Merging ", input.name, " into ", target.name);
             target.requirements.cfg = target.requirements.cfg.mergeImport(input.requirements.cfg);
             target.requirements.cfg = target.requirements.cfg.mergeStringImport(input.requirements.cfg);
@@ -1158,7 +1162,8 @@ void putLinkerFiles(const ProjectNode tree, out string[] dataContainer)
 
     dataContainer = dataContainer.append(tree.requirements.extra.librariesFullPath.map!((string libPath)
     {
-        return buildNormalizedPath(dirName(libPath), getOutputName(TargetType.staticLibrary, baseName(libPath), os));
+        import redub.misc.path;
+        return redub.misc.path.buildNormalizedPath(dirName(libPath), getOutputName(TargetType.staticLibrary, baseName(libPath), os));
     }).retro);
 }
 
@@ -1185,12 +1190,15 @@ enum ProjectType
 private TargetType inferTargetType(const ProjectNode node)
 {
     static immutable string[] filesThatInfersExecutable = ["app.d", "main.d", "app.c", "main.c"];
-    import std.path;
+    import redub.misc.path;
     if(node.parent.length == 0) foreach(p; node.requirements.cfg.sourcePaths)
     {
         static import std.file;
+        static char[4096] normalizeBuffer;
+        char[] temp = normalizeBuffer;
+
         foreach(f; filesThatInfersExecutable)
-        if(std.file.exists(buildNormalizedPath(node.requirements.cfg.workingDir, p,f)))
+        if(std.file.exists(normalizePath(temp, node.requirements.cfg.workingDir, p,f)))
             return TargetType.executable;
     }
     return TargetType.library;

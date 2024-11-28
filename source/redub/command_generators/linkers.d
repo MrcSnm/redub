@@ -7,7 +7,7 @@ import redub.command_generators.commons;
 
 string[] parseLinkConfiguration(const ThreadBuildData data, CompilingSession s, string requirementCache)
 {
-    import std.path;
+    import redub.misc.path;
     import redub.building.cache;
     string[] commands;
 
@@ -74,7 +74,7 @@ string[] parseLinkConfiguration(const ThreadBuildData data, CompilingSession s, 
 string[] parseLinkConfigurationMSVC(const ThreadBuildData data, CompilingSession s, string requirementCache)
 {
     import std.algorithm.iteration;
-    import std.path;
+    import redub.misc.path;
     import std.string;
     import redub.building.cache;
 

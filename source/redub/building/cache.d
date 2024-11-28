@@ -298,16 +298,18 @@ AdvCacheFormula getCompilationCacheFormula(const BuildRequirements req, string m
 
 string getCacheOutputDir(string mainPackHash, const BuildRequirements req, CompilingSession s)
 {
+    import redub.misc.path;
     if(mainPackHash.length == 0)
         throw new Exception("No hash.");
-    return buildNormalizedPath(getCacheFolder, mainPackHash, hashFrom(req, s));
+    return redub.misc.path.buildNormalizedPath(getCacheFolder, mainPackHash, hashFrom(req, s));
 }
 
 string getCacheOutputDir(string mainPackHash, const BuildConfiguration cfg, CompilingSession s, bool isRoot)
 {
+    import redub.misc.path;
     if(mainPackHash.length == 0)
         throw new Exception("No hash.");
-    return buildNormalizedPath(getCacheFolder, mainPackHash, hashFrom(cfg, s, isRoot));
+    return redub.misc.path.buildNormalizedPath(getCacheFolder, mainPackHash, hashFrom(cfg, s, isRoot));
 }
 
 
@@ -443,14 +445,16 @@ void clearJsonCompilationInfoCache()
 
 string getCacheFolder()
 {
+    import redub.misc.path;
     static string cacheFolder;
     if (!cacheFolder)
-        cacheFolder = buildNormalizedPath(getDubWorkspacePath(), CACHE_FOLDER_NAME);
+        cacheFolder = redub.misc.path.buildNormalizedPath(getDubWorkspacePath(), CACHE_FOLDER_NAME);
     return cacheFolder;
 }
 
 string getCacheFilePath(string rootCache)
 {
-    return buildNormalizedPath(getCacheFolder, rootCache ~ ".json");
+    import redub.misc.path;
+    return redub.misc.path.buildNormalizedPath(getCacheFolder, rootCache ~ ".json");
 }
 

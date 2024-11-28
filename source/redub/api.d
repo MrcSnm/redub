@@ -38,7 +38,7 @@ struct ProjectDetails
     string getCacheOutputDir(CompilingSession s) const
     {
         import redub.building.cache;
-        import std.path;
+        import redub.misc.path;
         string hash = hashFrom(tree.requirements, s);
         return buildNormalizedPath(getCacheFolder, hash);
     }
@@ -48,7 +48,7 @@ struct ProjectDetails
     */
     string getOutputFile()
     {
-        import std.path;
+        import redub.misc.path;
         import redub.command_generators.commons;
 
         return buildNormalizedPath(
@@ -155,7 +155,7 @@ class BuildException : Exception
 string[] getChangedBuildFiles(ProjectNode root, CompilingSession s)
 {
     import std.file;
-    import std.path;
+    import redub.misc.path;
     import std.algorithm.iteration;
     import std.array : array;
     import redub.command_generators.commons;
@@ -238,6 +238,7 @@ bool cleanProject(ProjectDetails d, bool showMessages)
 {
     import std.file;
     import std.path;
+    import redub.misc.path;
     import redub.command_generators.commons;
 
     static void removeFile(string filePath, bool show,  string message = null)
@@ -265,6 +266,7 @@ bool cleanProject(ProjectDetails d, bool showMessages)
             info("Cleaning project ", d.tree.name);
         foreach(ProjectNode node; d.tree.collapse)
         {
+            import redub.misc.path;
 
             foreach(type; [tuple("", node.requirements.cfg.targetType), tuple("-test-library", TargetType.executable)])
             {
@@ -272,7 +274,7 @@ bool cleanProject(ProjectDetails d, bool showMessages)
                 {
                     string ext = extension(output);
                     string base = baseName(output, ext);
-                    output = buildNormalizedPath(dirName(output), base~type[0]~ext);
+                    output = redub.misc.path.buildNormalizedPath(dirName(output), base~type[0]~ext);
                 }
                 foreach(ext; ["", getObjectExtension(os)])
                 {
@@ -293,11 +295,11 @@ bool cleanProject(ProjectDetails d, bool showMessages)
                 }
             }
 
-            removeFile(buildNormalizedPath(node.requirements.cfg.workingDir, "dub.sdl.redub_cache_json"), showMessages, "Removing redub json cache file");
-            removeFile(buildNormalizedPath(node.requirements.cfg.workingDir, ".ldc2_cache"), showMessages, "Removing ldc2 cache");
+            removeFile(redub.misc.path.buildNormalizedPath(node.requirements.cfg.workingDir, "dub.sdl.redub_cache_json"), showMessages, "Removing redub json cache file");
+            removeFile(redub.misc.path.buildNormalizedPath(node.requirements.cfg.workingDir, ".ldc2_cache"), showMessages, "Removing ldc2 cache");
             foreach(copiedFile; node.requirements.cfg.filesToCopy)
             {
-                string outFile = buildNormalizedPath(d.tree.requirements.cfg.outputDirectory, isAbsolute(copiedFile) ? baseName(copiedFile) : copiedFile);
+                string outFile = redub.misc.path.buildNormalizedPath(d.tree.requirements.cfg.outputDirectory, isAbsolute(copiedFile) ? baseName(copiedFile) : copiedFile);
                 removeFile(outFile, showMessages);
             }
         }
@@ -306,7 +308,7 @@ bool cleanProject(ProjectDetails d, bool showMessages)
         import redub.building.cache;
         
         string hash = hashFrom(d.tree.requirements, CompilingSession(d.compiler, osFromArch(d.cDetails.arch), isaFromArch(d.cDetails.arch)));
-        string cacheOutput = buildNormalizedPath(getCacheFolder, hash);
+        string cacheOutput = redub.misc.path.buildNormalizedPath(getCacheFolder, hash);
         string cacheFile = getCacheFilePath(hash);
 
         removeFile(cacheOutput, showMessages, "Removing cache output dir "~cacheOutput);
@@ -452,9 +454,9 @@ bool isIncremental(Inference incremental, ProjectNode tree)
 
 string getDubWorkspacePath()
 {
-    import std.path;
     import std.process;
     import redub.parsers.environment;
+    import redub.misc.path;
 
     version (Windows)
         return buildNormalizedPath(redubEnv["LOCALAPPDATA"], "dub");

@@ -7,7 +7,7 @@ import redub.building.cache;
 
 string[] parseBuildConfiguration(AcceptedCompiler comp, const BuildConfiguration b, CompilingSession s, string mainPackhash, bool isRoot)
 {
-    import std.path;
+    import redub.misc.path;
     string function(ValidDFlags) mapper = getFlagMapper(comp);
 
     

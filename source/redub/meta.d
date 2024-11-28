@@ -8,7 +8,7 @@ public import hipjson;
 
 private string getRedubMetaFileName()
 {
-    import std.path;
+    import redub.misc.path;
     import redub.api;
     static string redubCompilersFile;
     if(redubCompilersFile == null)
