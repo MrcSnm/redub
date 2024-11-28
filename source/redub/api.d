@@ -195,6 +195,7 @@ ProjectDetails buildProject(ProjectDetails d)
 
     CompilingSession session = CompilingSession(d.compiler, osFromArch(d.cDetails.arch), isaFromArch(d.tree.requirements.cfg.arch));
 
+    AdvCacheFormula sharedFormula;
     if(d.forceRebuild)
     {
         if(!cleanProject(d, false))
@@ -202,7 +203,7 @@ ProjectDetails buildProject(ProjectDetails d)
         d.tree.invalidateCacheOnTree();
     }
     else
-        invalidateCaches(d.tree,session);
+        invalidateCaches(d.tree,session, sharedFormula);
     ProjectNode tree = d.tree;
     if(d.useExistingObjFiles)
         tree.requirements.cfg.changedBuildFiles = getChangedBuildFiles(tree, session);
@@ -213,11 +214,11 @@ ProjectDetails buildProject(ProjectDetails d)
         switch(inferParallel(d))
         {
             case ParallelType.full:
-                return buildProjectFullyParallelized(tree, session);
+                return buildProjectFullyParallelized(tree, session, &sharedFormula);
             case ParallelType.leaves:
-                return buildProjectParallelSimple(tree, session);
+                return buildProjectParallelSimple(tree, session, &sharedFormula);
             case ParallelType.no:
-                return buildProjectSingleThread(tree, session);
+                return buildProjectSingleThread(tree, session, &sharedFormula);
             default: 
                 throw new RedubException(`Unsupported parallel type in this step.`);
         }

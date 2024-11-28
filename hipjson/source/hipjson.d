@@ -725,8 +725,15 @@ struct JSONValue
     }
 	bool hasErrorOccurred() const { return error.length != 0; }
 
-	//selfPrintKey is only used for object.
-	string toString(bool compressed = false, bool selfPrintkey = false) const
+	/**
+	 *
+	 * Params:
+	 *   compressed = Won't include any space in the file. Also, won't escape backslash. Since the parsing works with a single backslash.
+	 * this may reduce the json size, and increase the parsing speed.
+	 *   selfPrintkey = Only used for objects.
+	 * Returns:
+	 */
+	string toString(bool compressed = false)(bool selfPrintkey = false) const
 	{
 		if(hasErrorOccurred)
 			return error;
@@ -738,7 +745,7 @@ struct JSONValue
 			size_t length = input.length;
 			foreach(ch; input)
 			{
-				if(ch == '\\' || ch == '\n' || ch == '\t' || ch == '\r' || ch == '"') length++;
+				if(ch == '\n' || ch == '\t' || ch == '\r' || ch == '"' || ch == '\\') length++;
 			}
 			if(length == input.length) return input;
 			char[] escaped = new char[](length);
@@ -799,10 +806,18 @@ struct JSONValue
 				bool isFirst = true;
 				foreach(v; data.array.getArray)
 				{
-					if(!isFirst)
-						ret~= compressed ? "," : ", ";
+					static if(compressed)
+					{
+						if(!isFirst)
+							ret~= ',';
+					}
+					else
+					{
+						if(!isFirst)
+							ret~= ", ";
+					}
 					isFirst = false;
-					ret~= v.toString(compressed, false);
+					ret~= v.toString!compressed(false);
 				}
 				ret~= "]";
 				break;
@@ -811,7 +826,7 @@ struct JSONValue
 			{
 				if(selfPrintkey)
 				{
-					if(compressed)
+					static if(compressed)
 						ret = '"'~escapeCharacters(key)~"\":";
 					else
 						ret = '"'~escapeCharacters(key)~"\": ";
@@ -820,13 +835,22 @@ struct JSONValue
 				bool isFirst = true;
 				foreach(k, v; data.object.value)
 				{
-					if(!isFirst)
-						ret~= compressed ? ",": ", ";
-					isFirst = false;
-					if(compressed)
-						ret~= '"'~escapeCharacters(k)~"\":"~v.toString(false);
+					static if(compressed)
+					{
+						if(!isFirst)
+							ret~= ',';
+					}
+
 					else
-						ret~= '"'~escapeCharacters(k)~"\" : "~v.toString(false);
+					{
+						if(!isFirst)
+							ret~=  ", ";
+					}
+					isFirst = false;
+					static if(compressed)
+						ret~= '"'~escapeCharacters(k)~"\":"~v.toString!compressed(false);
+					else
+						ret~= '"'~escapeCharacters(k)~"\" : "~v.toString!compressed(false);
 				}
 				ret~= '}';
 				break;

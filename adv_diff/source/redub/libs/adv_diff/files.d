@@ -124,7 +124,7 @@ struct AdvCacheFormula
 	AdvDirectory[string] directories;
 	AdvFile[string] files;
 
-	bool isEmptyFormula() const { return contentHash == ubyte[8].init; }
+	bool isEmptyFormula() const { return directories.length == 0 && files.length == 0;}
 
 
 
@@ -155,6 +155,41 @@ struct AdvCacheFormula
 		return AdvCacheFormula(hashFromString(v[0].str), dirs, files);
 	}
 
+	static AdvCacheFormula deserializeSimple(JSONValue input, AdvCacheFormula reference)
+	{
+		enforce(input.type == JSONType.array, "AdvCacheFormula input must be an array");
+		JSONValue[] v = input.array;
+		enforce(v.length == 3, "AdvCacheFormula must contain a tuple of 3 values");
+		enforce(v[0].type == JSONType.string, "AdvCacheFormula at index 0 must contain a string. got types ["~v[0].getTypeName);
+		enforce(v[1].type == JSONType.array && v[2].type == JSONType.array, "AdvCacheFormula simple must contain arrays on index 1 and 2, got types ["~v[1].getTypeName~", "~v[2].getTypeName~"]");
+
+		AdvDirectory[string] dirs;
+		foreach(JSONValue advDir; v[1].array)
+		{
+			AdvDirectory* d = advDir.str in reference.directories;
+			if(!d)
+				enforce(false, "Could not find directory '"~advDir.str~"' inside formula reference.");
+			dirs[advDir.str] = *d;
+		}
+
+		AdvFile[string] files;
+		foreach(JSONValue advFile; v[2].array)
+		{
+			AdvFile* f = advFile.str in reference.files;
+			if(!f)
+				enforce(false, "Could not find directory '"~advFile.str~"' inside formula reference.");
+			files[advFile.str] = *f;
+		}
+
+
+		return AdvCacheFormula(hashFromString(v[0].str), dirs, files);
+	}
+
+	/**
+	 * Dumps the entire content of this AdvCacheFormula
+	 * Params:
+	 *   output = Target where to serialize this cache formula
+	 */
 	void serialize(ref JSONValue output) const
 	{
 		JSONValue dirsJson = JSONValue.emptyObject;
@@ -168,6 +203,23 @@ struct AdvCacheFormula
 			advFile.serialize(v);
 			filesJson[fileName] = v;
 		}
+		import std.digest;
+		output = JSONValue([JSONValue(toHexString(contentHash[])), dirsJson, filesJson]);
+	}
+
+	/**
+	 * Dumps only the file names and dir names inside the json. This is useful whenever having a shared AdvCacheFormula
+	 * Params:
+	 *   output =
+	 */
+	void serializeSimple(ref JSONValue output) const
+	{
+		JSONValue dirsJson = JSONValue.emptyArray;
+		foreach(string dirName, const AdvDirectory advDir; directories)
+			dirsJson.jsonArray~= dirName;
+		JSONValue filesJson = JSONValue.emptyArray;
+		foreach(string fileName, const AdvFile advFile; files)
+			filesJson.jsonArray~= fileName;
 		import std.digest;
 		output = JSONValue([JSONValue(toHexString(contentHash[])), dirsJson, filesJson]);
 	}
@@ -226,7 +278,7 @@ struct AdvCacheFormula
 	 *   contentHasher = Optional. If this input is given, it will read each file content and hash them
 	 *   directories = Which directories it should put on this formula
 	 *   files = Which files it should put on this formula
-	 *	 existing = Optional. If this is given and exists, it will compare dates and if they have a difference, a content hash will be generated.
+	 *	 existing = Optional. If this is given and exists, it will use the same hash inside it if the dates are the same.
 	 *   cacheHolder = Optional. If this is given, instead of looking into file system, it will use this cache holder instead. If no input is found on this cache holder, it will be populated with the new content.
 	 *   isSimplified = Optional. Generates a hash from the file name + size + lastTimeModified. This is useful when running for less relevant files that are also very big. Used for copy cache formula
 	 * Returns: A completely new AdvCacheFormula which may reference or not the cacheHolder fields.
@@ -281,16 +333,17 @@ struct AdvCacheFormula
 			foreach(DirEntry e; dirEntries(dir, SpanMode.depth))
             {
 				if(e.isDir || redub.command_generators.commons.isFileHidden(e) || !filterDir.shouldInclude(e.name)) continue;
-
+				///Move 1 since the last after length is a slash separator.
+				string fName = e.name[dir.length+1..$];
 				long time = e.timeLastModified.stdTime;
 				if(existingDir)
 				{
-					const(AdvFile)* existingFile = e.name in existingDir.files;
+					const(AdvFile)* existingFile = fName in existingDir.files;
 					if(existingFile)
 					{
 						if(existingFile.timeModified == time)
 						{
-							advDir.files[e.name] = existingFile.dup;
+							advDir.files[fName] = existingFile.dup;
 							joinedHash[0..8] = advDir.contentHash;
 							joinedHash[8..$] = existingFile.contentHash;
 							advDir.putContentHashInPlace(contentHasher(joinedHash, hashedContent)[0..8]);
@@ -299,7 +352,7 @@ struct AdvCacheFormula
 					}
 				}
 				if(!hashContent(e.name, fileBuffer, hashedContent, contentHasher, isSimplified || filterDir.useSimplifiedHashing)) continue;
-				advDir.files[e.name] = AdvFile(time, hashedContent[0..8]);
+				advDir.files[fName] = AdvFile(time, hashedContent[0..8]);
 				joinedHash[0..8] = advDir.contentHash;
 				joinedHash[8..$] = hashedContent;
 				advDir.putContentHashInPlace(contentHasher(joinedHash, hashedContent)[0..8]);

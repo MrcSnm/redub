@@ -44,10 +44,11 @@ struct CompilationCache
     string rootHash;
     private AdvCacheFormula formula;
     private AdvCacheFormula copyFormula;
+    private AdvCacheFormula sharedFormula;
 
-    const(AdvCacheFormula) getFormula() const
+    const(AdvCacheFormula) getSharedFormula() const
     {
-        return formula;
+        return sharedFormula;
     }
 
     static CompilationCache make(string requirementCache, string mainPackHash, const BuildRequirements req, CompilingSession s,
@@ -62,26 +63,27 @@ struct CompilationCache
      *   rootHash = The root BuildRequirements hash
      *   req = The BuildRequirements in which it will calculate the hash to find its cache
      *   s = CompilingSession for getting the hash
+     *   sharedFormula = Holds the formula for the entire compilation cache.
      * Returns: The compilation cache found inside .redub folder.
      */
-    static CompilationCache get(string rootHash, const BuildRequirements req, CompilingSession s)
+    static CompilationCache get(string rootHash, const BuildRequirements req, CompilingSession s, ref AdvCacheFormula sharedFormula, bool isRoot = false)
     {
         import std.exception;
         JSONValue c = *getCache(rootHash);
-        string reqCache = hashFrom(req, s, false);
-        if (c.type != JSONType.object || c.hasErrorOccurred)
+        string reqCache = isRoot ? rootHash : hashFrom(req.cfg, s, false);
+        if (c.type != JSONType.array || c.hasErrorOccurred || c.array.length != 2)
         {
             import redub.logging;
             error("Cache is corrupted, regenerating...");
             return CompilationCache(reqCache, rootHash);
         }
-        if (c == JSONValue.emptyObject)
-            return CompilationCache(reqCache, rootHash);
-        JSONValue* targetCache = reqCache in c;
+        if(sharedFormula.isEmptyFormula && c.array[0].array.length == 3)
+            sharedFormula = AdvCacheFormula.deserialize(c.array[0]);
+        JSONValue* targetCache = reqCache in c.array[1];
         if (!targetCache || targetCache.type != JSONType.array)
-            return CompilationCache(reqCache, rootHash);
+            return CompilationCache(reqCache, rootHash, AdvCacheFormula.init, AdvCacheFormula.init, sharedFormula);
 
-        return CompilationCache(reqCache, rootHash, AdvCacheFormula.deserialize(targetCache.array[0]), AdvCacheFormula.deserialize(targetCache.array[1]));
+        return CompilationCache(reqCache, rootHash, AdvCacheFormula.deserializeSimple(targetCache.array[0], sharedFormula), AdvCacheFormula.deserializeSimple(targetCache.array[1], sharedFormula), sharedFormula);
     }
 
     /** 
@@ -93,11 +95,11 @@ struct CompilationCache
      *   cache = Optional argument which stores precalculated results
      * Returns: isCompilationUpToDate
      */
-    bool isCompilationUpToDate(const BuildRequirements req, CompilingSession s, AdvCacheFormula* preprocessed, out string[64] diffs, out size_t diffCount) const
+    bool isCompilationUpToDate(const BuildRequirements req, CompilingSession s, AdvCacheFormula* preprocessed, out string[64] diffs, out size_t diffCount, bool isRoot) const
     {
-        if(requirementCache != hashFrom(req, s, false))
+        if(requirementCache != hashFrom(req, s, isRoot))
             return false;
-        AdvCacheFormula otherFormula = getCompilationCacheFormula(req, rootHash, s, &formula, preprocessed);
+        AdvCacheFormula otherFormula = getCompilationCacheFormula(req, rootHash, s, &sharedFormula, preprocessed);
         diffs = formula.diffStatus(otherFormula, diffCount);
         return diffCount == 0;
     }
@@ -115,7 +117,7 @@ struct CompilationCache
     {
         if(copyFormula.isEmptyFormula)
             return false;
-        AdvCacheFormula otherFormula = getCopyCacheFormula(rootHash, req, s, &formula, preprocessed);
+        AdvCacheFormula otherFormula = getCopyCacheFormula(rootHash, req, s, &sharedFormula, preprocessed);
         diffs = copyFormula.diffStatus(otherFormula, diffCount);
         return diffCount != 0;
     }
@@ -126,13 +128,13 @@ struct CompilationCache
  *   root = 
  * Returns: Current cache status from root, without modifying it
  */
-CompilationCache[] cacheStatusForProject(ProjectNode root, CompilingSession s)
+CompilationCache[] cacheStatusForProject(ProjectNode root, CompilingSession s, out AdvCacheFormula sharedFormula)
 {
     CompilationCache[] cache = new CompilationCache[](root.collapse.length);
-    string rootCache = hashFrom(root.requirements, s);
+    string rootCache = hashFrom(root.requirements, s, true);
     int i = 0;
     foreach (const ProjectNode node; root.collapse)
-        cache[i++] = CompilationCache.get(rootCache, node.requirements, s);
+        cache[i++] = CompilationCache.get(rootCache, node.requirements, s, sharedFormula, node.isRoot);
     return cache;
 }
 
@@ -144,10 +146,11 @@ CompilationCache[] cacheStatusForProject(ProjectNode root, CompilingSession s)
  * Params:
  *   root = Project root for traversing
  *   s = The session on which the cache should be invalidated
+ *   sharedFormula = Used later for not needing to recalculate hash from files which didn't change.
  */
-void invalidateCaches(ProjectNode root, CompilingSession s)
+void invalidateCaches(ProjectNode root, CompilingSession s, out AdvCacheFormula sharedFormula)
 {
-    CompilationCache[] cacheStatus = cacheStatusForProject(root, s);
+    CompilationCache[] cacheStatus = cacheStatusForProject(root, s, sharedFormula);
     ptrdiff_t i = cacheStatus.length;
     AdvCacheFormula preprocessed;
 
@@ -160,7 +163,7 @@ void invalidateCaches(ProjectNode root, CompilingSession s)
         --i;
         if (!n.isUpToDate)
             continue;
-        if (!cacheStatus[i].isCompilationUpToDate(n.requirements, s, &preprocessed, dirtyFiles, dirtyCount))
+        if (!cacheStatus[i].isCompilationUpToDate(n.requirements, s, &preprocessed, dirtyFiles, dirtyCount, n.isRoot))
         {
             n.setFilesDirty(dirtyFiles[0..dirtyCount]);
             n.invalidateCache();
@@ -249,7 +252,7 @@ string hashFrom(const BuildRequirements req, CompilingSession s, bool isRoot = t
  * Params:
  *   req = The requirements will load adv_diff with the paths to watch for changes
  *   target = Target is important for knowing how the library is called
- *   existing = An existing formula reference as input is important for getting content hash if they aren't up to date
+ *   existing = Reuses the hash of the existing calculated if the file hasn't changed
  *   preprocessed = This will store calculations on an AdvCacheFormula, so, subsequent checks are much faster
  * Returns: A new AdvCacheFormula
  */
@@ -312,7 +315,7 @@ string getCacheOutputDir(string mainPackHash, const BuildConfiguration cfg, Comp
  *   mainPackHash = The root cache on which this formula was built with. It is used for finding the output directory.
  *   req = The requirements will load adv_diff with the paths to watch for changes
  *   s = The session in which the compilation is happening
- *   existing = An existing formula reference as input is important for getting content hash if they aren't up to date
+ *   existing = Reuses the hash of the existing calculated if the file hasn't changed
  *   preprocessed = This will store calculations on an AdvCacheFormula, so, subsequent checks are much faster
  * Returns: A new AdvCacheFormula
  */
@@ -339,25 +342,39 @@ AdvCacheFormula getCopyCacheFormula(string mainPackHash, const BuildRequirements
     );
 }
 
-string[] updateCache(string rootCache, const CompilationCache cache, bool writeToDisk = false)
+string[] updateCache(string rootCache, const CompilationCache cache)
 {
     JSONValue* v = getCache(rootCache);
     JSONValue compileFormula;
     JSONValue copyFormula;
-    cache.formula.serialize(compileFormula);
-    cache.copyFormula.serialize(copyFormula);
+    cache.formula.serializeSimple(compileFormula);
+    cache.copyFormula.serializeSimple(copyFormula);
 
-    (*v)[cache.requirementCache] = JSONValue([compileFormula, copyFormula]);
 
-    if (writeToDisk)
-        updateCacheOnDisk(rootCache);
+    v.array[1][cache.requirementCache] = JSONValue([compileFormula, copyFormula]);
     return null;
 }
 
-void updateCacheOnDisk(string rootCache)
+/**
+ *
+ * Params:
+ *   rootCache = Root hash requirement to save
+ *   fullCache = The full AdvCacheFormula that were shared during execution. Will be dumped and saved as a simple
+ */
+void updateCacheOnDisk(string rootCache, AdvCacheFormula* fullCache)
 {
     static import std.file;
-    std.file.write(getCacheFilePath(rootCache), getCache(rootCache).toString(true));
+    JSONValue fullCacheJson;
+    JSONValue* cache = getCache(rootCache);
+    assert(fullCache !is null, "Full cache can't be null");
+    if(fullCache.isEmptyFormula)
+        fullCacheJson = cache.array[0];
+    else
+        fullCache.serialize(fullCacheJson);
+
+    std.file.write(getCacheFilePath(rootCache),
+        JSONValue([fullCacheJson, cache.array[1]]).toString!true
+    );
 }
 
 
@@ -383,7 +400,7 @@ private JSONValue* getCache(string rootCache)
 
     string file = getCacheFilePath(rootCache);
     if (!std.file.exists(file))
-        std.file.write(file, "{}");
+        std.file.write(file, "[[], {}]");
 
     if (!(rootCache in cacheJson))
     {
@@ -391,8 +408,8 @@ private JSONValue* getCache(string rootCache)
             cacheJson[rootCache] = parseJSON(cast(string)std.file.read(file));
         catch (Exception e)
         {
-            std.file.write(file, "{}");
-            cacheJson[rootCache] = JSONValue.emptyObject;
+            std.file.write(file, "[[], {}]");
+            cacheJson[rootCache] = JSONValue([JSONValue.emptyArray, JSONValue.emptyObject]);
         }
     }
 
