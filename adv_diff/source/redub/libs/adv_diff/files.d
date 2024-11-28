@@ -395,26 +395,31 @@ struct AdvCacheFormula
 			if(cacheHolder !is null)
 				cacheHolder.files[file] = f;
         }
+		ret.recalculateHash(contentHasher);
 
+		return ret;
+	}
+
+	ubyte[8] recalculateHash(ubyte[] function(ubyte[], ref ubyte[8] output) contentHasher)
+	{
 		ubyte[16] advCacheHashJoin;
 		ubyte[8]  advCacheHash;
 
-		foreach(AdvDirectory dir; ret.directories)
+		foreach(AdvDirectory dir; directories)
 		{
 			advCacheHashJoin[0..8] = dir.contentHash;
 			advCacheHashJoin[8..$] = advCacheHash;
 			advCacheHash = contentHasher(advCacheHashJoin, advCacheHash)[0..8];
 		}
-		foreach(AdvFile f; ret.files)
+		foreach(AdvFile f; files)
 		{
 			advCacheHashJoin[0..8] = f.contentHash;
 			advCacheHashJoin[8..$] = advCacheHash;
 			advCacheHash = contentHasher(advCacheHashJoin, advCacheHash)[0..8];
 		}
 
-		ret.contentHash = advCacheHash[0..8];
-
-		return ret;
+		this.contentHash = advCacheHash[0..8];
+		return contentHash;
 	}
 
 	/**

@@ -179,7 +179,7 @@ void invalidateCaches(ProjectNode root, CompilingSession s, out AdvCacheFormula 
     }
 }
 
-ubyte[] hashFunction(const char[] input, ref ubyte[8] output)
+ubyte[] hashFunction(const ubyte[] input, ref ubyte[8] output)
 {
     import xxhash3;
 
@@ -266,10 +266,6 @@ AdvCacheFormula getCompilationCacheFormula(const BuildRequirements req, string m
 {
     import std.algorithm.iteration, std.array, std.path;
 
-    static contentHasher = (ubyte[] content, ref ubyte[8] output) {
-        return hashFunction(cast(string) content, output);
-    };
-
     string cacheDir = getCacheOutputDir(mainPackHash, req, s);
 
     string[] dirs = [cacheDir];
@@ -284,7 +280,7 @@ AdvCacheFormula getCompilationCacheFormula(const BuildRequirements req, string m
 
 
     return AdvCacheFormula.make(
-        contentHasher,//DO NOT use sourcePaths since importPaths is always custom + sourcePaths
+        &hashFunction,//DO NOT use sourcePaths since importPaths is always custom + sourcePaths
         [
             DirectoriesWithFilter(req.cfg.importDirectories, true),
             DirectoriesWithFilter(req.cfg.stringImportPaths, false),
@@ -329,9 +325,6 @@ AdvCacheFormula getCopyCacheFormula(string mainPackHash, const BuildRequirements
 {
     import std.algorithm.iteration, std.array, std.path;
 
-    static contentHasher = (ubyte[] content, ref ubyte[8] output) {
-        return hashFunction(cast(string) content, output);
-    };
 
     string[] extraRequirements = [];
     if (req.cfg.targetType.isLinkedSeparately)
@@ -339,7 +332,7 @@ AdvCacheFormula getCopyCacheFormula(string mainPackHash, const BuildRequirements
             (libPath) => getLibraryPath(libPath, req.cfg.outputDirectory, os)).array;
 
     return AdvCacheFormula.make(
-        contentHasher,//DO NOT use sourcePaths since importPaths is always custom + sourcePaths
+        &hashFunction,//DO NOT use sourcePaths since importPaths is always custom + sourcePaths
         [DirectoriesWithFilter([], false)],
         joiner([getExpectedArtifacts(req, s.os, s.isa), extraRequirements]),
         existing,
@@ -367,7 +360,7 @@ string[] updateCache(string rootCache, const CompilationCache cache)
  *   rootCache = Root hash requirement to save
  *   fullCache = The full AdvCacheFormula that were shared during execution. Will be dumped and saved as a simple
  */
-void updateCacheOnDisk(string rootCache, AdvCacheFormula* fullCache)
+void updateCacheOnDisk(string rootCache, AdvCacheFormula* fullCache, const(AdvCacheFormula)* sharedFormula)
 {
     static import std.file;
     JSONValue fullCacheJson;
@@ -376,7 +369,25 @@ void updateCacheOnDisk(string rootCache, AdvCacheFormula* fullCache)
     if(fullCache.isEmptyFormula)
         fullCacheJson = cache.array[0];
     else
+    {
+        ///Merge with the fullCache if they are different
+        ///This is also a promise that it won't modify
+        foreach(string name, const AdvDirectory d; sharedFormula.directories)
+        {
+            if(!(name in fullCache.directories))
+                fullCache.directories[name] = cast()d;
+        }
+        foreach(string name, const AdvFile f; sharedFormula.files)
+        {
+            if(!(name in fullCache.files))
+                fullCache.files[name] = cast()f;
+        }
+
+        //Full cache doesn't need to have a hash calculation because it will never be used.
+        // fullCache.recalculateHash(&hashFunction);
         fullCache.serialize(fullCacheJson);
+    }
+
 
     std.file.write(getCacheFilePath(rootCache),
         JSONValue([fullCacheJson, cache.array[1]]).toString!true

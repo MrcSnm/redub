@@ -510,7 +510,7 @@ private void saveFinishedBuilds(ProjNodeRange)(ProjNodeRange finishedProjects, s
             updateCache(mainPackHash, CompilationCache.make(hashFrom(node.requirements, s), mainPackHash, node.requirements, s, existingSharedFormula, &cache));
         }
     }
-    updateCacheOnDisk(mainPackHash, formulaCache);
+    updateCacheOnDisk(mainPackHash, &cache, existingSharedFormula);
 
     ///TODO: Start comparing current build time with the last one
 }
