@@ -25,7 +25,7 @@ string[] parseLinkConfiguration(const ThreadBuildData data, CompilingSession s, 
 
             if (targetType.isLinkedSeparately)
             {
-                string cacheDir = getCacheOutputDir(requirementCache, b, s);
+                string cacheDir = getCacheOutputDir(requirementCache, b, s, data.extra.isRoot);
                 string objExtension = getObjectExtension(s.os);
                 commands~= "-of"~buildNormalizedPath(cacheDir, getOutputName(b, s.os)).escapePath;
                 if(b.outputsDeps)
@@ -84,7 +84,7 @@ string[] parseLinkConfigurationMSVC(const ThreadBuildData data, CompilingSession
     const BuildConfiguration b = data.cfg;
     with(b)
     {
-        string cacheDir = getCacheOutputDir(requirementCache, b, s);
+        string cacheDir = getCacheOutputDir(requirementCache, b, s, data.extra.isRoot);
         commands~= "-of"~buildNormalizedPath(cacheDir, getOutputName(b, s.os)).escapePath;
         string objExtension = getObjectExtension(s.os);
         if(b.outputsDeps)

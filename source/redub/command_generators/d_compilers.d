@@ -5,7 +5,7 @@ import redub.compiler_identification;
 import redub.command_generators.ldc;
 import redub.building.cache;
 
-string[] parseBuildConfiguration(AcceptedCompiler comp, const BuildConfiguration b, CompilingSession s, string mainPackhash)
+string[] parseBuildConfiguration(AcceptedCompiler comp, const BuildConfiguration b, CompilingSession s, string mainPackhash, bool isRoot)
 {
     import std.path;
     string function(ValidDFlags) mapper = getFlagMapper(comp);
@@ -20,7 +20,8 @@ string[] parseBuildConfiguration(AcceptedCompiler comp, const BuildConfiguration
         if(compilerVerbose) commands~= mapper(ValidDFlags.verbose);
         if(compilerVerboseCodeGen) commands~= mapper(ValidDFlags.verboseCodeGen);
 
-        string cacheDir = getCacheOutputDir(mainPackhash, b, s);
+
+        string cacheDir = getCacheOutputDir(mainPackhash, b, s, isRoot);
         ///Whenever a single output file is specified, DMD does not output obj files
         ///For LDC, it does output them anyway
         if(s.compiler.compiler == AcceptedCompiler.ldc2 && !b.outputsDeps)

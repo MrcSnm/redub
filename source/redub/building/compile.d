@@ -115,7 +115,7 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
 
             ExecutionResult ret;
             if(!pack.isCopyEnough)
-                ret = cast(ExecutionResult)execCompiler(cfg, compiler.binOrPath, getCompilationFlags(cfg, info, hash.rootHash), res.compilationCommand, compiler, inDir);
+                ret = cast(ExecutionResult)execCompiler(cfg, compiler.binOrPath, getCompilationFlags(cfg, info, hash.rootHash, data.extra.isRoot), res.compilationCommand, compiler, inDir);
 
             if(!isDCompiler(compiler) && !ret.status) //Always requires link.
             {
@@ -260,7 +260,7 @@ bool buildProjectParallelSimple(ProjectNode root, CompilingSession s, const(AdvC
 
             if(!finishedPackage.requirements.cfg.targetType.isLinkedSeparately)
             {
-                string reqCache = hashFrom(finishedPackage.requirements, s, finishedPackage.isRoot);
+                string reqCache = hashFrom(finishedPackage.requirements, s);
                 updateCache(mainPackHash, CompilationCache.make(reqCache, mainPackHash, finishedPackage.requirements, s, existingSharedFormula, &formulaCache));
             }
             if(finishedPackage is root)
@@ -317,7 +317,7 @@ bool buildProjectFullyParallelized(ProjectNode root, CompilingSession s, const(A
 
             if(!finishedPackage.requirements.cfg.targetType.isLinkedSeparately)
             {
-                string reqHash = hashFrom(finishedPackage.requirements, s, finishedPackage.isRoot);
+                string reqHash = hashFrom(finishedPackage.requirements, s);
                 updateCache(mainPackHash, CompilationCache.make(reqHash, mainPackHash, finishedPackage.requirements, s, existingSharedFormula, &formulaCache));
             }
         }
@@ -507,7 +507,7 @@ private void saveFinishedBuilds(ProjNodeRange)(ProjNodeRange finishedProjects, s
 
         if(!node.isUpToDate && !hasAlreadyWrittenInCache)
         {
-            updateCache(mainPackHash, CompilationCache.make(hashFrom(node.requirements, s, node.isRoot), mainPackHash, node.requirements, s, existingSharedFormula, &cache));
+            updateCache(mainPackHash, CompilationCache.make(hashFrom(node.requirements, s), mainPackHash, node.requirements, s, existingSharedFormula, &cache));
         }
     }
     updateCacheOnDisk(mainPackHash, formulaCache);

@@ -72,6 +72,7 @@ BuildRequirements postProcessBuildRequirements(BuildRequirements req, Compilatio
 {
     redub.parsers.environment.setupEnvironmentVariablesForPackage(req.cfg);
     req.cfg.arch = cInfo.arch;
+    req.extra.isRoot = isRoot;
     if(isRoot && useExistingObj)
         req.cfg.outputsDeps = true;
 

@@ -3,7 +3,7 @@ import redub.buildapi;
 import redub.command_generators.commons;
 import redub.command_generators.d_compilers;
 
-string[] parseBuildConfiguration(const BuildConfiguration b, CompilingSession s, string requirementCache)
+string[] parseBuildConfiguration(const BuildConfiguration b, CompilingSession s, string requirementCache, bool isRoot)
 {
-    return redub.command_generators.d_compilers.parseBuildConfiguration(AcceptedCompiler.dmd, b, s, requirementCache);
+    return redub.command_generators.d_compilers.parseBuildConfiguration(AcceptedCompiler.dmd, b, s, requirementCache, isRoot);
 }

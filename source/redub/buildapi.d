@@ -535,10 +535,12 @@ struct PendingMergeConfiguration
 struct ExtraInformation
 {
     string[] librariesFullPath;
+    bool isRoot;
     immutable(ExtraInformation) idup() inout
     {
         return immutable ExtraInformation(
-            librariesFullPath.idup
+            librariesFullPath.idup,
+            isRoot
         );
     }
 }
@@ -627,7 +629,7 @@ struct BuildRequirements
     {
         return immutable ThreadBuildData(
             cfg.idup,
-            extra.idup
+            extra.idup,
         );
     }
 
@@ -682,6 +684,7 @@ struct ThreadBuildData
 {
     BuildConfiguration cfg;
     ExtraInformation extra;
+    bool isRoot;
 }
 
 class ProjectNode

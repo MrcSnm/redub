@@ -51,8 +51,13 @@ struct CompilationCache
         return sharedFormula;
     }
 
-    static CompilationCache make(string requirementCache, string mainPackHash, const BuildRequirements req, CompilingSession s,
-        const(AdvCacheFormula)* existing, AdvCacheFormula* preprocessed)
+    static CompilationCache make(string requirementCache,
+        string mainPackHash,
+        const BuildRequirements req,
+        CompilingSession s,
+        const(AdvCacheFormula)* existing,
+        AdvCacheFormula* preprocessed
+        )
     {
         return CompilationCache(requirementCache, mainPackHash, getCompilationCacheFormula(req, mainPackHash, s, existing, preprocessed), getCopyCacheFormula(mainPackHash, req, s, existing, preprocessed));
     }
@@ -66,11 +71,11 @@ struct CompilationCache
      *   sharedFormula = Holds the formula for the entire compilation cache.
      * Returns: The compilation cache found inside .redub folder.
      */
-    static CompilationCache get(string rootHash, const BuildRequirements req, CompilingSession s, ref AdvCacheFormula sharedFormula, bool isRoot = false)
+    static CompilationCache get(string rootHash, const BuildRequirements req, CompilingSession s, ref AdvCacheFormula sharedFormula)
     {
         import std.exception;
         JSONValue c = *getCache(rootHash);
-        string reqCache = isRoot ? rootHash : hashFrom(req.cfg, s, false);
+        string reqCache = req.extra.isRoot ? rootHash : hashFrom(req.cfg, s, false);
         if (c.type != JSONType.array || c.hasErrorOccurred || c.array.length != 2)
         {
             import redub.logging;
@@ -95,9 +100,9 @@ struct CompilationCache
      *   cache = Optional argument which stores precalculated results
      * Returns: isCompilationUpToDate
      */
-    bool isCompilationUpToDate(const BuildRequirements req, CompilingSession s, AdvCacheFormula* preprocessed, out string[64] diffs, out size_t diffCount, bool isRoot) const
+    bool isCompilationUpToDate(const BuildRequirements req, CompilingSession s, AdvCacheFormula* preprocessed, out string[64] diffs, out size_t diffCount) const
     {
-        if(requirementCache != hashFrom(req, s, isRoot))
+        if(requirementCache != hashFrom(req, s))
             return false;
         AdvCacheFormula otherFormula = getCompilationCacheFormula(req, rootHash, s, &sharedFormula, preprocessed);
         diffs = formula.diffStatus(otherFormula, diffCount);
@@ -131,10 +136,10 @@ struct CompilationCache
 CompilationCache[] cacheStatusForProject(ProjectNode root, CompilingSession s, out AdvCacheFormula sharedFormula)
 {
     CompilationCache[] cache = new CompilationCache[](root.collapse.length);
-    string rootCache = hashFrom(root.requirements, s, true);
+    string rootCache = hashFrom(root.requirements, s);
     int i = 0;
     foreach (const ProjectNode node; root.collapse)
-        cache[i++] = CompilationCache.get(rootCache, node.requirements, s, sharedFormula, node.isRoot);
+        cache[i++] = CompilationCache.get(rootCache, node.requirements, s, sharedFormula);
     return cache;
 }
 
@@ -163,7 +168,7 @@ void invalidateCaches(ProjectNode root, CompilingSession s, out AdvCacheFormula 
         --i;
         if (!n.isUpToDate)
             continue;
-        if (!cacheStatus[i].isCompilationUpToDate(n.requirements, s, &preprocessed, dirtyFiles, dirtyCount, n.isRoot))
+        if (!cacheStatus[i].isCompilationUpToDate(n.requirements, s, &preprocessed, dirtyFiles, dirtyCount))
         {
             n.setFilesDirty(dirtyFiles[0..dirtyCount]);
             n.invalidateCache();
@@ -205,7 +210,7 @@ bool attrIncludesUDA(LookType, Attribs...)()
  *   isRoot = This one may include less information. This allows more cache to be reused while keeping the smaller pieces of cache more restrained.
  * Returns: The hash.
  */
-string hashFrom(const BuildConfiguration cfg, CompilingSession session, bool isRoot = true)
+string hashFrom(const BuildConfiguration cfg, CompilingSession session, bool isRoot)
 {
     import std.conv : to;
     import xxhash3;
@@ -241,9 +246,9 @@ string hashFrom(const BuildConfiguration cfg, CompilingSession session, bool isR
     return xxh.finish().toHexString.idup;
 }
 
-string hashFrom(const BuildRequirements req, CompilingSession s, bool isRoot = true)
+string hashFrom(const BuildRequirements req, CompilingSession s)
 {
-    return hashFrom(req.cfg, s, isRoot);
+    return hashFrom(req.cfg, s, req.extra.isRoot);
 }
 
 /** 
@@ -254,6 +259,7 @@ string hashFrom(const BuildRequirements req, CompilingSession s, bool isRoot = t
  *   target = Target is important for knowing how the library is called
  *   existing = Reuses the hash of the existing calculated if the file hasn't changed
  *   preprocessed = This will store calculations on an AdvCacheFormula, so, subsequent checks are much faster
+ *   isRoot = Used to calculate some of the output directories.
  * Returns: A new AdvCacheFormula
  */
 AdvCacheFormula getCompilationCacheFormula(const BuildRequirements req, string mainPackHash, CompilingSession s, const(AdvCacheFormula)* existing, AdvCacheFormula* preprocessed)
@@ -264,7 +270,7 @@ AdvCacheFormula getCompilationCacheFormula(const BuildRequirements req, string m
         return hashFunction(cast(string) content, output);
     };
 
-    string cacheDir = getCacheOutputDir(mainPackHash, req.cfg, s);
+    string cacheDir = getCacheOutputDir(mainPackHash, req, s);
 
     string[] dirs = [cacheDir];
     if(s.compiler.compiler == AcceptedCompiler.ldc2)
@@ -301,11 +307,11 @@ string getCacheOutputDir(string mainPackHash, const BuildRequirements req, Compi
     return buildNormalizedPath(getCacheFolder, mainPackHash, hashFrom(req, s));
 }
 
-string getCacheOutputDir(string mainPackHash, const BuildConfiguration cfg, CompilingSession s)
+string getCacheOutputDir(string mainPackHash, const BuildConfiguration cfg, CompilingSession s, bool isRoot)
 {
     if(mainPackHash.length == 0)
         throw new Exception("No hash.");
-    return buildNormalizedPath(getCacheFolder, mainPackHash, hashFrom(cfg, s));
+    return buildNormalizedPath(getCacheFolder, mainPackHash, hashFrom(cfg, s, isRoot));
 }
 
 

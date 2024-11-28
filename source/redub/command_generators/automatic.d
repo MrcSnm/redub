@@ -22,18 +22,18 @@ string escapeCompilationCommands(string compilerBin, string[] flags)
  *   mainPackHash = This will be used as a directory in some of outputs
  * Returns: The compilation commands those arguments generates
  */
-string[] getCompilationFlags(const BuildConfiguration cfg, CompilingSession s, string mainPackHash)
+string[] getCompilationFlags(const BuildConfiguration cfg, CompilingSession s, string mainPackHash, bool isRoot)
 {
     switch(s.compiler.compiler) with(AcceptedCompiler)
     {
         case gxx:
-            return redub.command_generators.gnu_based_ccplusplus.parseBuildConfiguration(cfg, s, mainPackHash);
+            return redub.command_generators.gnu_based_ccplusplus.parseBuildConfiguration(cfg, s, mainPackHash, isRoot);
         case gcc:
-            return redub.command_generators.gnu_based.parseBuildConfiguration(cfg, s, mainPackHash);
+            return redub.command_generators.gnu_based.parseBuildConfiguration(cfg, s, mainPackHash, isRoot);
         case dmd:
-            return redub.command_generators.dmd.parseBuildConfiguration(cfg, s, mainPackHash);
+            return redub.command_generators.dmd.parseBuildConfiguration(cfg, s, mainPackHash, isRoot);
         case ldc2:
-            return redub.command_generators.ldc.parseBuildConfiguration(cfg, s, mainPackHash);
+            return redub.command_generators.ldc.parseBuildConfiguration(cfg, s, mainPackHash, isRoot);
         default:throw new Exception("Unsupported compiler '"~s.compiler.binOrPath~"'");
     }
 }

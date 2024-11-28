@@ -536,7 +536,7 @@ struct JSONValue
 			char ch = data[index];
 			switch(ch)
 			{
-				case '\n': 
+				case '\n':
 					line++;
 					break;
 				case '{':

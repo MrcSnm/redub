@@ -106,7 +106,7 @@ string getDepsFilePath(ProjectNode root, CompilingSession s)
 {
     import redub.building.cache;
     string packHash = hashFrom(root.requirements, s);
-    return getDepsFilePath(getCacheOutputDir(packHash, root.requirements.cfg, s));
+    return getDepsFilePath(getCacheOutputDir(packHash, root.requirements.cfg, s, root.isRoot));
 }
 
 string getDepsFilePath(string cacheDir)

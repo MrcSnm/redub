@@ -81,9 +81,9 @@ void buildPlugin(string pluginName, string inputFile, CompilationInfo cInfo)
     CompilingSession s = CompilingSession(getCompiler, os, instructionSetArchitecture);
 
     string buildCmds;
-    string inDir = getCacheOutputDir("plugins", b, s);
+    string inDir = getCacheOutputDir("plugins", b, s, true);
 
-    errorTitle("", execCompiler(b, s.compiler.binOrPath, getCompilationFlags(b, s, "plugins"), buildCmds, s.compiler, inDir).output);
+    errorTitle("", execCompiler(b, s.compiler.binOrPath, getCompilationFlags(b, s, "plugins", true), buildCmds, s.compiler, inDir).output);
     errorTitle("Plugin Flags: ", buildCmds);
     errorTitle("", linkBase(const ThreadBuildData(b, ExtraInformation()), s, "plugins", buildCmds).output);
     errorTitle("Plugin Flags: ", buildCmds);

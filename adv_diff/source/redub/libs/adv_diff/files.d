@@ -177,7 +177,7 @@ struct AdvCacheFormula
 		{
 			AdvFile* f = advFile.str in reference.files;
 			if(!f)
-				enforce(false, "Could not find directory '"~advFile.str~"' inside formula reference.");
+				enforce(false, "Could not find file '"~advFile.str~"' inside formula reference.");
 			files[advFile.str] = *f;
 		}
 
@@ -299,8 +299,7 @@ struct AdvCacheFormula
 		AdvCacheFormula ret;
 		ubyte[8] hashedContent;
 		ubyte[16] joinedHash;
-		ubyte[16] advCacheHashJoin;
-		ubyte[8]  advCacheHash;
+
 
 
 		foreach(filterDir; filteredDirectories) foreach(dir; filterDir.dirs)
@@ -311,9 +310,6 @@ struct AdvCacheFormula
 				if(cacheDir !is null)
 				{
 					ret.directories[dir] = *cacheDir;
-					advCacheHashJoin[0..8] = cacheDir.contentHash;
-					advCacheHashJoin[8..$] = advCacheHash;
-					advCacheHash = contentHasher(advCacheHashJoin, advCacheHash)[0..8];
 					continue;
 				}
 			}
@@ -360,9 +356,6 @@ struct AdvCacheFormula
 			ret.directories[dir] = advDir;
 			if(cacheHolder !is null)
 				cacheHolder.directories[dir] = advDir;
-			advCacheHashJoin[0..8] = advDir.contentHash;
-			advCacheHashJoin[8..$] = advCacheHash;
-			advCacheHash = contentHasher(advCacheHashJoin, advCacheHash)[0..8];
 		}
 
 		foreach(file; files)
@@ -374,9 +367,6 @@ struct AdvCacheFormula
 				if(fileInCache)
 				{
 					ret.files[file] = *fileInCache;
-					advCacheHashJoin[0..8] = fileInCache.contentHash;
-					advCacheHashJoin[8..$] = advCacheHash;
-					advCacheHash = contentHasher(advCacheHashJoin, advCacheHash)[0..8];
 					continue;
 				}
 			}
@@ -404,10 +394,24 @@ struct AdvCacheFormula
 			ret.files[file] = f;
 			if(cacheHolder !is null)
 				cacheHolder.files[file] = f;
+        }
+
+		ubyte[16] advCacheHashJoin;
+		ubyte[8]  advCacheHash;
+
+		foreach(AdvDirectory dir; ret.directories)
+		{
+			advCacheHashJoin[0..8] = dir.contentHash;
+			advCacheHashJoin[8..$] = advCacheHash;
+			advCacheHash = contentHasher(advCacheHashJoin, advCacheHash)[0..8];
+		}
+		foreach(AdvFile f; ret.files)
+		{
 			advCacheHashJoin[0..8] = f.contentHash;
 			advCacheHashJoin[8..$] = advCacheHash;
 			advCacheHash = contentHasher(advCacheHashJoin, advCacheHash)[0..8];
-        }
+		}
+
 		ret.contentHash = advCacheHash[0..8];
 
 		return ret;
