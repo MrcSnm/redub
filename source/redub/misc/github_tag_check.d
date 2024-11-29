@@ -31,11 +31,15 @@ string getLatestVersion()
 {
     import std.net.curl;
     import hipjson;
-    
-    char[] tagsContent = get(GithubTagAPI);
-    if(tagsContent.length == 0)
-        return null;
-    return parseJSON(cast(string)tagsContent).array[0]["name"].str;
+    static string newestVer;
+    if(!newestVer)
+    {
+        char[] tagsContent = get(GithubTagAPI);
+        if(tagsContent.length == 0)
+            return null;
+        newestVer = parseJSON(cast(string)tagsContent).array[0]["name"].str;
+    }
+    return newestVer;
 }
 
 string getRedubDownloadLink(string ver)

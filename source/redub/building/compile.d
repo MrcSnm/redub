@@ -7,6 +7,13 @@ import std.system;
 import redub.compiler_identification;
 import redub.command_generators.automatic;
 
+/** 
+ * When using redub as a library, one may spawn multiple times the same package, having a bug on it.
+ * The problem is that although it returns to execution, the threads aren't actually killed!
+ * To solve that problem, finishedPackages will only ever add to it if the buildExecutions id is the same.
+ */
+size_t buildExecutions;
+
 struct CompilationResult
 {
     string compilationCommand;
@@ -14,6 +21,7 @@ struct CompilationResult
     size_t msNeeded;
     int status;
     shared ProjectNode node;
+    size_t id;
 }
 
 struct HashPair
@@ -56,10 +64,11 @@ private ExecutionResult executeCommands(const string[] commandsList, string list
     return ExecutionResult(0, "Success");
 }
 
-void execCompilationThread(immutable ThreadBuildData data, shared ProjectNode pack, CompilingSession info, HashPair hash, immutable string[string] env)
+void execCompilationThread(immutable ThreadBuildData data, shared ProjectNode pack, CompilingSession info, HashPair hash, immutable string[string] env, size_t id)
 {
     import std.concurrency;
     CompilationResult res = execCompilation(data, pack, info, hash, env);
+    res.id = id;
     scope(exit)
     {
         ownerTid.send(res);
@@ -236,7 +245,8 @@ bool buildProjectParallelSimple(ProjectNode root, CompilingSession s, const(AdvC
                     spawn(&execCompilationThread,
                         dep.requirements.buildData, cast(shared)dep, 
                         s, HashPair(mainPackHash, hashFrom(dep.requirements, s)),
-                        getEnvForProject(dep, env)
+                        getEnvForProject(dep, env),
+                        0
                     );
                 }
                 else
@@ -280,6 +290,7 @@ bool buildProjectFullyParallelized(ProjectNode root, CompilingSession s, const(A
 
     size_t i = 0;
     size_t sentPackages = 0;
+    size_t execID = buildExecutions++;
     foreach(ProjectNode pack; root.collapse)
     {
         if(pack.shouldEnterCompilationThread)
@@ -290,7 +301,8 @@ bool buildProjectFullyParallelized(ProjectNode root, CompilingSession s, const(A
                 cast(shared)pack, 
                 s,
                 HashPair(mainPackHash, hashFrom(pack.requirements, s)),
-                getEnvForProject(pack, env)
+                getEnvForProject(pack, env),
+                execID
             );
         }
         i++;
@@ -298,9 +310,15 @@ bool buildProjectFullyParallelized(ProjectNode root, CompilingSession s, const(A
     printCachedBuildInfo(root);
     AdvCacheFormula formulaCache;
 
-    foreach(_; 0..sentPackages)
+    for(int _ = 0; _ < sentPackages; _++)
     {
         CompilationResult res = receiveOnly!CompilationResult;
+        ///Workaround on not actually killing threads when build fail and using redub as a library.
+        if(res.id != execID)
+        {
+            _--;
+            continue;
+        }
         ProjectNode finishedPackage = cast()res.node;
 
         if(res.status)

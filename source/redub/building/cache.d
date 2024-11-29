@@ -82,8 +82,13 @@ struct CompilationCache
             error("Cache is corrupted, regenerating...");
             return CompilationCache(reqCache, rootHash);
         }
-        if(sharedFormula.isEmptyFormula && c.array[0].array.length == 3)
-            sharedFormula = AdvCacheFormula.deserialize(c.array[0]);
+        if(c.array[0].array.length == 3)
+        {
+            if(sharedFormula.isEmptyFormula)
+                sharedFormula = AdvCacheFormula.deserialize(c.array[0]);
+        }
+        else 
+            return CompilationCache(reqCache, rootHash, AdvCacheFormula.init, AdvCacheFormula.init, sharedFormula);
         JSONValue* targetCache = reqCache in c.array[1];
         if (!targetCache || targetCache.type != JSONType.array)
             return CompilationCache(reqCache, rootHash, AdvCacheFormula.init, AdvCacheFormula.init, sharedFormula);
@@ -405,6 +410,10 @@ private JSONValue* getCache(string rootCache)
     string folder = getCacheFolder;
     import redub.meta;
     import redub.logging;
+    if(rootCache == "88771E2177A3FA47")
+    {
+        throw new Exception("Calculated wrong cache.");
+    }
 
     if(cacheJson == cacheJson.init)
     {
