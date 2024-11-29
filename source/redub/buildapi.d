@@ -1194,12 +1194,16 @@ private TargetType inferTargetType(const ProjectNode node)
     if(node.parent.length == 0) foreach(p; node.requirements.cfg.sourcePaths)
     {
         static import std.file;
+        static import std.path;
         static char[4096] normalizeBuffer;
         char[] temp = normalizeBuffer;
 
+        
         foreach(f; filesThatInfersExecutable)
-        if(std.file.exists(normalizePath(temp, node.requirements.cfg.workingDir, p,f)))
-            return TargetType.executable;
+        {
+            if(std.file.exists(normalizePath(temp, p,f)))
+                return TargetType.executable;
+        }
     }
     return TargetType.library;
 }

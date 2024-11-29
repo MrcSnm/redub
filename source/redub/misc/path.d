@@ -6,9 +6,11 @@ string buildNormalizedPath(scope string[] paths...)
 	string output  = normalizePath(buffer, paths);
 	return output;
 }
+
 string normalizePath(return ref char[] output, scope string[] paths...)
 {
     size_t start, length;
+    import std.ascii;
     static string[1024] normalized;
 
     foreach(path; paths)
@@ -26,6 +28,16 @@ string normalizePath(return ref char[] output, scope string[] paths...)
             }
             else
             {
+				version(Posix)
+				{
+					if(p.length == 0) //Path is a single slash
+						length = start = 0;
+				}
+				else
+				{
+					if(path.length > 1 && path[1] == ':') //Path has drive letter is absolute
+						length = start = 0;
+				}
                 normalized[length++] = p;
             }
         }
