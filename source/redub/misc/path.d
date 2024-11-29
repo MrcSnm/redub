@@ -35,7 +35,7 @@ string normalizePath(return ref char[] output, scope string[] paths...)
 				}
 				else
 				{
-					if(path.length > 1 && path[1] == ':') //Path has drive letter is absolute
+					if(p.length > 1 && p[1] == ':') //Path has drive letter is absolute
 						length = start = 0;
 				}
                 normalized[length++] = p;
