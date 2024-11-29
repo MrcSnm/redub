@@ -410,10 +410,6 @@ private JSONValue* getCache(string rootCache)
     string folder = getCacheFolder;
     import redub.meta;
     import redub.logging;
-    if(rootCache == "88771E2177A3FA47")
-    {
-        throw new Exception("Calculated wrong cache.");
-    }
 
     if(cacheJson == cacheJson.init)
     {
