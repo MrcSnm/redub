@@ -144,6 +144,12 @@ private void getProjectTreeImpl(
                 import redub.api;
                 throw new RedubException("Dependency '"~dep.name~"' specified at path '"~dep.path~"' matches '"~depNode.name~"'. The dependency name should correctly match the one found at that path.");
             }
+            ///TODO: Improve dependency cycle detection
+            if(dep.name == node.name)
+            {
+                import redub.api;
+                throw new RedubException("Package '"~dep.name~"' at path '"~dep.path~"' can't depend on itself.");
+            }
             subConfigurations = depNode.requirements.mergeSubConfigurations(subConfigurations);
             visited[dep.name] = depNode;
             queue~= depNode;

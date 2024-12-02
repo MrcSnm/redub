@@ -136,9 +136,7 @@ private string getActualCompilerToUse(string preferredCompiler, ref string actua
         if(preferredTested && searchable == preferredCompiler)
             continue;
         if(searchable != preferredCompiler)
-        {
             searchable = tryGetCompilerOnCwd(searchable);
-        }
         else
             preferredTested = true;
         compVersionRes = executeShell(searchable ~ " --version");
@@ -230,6 +228,7 @@ Compiler getCompiler(string compilerOrPath = "dmd", string compilerAssumption = 
         {
             if(inf(actualCompiler, versionString, ret))
             {
+                ret.binOrPath = findExecutable(ret.binOrPath);
                 saveCompilerInfo(compilersInfo, ret, isDefault, isGlobal);
                 return ret;
             }
@@ -267,9 +266,10 @@ private Compiler getCompilerFromCache(JSONValue allCompilersInfo, string compile
         {
             if(value.type != JSONType.array)
                 enforce(false, "Expected that the value from object "~key~" were an array.");
-            if(key == compiler)
+            if(key == compiler && std.file.exists(key))
             {
                 JSONValue[] arr = value.array;
+
                 if(arr[TIMESTAMP].get!long != timeLastModified(key).stdTime)
                     return Compiler.init;
 
