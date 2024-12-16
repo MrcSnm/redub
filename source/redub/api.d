@@ -395,6 +395,7 @@ ProjectDetails resolveDependencies(
             BuildRequirements.Configuration(proj.configuration, false),
             proj.subPackage,
             proj.recipe,
+            null,
             true,
             null,
             cDetails.useExistingObj,

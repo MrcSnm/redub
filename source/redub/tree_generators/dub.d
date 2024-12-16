@@ -139,14 +139,13 @@ private void getProjectTreeImpl(
         else
         {
             depNode = new ProjectNode(parseDependency(dep, node.requirements, info), dep.isOptional);
-            string depName = dep.subPackage ? dep.subPackage : dep.name;
-            if(depName != depNode.name)
+            if(dep.name != depNode.name)
             {
                 import redub.api;
                 throw new RedubException("Dependency '"~dep.name~"' specified at path '"~dep.path~"' matches '"~depNode.name~"'. The dependency name should correctly match the one found at that path.");
             }
             ///TODO: Improve dependency cycle detection
-            if(depName == node.name)
+            if(dep.name == node.name)
             {
                 import redub.api;
                 throw new RedubException("Package '"~dep.name~"' at path '"~dep.path~"' can't depend on itself.");

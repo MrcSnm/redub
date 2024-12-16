@@ -20,17 +20,23 @@ struct ParseConfig
     CompilationInfo cInfo;
     ///The package name to use if recipe has no name
     string defaultPackageName;
-    ///Who required that package.
-    string requiredBy;
-    ///If the current parse config is a sub package, it will have a parent
-    string parentName;
-    ///That information is important for assembling the name.
-    bool isParsingSubpackage;
+    ParseSubConfig extra;
     ///When first run is equals false, it won't do anything at "configurations"
     bool firstRun = true;
     ///When preGenerateRun is true, it will run the preGenerateRun
     bool preGenerateRun = true;
     bool isRoot = false;
+}
+
+///Supplemental information for ParseConfig
+struct ParseSubConfig
+{
+    ///The requester of that package
+    string requiredBy;
+    ///If it has a parent, it is treated as a sub package, important for assembling the name.
+    string parentName;
+
+    bool isParsingSubpackage() const { return parentName.length != 0; }
 }
 
 
@@ -48,8 +54,8 @@ void setName(ref BuildRequirements req, string name, ParseConfig c)
 {
     if(c.firstRun)
     {
-        if(c.parentName.length)
-            name = c.parentName~":"~name;
+        if(c.extra.parentName.length)
+            name = c.extra.parentName~":"~name;
         req.cfg.name = name;
         if(!req.cfg.targetName.length)
             req.cfg.targetName = name;
@@ -73,7 +79,7 @@ void addPreGenerateCommands(ref BuildRequirements req, JSONStringArray cmds, Par
     import redub.parsers.environment;
     if(c.preGenerateRun)
     {
-        infos("Pre-gen ", "Running commands for ", c.requiredBy);
+        infos("Pre-gen ", "Running commands for ", c.extra.requiredBy);
         foreach(JSONValue cmd; cmds.save)
         {
             import std.process;
@@ -178,7 +184,7 @@ void addSubConfiguration(
     string subConfigurationName
 )
 {
-    vlog("Using ", subConfigurationName, " subconfiguration for ", dependencyName, " in project ", c.requiredBy);
+    vlog("Using ", subConfigurationName, " subconfiguration for ", dependencyName, " in project ", c.extra.requiredBy);
     import std.algorithm.searching:countUntil;
     ptrdiff_t depIndex = countUntil!((dep) => dep.name == dependencyName)(req.dependencies);
     if(depIndex == -1)

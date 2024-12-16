@@ -14,12 +14,11 @@ import redub.tree_generators.dub;
  * for after the parsing stage.
  * Params:
  *   projectWorkingDir = Optional working dir. What is the root being considered for the recipe file
- *   compiler = Which compiler to use
+ *   cInfo = Important compilation info for that project
  *   subConfiguration = Sub configuration to use
  *   subPackage = Optional sub package
  *   recipe = Optional recipe to read. It's path is not used as root.
- *   targetOS = Will be used to filter out some commands
- *   isa = Instruction Set Architexture to use for filtering commands
+ *   parentName = Used whenever parseProject is called for a sub package.
  *   isRoot = When the package is root, it is added to the package searching cache automatically with version 0.0.0
  *   version = The actual version of that project, may be null on root
  *   useExistingObj = Makes the project output dependencies if it is a root project. Disabled by default since compilation may be way slower
@@ -32,6 +31,7 @@ BuildRequirements parseProject(
     BuildRequirements.Configuration subConfiguration,
     string subPackage, 
     string recipe,
+    string parentName = "",
     bool isRoot = false,
     string version_ = null,
     bool useExistingObj = false,
@@ -50,8 +50,8 @@ BuildRequirements parseProject(
 
     switch(extension(projectFile))
     {
-        case ".sdl":   req = redub.parsers.sdl.parse(projectFile, projectWorkingDir, cInfo, null, version_, subConfiguration, subPackage, "", isDescribeOnly, isRoot); break;
-        case ".json":  req = redub.parsers.json.parse(projectFile, projectWorkingDir, cInfo, null, version_, subConfiguration, subPackage, "", isDescribeOnly, isRoot); break;
+        case ".sdl":   req = redub.parsers.sdl.parse(projectFile, projectWorkingDir, cInfo, null, version_, subConfiguration, subPackage, parentName, isDescribeOnly, isRoot); break;
+        case ".json":  req = redub.parsers.json.parse(projectFile, projectWorkingDir, cInfo, null, version_, subConfiguration, subPackage, parentName, isDescribeOnly, isRoot); break;
         default: throw new Exception("Unsupported project type "~projectFile~" at dir "~projectWorkingDir);
     }
     return postProcessBuildRequirements(req, cInfo, isRoot, useExistingObj);

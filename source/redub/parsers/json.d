@@ -48,7 +48,7 @@ BuildRequirements parse(string filePath,
 )
 {
     import std.path;
-    ParseConfig c = ParseConfig(projectWorkingDir, subConfiguration, subPackage, version_, cInfo, defaultPackageName, null, parentName, preGenerateRun: !isDescribeOnly);
+    ParseConfig c = ParseConfig(projectWorkingDir, subConfiguration, subPackage, version_, cInfo, defaultPackageName, ParseSubConfig(null,parentName), preGenerateRun: !isDescribeOnly);
     return parse(parseJSONCached(filePath), c, isRoot);
 }
 
@@ -81,7 +81,7 @@ BuildRequirements parseWithData(string filePath,
 )
 {
     import std.path;
-    ParseConfig c = ParseConfig(projectWorkingDir, subConfiguration, subPackage, version_, cInfo, defaultPackageName, null, parentName, preGenerateRun: !isDescribeOnly);
+    ParseConfig c = ParseConfig(projectWorkingDir, subConfiguration, subPackage, version_, cInfo, defaultPackageName, ParseSubConfig(null, parentName), preGenerateRun: !isDescribeOnly);
     return parse(parseJSONCached(filePath, fileData), c, isRoot);
 }
 
@@ -132,18 +132,18 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
     import std.exception;
     cfg.isRoot = isRoot;
     ///Setup base of configuration before finding anything
-    if(!cfg.requiredBy)
+    if(!cfg.extra.requiredBy)
     {
         string name = tryStr(json, "name", cfg.defaultPackageName);
         enforce(name.length, "Every package must contain a 'name' or have a defaultPackageName");
-        cfg.requiredBy = name;
+        cfg.extra.requiredBy = name;
         cfg.version_ = tryStr(json, "version", cfg.version_);
     }
     if(isRoot)
     {
         import redub.package_searching.cache;
-        putRootPackageInCache(cfg.requiredBy, cfg.workingDir);
-        vlog("Added project ", cfg.requiredBy, " to memory cache.");
+        putRootPackageInCache(cfg.extra.requiredBy, cfg.workingDir);
+        vlog("Added project ", cfg.extra.requiredBy, " to memory cache.");
     }
     BuildRequirements buildRequirements = getDefaultBuildRequirement(cfg);
 
@@ -312,14 +312,14 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
             if(keys.length > 1)
             {
                 foreach(size_t i, string depName; parallel(keys))
-                    foundPackages[i] = parseDep(v[depName], depName, req.cfg.workingDir, c.requiredBy, c.version_);
+                    foundPackages[i] = parseDep(v[depName], depName, req.cfg.workingDir, c.extra.requiredBy, c.version_);
                 foreach(pkg; foundPackages)
                     addDependency(req, c, pkg.name, pkg.version_, BuildRequirements.Configuration.init, pkg.path, getVisibilityString(pkg.visibility), pkg.pkgInfo, pkg.isOptional);
             }
             else if(keys.length == 1)
             {
                 string depName = keys[0];
-                Dependency pkg = parseDep(v[depName], depName, req.cfg.workingDir, c.requiredBy, c.version_);
+                Dependency pkg = parseDep(v[depName], depName, req.cfg.workingDir, c.extra.requiredBy, c.version_);
                 addDependency(req, c, pkg.name, pkg.version_, BuildRequirements.Configuration.init, pkg.path, getVisibilityString(pkg.visibility), pkg.pkgInfo, pkg.isOptional);
             }
 
@@ -357,6 +357,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
             enforce(p.type == JSONType.object || p.type == JSONType.string, "subPackages may only be either a string or an object");
 
             string subPackageName;
+            string subPackagePath = cfg.workingDir;
             if(p.type == JSONType.object)
             {
                 const(JSONValue)* name = "name" in p;
@@ -367,13 +368,13 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
             {
                 import std.path;
                 import redub.misc.path;
-                string subPackagePath = p.str;
+                subPackagePath = p.str;
                 if(!std.path.isAbsolute(subPackagePath))
                     subPackagePath = redub.misc.path.buildNormalizedPath(cfg.workingDir, subPackagePath);
                 enforce(std.file.isDir(subPackagePath), "subPackage path '"~subPackagePath~"' must be a directory " );
                 subPackageName = pathSplitter(subPackagePath).back;
             }
-            redub.package_searching.cache.putPackageInCache(buildRequirements.name~":"~subPackageName, cfg.version_, cfg.workingDir);
+            redub.package_searching.cache.putPackageInCache(buildRequirements.name~":"~subPackageName, cfg.version_, subPackagePath);
         }
 
         foreach(JSONValue p; subPackages.array)
@@ -382,7 +383,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
             {
                 const(JSONValue)* name = "name" in p;
                 if(name.str == cfg.subPackage)
-                    return parse(p, ParseConfig(cfg.workingDir, cfg.subConfiguration, null, cfg.version_, cfg.cInfo, null, cfg.requiredBy, buildRequirements.name, true, true, true));
+                    return parse(p, ParseConfig(cfg.workingDir, cfg.subConfiguration, null, cfg.version_, cfg.cInfo, null, ParseSubConfig(cfg.extra.requiredBy, buildRequirements.name), true, true));
             }
             else ///Subpackage is on other file
             {
@@ -393,10 +394,11 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
                 if(!std.path.isAbsolute(subPackagePath))
                     subPackagePath = redub.misc.path.buildNormalizedPath(cfg.workingDir, subPackagePath);
                 string subPackageName = pathSplitter(subPackagePath).back;
+
                 if(subPackageName == cfg.subPackage)
                 {
                     import redub.parsers.automatic;
-                    return parseProject(subPackagePath, cfg.cInfo, cfg.subConfiguration, null, null, false, cfg.version_);
+                    return parseProject(subPackagePath, cfg.cInfo, cfg.subConfiguration, null, null, buildRequirements.name, false, cfg.version_);
                 }
             } 
         }

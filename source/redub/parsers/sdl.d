@@ -81,7 +81,7 @@ BuildRequirements parseWithData(
     static import redub.parsers.json;
     import redub.parsers.base;
 
-    ParseConfig c = ParseConfig(workingDir, subConfiguration, subPackage, version_, cInfo, defaultPackageName, null, parentName, preGenerateRun: !isDescribeOnly);
+    ParseConfig c = ParseConfig(workingDir, subConfiguration, subPackage, version_, cInfo, defaultPackageName, ParseSubConfig(null, parentName), preGenerateRun: !isDescribeOnly);
     JSONValue json = parseSdlCached(filePath, fileData);
     BuildRequirements ret = redub.parsers.json.parse(json, c, isRoot);
     return ret;
