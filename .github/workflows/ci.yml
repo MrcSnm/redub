@@ -1,0 +1,85 @@
+name: Artifacts
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            arch: x86_64
+          - os: ubuntu-24.04-arm
+            arch: arm64
+          - os: macos-latest
+            arch: arm64
+          - os: windows-latest
+            arch: x86_64
+      fail-fast: false
+    runs-on: ${{matrix.os}}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dlang-community/setup-dlang@v2
+        with:
+          compiler: ldc-latest
+      - name: Build
+        run: |
+          dub build -b release
+      - uses: actions/upload-artifact@v4
+        if: github.ref == 'refs/heads/main'
+        with:
+          name: redub-${{ matrix.os }}-${{ matrix.arch }}
+          path: build
+
+  freebsd:
+    strategy:
+      matrix:
+        arch: [x86_64]
+      fail-fast: false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run FreeBSD VM
+        uses: vmactions/freebsd-vm@v1
+        with:
+          usesh: true
+          prepare: |
+            pkg install -y dub ldc
+          run: |
+            dub build -b release
+      - uses: actions/upload-artifact@v4
+        if: github.ref == 'refs/heads/main'
+        with:
+          name: redub-freebsd-14.2-x86_64
+          path: build
+
+  alpine:
+    strategy:
+      matrix:
+        arch: [x86_64]
+      fail-fast: false
+    runs-on: ubuntu-latest
+    container:
+      image: alpine:latest
+    defaults:
+      run:
+        shell: sh
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Prepare
+        run: |
+            apk update
+            apk add --no-cache ldc dub clang
+      - name: Build
+        run: |
+            dub build -b release      
+      - uses: actions/upload-artifact@v4
+        if: github.ref == 'refs/heads/main'
+        with:
+          name: redub-alpine-x86_64
+          path: build
