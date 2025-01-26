@@ -94,6 +94,7 @@ jobs:
         if: github.ref == 'refs/heads/main'
         with:
           name: redub-alpine-x86_64
+          path: redub-alpine-x86_64
 
   update-release:
     runs-on: ubuntu-latest
