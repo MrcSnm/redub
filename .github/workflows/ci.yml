@@ -44,7 +44,7 @@ jobs:
         if: github.ref == 'refs/heads/main'
         with:
           name: redub-${{ matrix.os }}-${{ matrix.arch }}
-          path: build
+          path: redub-${{ matrix.os }}-${{ matrix.arch }}
 
   # freebsd:
   #   strategy:
