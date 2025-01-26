@@ -92,11 +92,12 @@ jobs:
     steps:
     - name: "Download build artifacts"
       uses: actions/download-artifact@v4.1.8
+      with:
+        path: "build"
     - name: "Update BuildAssets"
       uses: ncipollo/release-action@v1
       with:
-        path: "build"
-        pattern: "redub-*"
+        artifacts: "build/redub-ubuntu-latest-x86_64,build/redub-ubuntu-24.04-arm-arm64,build/redub-macos-latest-arm64,build/redub-windows-latest-x86_64.exe,build/redub-alpine-x86_64"
         allowUpdates: "true"
         tag: "Build"
 
