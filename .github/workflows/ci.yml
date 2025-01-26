@@ -31,10 +31,14 @@ jobs:
           dub build -b release-debug
       - name: Rename artifact on Windows
         if: runner.os == 'Windows'
-        run: move redub-${{ matrix.os }}-${{ matrix.arch }}
+        run: |
+          move redub.exe redub-${{ matrix.os }}-${{ matrix.arch }}.exe
+          dir
       - name: Rename artifact Unix
         if: runner.os != 'Windows'
-        run: mv redub-${{ matrix.os }}-${{ matrix.arch }}
+        run: |
+          mv redub redub-${{ matrix.os }}-${{ matrix.arch }}
+          ls
       
       - uses: actions/upload-artifact@v4
         if: github.ref == 'refs/heads/main'
@@ -84,7 +88,7 @@ jobs:
             apk add --no-cache ldc dub clang
       - name: Build
         run: |
-            dub build -b release
+            dub build -b release-debug
       - run: mv redub redub-alpine-x86_64
       - uses: actions/upload-artifact@v4
         if: github.ref == 'refs/heads/main'
