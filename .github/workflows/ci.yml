@@ -36,7 +36,7 @@ jobs:
           dir
           move build/redub.exe redub-${{ matrix.os }}-${{ matrix.arch }}.exe
       - name: Upload artifacts on Windows
-      - uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4
         if: runner.os == 'Windows'
         with:
           name: redub-windows-latest-x86_64.exe
@@ -48,7 +48,7 @@ jobs:
           ls -R
           mv build/redub redub-${{ matrix.os }}-${{ matrix.arch }}
       - name: Upload artifacts on Unix
-      - uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4
         if: runner.os != 'Windows' && github.ref == 'refs/heads/main'
         with:
           name: redub-${{ matrix.os }}-${{ matrix.arch }}
@@ -117,7 +117,7 @@ jobs:
     - name: Display structure of downloaded files
       run: ls -R
 
-    - name: "Update BuildAssets"
+    - name: "Update Prebuilt Binaries"
       uses: ncipollo/release-action@v1
       with:
         artifacts: "redub-ubuntu-latest-x86_64,redub-ubuntu-24.04-arm-arm64,redub-macos-latest-arm64,redub-windows-latest-x86_64.exe,redub-alpine-x86_64"
