@@ -94,13 +94,14 @@ jobs:
       uses: actions/download-artifact@v4.1.8
       with:
         path: "build"
+        merge-multiple: true
     - name: Display structure of downloaded files
       run: ls -R build
 
     - name: "Update BuildAssets"
       uses: ncipollo/release-action@v1
       with:
-        artifacts: "build/redub-ubuntu-latest-x86_64/redub,build/redub-ubuntu-24.04-arm-arm64/redub,build/redub-macos-latest-arm64/redub,build/redub-windows-latest-x86_64/redub.exe,build/redub-alpine-x86_64/redub"
+        artifacts: "build/redub-ubuntu-latest-x86_64,build/redub-ubuntu-24.04-arm-arm64,build/redub-macos-latest-arm64,build/redub-windows-latest-x86_64.exe,build/redub-alpine-x86_64"
         allowUpdates: "true"
         tag: "Build"
 
