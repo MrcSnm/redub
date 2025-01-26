@@ -107,7 +107,7 @@ jobs:
       with:
         merge-multiple: true
     - name: Display structure of downloaded files
-      run: ls -R build
+      run: ls -R
 
     - name: "Update BuildAssets"
       uses: ncipollo/release-action@v1
