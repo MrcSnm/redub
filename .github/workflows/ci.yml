@@ -83,3 +83,19 @@ jobs:
         with:
           name: redub-alpine-x86_64
           path: build
+
+  update-release:
+    runs-on: ubuntu-latest
+    needs: [build, alpine]
+    permissions:
+      contents: write
+    steps:
+    - name: "Download build artifacts"
+      uses: actions/download-artifact@v4.1.8
+    - name: "Update BuildAssets"
+      uses: ncipollo/release-action@v1
+      with:
+        artifacts: "build/redub-ubuntu-latest-x86_64,build/redub-ubuntu-24.04-arm-arm64,build/redub-macos-latest-arm,build/redub-windows-latest-x86_64,build/redub-alpine-x86_64"
+        allowUpdates: "true"
+        tag: "BuildAssets.v1.0.0"
+
