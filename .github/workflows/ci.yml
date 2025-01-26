@@ -95,7 +95,7 @@ jobs:
     - name: "Update BuildAssets"
       uses: ncipollo/release-action@v1
       with:
-        artifacts: "build/redub-ubuntu-latest-x86_64,build/redub-ubuntu-24.04-arm-arm64,build/redub-macos-latest-arm,build/redub-windows-latest-x86_64,build/redub-alpine-x86_64"
+        artifacts: "redub-ubuntu-latest-x86_64,redub-ubuntu-24.04-arm-arm64,redub-macos-latest-arm,redub-windows-latest-x86_64,redub-alpine-x86_64"
         allowUpdates: "true"
-        tag: "BuildAssets.v1.0.0"
+        tag: "Build"
 
