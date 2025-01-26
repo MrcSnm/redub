@@ -29,19 +29,27 @@ jobs:
       - name: Build
         run: |
           dub build -b release-debug
+      
       - name: Rename artifact on Windows
         if: runner.os == 'Windows'
         run: |
           dir
           move build/redub.exe redub-${{ matrix.os }}-${{ matrix.arch }}.exe
+      - name: Upload artifacts on Windows
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'Windows'
+        with:
+          name: redub-windows-latest-x86_64.exe
+          path: redub-windows-latest-x86_64.exe
+        
       - name: Rename artifact Unix
         if: runner.os != 'Windows'
         run: |
           ls -R
           mv build/redub redub-${{ matrix.os }}-${{ matrix.arch }}
-      
+      - name: Upload artifacts on Unix
       - uses: actions/upload-artifact@v4
-        if: github.ref == 'refs/heads/main'
+        if: runner.os != 'Windows' && github.ref == 'refs/heads/main'
         with:
           name: redub-${{ matrix.os }}-${{ matrix.arch }}
           path: redub-${{ matrix.os }}-${{ matrix.arch }}
