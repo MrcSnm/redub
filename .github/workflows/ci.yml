@@ -28,7 +28,14 @@ jobs:
           compiler: ldc-latest
       - name: Build
         run: |
-          dub build -b release
+          dub build -b release-debug
+      - name: Rename artifact on Windows
+        if: runner.os == 'Windows'
+        run: move redub-${{ matrix.os }}-${{ matrix.arch }}
+      - name: Rename artifact Unix
+        if: runner.os != 'Windows'
+        run: mv redub-${{ matrix.os }}-${{ matrix.arch }}
+      
       - uses: actions/upload-artifact@v4
         if: github.ref == 'refs/heads/main'
         with:
@@ -77,12 +84,12 @@ jobs:
             apk add --no-cache ldc dub clang
       - name: Build
         run: |
-            dub build -b release      
+            dub build -b release
+      - run: mv redub redub-alpine-x86_64
       - uses: actions/upload-artifact@v4
         if: github.ref == 'refs/heads/main'
         with:
           name: redub-alpine-x86_64
-          path: build
 
   update-release:
     runs-on: ubuntu-latest
@@ -93,7 +100,6 @@ jobs:
     - name: "Download build artifacts"
       uses: actions/download-artifact@v4.1.8
       with:
-        path: "build"
         merge-multiple: true
     - name: Display structure of downloaded files
       run: ls -R build
@@ -101,7 +107,7 @@ jobs:
     - name: "Update BuildAssets"
       uses: ncipollo/release-action@v1
       with:
-        artifacts: "build/redub-ubuntu-latest-x86_64,build/redub-ubuntu-24.04-arm-arm64,build/redub-macos-latest-arm64,build/redub-windows-latest-x86_64.exe,build/redub-alpine-x86_64"
+        artifacts: "redub-ubuntu-latest-x86_64,redub-ubuntu-24.04-arm-arm64,redub-macos-latest-arm64,redub-windows-latest-x86_64.exe,redub-alpine-x86_64"
         allowUpdates: "true"
         tag: "Build"
 
