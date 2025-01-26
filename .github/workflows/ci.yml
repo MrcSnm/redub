@@ -33,12 +33,12 @@ jobs:
         if: runner.os == 'Windows'
         run: |
           dir
-          move redub.exe redub-${{ matrix.os }}-${{ matrix.arch }}.exe
+          move build/redub.exe redub-${{ matrix.os }}-${{ matrix.arch }}.exe
       - name: Rename artifact Unix
         if: runner.os != 'Windows'
         run: |
           ls -R
-          mv redub redub-${{ matrix.os }}-${{ matrix.arch }}
+          mv build/redub redub-${{ matrix.os }}-${{ matrix.arch }}
       
       - uses: actions/upload-artifact@v4
         if: github.ref == 'refs/heads/main'
@@ -89,7 +89,7 @@ jobs:
       - name: Build
         run: |
             dub build -b release-debug
-      - run: mv redub redub-alpine-x86_64
+      - run: mv build/redub redub-alpine-x86_64
       - uses: actions/upload-artifact@v4
         if: github.ref == 'refs/heads/main'
         with:
