@@ -114,6 +114,10 @@ jobs:
       uses: actions/download-artifact@v4.1.8
       with:
         merge-multiple: true
+    - name: "Get latest tag"
+      id: get_tag
+      run: echo "::set-output name=tag::$(git describe --tags --abbrev=0)"
+      
     - name: Display structure of downloaded files
       run: ls -R
 
@@ -122,5 +126,4 @@ jobs:
       with:
         artifacts: "redub-ubuntu-latest-x86_64,redub-ubuntu-24.04-arm-arm64,redub-macos-latest-arm64,redub-windows-latest-x86_64.exe,redub-alpine-x86_64"
         allowUpdates: "true"
-        tag: "Build"
-
+        tag: "Redub ${{ steps.get_tag.outputs.tag}}"
