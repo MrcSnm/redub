@@ -28,34 +28,53 @@ jobs:
           compiler: ldc-latest
       - name: Build
         run: |
-          dub build -b release
-      - uses: actions/upload-artifact@v4
-        if: github.ref == 'refs/heads/main'
+          dub build -b release-debug
+      
+      - name: Rename artifact on Windows
+        if: runner.os == 'Windows'
+        run: |
+          dir
+          move build/redub.exe redub-${{ matrix.os }}-${{ matrix.arch }}.exe
+      - name: Upload artifacts on Windows
+        uses: actions/upload-artifact@v4
+        if: runner.os == 'Windows'
+        with:
+          name: redub-windows-latest-x86_64.exe
+          path: redub-windows-latest-x86_64.exe
+        
+      - name: Rename artifact Unix
+        if: runner.os != 'Windows'
+        run: |
+          ls -R
+          mv build/redub redub-${{ matrix.os }}-${{ matrix.arch }}
+      - name: Upload artifacts on Unix
+        uses: actions/upload-artifact@v4
+        if: runner.os != 'Windows' && github.ref == 'refs/heads/main'
         with:
           name: redub-${{ matrix.os }}-${{ matrix.arch }}
-          path: build
+          path: redub-${{ matrix.os }}-${{ matrix.arch }}
 
-  freebsd:
-    strategy:
-      matrix:
-        arch: [x86_64]
-      fail-fast: false
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Run FreeBSD VM
-        uses: vmactions/freebsd-vm@v1
-        with:
-          usesh: true
-          prepare: |
-            pkg install -y dub ldc
-          run: |
-            dub build -b release
-      - uses: actions/upload-artifact@v4
-        if: github.ref == 'refs/heads/main'
-        with:
-          name: redub-freebsd-14.2-x86_64
-          path: build
+  # freebsd:
+  #   strategy:
+  #     matrix:
+  #       arch: [x86_64]
+  #     fail-fast: false
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - name: Run FreeBSD VM
+  #       uses: vmactions/freebsd-vm@v1
+  #       with:
+  #         usesh: true
+  #         prepare: |
+  #           pkg install -y dub ldc
+  #         run: |
+  #           dub build -b release
+  #     - uses: actions/upload-artifact@v4
+  #       if: github.ref == 'refs/heads/main'
+  #       with:
+  #         name: redub-freebsd-14.2-x86_64
+  #         path: build
 
   alpine:
     strategy:
@@ -77,9 +96,31 @@ jobs:
             apk add --no-cache ldc dub clang
       - name: Build
         run: |
-            dub build -b release      
+            dub build -b release-debug
+      - run: mv build/redub redub-alpine-x86_64
       - uses: actions/upload-artifact@v4
         if: github.ref == 'refs/heads/main'
         with:
           name: redub-alpine-x86_64
-          path: build
+          path: redub-alpine-x86_64
+
+  update-release:
+    runs-on: ubuntu-latest
+    needs: [build, alpine]
+    permissions:
+      contents: write
+    steps:
+    - name: "Download build artifacts"
+      uses: actions/download-artifact@v4.1.8
+      with:
+        merge-multiple: true
+    - name: Display structure of downloaded files
+      run: ls -R
+
+    - name: "Update Prebuilt Binaries"
+      uses: ncipollo/release-action@v1
+      with:
+        artifacts: "redub-ubuntu-latest-x86_64,redub-ubuntu-24.04-arm-arm64,redub-macos-latest-arm64,redub-windows-latest-x86_64.exe,redub-alpine-x86_64"
+        allowUpdates: "true"
+        tag: "Build"
+
