@@ -23,6 +23,7 @@ auto execCompilerBase(const BuildConfiguration cfg, string compilerBin, string[]
 auto execCompiler(const BuildConfiguration cfg, string compilerBin, string[] compileFlags, out string compilationCommands, Compiler compiler, string inputDir)
 {
     import std.file;
+    import redub.api;
     import std.path;
 
     import redub.compiler_identification;
@@ -34,11 +35,15 @@ auto execCompiler(const BuildConfiguration cfg, string compilerBin, string[] com
 
     auto ret = execCompilerBase(cfg, compilerBin, compileFlags, compilationCommands, compiler.isDCompiler);
 
-    //For working around bug 3541, 24748, dmd generates .obj files besides files, redub will move them out
-    //of there to the object directory
-    if(cfg.outputsDeps && cfg.preservePath && compiler.compiler == AcceptedCompiler.dmd)
-        moveGeneratedObjectFiles(cfg.sourcePaths, cfg.sourceFiles, cfg.excludeSourceFiles, getObjectDir(inputDir),getObjectExtension(os));
-    copyDir(inputDir, dirName(outDir));
+    if(ret.status == 0)
+    {
+        //For working around bug 3541, 24748, dmd generates .obj files besides files, redub will move them out
+        //of there to the object directory
+        if(cfg.outputsDeps && cfg.preservePath && compiler.compiler == AcceptedCompiler.dmd)
+            moveGeneratedObjectFiles(cfg.sourcePaths, cfg.sourceFiles, cfg.excludeSourceFiles, getObjectDir(inputDir),getObjectExtension(os));
+        copyDir(inputDir, dirName(outDir));
+    }
+
 
     return ret;
 }

@@ -81,11 +81,14 @@ void buildPlugin(string pluginName, string inputFile, CompilationInfo cInfo)
     CompilingSession s = CompilingSession(getCompiler, os, instructionSetArchitecture);
 
     string buildCmds;
-    string inDir = getCacheOutputDir("plugins", b, s, true);
+    string pluginHash = hashFrom(b, s, true);
+    string inDir = getCacheOutputDir(pluginHash, b, s, true);
 
-    errorTitle("", execCompiler(b, s.compiler.binOrPath, getCompilationFlags(b, s, "plugins", true), buildCmds, s.compiler, inDir).output);
+    errorTitle(pluginHash, " ", hashFrom(b, s, false));
+
+    errorTitle("", execCompiler(b, s.compiler.binOrPath, getCompilationFlags(b, s, pluginHash, true), buildCmds, s.compiler, inDir).output);
     errorTitle("Plugin Flags: ", buildCmds);
-    errorTitle("", linkBase(const ThreadBuildData(b, ExtraInformation()), s, "plugins", buildCmds).output);
+    errorTitle("", linkBase(const ThreadBuildData(b, ExtraInformation()), s, pluginHash, buildCmds).output);
     errorTitle("Plugin Flags: ", buildCmds);
 }
 
