@@ -114,6 +114,12 @@ jobs:
       uses: actions/download-artifact@v4.1.8
       with:
         merge-multiple: true
+    # - uses: actions/checkout@v4
+    # - name: Fetch all tags
+    #   run: git fetch --tags
+    # - name: "Get latest tag"
+    #   run: echo "TAG=$(git describe --tags --abbrev=0) >> $GITHUB_ENV"
+      
     - name: Display structure of downloaded files
       run: ls -R
 
@@ -123,4 +129,3 @@ jobs:
         artifacts: "redub-ubuntu-latest-x86_64,redub-ubuntu-24.04-arm-arm64,redub-macos-latest-arm64,redub-windows-latest-x86_64.exe,redub-alpine-x86_64"
         allowUpdates: "true"
         tag: "Build"
-
