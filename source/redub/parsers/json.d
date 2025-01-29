@@ -402,8 +402,12 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
                 }
             } 
         }
+        import std.array;
+        import std.algorithm.iteration;
+
         throw new Exception("subPackage named '"~cfg.subPackage~"' could not be found " ~
-            "while looking inside the requested package '"~buildRequirements.name ~ "' in path "~ cfg.workingDir
+            "while looking inside the requested package '"~buildRequirements.name ~ "' in path "~ cfg.workingDir~".\nAvailable subpackages:\n\t"~
+            subPackages.array.map!((JSONValue v) => v["name"].str).join("\n\t")
         );
     }
     string[] unusedKeys;
