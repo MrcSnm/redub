@@ -12,14 +12,24 @@ OS osFromArch(string arch)
 {
     import std.string;
     static bool contains(string a, string b){return a.indexOf(b) != -1;}
+
+    if(arch is null) return std.system.os;
+
     if(contains(arch, "x86_64-windows")) return OS.win64;
     else if(contains(arch, "i686-windows")) return OS.win32;
     else if(contains(arch, "android")) return OS.android;
     else if(contains(arch, "linux")) return OS.linux;
     else if(contains(arch, "macos")) return OS.osx;
     else if(contains(arch, "ios")) return OS.iOS;
-    else if(contains(arch, "wasm32")) return OS.otherPosix;
-    else return std.system.os;
+    else if(contains(arch, "tvos")) return OS.tvOS;
+    else if(contains(arch, "watchos")) return OS.watchOS;
+    else if(contains(arch, "freebsd")) return OS.freeBSD;
+    else if(contains(arch, "netbsd")) return OS.netBSD;
+    else if(contains(arch, "openbsd")) return OS.openBSD;
+    else if(contains(arch, "solaris")) return OS.solaris;
+    else if(contains(arch, "posix")) return OS.otherPosix;
+
+    return OS.unknown;
 }
 
 ISA isaFromArch(string arch)
@@ -228,7 +238,7 @@ void copyDir(string fromDir, string toDir, bool shallow = true)
 string getOutputName(TargetType t, string name, OS os, ISA isa = std.system.instructionSetArchitecture)
 {
     string outputName = name;
-    if(os.isPosix && t.isAnyLibrary)
+    if(!os.isWindows && t.isAnyLibrary)
     {
         import std.path;
         import std.string;

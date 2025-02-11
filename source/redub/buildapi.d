@@ -8,7 +8,7 @@ import redub.package_searching.api;
 
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.20.2";
+enum RedubVersionOnly = "v1.20.3";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -1158,7 +1158,7 @@ void putLinkerFiles(const ProjectNode tree, out string[] dataContainer, OS os, I
     import std.path;
     
     if(tree.requirements.cfg.targetType.isStaticLibrary)
-        dataContainer~= tree.getOutputName(os);
+        dataContainer~= tree.getOutputName(os, isa);
 
     dataContainer = dataContainer.append(tree.requirements.extra.librariesFullPath.map!((string libPath)
     {
