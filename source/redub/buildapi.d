@@ -8,7 +8,7 @@ import redub.package_searching.api;
 
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.20.1";
+enum RedubVersionOnly = "v1.20.2";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -1150,7 +1150,7 @@ class ProjectNode
     }
 }
 
-void putLinkerFiles(const ProjectNode tree, out string[] dataContainer)
+void putLinkerFiles(const ProjectNode tree, out string[] dataContainer, OS os, ISA isa)
 {
     import std.algorithm.iteration;
     import redub.command_generators.commons;
@@ -1163,7 +1163,7 @@ void putLinkerFiles(const ProjectNode tree, out string[] dataContainer)
     dataContainer = dataContainer.append(tree.requirements.extra.librariesFullPath.map!((string libPath)
     {
         import redub.misc.path;
-        return redub.misc.path.buildNormalizedPath(dirName(libPath), getOutputName(TargetType.staticLibrary, baseName(libPath), os));
+        return redub.misc.path.buildNormalizedPath(dirName(libPath), getOutputName(TargetType.staticLibrary, baseName(libPath), os, isa));
     }).retro);
 }
 

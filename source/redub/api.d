@@ -32,7 +32,11 @@ struct ProjectDetails
         return 0;
     }
 
-    void getLinkerFiles(out string[] output) const {putLinkerFiles(tree, output);}
+    void getLinkerFiles(out string[] output) const
+    {
+        import redub.command_generators.commons;
+        putLinkerFiles(tree, output, osFromArch(cDetails.arch), isaFromArch(cDetails.arch));
+    }
     void getSourceFiles(out string[] output) const {putSourceFiles(tree, output);}
 
     string getCacheOutputDir(CompilingSession s) const

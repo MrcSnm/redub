@@ -149,31 +149,31 @@ int describeMain(string[] args)
     alias OutputData = string[];
 
     static immutable outputs =[
-        "main-source-file": (ref string[] dataContainer, const ProjectNode root){dataContainer~= root.requirements.cfg.sourceEntryPoint;},
-        "dflags": (ref string[] dataContainer, const ProjectNode root){dataContainer~= root.requirements.cfg.dFlags;},
-        "lflags": (ref string[] dataContainer, const ProjectNode root){dataContainer~= root.requirements.cfg.linkFlags;},
-        "libs": (ref string[] dataContainer, const ProjectNode root){dataContainer~= root.requirements.cfg.libraries;},
-        "linker-files": (ref string[] dataContainer, const ProjectNode root)
+        "main-source-file": (ref string[] dataContainer, const ProjectNode root, const ProjectDetails d){dataContainer~= root.requirements.cfg.sourceEntryPoint;},
+        "dflags": (ref string[] dataContainer, const ProjectNode root, const ProjectDetails d){dataContainer~= root.requirements.cfg.dFlags;},
+        "lflags": (ref string[] dataContainer, const ProjectNode root, const ProjectDetails d){dataContainer~= root.requirements.cfg.linkFlags;},
+        "libs": (ref string[] dataContainer, const ProjectNode root, const ProjectDetails d){dataContainer~= root.requirements.cfg.libraries;},
+        "linker-files": (ref string[] dataContainer, const ProjectNode root, const ProjectDetails d)
         {
-            root.putLinkerFiles(dataContainer);
+            root.putLinkerFiles(dataContainer, osFromArch(d.cDetails.arch), isaFromArch(d.cDetails.arch));
         },
-        "source-files": (ref string[] dataContainer, const ProjectNode root)
+        "source-files": (ref string[] dataContainer, const ProjectNode root, const ProjectDetails d)
         {
             root.putSourceFiles(dataContainer);
         },
-        "versions": (ref string[] dataContainer, const ProjectNode root){dataContainer~= root.requirements.cfg.versions;},
+        "versions": (ref string[] dataContainer, const ProjectNode root, const ProjectDetails d){dataContainer~= root.requirements.cfg.versions;},
         // "debug-versions": (){},
-        "import-paths": (ref string[] dataContainer, const ProjectNode root){dataContainer~= root.requirements.cfg.importDirectories;},
-        "string-import-paths": (ref string[] dataContainer, const ProjectNode root){dataContainer~= root.requirements.cfg.stringImportPaths;}, 
-        "import-files": (ref string[] dataContainer, const ProjectNode root){}, 
-        "options": (ref string[] dataContainer, const ProjectNode root){}
+        "import-paths": (ref string[] dataContainer, const ProjectNode root, const ProjectDetails d){dataContainer~= root.requirements.cfg.importDirectories;},
+        "string-import-paths": (ref string[] dataContainer, const ProjectNode root, const ProjectDetails d){dataContainer~= root.requirements.cfg.stringImportPaths;},
+        "import-files": (ref string[] dataContainer, const ProjectNode root, const ProjectDetails d){},
+        "options": (ref string[] dataContainer, const ProjectNode root, const ProjectDetails d){}
     ];
     OutputData[] outputContainer = new OutputData[](desc.data.length);
     foreach(i, data; desc.data)
     {
         auto handler = data in outputs;
         if(handler)
-            (*handler)(outputContainer[i], d.tree);
+            (*handler)(outputContainer[i], d.tree, d);
     }
 
     foreach(data; outputContainer)
