@@ -8,7 +8,7 @@ import redub.package_searching.api;
 
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.20.3";
+enum RedubVersionOnly = "v1.21.0";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -30,6 +30,21 @@ struct CompilingSession
     Compiler compiler;
     OS os;
     ISA isa;
+
+    this(Compiler compiler, OS os, ISA isa)
+    {
+        this.compiler = compiler;
+        this.os = os;
+        this.isa = isa;
+    }
+
+    this(Compiler compiler, string arch)
+    {
+        import redub.command_generators.commons;
+        this.compiler = compiler;
+        this.os = osFromArch(arch);
+        this.isa = isaFromArch(arch);
+    }
 }
 
 enum TargetType
@@ -758,6 +773,34 @@ class ProjectNode
             if(!parallelizable) return false;
         }
         return parallelizable;
+    }
+
+    /** 
+     * 
+     * Returns: Values being either -1, 0 or 1
+     *
+     *  -1: The linker flags doesn't say anything
+     *  0: Linker flags explicitly set to not use (-link-internally or other linker)
+     *  1: Explicitly set to use gnu ld. (-linker=ld)
+     * 
+     */
+    int isUsingGnuLinker() const
+    {
+        import std.string:startsWith;
+        foreach(lFlag; requirements.cfg.linkFlags)
+        {
+            if(lFlag.startsWith("-link"))
+            {
+                string temp = lFlag["-link".length..$];
+                switch(temp) //-link-internally
+                {
+                    case "-internally": return false;
+                    case "-er=ld": return true;
+                    default: return false;
+                }
+            }
+        }
+        return false;
     }
 
     /** 

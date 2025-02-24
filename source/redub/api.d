@@ -197,7 +197,7 @@ ProjectDetails buildProject(ProjectDetails d)
     if(!d.tree)
         return d;
 
-    CompilingSession session = CompilingSession(d.compiler, osFromArch(d.cDetails.arch), isaFromArch(d.tree.requirements.cfg.arch));
+    CompilingSession session = CompilingSession(d.compiler, d.cDetails.arch);
 
     AdvCacheFormula sharedFormula;
     if(d.forceRebuild)
@@ -211,6 +211,9 @@ ProjectDetails buildProject(ProjectDetails d)
     ProjectNode tree = d.tree;
     if(d.useExistingObjFiles)
         tree.requirements.cfg.changedBuildFiles = getChangedBuildFiles(tree, session);
+    int uses = tree.isUsingGnuLinker();
+    if(uses != -1)
+        session.compiler.usesGnuLinker = uses ? true : false;
     startHandlingConsoleControl();
 
     auto result = timed(()
@@ -354,7 +357,7 @@ ProjectDetails resolveDependencies(
     static import redub.parsers.build_type;
 
     StopWatch st = StopWatch(AutoStart.yes);
-    Compiler compiler = getCompiler(cDetails.compilerOrPath, cDetails.assumption);
+    Compiler compiler = getCompiler(cDetails.compilerOrPath, cDetails.assumption, cDetails.arch);
 
     with(dubVars)
     {

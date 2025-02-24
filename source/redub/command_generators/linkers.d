@@ -10,11 +10,7 @@ string[] parseLinkConfiguration(const ThreadBuildData data, CompilingSession s, 
     import redub.misc.path;
     import redub.building.cache;
     string[] commands;
-
-    version(linux)
-        bool isUsingGNULinker = true;
-    else
-        bool isUsingGNULinker = false;
+    bool isUsingGNULinker = s.compiler.usesGnuLinker;
 
     const BuildConfiguration b = data.cfg;
     with(b)

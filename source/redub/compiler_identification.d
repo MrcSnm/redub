@@ -12,6 +12,13 @@ enum AcceptedCompiler
     gxx
 }
 
+enum UsesGnuLinker
+{
+    unknown,
+    yes,
+    no
+}
+
 AcceptedCompiler acceptedCompilerfromString(string str)
 {
     switch(str)
@@ -50,6 +57,8 @@ struct Compiler
     string archiver = "llvm-ar";
 
     bool usesIncremental = false;
+
+    bool usesGnuLinker = false;
 
 
     string getCompilerString() const
@@ -156,69 +165,133 @@ private string getActualCompilerToUse(string preferredCompiler, ref string actua
     return compVersionRes.output;
 }
 
+string tryGetStr(JSONValue v, string key)
+{
+    JSONValue* ret = key in v;
+    return ret ? ret.str : null;
+}
 
 /** 
  * Use this function to get extensive information about the Compiler to use.
  * Params:
  *   compilerOrPath = Can be used both as a global, such as `dmd` or a complete path to a compiler. If null, defaults to DMD
  *   compilerAssumption = Optinal version string, such as `dmd v[2.105.0] f[2.106.0]`, v being its version, f being frontend version
+ *   arch = Used mainly for identifying which ldc.conf to take, and by using it, it is possible to detect the default linker for the specific arch
  * Returns: The Compiler information that was found, or inferred if compilerAssumption was used.
  */
-Compiler getCompiler(string compilerOrPath = "dmd", string compilerAssumption = null)
+Compiler getCompiler(string compilerOrPath = "dmd", string compilerAssumption = null, string arch = null)
 {
-    import std.process;
     import std.algorithm.comparison:either;
     import redub.misc.find_executable;
     import redub.meta;
-    import std.exception;
     import std.path;
 
 
     JSONValue compilersInfo = getRedubMeta();
-    bool isDefault;
-    if(compilerOrPath == null) 
-    {
-        if("defaultCompiler" in compilersInfo)
-            compilerOrPath = compilersInfo["defaultCompiler"].str;
-        isDefault = true;
-    }
-    if(compilerOrPath == null)
-        compilerOrPath = "dmd";
+    bool isDefault = compilerOrPath == null;
+    compilerOrPath = either(compilerOrPath, tryGetStr(compilersInfo, "defaultCompiler"), "dmd");
+    bool isGlobal = false;
 
-    bool isGlobal;
+    Compiler ret;
+    //Try get compiler on global cache with global cached paths
     if(!isAbsolute(compilerOrPath))
     {
         string locCompiler = tryGetCompilerOnCwd(compilerOrPath);
-        isGlobal = locCompiler == compilerOrPath;
-
-        if(!isGlobal)
+        if(locCompiler != compilerOrPath)
             compilerOrPath = locCompiler;
         else
         {
-            if(JSONValue* globalPaths = "globalPaths" in compilersInfo)
-            {
-                if(JSONValue* cachedPath = compilerOrPath in *globalPaths)
-                {
-                    Compiler ret = getCompilerFromCache(compilersInfo, cachedPath.str);
-                    if(ret != Compiler.init)
-                        return ret;
-                }
-            }
-            compilerOrPath = findExecutable(compilerOrPath);
+            ret = getCompilerFromGlobalPath(compilerOrPath, compilersInfo);
+            isGlobal = true;
         }
     }
+    //Try finding the compiler globally and getting it from cache
+    if(ret == Compiler.init)
+    {
+        compilerOrPath = findExecutable(compilerOrPath);
+        ret = getCompilerFromCache(compilersInfo, compilerOrPath);
+    }
+    //Try inferring the compiler and saving its infos
+    if(ret == Compiler.init)
+        ret = inferCompiler(compilerOrPath, compilerAssumption, compilersInfo, isDefault, isGlobal);
 
-    Compiler ret = getCompilerFromCache(compilersInfo, compilerOrPath);
-    if(ret != Compiler.init)
-        return ret;
+    ret.usesGnuLinker = compilersInfo["defaultsToGnuLd"].boolean;
+
+    //Checks for ldc.conf switches to see if it is using gnu linker by default
+    if(ret.compiler == AcceptedCompiler.ldc2)
+    {
+        int res = isUsingGnuLinker(ret.binOrPath, arch);
+        if(res != UsesGnuLinker.unknown)
+            ret.usesGnuLinker = res == UsesGnuLinker.yes ? true : false;
+    } 
+
+    
+    return ret;
+}
+
+/** 
+ * Used for determining whether it is running on gnu ld or not
+ * Params:
+ *   ldcPath = Ldc path for finding the ldc.conf file
+ *   arch = Which architecture this compiler run is running with
+ * Returns: -1 for can't tell. 0 if false and 1 if true
+ */
+private UsesGnuLinker isUsingGnuLinker(string ldcPath, string arch)
+{
+    import redub.misc.ldc_conf_parser;
+    import std.file;
+    import std.algorithm.searching;
+    ConfigSection section = getLdcConfig(std.file.getcwd(), ldcPath, arch);
+    if(section == ConfigSection.init)
+        return UsesGnuLinker.unknown;
+    string* switches = "switches" in section.values;
+    if(!switches)
+        return UsesGnuLinker.unknown;
+    string s = *switches;
+    ptrdiff_t linkerStart = s.countUntil("-link");
+    if(linkerStart == -1)
+        return UsesGnuLinker.unknown;
+    s = s[linkerStart..$];
+
+    if(countUntil(s, "-link-internally") != -1 || countUntil(s, "-linker=lld"))
+        return UsesGnuLinker.no;
+
+    return countUntil(s, "-linker=ld") != -1 ? UsesGnuLinker.yes : UsesGnuLinker.unknown;
+}
 
 
+private Compiler getCompilerFromGlobalPath(string compilerOrPath, JSONValue compilersInfo)
+{
+    if(JSONValue* globalPaths = "globalPaths" in compilersInfo)
+    {
+        if(JSONValue* cachedPath = compilerOrPath in *globalPaths)
+            return getCompilerFromCache(compilersInfo, cachedPath.str);
+    }
+    return Compiler.init;
+}
+
+/** 
+ * 
+ * Params:
+ *   compilerOrPath = The path where the compiler is
+ *   compilerAssumption = Assumption that will make skip --version call
+ *   compilersInfo = Used for saving metadata
+ *   isDefault = Used for metadata
+ *   isGlobal = Used for metadata
+ * Returns: The compiler that was inferrred from the given info
+ */
+private Compiler inferCompiler(string compilerOrPath, string compilerAssumption, JSONValue compilersInfo, bool isDefault, bool isGlobal)
+{
+    import redub.misc.find_executable;
+    import std.array;
     immutable inference = [
         &tryInferDmd,
         &tryInferLdc,
         &tryInferGcc,
         &tryInferGxx
-    ];
+    ].staticArray;
+
+    Compiler ret;
 
     if(compilerAssumption == null)
     {
@@ -278,7 +351,7 @@ private Compiler getCompilerFromCache(JSONValue allCompilersInfo, string compile
                     SemVer(arr[VERSION_].str),
                     SemVer(arr[FRONTEND_VERSION].str),
                     arr[VERSION_STRING].str,
-                    key
+                    key, null, false, allCompilersInfo["defaultsToGnuLd"].boolean
                 );
             }
         }
@@ -296,11 +369,11 @@ private Compiler getCompilerFromCache(JSONValue allCompilersInfo, string compile
 ```
  * Params:
  *   allCompilersInfo = The JSON value of the current redub compilers info
- *   compiler = The new compiler to add
+ *   compiler = The new compiler to add. It will also save usesGnuLinker inside compiler
  *   isDefault = saves the compiler as the default compiler
  *   isGlobal = Saves the compiler as a globalPath. For example, it will use the path whenever expected to find in global path when "dmd" is sent or "ldc2" (i.e: no real path)
  */
-private void saveCompilerInfo(JSONValue allCompilersInfo, Compiler compiler, bool isDefault, bool isGlobal)
+private void saveCompilerInfo(JSONValue allCompilersInfo, ref Compiler compiler, bool isDefault, bool isGlobal)
 {
     import redub.meta;
     import std.conv:to;
@@ -319,6 +392,11 @@ private void saveCompilerInfo(JSONValue allCompilersInfo, Compiler compiler, boo
     }
     if(!("version" in allCompilersInfo))
         allCompilersInfo["version"] = JSONValue(RedubVersionOnly);
+
+    if(!("defaultsToGnuLd" in allCompilersInfo))
+        allCompilersInfo["defaultsToGnuLd"] = JSONValue(isDefaultLinkerGnuLd());
+
+    compiler.usesGnuLinker = allCompilersInfo["defaultsToGnuLd"].boolean;
 
     if(!("compilers" in allCompilersInfo))
         allCompilersInfo["compilers"] = JSONValue.emptyObject;
@@ -371,6 +449,19 @@ private Compiler assumeCompiler(string compilerOrPath, string compilerAssumption
     return ret;
 }
 
+
+bool isDefaultLinkerGnuLd()
+{
+    version(linux)
+    {
+        import std.process;
+        import std.string;
+        auto res = executeShell("ld -v");
+        return res.status == 0 && res.output.startsWith("GNU ld");
+    }
+    else
+        return false;
+}
 
 private bool tryInferLdc(string compilerOrPath, string vString, out Compiler comp)
 {
