@@ -150,6 +150,10 @@ struct DubArguments
     @("Specifies the target name")
     string targetName;
 
+
+    @("Uses breadth first search for source files, replicating how dub adds files to project. Might be a little slower")
+    bool breadth;
+
     @(
         "Specifies a version string which contains the compiler name and its version "~
         "This can make the dependency resolution a lot faster since executing compiler --version won't be necessary "~

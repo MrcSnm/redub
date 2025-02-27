@@ -332,6 +332,13 @@ bool isFileHidden(DirEntry e)
     }
 }
 
+
+private __gshared bool useBreadth;
+void setSpanModeAsBreadth(bool breadth)
+{
+    useBreadth = breadth;
+}
+
 void putSourceFiles(
     ref string[] output,
     const string workingDir,
@@ -349,7 +356,7 @@ void putSourceFiles(
     
     foreach(path; paths)
     {
-        DirEntryLoop: foreach(DirEntry e; dirEntries(unescapePath(path), SpanMode.depth))
+        DirEntryLoop: foreach(DirEntry e; dirEntries(unescapePath(path), useBreadth ? SpanMode.breadth : SpanMode.depth))
         {
             foreach(exclusion; excludeFiles)
                 if(e.name.globMatch(exclusion))

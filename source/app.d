@@ -426,6 +426,11 @@ update
         writeln(RedubVersion);
         return ProjectDetails(null, Compiler.init, ParallelType.auto_, CompilationDetails.init, false, true);
     }
+    if(bArgs.breadth)
+    {
+        import redub.command_generators.commons;
+        setSpanModeAsBreadth(bArgs.breadth);
+    }
 
     if(bArgs.arch && !bArgs.compiler) bArgs.compiler = "ldc2";
     DubCommonArguments cArgs = bArgs.cArgs;
