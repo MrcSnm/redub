@@ -426,11 +426,6 @@ update
         writeln(RedubVersion);
         return ProjectDetails(null, Compiler.init, ParallelType.auto_, CompilationDetails.init, false, true);
     }
-    if(bArgs.breadth)
-    {
-        import redub.command_generators.commons;
-        setSpanModeAsBreadth(bArgs.breadth);
-    }
 
     if(bArgs.arch && !bArgs.compiler) bArgs.compiler = "ldc2";
     DubCommonArguments cArgs = bArgs.cArgs;
@@ -441,6 +436,13 @@ update
         throw new RedubException("Can't set both --single and --recipe");
     if(cArgs.recipe)
         recipe = cArgs.getRecipe(workingDir);
+
+    if(bArgs.build.breadth)
+    {
+        import redub.command_generators.commons;
+        setSpanModeAsBreadth(bArgs.build.breadth);
+    }
+
     if(bArgs.single)
     {
         import std.path;

@@ -333,10 +333,12 @@ bool isFileHidden(DirEntry e)
 }
 
 
-private __gshared bool useBreadth;
+
+private __gshared bool usingBreadth;
 void setSpanModeAsBreadth(bool breadth)
 {
-    useBreadth = breadth;
+    import core.atomic;
+    atomicStore(breadth, true);
 }
 
 void putSourceFiles(
@@ -353,10 +355,18 @@ void putSourceFiles(
     import std.string:endsWith;
     import std.algorithm.searching;
     import std.exception;
+    import std.array;
+    import core.atomic;
+
+    auto app = appender!(string[]);
+    scope(exit)
+    {
+        output~= app.data;
+    }
     
     foreach(path; paths)
     {
-        DirEntryLoop: foreach(DirEntry e; dirEntries(unescapePath(path), useBreadth ? SpanMode.breadth : SpanMode.depth))
+        DirEntryLoop: foreach(DirEntry e; dirEntries(unescapePath(path), atomicLoad(usingBreadth) ? SpanMode.breadth : SpanMode.depth))
         {
             foreach(exclusion; excludeFiles)
                 if(e.name.globMatch(exclusion))
@@ -367,16 +377,12 @@ void putSourceFiles(
             {
                 if(e.name.endsWith(ext))
                 {
-                    output~= escapePath(e.name);
+                    app~= escapePath(e.name);
                     break;
                 }
             }
         }
     }
-    if(files.length == 0)
-        return;
-    size_t length = output.length;
-    output.length+= files.length;
     foreach(i, file; files)
     {
         if(output.countUntil(file) != -1)
@@ -387,7 +393,7 @@ void putSourceFiles(
                 paths.to!string ~ ".  Either add this file to excludeSourceFiles or remove it from sourceFiles."
             );
         }
-        output[length+i] = escapePath(file);
+        app~= escapePath(file);
     }
 }
 

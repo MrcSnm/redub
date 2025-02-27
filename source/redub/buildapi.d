@@ -8,7 +8,7 @@ import redub.package_searching.api;
 
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.21.1";
+enum RedubVersionOnly = "v1.21.2";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -414,17 +414,22 @@ private auto save(TRange)(TRange input)
 ref string[] exclusiveMerge(StringRange)(return scope ref string[] a, StringRange b, scope const string[] excludeFromMerge = null)
 {
     import std.algorithm.searching:countUntil;
-    size_t length = a.length;
+    import std.array;
+    auto app = appender!(string[]);
+    scope(exit)
+    {
+        a~= app.data;
+    }
     outer: foreach(bV; save(b))
     {
         if(bV.length == 0) continue;
         if(countUntil(excludeFromMerge, bV) != -1) continue;
-        foreach(i; 0..length)
+        foreach(aV; a)
         {
-            if(a[i] == bV)
+            if(aV == bV)
                 continue outer;
         }
-        a~= bV;
+        app~= bV;
     }
     return a;
 }
@@ -450,15 +455,21 @@ ref string[] exclusiveMergePaths(StringRange)(return scope ref string[] a, Strin
     {
         return noTrailingSlash(noInitialDot(input));
     }
-    size_t length = a.length ;
+
+    import std.array;
+    auto app = appender!(string[]);
+    scope(exit)
+    {
+        a~= app.data;
+    }
     outer: foreach(bPath; save(b) )
     {
-        foreach(i; 0..length)
+        foreach(aPath; a)
         {
-            if(fixPath(bPath) == fixPath(a[i]))
+            if(fixPath(bPath) == fixPath(aPath))
                 continue outer;
         }
-        a~= bPath;
+        app~= bPath;
     }
     return a;
 }
