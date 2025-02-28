@@ -338,7 +338,54 @@ private __gshared bool usingBreadth;
 void setSpanModeAsBreadth(bool breadth)
 {
     import core.atomic;
-    atomicStore(breadth, true);
+    import redub.logging;
+    warn("Using redub search file mode as breadth for dub compatibility.");
+    atomicStore(usingBreadth, true);
+}
+
+auto dirEntriesBreadth(string inputPath)
+{
+    import std.file;
+    import std.array;
+    struct DirEntriesRange
+    {
+        DirEntry[] currPathEntries;
+        DirEntry[] nextDirs;
+
+        void popFront()
+        {
+            if(currPathEntries.length == 0)
+            {
+                if(nextDirs.length == 0)
+                    return;
+
+                while(nextDirs.length && currPathEntries.length == 0)
+                {
+                    DirEntry next = nextDirs[0];
+                    currPathEntries = dirEntries(next.name, SpanMode.shallow).array;
+                    nextDirs = nextDirs[1..$];
+                }
+            }
+            else
+            {
+                if(currPathEntries[0].isDir)
+                    nextDirs~= currPathEntries[0];
+                currPathEntries = currPathEntries[1..$];
+            }
+
+
+        }
+        bool empty(){return currPathEntries.length == 0 && nextDirs.length == 0;}
+        DirEntry front()
+        {
+            if(currPathEntries.length == 0)
+                popFront();
+            return currPathEntries[0];
+        }
+    }
+
+
+    return DirEntriesRange(dirEntries(inputPath, SpanMode.shallow).array);
 }
 
 void putSourceFiles(
@@ -356,6 +403,7 @@ void putSourceFiles(
     import std.algorithm.searching;
     import std.exception;
     import std.array;
+    import std.range:choose;
     import core.atomic;
 
     auto app = appender!(string[]);
@@ -363,17 +411,18 @@ void putSourceFiles(
     {
         output~= app.data;
     }
-    
-    foreach(path; paths)
+
+    if(atomicLoad(usingBreadth))
     {
-        DirEntryLoop: foreach(DirEntry e; dirEntries(unescapePath(path), atomicLoad(usingBreadth) ? SpanMode.breadth : SpanMode.depth))
+        foreach(path; paths)
+        DirEntryLoopBreadth: foreach(DirEntry e; dirEntriesBreadth(unescapePath(path)))
         {
             foreach(exclusion; excludeFiles)
                 if(e.name.globMatch(exclusion))
-                    continue DirEntryLoop;
+                    continue DirEntryLoopBreadth;
             if(isFileHidden(e) || e.isDir)
                 continue;
-            foreach(ext; extensions) 
+            foreach(ext; extensions)
             {
                 if(e.name.endsWith(ext))
                 {
@@ -383,6 +432,27 @@ void putSourceFiles(
             }
         }
     }
+    else
+    {
+        foreach(path; paths)
+        DirEntryLoopDepth: foreach(DirEntry e; dirEntries(unescapePath(path),SpanMode.depth))
+        {
+            foreach(exclusion; excludeFiles)
+                if(e.name.globMatch(exclusion))
+                    continue DirEntryLoopDepth;
+            if(isFileHidden(e) || e.isDir)
+                continue;
+            foreach(ext; extensions)
+            {
+                if(e.name.endsWith(ext))
+                {
+                    app~= escapePath(e.name);
+                    break;
+                }
+            }
+        }
+    }
+
     foreach(i, file; files)
     {
         if(output.countUntil(file) != -1)
