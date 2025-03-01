@@ -230,7 +230,7 @@ string stripComments(string str)
             i++; //Skip '`'
             ret~= str[left..i];
         }
-        if(str[i] == '"')
+        else if(str[i] == '"')
         {
             size_t left = i;
             i++;
@@ -250,6 +250,12 @@ string stripComments(string str)
             while(i < length && str[i] != '\n')
                 i++;
         }
+		else if(str[i] == '-' && i + 1 < length && str[i+1] == '-') //Single line --
+		{
+			i+=2;
+            while(i < length && str[i] != '\n')
+                i++;
+		}
         //Single line #
         else if(str[i] == '#')
         {
