@@ -133,7 +133,7 @@ ConfigSection parseLDCConfig(string configText, string confToMatch)
 unittest
 {
     string ldc2example =  q"EOS
-`// See comments in driver/config.d in ldc source tree for grammar description of
+// See comments in driver/config.d in ldc source tree for grammar description of
 // this config file.
 
 // For cross-compilation, you can add sections for specific target triples by

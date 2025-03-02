@@ -211,9 +211,10 @@ ProjectDetails buildProject(ProjectDetails d)
     ProjectNode tree = d.tree;
     if(d.useExistingObjFiles)
         tree.requirements.cfg.changedBuildFiles = getChangedBuildFiles(tree, session);
-    int uses = tree.isUsingGnuLinker();
-    if(uses != -1)
-        session.compiler.usesGnuLinker = uses ? true : false;
+    ///TODO: Might be reactivated if that issue shows again.
+    // int uses = tree.isUsingGnuLinker();
+    // if(uses != -1)
+    //     session.compiler.usesGnuLinker = uses ? true : false;
     startHandlingConsoleControl();
 
     auto result = timed(()

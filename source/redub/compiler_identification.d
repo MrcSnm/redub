@@ -58,6 +58,8 @@ struct Compiler
 
     bool usesIncremental = false;
 
+    ///Currently unused. Was used before for checking whether --start-group should be emitted or not. Since it is emitted
+    ///by default, only on webAssembly which is not, it lost its usage for now.
     bool usesGnuLinker = false;
 
 
@@ -218,12 +220,13 @@ Compiler getCompiler(string compilerOrPath = "dmd", string compilerAssumption = 
     ret.usesGnuLinker = compilersInfo["defaultsToGnuLd"].boolean;
 
     //Checks for ldc.conf switches to see if it is using gnu linker by default
-    if(ret.compiler == AcceptedCompiler.ldc2)
-    {
-        int res = isUsingGnuLinker(ret.binOrPath, arch);
-        if(res != UsesGnuLinker.unknown)
-            ret.usesGnuLinker = res == UsesGnuLinker.yes ? true : false;
-    } 
+    ///TODO: Might be reactivated if that issue shows again.
+    // if(ret.compiler == AcceptedCompiler.ldc2)
+    // {
+    //     int res = isUsingGnuLinker(ret.binOrPath, arch);
+    //     if(res != UsesGnuLinker.unknown)
+    //         ret.usesGnuLinker = res == UsesGnuLinker.yes ? true : false;
+    // }
 
     
     return ret;
@@ -236,28 +239,28 @@ Compiler getCompiler(string compilerOrPath = "dmd", string compilerAssumption = 
  *   arch = Which architecture this compiler run is running with
  * Returns: -1 for can't tell. 0 if false and 1 if true
  */
-private UsesGnuLinker isUsingGnuLinker(string ldcPath, string arch)
-{
-    import redub.misc.ldc_conf_parser;
-    import std.file;
-    import std.algorithm.searching;
-    ConfigSection section = getLdcConfig(std.file.getcwd(), ldcPath, arch);
-    if(section == ConfigSection.init)
-        return UsesGnuLinker.unknown;
-    string* switches = "switches" in section.values;
-    if(!switches)
-        return UsesGnuLinker.unknown;
-    string s = *switches;
-    ptrdiff_t linkerStart = s.countUntil("-link");
-    if(linkerStart == -1)
-        return UsesGnuLinker.unknown;
-    s = s[linkerStart..$];
+// private UsesGnuLinker isUsingGnuLinker(string ldcPath, string arch)
+// {
+//     import redub.misc.ldc_conf_parser;
+//     import std.file;
+//     import std.algorithm.searching;
+//     ConfigSection section = getLdcConfig(std.file.getcwd(), ldcPath, arch);
+//     if(section == ConfigSection.init)
+//         return UsesGnuLinker.unknown;
+//     string* switches = "switches" in section.values;
+//     if(!switches)
+//         return UsesGnuLinker.unknown;
+//     string s = *switches;
+//     ptrdiff_t linkerStart = s.countUntil("-link");
+//     if(linkerStart == -1)
+//         return UsesGnuLinker.unknown;
+//     s = s[linkerStart..$];
 
-    if(countUntil(s, "-link-internally") != -1 || countUntil(s, "-linker=lld"))
-        return UsesGnuLinker.no;
+//     if(countUntil(s, "-link-internally") != -1 || countUntil(s, "-linker=lld"))
+//         return UsesGnuLinker.no;
 
-    return countUntil(s, "-linker=ld") != -1 ? UsesGnuLinker.yes : UsesGnuLinker.unknown;
-}
+//     return countUntil(s, "-linker=ld") != -1 ? UsesGnuLinker.yes : UsesGnuLinker.unknown;
+// }
 
 
 private Compiler getCompilerFromGlobalPath(string compilerOrPath, JSONValue compilersInfo)
