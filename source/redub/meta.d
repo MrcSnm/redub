@@ -38,6 +38,8 @@ JSONValue getRedubMeta()
         if(exists(metaFile))
         {
             meta = parseJSON(cast(string)std.file.read(getRedubMetaFileName));
+            if(meta.hasErrorOccurred)
+                return JSONValue.emptyObject;
             JSONValue* ver = "version" in meta;
             if(ver == null || ver.str != RedubVersionOnly)
                 return JSONValue.emptyObject;

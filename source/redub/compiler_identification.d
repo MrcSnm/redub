@@ -482,7 +482,7 @@ AcceptedLinker getDefaultLinker()
         import std.process;
         import std.string;
         auto res = executeShell("ld -v");
-        if(res.status == 0)
+        if(res.status != 0)
             return AcceptedLinker.unknown;
 
         if(res.output.startsWith("GNU ld"))
