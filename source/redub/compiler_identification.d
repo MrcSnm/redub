@@ -12,6 +12,14 @@ enum AcceptedCompiler
     gxx
 }
 
+enum AcceptedLinker
+{
+    unknown,
+    gnuld,
+    ld64,
+    ///I know there a plenty more, but still..
+}
+
 enum UsesGnuLinker
 {
     unknown,
@@ -32,6 +40,20 @@ AcceptedCompiler acceptedCompilerfromString(string str)
             throw new Exception("Invalid AcceptedCompiler string received: "~str);
     }
 }
+AcceptedLinker acceptedLinkerfromString(string str)
+{
+    switch(str)
+    {
+        static foreach(mem; __traits(allMembers, AcceptedLinker))
+        {
+            case mem:
+                return __traits(getMember, AcceptedLinker, mem);
+        }
+        default:
+            return AcceptedLinker.unknown;
+    }
+}
+
 
 
 /** 
@@ -60,7 +82,7 @@ struct Compiler
 
     ///Currently unused. Was used before for checking whether --start-group should be emitted or not. Since it is emitted
     ///by default, only on webAssembly which is not, it lost its usage for now.
-    bool usesGnuLinker = false;
+    AcceptedLinker linker = AcceptedLinker.unknown;
 
 
     string getCompilerString() const
@@ -217,7 +239,7 @@ Compiler getCompiler(string compilerOrPath = "dmd", string compilerAssumption = 
     if(ret == Compiler.init)
         ret = inferCompiler(compilerOrPath, compilerAssumption, compilersInfo, isDefault, isGlobal);
 
-    ret.usesGnuLinker = compilersInfo["defaultsToGnuLd"].boolean;
+    ret.linker = acceptedLinkerfromString(compilersInfo["defaultLinker"].str);
 
     //Checks for ldc.conf switches to see if it is using gnu linker by default
     ///TODO: Might be reactivated if that issue shows again.
@@ -354,7 +376,7 @@ private Compiler getCompilerFromCache(JSONValue allCompilersInfo, string compile
                     SemVer(arr[VERSION_].str),
                     SemVer(arr[FRONTEND_VERSION].str),
                     arr[VERSION_STRING].str,
-                    key, null, false, allCompilersInfo["defaultsToGnuLd"].boolean
+                    key, null, false, acceptedLinkerfromString(allCompilersInfo["defaultLinker"].str)
                 );
             }
         }
@@ -396,10 +418,10 @@ private void saveCompilerInfo(JSONValue allCompilersInfo, ref Compiler compiler,
     if(!("version" in allCompilersInfo))
         allCompilersInfo["version"] = JSONValue(RedubVersionOnly);
 
-    if(!("defaultsToGnuLd" in allCompilersInfo))
-        allCompilersInfo["defaultsToGnuLd"] = JSONValue(isDefaultLinkerGnuLd());
+    if(!("defaultLinker" in allCompilersInfo))
+        allCompilersInfo["defaultLinker"] = JSONValue(getDefaultLinker().to!string);
 
-    compiler.usesGnuLinker = allCompilersInfo["defaultsToGnuLd"].boolean;
+    compiler.linker = acceptedLinkerfromString(allCompilersInfo["defaultLinker"].str);
 
     if(!("compilers" in allCompilersInfo))
         allCompilersInfo["compilers"] = JSONValue.emptyObject;
@@ -453,17 +475,23 @@ private Compiler assumeCompiler(string compilerOrPath, string compilerAssumption
 }
 
 
-bool isDefaultLinkerGnuLd()
+AcceptedLinker getDefaultLinker()
 {
-    version(linux)
+    version(Posix)
     {
         import std.process;
         import std.string;
         auto res = executeShell("ld -v");
-        return res.status == 0 && res.output.startsWith("GNU ld");
+        if(res.status == 0)
+            return AcceptedLinker.unknown;
+
+        if(res.output.startsWith("GNU ld"))
+            return AcceptedLinker.gnuld;
+        else if(res.output.startsWith("@(#)PROGRAM:ld"))
+            return AcceptedLinker.ld64;
     }
-    else
-        return false;
+
+    return AcceptedLinker.unknown;
 }
 
 private bool tryInferLdc(string compilerOrPath, string vString, out Compiler comp)

@@ -10,7 +10,8 @@ string[] parseLinkConfiguration(const ThreadBuildData data, CompilingSession s, 
     import redub.misc.path;
     import redub.building.cache;
     string[] commands;
-    bool isUsingGNULinker = s.compiler.usesGnuLinker;
+    AcceptedLinker linker = s.compiler.linker;
+    bool emitStartGroup = s.isa != ISA.webAssembly && linker != AcceptedLinker.ld64;
 
 
     const BuildConfiguration b = data.cfg;
@@ -41,14 +42,14 @@ string[] parseLinkConfiguration(const ThreadBuildData data, CompilingSession s, 
         if (targetType.isLinkedSeparately)
         {
             //Only linux supports start/end group and no-as-needed. OSX does not
-            if(s.isa != ISA.webAssembly)
+            if(emitStartGroup)
             {
                 commands~= "-L--no-as-needed";
                 commands~= "-L--start-group";
             }
             ///Use library full path for the base file
             commands = mapAppendReverse(commands, data.extra.librariesFullPath, (string l) => "-L"~getOutputName(TargetType.staticLibrary, l, s.os));
-            if(s.isa != ISA.webAssembly)
+            if(emitStartGroup)
                 commands~= "-L--end-group";
             commands = mapAppendPrefix(commands, linkFlags, "-L", false);
             commands = mapAppendPrefix(commands, libraryPaths, "-L-L", true);
