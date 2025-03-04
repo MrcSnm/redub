@@ -186,6 +186,35 @@ string[] getChangedBuildFiles(ProjectNode root, CompilingSession s)
     return buildFiles;
 }
 
+void createSelectionsFile(ProjectNode tree)
+{
+    import std.file;
+    import std.array:appender;
+    import std.string:replace;
+    if(exists("dub.selections.json"))
+        return;
+    auto dubSelections = appender!string;
+    dubSelections~= "{\n\t\"fileVersion\": 1,\n\t\"versions\": {";
+
+    bool isFirst = true;
+
+    foreach(ProjectNode node; tree.collapse)
+    {
+        if(!isFirst) dubSelections~=",";
+        isFirst = false;
+        auto req = node.requirements;
+        dubSelections~= "\n\t\t\""~node.name~"\": ";
+        if(req.version_.length != 0)
+            dubSelections~= "\""~req.version_~"\"";
+        else
+            dubSelections~= " {\"path\": \""~replace(req.cfg.workingDir, "\\", "\\\\")~"\"}";
+    }
+
+    dubSelections~= "\n\t}\n}";
+
+    std.file.write("dub.selections.json", dubSelections.data);
+}
+
 
 ProjectDetails buildProject(ProjectDetails d)
 {
@@ -209,6 +238,7 @@ ProjectDetails buildProject(ProjectDetails d)
     else
         invalidateCaches(d.tree,session, sharedFormula);
     ProjectNode tree = d.tree;
+    createSelectionsFile(tree);
     if(d.useExistingObjFiles)
         tree.requirements.cfg.changedBuildFiles = getChangedBuildFiles(tree, session);
     ///TODO: Might be reactivated if that issue shows again.
