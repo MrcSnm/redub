@@ -39,22 +39,23 @@ struct JSONArray
 		}
 		private void append(T[] values)
 		{
+			import core.stdc.string;
 			if(actualLength + values.length <= N)
-				staticData.ptr[actualLength..actualLength+values.length] = values[];
+				memcpy(staticData.ptr + actualLength, values.ptr, values.length * T.sizeof);
 			else
 			{
 				import std.array:uninitializedArray;
 				if(dynData is null)
 				{
 					dynData = uninitializedArray!(T[])(actualLength+values.length);
-					dynData.ptr[0..actualLength] = staticData.ptr[0..actualLength];
+					memcpy(dynData.ptr, staticData.ptr, actualLength * T.sizeof);
 				}
 				else if (dynData.length < actualLength + values.length)
 				{
 					size_t newSize = actualLength+values.length > actualLength*2 ? actualLength+values.length : actualLength*2;
 					dynData.length = newSize;
 				}
-				dynData.ptr[actualLength..actualLength+values.length] = values[];
+				memcpy(dynData.ptr + actualLength, values.ptr, values.length * T.sizeof);
 			}
 			actualLength+= values.length;
 		}
@@ -145,8 +146,8 @@ bool isWhitespace(char ch)
 	}
 }
 
-pragma(inline, true) bool isNumber(char ch){return ch >= '0' && ch <= '9';}
-pragma(inline, true) bool isNumeric(char ch){return (ch >= '0' && ch <= '9') || ch == '-' || ch == '.';}
+pragma(inline, true) bool isNumber(char ch){return '0' <= ch && ch <= '9';}
+pragma(inline, true) bool isNumeric(char ch){return ('0' <= ch  && ch <= '9') || ch == '-' || ch == '.';}
 
 struct JSONValue
 {
@@ -374,52 +375,6 @@ struct JSONValue
 		ptrdiff_t index = 0;
 		StringPool pool = StringPool(cast(size_t)(data.length*0.75));
 
-		// bool getNextString(string data, ptrdiff_t currentIndex, out ptrdiff_t newIndex, out string theString)
-		// {
-		// 	import std.array;
-		// 	assert(data[currentIndex] == '"');
-		// 	ptrdiff_t i = currentIndex + 1;
-		// 	size_t returnLength = 0;
-		// 	// char[] ret = uninitializedArray!(char[])(128);
-		// 	char[] ret = pool.getNewString(64);
-		// 	char ch;
-
-		// 	ubyte[4] chars;
-		// 	bool escaped;
-		// 	LOOP: while(i < data.length)
-		// 	{
-		// 		ubyte count = nextByte32(chars, data, i);
-		// 		for(size_t byteIndex = 0; byteIndex < count; byteIndex++)
-		// 		{
-		// 			ch = cast(char)chars[byteIndex];
-		// 			if(!escaped)
-		// 			{
-		// 				if(ch == '"')
-		// 				{
-		// 					i+= byteIndex;
-		// 					break LOOP;
-		// 				}
-		// 				else if(ch == '\\')
-		// 				{
-		// 					escaped = true;
-		// 					continue;
-		// 				}
-		// 			}
-		// 			if(returnLength >= ret.length)
-		// 				ret = pool.resizeString(ret, ret.length*2);
-		// 			ret[returnLength++] = cast(char)chars[byteIndex];
-		// 			escaped = false;
-		// 		}
-		// 		i+= count;
-		// 	}
-		// 	ret = pool.resizeString(ret, returnLength);
-		// 	newIndex = i;
-		// 	if(newIndex == data.length) //Not found
-		// 		return false;
-		// 	theString = cast(string)ret;
-		// 	return true;
-		// }
-
 		bool getNextString(string data, ptrdiff_t currentIndex, out ptrdiff_t newIndex, out string theString)
 		{
 			assert(data[currentIndex] == '"', "getNextString must start with a quotation mark");
@@ -433,41 +388,22 @@ struct JSONValue
 				ch = data[i];
 				switch(ch)
 				{
-					case '"': 
-					{
+					case '"':
 						ret = pool.resizeString(ret, returnLength);
 						newIndex = i;
 						theString = cast(string)ret;
 						return true;
-					}
 					case '\\':
-						if(i + 1 < data.length)
-						{
-							i++;
-							switch(data[i])
-							{
-								case 'n':
-									ch = '\n';
-									break;
-								case 't':
-									ch = '\t';
-									break;
-								case 'r':
-									ch = '\r';
-									break;
-								default:
-									ch = data[i];
-									break;
-							}
-						}
-						else
+						if(i + 1 >= data.length)
 							return false;
+						ch = escapedCharacter(data[++i]);
 						break;
 					default: break;
+
 				}
 				if(returnLength >= ret.length)
 					ret = pool.resizeString(ret, ret.length*2);
-				
+
 				ret[returnLength++] = ch;
 				i++;
 			}
@@ -482,23 +418,17 @@ struct JSONValue
 			newIndex = currentIndex;
 			if(data[currentIndex] == '-')
 				newIndex++;
-			if(data[newIndex] == '.')
-			{
-				hasDecimal = true;
-				newIndex++;
-			}
 
 			while(newIndex < data.length)
 			{
 				if(!hasDecimal && data[newIndex] == '.')
 				{
-					if(!hasDecimal) hasDecimal = true;
+					hasDecimal = true;
 					if(newIndex+1 < data.length) newIndex++;
 				}
-				if(isNumber(data[newIndex]))
-					newIndex++;
-				else 
+				if(!isNumber(data[newIndex]))
 					break;
+				newIndex++;
 			}
 			if(hasDecimal)
 			{
@@ -917,7 +847,7 @@ private struct StringPool
 				else
 				{
 					ptrdiff_t offset = str.ptr - pool.ptr;
-					assert(offset > 0, " Out of bounds?");
+					assert(offset >= 0, " Out of bounds?");
 					used+= newSize - str.length;
 					return pool[cast(size_t)offset..offset+newSize];
 				}
@@ -1066,4 +996,18 @@ unittest
     ]
 }`;
 	assert(parseJSON(json)["D5F04185E96CC720"].array[1].array[0].toString == `"Second Value"`);
+}
+
+
+pragma(inline, true)
+private char escapedCharacter(char a)
+{
+	switch(a)
+	{
+		case 'n': return '\n';
+		case 't': return '\t';
+		case 'b': return '\b';
+		case 'r': return '\r';
+		default: return a;
+	}
 }
