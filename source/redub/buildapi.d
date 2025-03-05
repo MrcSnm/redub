@@ -8,7 +8,7 @@ import redub.package_searching.api;
 
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.21.9";
+enum RedubVersionOnly = "v1.21.10";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
