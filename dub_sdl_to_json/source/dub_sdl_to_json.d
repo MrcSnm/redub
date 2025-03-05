@@ -191,11 +191,11 @@ JSONValue sdlToJSON(SDLNode[] sdl)
 		}
 		// ret[v.name] = v.values[0]
 	}
-	if(dependencies.data.object.value !is null)
+	if(dependencies.data.object !is null)
 		ret["dependencies"] = dependencies;
-	if(subConfigurations.data.object.value !is null)
+	if(subConfigurations.data.object !is null)
 		ret["subConfigurations"] = subConfigurations;
-	if(buildTypes.data.object.value !is null)
+	if(buildTypes.data.object !is null)
 		ret["buildTypes"] = buildTypes;
 
 	if(configurations.array.length != 0)
