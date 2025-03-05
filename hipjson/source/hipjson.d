@@ -106,8 +106,7 @@ struct JSONArray
 
 	static JSONArray* createNew(JSONValue[] data)
 	{
-		JSONArray* ret = new JSONArray(data);
-		return ret;
+		return new JSONArray(data);
 	}
 
 
@@ -164,57 +163,38 @@ struct JSONValue
 	JSONData data;
 	static if(size_t.sizeof == uint.sizeof)
 	{
-		///Used only for the string.
-		uint _length;
-
-		pragma(inline, true) JSONType type(JSONType t)
-		{
-			_length = (_length & 0x1FFFFFFF) | (cast(uint)t << 29);
-			return t;
-		}
-		pragma(inline, true) JSONType type() const
-		{
-			return cast(JSONType)(_length >> 29);
-		}
-
-		pragma(inline, true)  private void setString(string s)
-		{
-			import core.stdc.string;
-			data._string = s.ptr;
-			_length = (s.length & 0x1FFFFFFF) | (cast(uint)type << 29);
-		}
-
-		pragma(inline, true) private uint length() const
-		{
-			return _length & 0x1FFFFFFF;
-		}
+		private static enum bitOffset = 29;
+		private static enum lengthMask = 0x1FFFFFFF;
 	}
 	else
 	{
-		///Used only for the string.
-		ulong _length;
+		///Bit offset on where the type information is stored
+		private static enum bitOffset = 61;
+		///All the bits that defines where length is.
+		private static enum lengthMask = 0x1FFFFFFFFFFFFFFF;
+	}
+	///Used only for the string.
+	private size_t _length;
 
-		pragma(inline, true) JSONType type(JSONType t)
-		{
-			_length = (_length & 0x1FFFFFFFFFFFFFFF) | (cast(size_t)t << 61);
-			return t;
-		}
-		pragma(inline, true) JSONType type() const
-		{
-			return cast(JSONType)(_length >> 61);
-		}
+	pragma(inline, true) JSONType type(JSONType t)
+	{
+		_length = (_length & lengthMask) | (cast(size_t)t << bitOffset);
+		return t;
+	}
+	pragma(inline, true) JSONType type() const
+	{
+		return cast(JSONType)(_length >> bitOffset);
+	}
 
-		pragma(inline, true)  private void setString(string s)
-		{
-			import core.stdc.string;
-			data._string = s.ptr;
-			_length = (s.length & 0x1FFFFFFFFFFFFFFF) | (cast(size_t)type << 61);
-		}
+	pragma(inline, true) private void setString(string s)
+	{
+		_length = (s.length & lengthMask) | (cast(size_t)type << bitOffset);
+		data._string = s.ptr;
+	}
 
-		pragma(inline, true) private size_t length() const
-		{
-			return _length & 0x1FFFFFFFFFFFFFFF;
-		}
+	pragma(inline, true) private size_t length() const
+	{
+		return _length & lengthMask;
 	}
 
 
@@ -402,11 +382,6 @@ struct JSONValue
 		return ret;
 	}
 
-	private static JSONValue create(T)(T data)
-	{
-		JSONValue ret = JSONValue(data);
-		return ret;
-	}
 	private static JSONValue errorObj(string message)
 	{
 		JSONValue ret;
@@ -422,9 +397,7 @@ struct JSONValue
 		import std.conv:to;
 
 		if(!data.length)
-		{
 			return JSONValue.errorObj("No data provided");
-		}
 		ptrdiff_t index = 0;
 		StringPool pool = StringPool(cast(size_t)(data.length*0.75));
 
@@ -490,7 +463,14 @@ struct JSONValue
 			}
 			else
 			{
-				theData._int = to!long(data[currentIndex..newIndex]);
+				static long strToLong(string str)
+				{
+					long result = 0;
+					foreach(ch; str)
+						result = result * 10 + (ch - '0');
+					return result;
+				}
+				theData._int = strToLong(data[currentIndex..newIndex]);
 				type = JSONType.int_;
 			}
 			//Stopped on a non number. Revert 1 step.
@@ -504,7 +484,7 @@ struct JSONValue
 		JSONValue lastValue = ret;
 
 		import std.array;
-		scope JSONValue[] stack = uninitializedArray!(JSONValue[])(128);
+		scope JSONValue[] stack = uninitializedArray!(JSONValue[])(32);
 		scope ptrdiff_t stackLength = 0;
 
 		size_t line = 0;
@@ -526,7 +506,7 @@ struct JSONValue
 				{
 					if(state != JSONState.value)
 						return JSONValue.errorObj(getErr());
-					JSONValue obj = JSONValue.create(new JSONObject);
+					JSONValue obj = JSONValue(new JSONObject);
 					if(!pushNewScope(obj, current, stackLength, stack, lastKey))
 						return JSONValue.errorObj(getErr("Could not push new scope in JSON. Only array, object or null are valid"));
 
@@ -558,8 +538,6 @@ struct JSONValue
 							assert(current.type == JSONType.object, getErr("only object can receive a key."));
 							if(!getNextString(data, index, index, lastKey))
 								return JSONValue.errorObj(getErr("unclosed quotes."));
-							JSONValue keyJson;
-							pushToStack(keyJson, current, lastValue, lastKey);
 							state = JSONState.lookingAssignment;
 							break;
 						}
@@ -568,7 +546,7 @@ struct JSONValue
 							string val;
 							if(!getNextString(data, index, index, val))
 								return JSONValue.errorObj(getErr("unclosed quotes."));
-							pushToStack(JSONValue.create!string(val), current, lastValue, lastKey);
+							pushToStack(JSONValue(val), current, lastValue, lastKey);
 							state = JSONState.lookingForNext;
 							break;
 						}
@@ -581,7 +559,7 @@ struct JSONValue
 				{
 					if(state != JSONState.lookingForNext && state != JSONState.value)
 						return JSONValue.errorObj(getErr(" expected to be a value. "));
-					if(!pushNewScope(JSONValue.create(JSONArray.createNew()), current, stackLength, stack, lastKey))
+					if(!pushNewScope(JSONValue(JSONArray.createNew()), current, stackLength, stack, lastKey))
 						return JSONValue.errorObj(getErr("Could not push new scope in JSON. Only array, object or null are valid"));
 					state = JSONState.value;
 					break;
@@ -625,22 +603,25 @@ struct JSONValue
 							{
 								if(state == JSONState.lookingForNext && current.type != JSONType.array)
 									return JSONValue.errorObj(getErr("unexpected number."));
-								pushToStack(JSONValue.create(true), current, lastValue, lastKey);
+								pushToStack(JSONValue(true), current, lastValue, lastKey);
 								state = JSONState.lookingForNext;
+								index+= 3;
 							}
 							else if(index + "false".length < data.length && data[index.."false".length + index] == "false")
 							{
 								if(state == JSONState.lookingForNext && current.type != JSONType.array)
 									return JSONValue.errorObj(getErr("unexpected number."));
-								pushToStack(JSONValue.create(false), current, lastValue, lastKey);
+								pushToStack(JSONValue(false), current, lastValue, lastKey);
 								state = JSONState.lookingForNext;
+								index+= 4;
 							}
 							else if(index + "null".length < data.length && data[index.."null".length + index] == "null")
 							{
 								if(state == JSONState.lookingForNext && current.type != JSONType.array)
 									return JSONValue.errorObj(getErr("unexpected number."));
-								pushToStack(JSONValue.create(null), current, lastValue, lastKey);
+								pushToStack(JSONValue(null), current, lastValue, lastKey);
 								state = JSONState.lookingForNext;
+								index+= 3;
 							}
 							break;
 						default:break;
@@ -650,6 +631,8 @@ struct JSONValue
 			index++;
 		}
 		while(index < data.length && stack.length > 0);
+
+		pool.trim();
 		return ret;
 	}
 
@@ -923,6 +906,13 @@ private struct StringPool
 			return ret;
 		return new char[](strSize);
 	}
+
+	void trim()
+	{
+		pool.length = used;
+		if(used == 0)
+			pool = null;
+	}
 }
 
 pragma(inline, true)
@@ -994,6 +984,18 @@ void pushToStack(JSONValue val, ref JSONValue* current, ref JSONValue lastValue,
 	lastValue = val;
 }
 
+pragma(inline, true)
+private char escapedCharacter(char a)
+{
+	switch(a)
+	{
+		case 'n': return '\n';
+		case 't': return '\t';
+		case 'b': return '\b';
+		case 'r': return '\r';
+		default: return a;
+	}
+}
 
 unittest
 {
@@ -1046,18 +1048,4 @@ unittest
     ]
 }`;
 	assert(parseJSON(json)["D5F04185E96CC720"].array[1].array[0].toString == `"Second Value"`);
-}
-
-
-pragma(inline, true)
-private char escapedCharacter(char a)
-{
-	switch(a)
-	{
-		case 'n': return '\n';
-		case 't': return '\t';
-		case 'b': return '\b';
-		case 'r': return '\r';
-		default: return a;
-	}
 }
