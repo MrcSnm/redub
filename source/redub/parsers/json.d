@@ -131,6 +131,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
 {
     import std.exception;
     cfg.isRoot = isRoot;
+
     ///Setup base of configuration before finding anything
     if(!cfg.extra.requiredBy)
     {
@@ -341,6 +342,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
             "dub.json at "~cfg.workingDir~
             " which contains subPackages, must contain a name"
         );
+
         JSONValue* subPackages = "subPackages" in json;
         enforce(subPackages,
             "dub.json at "~cfg.workingDir~
@@ -412,7 +414,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
     }
     string[] unusedKeys;
 
-    setName(buildRequirements, "name" in json ? json["name"].str : cfg.defaultPackageName, cfg);
+    setName(buildRequirements, tryStr(json, "name", cfg.defaultPackageName), cfg);
     runHandlers(requirementsRun, buildRequirements, cfg, json, false, unusedKeys);
 
     if(cfg.firstRun && unusedKeys.length) warn("Unused Keys -> ", unusedKeys);

@@ -213,6 +213,7 @@ string getExtension(TargetType t, OS target, ISA isa)
 
 void copyDir(string fromDir, string toDir, bool shallow = true)
 {
+    import redub.api;
     import std.file;
     import std.path;
     import std.exception;
@@ -225,7 +226,10 @@ void copyDir(string fromDir, string toDir, bool shallow = true)
         enforce(isDir(toDir), "Output must be a directory");
 
     foreach(DirEntry e; dirEntries(fromDir, shallow ? SpanMode.shallow : SpanMode.depth))
-        hardLinkFile(e.name, buildNormalizedPath(toDir, baseName(e.name)), true);
+    {
+        if(!hardLinkFile(e.name, buildNormalizedPath(toDir, baseName(e.name)), true))
+            throw new RedubException("Could not copy file "~e.name);
+    }
 }
 
 /** 

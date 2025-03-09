@@ -112,15 +112,22 @@ void putRootPackageInCache(string packageName, string path)
 {
     synchronized(cacheMtx)
     {
-        packagesCache[packageName] = PackageInfo(packageName, null, SemVer(0,0,0), SemVer(0,0,0), path, null);
+        packagesCache[packageName] = PackageInfo(packageName, null, SemVer(0,0,0), SemVer(0,0,0), path, null,);
     }
 }
 
+/**
+ * Puts the package in cache. This is only called from subPackage, and, when this package is searched again, redub will know where to look at.
+ * Params:
+ *   packageName = The full package name
+ *   version_ = Which version is it
+ *   path = Where is it located
+ */
 void putPackageInCache(string packageName, string version_, string path)
 {
     synchronized(cacheMtx)
     {
-        packagesCache[packageName] = PackageInfo(packageName, null, SemVer(version_), SemVer(version_), path, null);
+        packagesCache[packageName] = PackageInfo(packageName, null, SemVer(version_), SemVer(version_), path, null,);
     }
 }
 
