@@ -111,6 +111,7 @@ void buildPluginProject(string pluginDir, CompilationInfo cInfo)
     if(!pluginDetails.tree)
         throw new Exception("Could not build plugin at path "~pluginDir);
 
+    pluginDetails.bCreateSelections = false;
     pluginDetails.tree.requirements.cfg = injectPluginCfg(pluginDetails.tree.requirements.cfg, pluginDetails.tree.name, cInfo);
     pluginDetails = buildProject(pluginDetails);
     setLogLevel(level);

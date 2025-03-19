@@ -20,6 +20,7 @@ struct ProjectDetails
     bool printOnly;
     int externalErrorCode = int.min;
     bool forceRebuild;
+    bool bCreateSelections = true;
 
     bool error() const {return this == ProjectDetails.init; }
 
@@ -238,7 +239,8 @@ ProjectDetails buildProject(ProjectDetails d)
     else
         invalidateCaches(d.tree,session, sharedFormula);
     ProjectNode tree = d.tree;
-    createSelectionsFile(tree);
+    if(d.bCreateSelections)
+        createSelectionsFile(tree);
     if(d.useExistingObjFiles)
         tree.requirements.cfg.changedBuildFiles = getChangedBuildFiles(tree, session);
     ///TODO: Might be reactivated if that issue shows again.
