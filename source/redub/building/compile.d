@@ -97,6 +97,7 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
 
         BuildConfiguration cfg = data.cfg.clone;
         Compiler compiler = info.compiler;
+        CompilerBinary c = data.cfg.getCompiler(compiler);
         OS os = info.os;
         ISA isa = info.isa;
         //Remove existing binary, since it won't be replaced by simply executing commands
@@ -124,9 +125,9 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
 
             ExecutionResult ret;
             if(!pack.isCopyEnough)
-                ret = cast(ExecutionResult)execCompiler(cfg, compiler.binOrPath, getCompilationFlags(cfg, info, hash.rootHash, data.extra.isRoot), res.compilationCommand, compiler, inDir);
+                ret = cast(ExecutionResult)execCompiler(cfg, c.bin, getCompilationFlags(cfg, info, hash.rootHash, data.extra.isRoot), res.compilationCommand, compiler, inDir);
 
-            if(!isDCompiler(compiler) && !ret.status && isStaticLibrary(data.cfg.targetType)) //Must call archiver when
+            if(!isDCompiler(c) && !ret.status && isStaticLibrary(data.cfg.targetType)) //Must call archiver when
             {
                 string cmd ;
                 auto archiverRes = executeArchiver(data, info, cmd);
@@ -138,7 +139,7 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
             copyDir(inDir, dirName(outDir));
 
             ///Shared Library(mostly?)
-            if(isDCompiler(compiler) && isLinkedSeparately(data.cfg.targetType) && !pack.isRoot)
+            if(isDCompiler(c) && isLinkedSeparately(data.cfg.targetType) && !pack.isRoot)
             {
                 CompilationResult linkRes = link(cast()pack, hash.requirementHash, data, info, env);
                 ret.status = linkRes.status;
@@ -446,7 +447,7 @@ private void buildFailed(const ProjectNode node, CompilationResult res, Compilin
 {
     import redub.misc.github_tag_check;
     errorTitle("Build Failure: '", node.name, " ",node.requirements.version_," [", node.requirements.targetConfiguration,"]' \n\t",
-        RedubVersionShort, "\n\t", s.compiler.getCompilerWithVersion, "\n\tFailed with flags: \n\n\t",
+        RedubVersionShort, "\n\t", node.getCompiler(s.compiler).getCompilerWithVersion, "\n\tFailed with flags: \n\n\t",
         res.compilationCommand, 
         "\nFailed after ", res.msNeeded,"ms with message\n\t", res.message
     );
@@ -538,7 +539,7 @@ private bool doLink(ProjectNode root, CompilingSession info, string mainPackHash
 {
     Compiler compiler = info.compiler;
     bool isUpToDate = root.isUpToDate;
-    bool shouldSkipLinking = isUpToDate || (compiler.isDCompiler && !root.requirements.cfg.targetType.isLinkedSeparately);
+    bool shouldSkipLinking = isUpToDate || (root.getCompiler(info.compiler).isDCompiler && !root.requirements.cfg.targetType.isLinkedSeparately);
 
     if(!shouldSkipLinking)
     {
@@ -551,7 +552,7 @@ private bool doLink(ProjectNode root, CompilingSession info, string mainPackHash
         {
             import redub.misc.github_tag_check;
             import redub.libs.colorize;
-            errorTitle("Linking Error ", "at \"", root.name.color(fg.light_red), "\". \n\t"~ RedubVersionShort~ "\n\t" ~ compiler.getCompilerWithVersion ~ "\n\tFailed with flags: \n\n\t",
+            errorTitle("Linking Error ", "at \"", root.name.color(fg.light_red), "\". \n\t"~ RedubVersionShort~ "\n\t" ~ root.getCompiler(compiler).getCompilerWithVersion ~ "\n\tFailed with flags: \n\n\t",
                 linkRes.compilationCommand,"\n\t\t  :\n\t",
                 linkRes.message,
             );

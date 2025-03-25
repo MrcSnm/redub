@@ -24,7 +24,7 @@ string[] parseBuildConfiguration(AcceptedCompiler comp, const BuildConfiguration
         string cacheDir = getCacheOutputDir(mainPackhash, b, s, isRoot);
         ///Whenever a single output file is specified, DMD does not output obj files
         ///For LDC, it does output them anyway
-        if(s.compiler.compiler == AcceptedCompiler.ldc2 && !b.outputsDeps)
+        if(b.getCompiler(s.compiler).compiler == AcceptedCompiler.ldc2 && !b.outputsDeps)
         {
             import std.file;
             string ldcObjOutDir = escapePath(cacheDir~ "_obj");

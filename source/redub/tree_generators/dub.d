@@ -9,6 +9,7 @@ import redub.parsers.automatic;
 struct CompilationInfo
 {
     string compiler;
+    string c_compiler;
     string arch;
     OS targetOS;
     ///Target Instruction Set Architecture

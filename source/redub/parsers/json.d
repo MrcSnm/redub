@@ -147,6 +147,8 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
         vlog("Added project ", cfg.extra.requiredBy, " to memory cache.");
     }
     BuildRequirements buildRequirements = getDefaultBuildRequirement(cfg);
+    buildRequirements.cfg.language = tryStr(json, "language", "D");
+    enforce(buildRequirements.cfg.language == "C" || buildRequirements.cfg.language == "D", "\"language\" must only be set as language C and D for redub projects.");
 
     immutable static requirementsRun = [
         "name": (ref BuildRequirements req, JSONValue v, ParseConfig c){},

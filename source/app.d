@@ -201,7 +201,7 @@ int testMain(string[] args)
     if(d.error)
         return d.getReturnCode();
     import redub.parsers.build_type;
-    d.tree.requirements.cfg = d.tree.requirements.cfg.merge(parse(BuildType.unittest_, d.compiler.compiler));
+    d.tree.requirements.cfg = d.tree.requirements.cfg.merge(parse(BuildType.unittest_, d.tree.requirements.cfg.getCompiler(d.compiler).compiler));
     d.tree.requirements.cfg.dFlags~= "-main";
     d.tree.requirements.cfg.targetType = TargetType.executable;
     d.tree.requirements.cfg.targetName~= "-test-";
@@ -459,7 +459,7 @@ update
     ProjectDetails ret =  redub.api.resolveDependencies(
         bArgs.build.force,
         os,
-        CompilationDetails(bArgs.compiler, bArgs.arch, bArgs.compilerAssumption, bArgs.build.incremental, bArgs.build.useExistingObj, bArgs.build.combined, bArgs.build.parallel),
+        CompilationDetails(bArgs.compiler, bArgs.cCompiler, bArgs.arch, bArgs.compilerAssumption, bArgs.build.incremental, bArgs.build.useExistingObj, bArgs.build.combined, bArgs.build.parallel),
         ProjectToParse(bArgs.config, workingDir, subPackage, recipe, bArgs.single.length != 0, isDescribeOnly),
         getInitialDubVariablesFromArguments(bArgs, DubBuildArguments.init, os, args),
         bt

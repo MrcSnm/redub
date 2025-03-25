@@ -70,6 +70,8 @@ struct CompilationDetails
 {
     ///This is the only required member of this struct. Must be a path to compiler or a compiler in the global context, i.e: `dmd`
     string compilerOrPath;
+    ///Must be a path to compiler or a compiler in the global context, i.e: `gcc`
+    string cCompilerOrPath;
     ///Arch is only being used for LDC2 compilers. If arch is used, ldc2 is automatically inferred
     string arch;
     ///Assumption to make dependency resolution slightly faster
@@ -390,7 +392,7 @@ ProjectDetails resolveDependencies(
     static import redub.parsers.build_type;
 
     StopWatch st = StopWatch(AutoStart.yes);
-    Compiler compiler = getCompiler(cDetails.compilerOrPath, cDetails.assumption, cDetails.arch);
+    Compiler compiler = getCompiler(cDetails.compilerOrPath, cDetails.cCompilerOrPath, cDetails.assumption, cDetails.arch);
 
     with(dubVars)
     {
@@ -401,14 +403,14 @@ ProjectDetails resolveDependencies(
         DUB_BUILD_TYPE = buildType;
 
         DUB_COMBINED = redub.parsers.environment.str(cDetails.combinedBuild);
-        DC = either(DC, compiler.binOrPath);
-        DC_BASE = either(DC_BASE, compiler.binOrPath);
+        DC = either(DC, compiler.d.bin);
+        DC_BASE = either(DC_BASE, compiler.d.bin);
         DUB_ARCH = either(DUB_ARCH, cDetails.arch, isaFromArch(cDetails.arch).to!string);
         DUB_PLATFORM = either(DUB_PLATFORM, redub.parsers.environment.str(os));
         DUB_FORCE = either(DUB_FORCE, redub.parsers.environment.str(invalidateCache));
     }
     redub.parsers.environment.setupBuildEnvironmentVariables(dubVars);
-    CompilationInfo cInfo = CompilationInfo(compiler.getCompilerString, cDetails.arch, osFromArch(cDetails.arch), isaFromArch(cDetails.arch), compiler.binOrPath);
+    CompilationInfo cInfo = CompilationInfo(compiler.d.getCompilerString, compiler.c.getCompilerString, cDetails.arch, osFromArch(cDetails.arch), isaFromArch(cDetails.arch), compiler.d.bin);
     if(proj.workingDir == null)
     {
         import std.file;
@@ -441,11 +443,13 @@ ProjectDetails resolveDependencies(
             cDetails.useExistingObj,
             proj.isDescribeOnly
         );
+
+    CompilerBinary cBin = req.cfg.getCompiler(compiler);
     redub.parsers.environment.setupEnvironmentVariablesForRootPackage(cast(immutable)req);
     if(cDetails.includeEnvironmentVariables)
         req.cfg = req.cfg.merge(redub.parsers.environment.parse());
 
-    req.cfg = req.cfg.merge(redub.parsers.build_type.parse(buildType, compiler.compiler));
+    req.cfg = req.cfg.merge(redub.parsers.build_type.parse(buildType, cBin.compiler));
 
     ProjectNode tree = getProjectTree(req, cInfo);
 
@@ -468,7 +472,7 @@ ProjectDetails resolveDependencies(
 
     infos(
         "Dependencies resolved", " - ", (st.peek.total!"msecs"), " ms \"",
-        color(buildType, fg.magenta),"\" using ", compiler.binOrPath," v", compiler.version_,
+        color(buildType, fg.magenta),"\" using ", cBin.bin," v", cBin.version_,
         color(" ["~ cInfo.targetOS.to!string~ "-"~cInfo.isa.to!string~ "]", fg.light_cyan),
         " - ", color(inferParallel(ret).to!string~" parallel", fg.light_green)
     );

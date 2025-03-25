@@ -17,14 +17,14 @@ private string getRedubMetaFileName()
 }
 
 
-void saveRedubMeta(string content)
+void saveRedubMeta(JSONValue content)
 {
     import std.file;
     import std.path;
     string dir = dirName(getRedubMetaFileName);
     if(!std.file.exists(dir))
         mkdirRecurse(dir);
-    std.file.write(getRedubMetaFileName, content);
+    std.file.write(getRedubMetaFileName, content.toString);
 }
 
 JSONValue getRedubMeta()

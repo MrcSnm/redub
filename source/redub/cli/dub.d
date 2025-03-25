@@ -137,11 +137,19 @@ struct DubArguments
     string config;
 
     @(
-        "Specifies the compiler binary to use (can be a path)" ~
-        "Arbitrary pre- and suffixes to the identifiers below are recognized (e.g. ldc2 or dmd-2.063) and matched to the proper compiler type:" ~
-        "dmd, gdc, ldc, gdmd, ldmd, gcc, g++"
+        "Specifies the compiler binary to use (can be a path)\n" ~
+        "Arbitrary pre- and suffixes to the identifiers below are recognized (e.g. ldc2 or dmd-2.063) and matched to the proper compiler type:\n" ~
+        "dmd, ldc (For the C Compilers, use -C or --cCompiler) gcc, g++ "
     )
+    @("compiler|D")
     string compiler;
+
+    @(
+        "Specifies which C compiler binary to use "~
+        "The current supported C compilers are gcc and g++"
+    )
+    @("cCompiler|C")
+    string cCompiler;
 
 
     @("Specifies where the target output is.")

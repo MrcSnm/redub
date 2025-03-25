@@ -33,13 +33,13 @@ auto execCompiler(const BuildConfiguration cfg, string compilerBin, string[] com
     if(exists(outDir))
         remove(outDir);
 
-    auto ret = execCompilerBase(cfg, compilerBin, compileFlags, compilationCommands, compiler.isDCompiler);
+    auto ret = execCompilerBase(cfg, compilerBin, compileFlags, compilationCommands, cfg.getCompiler(compiler).isDCompiler);
 
     if(ret.status == 0)
     {
         //For working around bug 3541, 24748, dmd generates .obj files besides files, redub will move them out
         //of there to the object directory
-        if(cfg.outputsDeps && cfg.preservePath && compiler.compiler == AcceptedCompiler.dmd)
+        if(cfg.outputsDeps && cfg.preservePath && cfg.getCompiler(compiler).compiler == AcceptedCompiler.dmd)
             moveGeneratedObjectFiles(cfg.sourcePaths, cfg.sourceFiles, cfg.excludeSourceFiles, getObjectDir(inputDir),getObjectExtension(os));
         copyDir(inputDir, dirName(outDir));
     }
@@ -51,12 +51,13 @@ auto execCompiler(const BuildConfiguration cfg, string compilerBin, string[] com
 auto linkBase(const ThreadBuildData data, CompilingSession session, string rootHash, out string compilationCommand)
 {
     import redub.command_generators.automatic;
+    CompilerBinary c = data.cfg.getCompiler(session.compiler);
     return execCompilerBase(
         data.cfg,
-        getLinkerBin(session.compiler),
+        c.bin,
         getLinkFlags(data, session,  rootHash),
         compilationCommand,
-        session.compiler.isDCompiler,
+        c.isDCompiler,
     );
 }
 
@@ -86,7 +87,7 @@ auto executeArchiver(const ThreadBuildData data, CompilingSession s, out string 
 
     cmd~= buildNormalizedPath(data.cfg.outputDirectory, getOutputName(data.cfg, s.os, s.isa));
 
-    putObjectFiles(cmd, data.cfg, s.os, s.compiler.compiler.gcc ? cExt : cppExt);
+    putObjectFiles(cmd, data.cfg, s.os, data.cfg.getCompiler(s.compiler).compiler == AcceptedCompiler.gcc ? cExt : cppExt);
     command = cmd.join(" ");
 
     return executeShell(command);

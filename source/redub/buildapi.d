@@ -1,7 +1,7 @@
 module redub.buildapi;
 
 public import std.system:OS, ISA, instructionSetArchitecture;
-public import redub.compiler_identification: Compiler;
+public import redub.compiler_identification: Compiler, CompilerBinary;
 public import redub.plugin.api;
 import redub.logging;
 import redub.package_searching.api;
@@ -164,6 +164,7 @@ struct BuildConfiguration
     string[] postBuildCommands;
     ///Unused
     string sourceEntryPoint;
+    string language = "D";
     @cacheExclude string targetName;
 
     ///When having those files, the build will use them instead of sourcePaths + sourceFiles
@@ -257,6 +258,15 @@ struct BuildConfiguration
                 ret.tupleof[i] = this.tupleof[i];
         }
         return cast(immutable)ret;
+    }
+
+    CompilerBinary getCompiler(const Compiler c) const
+    {
+        final switch(language)
+        {
+            case "C": return c.c;
+            case "D": return c.d;
+        }
     }
 
     BuildConfiguration clone() const{return cast()this;}
@@ -611,6 +621,16 @@ struct BuildRequirements
 
     ExtraInformation extra;
 
+    /**
+     * Params:
+     *   c = The Compiler collection
+     * Returns: Actual compiler in use for the specified configuration.
+     */
+    CompilerBinary getCompiler(Compiler c) const
+    {
+        return cfg.getCompiler(c);
+    }
+
 
 
     BuildRequirements addPending(PendingMergeConfiguration pending) const
@@ -730,6 +750,11 @@ class ProjectNode
 
     string name() const { return requirements.name; }
     string targetName() const { return requirements.cfg.targetName; }
+
+    CompilerBinary getCompiler(const Compiler c) const
+    {
+        return requirements.cfg.getCompiler(c);
+    }
 
     string getOutputName(OS targetOS, ISA isa = instructionSetArchitecture) const
     {

@@ -223,7 +223,7 @@ string hashFrom(const BuildConfiguration cfg, CompilingSession session, bool isR
 
     XXH_64 xxh;
     xxh.start();
-    xxh.put(cast(ubyte[]) session.compiler.versionString);
+    xxh.put(cast(ubyte[])cfg.getCompiler(session.compiler).versionString);
     xxh.put(cast(ubyte)session.os);
     xxh.put(cast(ubyte)session.isa);
     // xxh.put(cast(ubyte[])req.targetConfiguration);
@@ -275,7 +275,7 @@ AdvCacheFormula getCompilationCacheFormula(const BuildRequirements req, string m
     string cacheDir = getCacheOutputDir(mainPackHash, req, s);
 
     string[] dirs = [cacheDir];
-    if(s.compiler.compiler == AcceptedCompiler.ldc2)
+    if(req.getCompiler(s.compiler).compiler == AcceptedCompiler.ldc2)
     {
         ///LDC object output directory
         dirs~= cacheDir~ "_obj";

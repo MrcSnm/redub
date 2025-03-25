@@ -15,6 +15,7 @@ string[] parseLinkConfiguration(const ThreadBuildData data, CompilingSession s, 
 
 
     const BuildConfiguration b = data.cfg;
+    CompilerBinary c = b.getCompiler(s.compiler);
     with(b)
     {
         {
@@ -24,7 +25,7 @@ string[] parseLinkConfiguration(const ThreadBuildData data, CompilingSession s, 
             {
                 string cacheDir = getCacheOutputDir(requirementCache, b, s, data.extra.isRoot);
                 string objExtension = getObjectExtension(s.os);
-                if(s.compiler.isDCompiler)
+                if(c.isDCompiler)
                     commands~= "-of"~buildNormalizedPath(cacheDir, getOutputName(b, s.os)).escapePath;
                 else
                 {
@@ -36,16 +37,16 @@ string[] parseLinkConfiguration(const ThreadBuildData data, CompilingSession s, 
                 else
                     commands~= buildNormalizedPath(outputDirectory, targetName~objExtension).escapePath;
             }
-            if(s.compiler.isDCompiler)
+            if(c.isDCompiler)
             {
-                string arch = mapArch(s.compiler.compiler, b.arch);
+                string arch = mapArch(c.compiler, b.arch);
                 if(arch)
                     commands~= arch;
             }
             commands~= filterLinkFlags(b.dFlags);
         }
         if(targetType == TargetType.dynamicLibrary)
-            commands~= getTargetTypeFlag(targetType, s.compiler);
+            commands~= getTargetTypeFlag(targetType, c);
         
         if (targetType.isLinkedSeparately)
         {
@@ -81,6 +82,7 @@ string[] parseLinkConfigurationMSVC(const ThreadBuildData data, CompilingSession
     if(!s.os.isWindows) return parseLinkConfiguration(data, s, requirementCache);
     string[] commands;
     const BuildConfiguration b = data.cfg;
+    CompilerBinary c = b.getCompiler(s.compiler);
     with(b)
     {
         string cacheDir = getCacheOutputDir(requirementCache, b, s, data.extra.isRoot);
@@ -91,10 +93,10 @@ string[] parseLinkConfigurationMSVC(const ThreadBuildData data, CompilingSession
         else
             commands~= buildNormalizedPath(outputDirectory, targetName~objExtension).escapePath;
 
-        if(s.compiler.isDCompiler)
+        if(c.isDCompiler)
         {
             import redub.command_generators.d_compilers;
-            string arch = mapArch(s.compiler.compiler, b.arch);
+            string arch = mapArch(c.compiler, b.arch);
             if(arch)
                 commands~= arch;
             commands~= filterLinkFlags(b.dFlags);
@@ -105,7 +107,7 @@ string[] parseLinkConfigurationMSVC(const ThreadBuildData data, CompilingSession
         }
         
         if(targetType == TargetType.dynamicLibrary)
-            commands~= getTargetTypeFlag(targetType, s.compiler);
+            commands~= getTargetTypeFlag(targetType, c);
         
         commands = mapAppendReverse(commands, data.extra.librariesFullPath, (string l) => (l~getLibraryExtension(s.os)).escapePath);
 
@@ -120,7 +122,7 @@ string[] parseLinkConfigurationMSVC(const ThreadBuildData data, CompilingSession
 }
 
 
-string getTargetTypeFlag(TargetType o, Compiler compiler)
+string getTargetTypeFlag(TargetType o, CompilerBinary compiler)
 {
     static import redub.command_generators.d_compilers;
     static import redub.command_generators.gnu_based;
@@ -129,8 +131,6 @@ string getTargetTypeFlag(TargetType o, Compiler compiler)
     {
         case dmd, ldc2: return redub.command_generators.d_compilers.getTargetTypeFlag(o, compiler.compiler);
         case gcc, gxx: return redub.command_generators.gnu_based.getTargetTypeFlag(o);
-        default: throw new Exception("Unsupported compiler "~compiler.binOrPath);
+        default: throw new Exception("Unsupported compiler "~compiler.bin);
     }
 }
-
-

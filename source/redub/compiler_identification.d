@@ -1,6 +1,7 @@
 module redub.compiler_identification;
 public import redub.libs.semver;
 import hipjson;
+import std.algorithm.setops;
 
 
 enum AcceptedCompiler : ubyte
@@ -94,6 +95,37 @@ private Archiver acceptedArchiver(JSONValue v)
     return Archiver(acceptedArchiverFromString(acc.object["type"].str), acc.object["bin"].str);
 }
 
+struct CompilerBinary
+{
+    AcceptedCompiler compiler;
+    string bin;
+    ///Version of the compiler used.
+    SemVer version_;
+    ///D Only - Which frontend was based
+    SemVer frontendVersion;
+    ///Contents of executing binOrPath --version
+    string versionString;
+
+
+
+    string getCompilerString() const
+    {
+        final switch(compiler) with(AcceptedCompiler)
+        {
+            case dmd: return "dmd";
+            case ldc2: return "ldc";
+            case gcc: return "gcc";
+            case gxx: return "g++";
+            case invalid: return null;
+        }
+    }
+
+    string getCompilerWithVersion() const
+    {
+        return getCompilerString()~" "~version_.toString;
+    }
+}
+
 
 /** 
  * Using this structure, it is possible to use any compiler with any version as long
@@ -102,17 +134,9 @@ private Archiver acceptedArchiver(JSONValue v)
 struct Compiler
 {
     ///Accepted compiler is used for getting the commands
-    AcceptedCompiler compiler;
-    ///Version of the compiler used.
-    SemVer version_;
-    ///D Only - Which frontend was based 
-    SemVer frontendVersion;
-
-    ///Contents of executing binOrPath --version
-    string versionString;
-
-    ///Accepts both a complete path to an executable or a global environment search path name
-    string binOrPath;
+    CompilerBinary d;
+    ///C compiiler that will be used when finding C proejcts
+    CompilerBinary c;
 
     /**
      * For generating libraries, redub might use dmd/ldc2 by default since that simplifies the logic.
@@ -129,28 +153,9 @@ struct Compiler
     ///Currently unused. Was used before for checking whether --start-group should be emitted or not. Since it is emitted
     ///by default, only on webAssembly which is not, it lost its usage for now.
     AcceptedLinker linker = AcceptedLinker.unknown;
-
-
-    string getCompilerString() const
-    {
-        final switch(compiler) with(AcceptedCompiler)
-        {
-            case dmd: return "dmd";
-            case ldc2: return "ldc";
-            case gcc: return "gcc";
-            case gxx: return "g++";
-            case invalid: throw new Exception("Invalid compiler.");
-        }
-    }
-
-    string getCompilerWithVersion() const
-    {
-        return getCompilerString()~" "~version_.toString;
-    }
 }
 
-
-bool isDCompiler(immutable Compiler comp)
+bool isDCompiler(immutable CompilerBinary comp)
 {
     return comp.compiler == AcceptedCompiler.dmd || comp.compiler == AcceptedCompiler.ldc2;
 }
@@ -249,41 +254,22 @@ string tryGetStr(JSONValue v, string key)
  *   arch = Used mainly for identifying which ldc.conf to take, and by using it, it is possible to detect the default linker for the specific arch
  * Returns: The Compiler information that was found, or inferred if compilerAssumption was used.
  */
-Compiler getCompiler(string compilerOrPath = "dmd", string compilerAssumption = null, string arch = null)
+Compiler getCompiler(string compilerOrPath = "dmd", string cCompilerOrPath = null, string compilerAssumption = null, string arch = null)
 {
     import std.algorithm.comparison:either;
-    import redub.misc.find_executable;
     import redub.meta;
-    import std.path;
-
 
     JSONValue compilersInfo = getRedubMeta();
     bool isDefault = compilerOrPath == null;
     compilerOrPath = either(compilerOrPath, tryGetStr(compilersInfo, "defaultCompiler"), "dmd");
-    bool isGlobal = false;
 
     Compiler ret;
-    //Try get compiler on global cache with global cached paths
-    if(!isAbsolute(compilerOrPath))
+
+    ret.d = searchCompiler(compilerOrPath, compilersInfo, isDefault, false, compilerAssumption);
+    if(cCompilerOrPath)
     {
-        string locCompiler = tryGetCompilerOnCwd(compilerOrPath);
-        if(locCompiler != compilerOrPath)
-            compilerOrPath = locCompiler;
-        else
-        {
-            ret = getCompilerFromGlobalPath(compilerOrPath, compilersInfo);
-            isGlobal = true;
-        }
+        ret.c = searchCompiler(cCompilerOrPath, compilersInfo, false, true);
     }
-    //Try finding the compiler globally and getting it from cache
-    if(ret == Compiler.init)
-    {
-        compilerOrPath = findExecutable(compilerOrPath);
-        ret = getCompilerFromCache(compilersInfo, compilerOrPath);
-    }
-    //Try inferring the compiler and saving its infos
-    if(ret == Compiler.init)
-        ret = inferCompiler(compilerOrPath, compilerAssumption, compilersInfo, isDefault, isGlobal);
 
     ret.linker = acceptedLinkerfromString(compilersInfo["defaultLinker"].str);
     ret.archiver = acceptedArchiver(compilersInfo);
@@ -298,6 +284,37 @@ Compiler getCompiler(string compilerOrPath = "dmd", string compilerAssumption = 
     // }
 
     
+    return ret;
+}
+private CompilerBinary searchCompiler(string compilerOrPath, JSONValue compilersInfo, bool isDefault, bool isC, string compilerAssumption = null)
+{
+    import redub.misc.find_executable;
+    import std.path;
+    import std.file;
+    bool isGlobal = false;
+
+    CompilerBinary ret;
+    //Try get compiler on global cache with global cached paths
+    if(!isAbsolute(compilerOrPath))
+    {
+        string locCompiler = tryGetCompilerOnCwd(compilerOrPath);
+        if(locCompiler != compilerOrPath)
+            compilerOrPath = locCompiler;
+        else
+        {
+            ret = getCompilerFromGlobalPath(compilerOrPath, compilersInfo);
+            isGlobal = true;
+        }
+    }
+    //Try finding the compiler globally and getting it from cache
+    if(ret == CompilerBinary.init)
+    {
+        compilerOrPath = findExecutable(compilerOrPath);
+        ret = getCompilerFromCache(compilersInfo, compilerOrPath);
+    }
+    //Try inferring the compiler and saving its infos
+    if(ret == CompilerBinary.init)
+        ret = inferCompiler(compilerOrPath, compilerAssumption, compilersInfo, isDefault, isGlobal, isC);
     return ret;
 }
 
@@ -332,14 +349,14 @@ Compiler getCompiler(string compilerOrPath = "dmd", string compilerAssumption = 
 // }
 
 
-private Compiler getCompilerFromGlobalPath(string compilerOrPath, JSONValue compilersInfo)
+private CompilerBinary getCompilerFromGlobalPath(string compilerOrPath, JSONValue compilersInfo)
 {
     if(JSONValue* globalPaths = "globalPaths" in compilersInfo)
     {
         if(JSONValue* cachedPath = compilerOrPath in *globalPaths)
             return getCompilerFromCache(compilersInfo, cachedPath.str);
     }
-    return Compiler.init;
+    return CompilerBinary.init;
 }
 
 /** 
@@ -350,9 +367,10 @@ private Compiler getCompilerFromGlobalPath(string compilerOrPath, JSONValue comp
  *   compilersInfo = Used for saving metadata
  *   isDefault = Used for metadata
  *   isGlobal = Used for metadata
+ *   isC = Used for metadata
  * Returns: The compiler that was inferrred from the given info
  */
-private Compiler inferCompiler(string compilerOrPath, string compilerAssumption, JSONValue compilersInfo, bool isDefault, bool isGlobal)
+private CompilerBinary inferCompiler(string compilerOrPath, string compilerAssumption, JSONValue compilersInfo, bool isDefault, bool isGlobal, bool isC)
 {
     import redub.misc.find_executable;
     import std.array;
@@ -363,7 +381,7 @@ private Compiler inferCompiler(string compilerOrPath, string compilerAssumption,
         &tryInferGxx
     ].staticArray;
 
-    Compiler ret;
+    CompilerBinary ret;
 
     if(compilerAssumption == null)
     {
@@ -373,8 +391,8 @@ private Compiler inferCompiler(string compilerOrPath, string compilerAssumption,
         {
             if(inf(actualCompiler, versionString, ret))
             {
-                ret.binOrPath = findExecutable(ret.binOrPath);
-                saveCompilerInfo(compilersInfo, ret, isDefault, isGlobal);
+                ret.bin = findExecutable(ret.bin);
+                saveCompilerInfo(compilersInfo, ret, isDefault, isGlobal, isC);
                 return ret;
             }
         }
@@ -387,7 +405,7 @@ private Compiler inferCompiler(string compilerOrPath, string compilerAssumption,
 }
 
 
-private Compiler getCompilerFromCache(JSONValue allCompilersInfo, string compiler)
+private CompilerBinary getCompilerFromCache(JSONValue allCompilersInfo, string compiler)
 {
     import std.exception;
     import std.file;
@@ -409,27 +427,26 @@ private Compiler getCompilerFromCache(JSONValue allCompilersInfo, string compile
     {
         foreach(key, value; comps.object)
         {
-            if(value.type != JSONType.array)
-                enforce(false, "Expected that the value from object "~key~" were an array.");
+            enforce(value.type == JSONType.array, "Expected that the value from object "~key~" were an array.");
             if(key == compiler && std.file.exists(key))
             {
                 JSONValue[] arr = value.array;
 
                 if(arr[TIMESTAMP].get!long != timeLastModified(key).stdTime)
-                    return Compiler.init;
+                    return CompilerBinary.init;
 
-                return Compiler(
+                return CompilerBinary(
                     acceptedCompilerfromString(arr[ACCEPTED_COMPILER].str),
+                    key,
                     SemVer(arr[VERSION_].str),
                     SemVer(arr[FRONTEND_VERSION].str),
                     arr[VERSION_STRING].str,
-                    key, acceptedArchiver(allCompilersInfo), false, acceptedLinkerfromString(allCompilersInfo["defaultLinker"].str)
                 );
             }
         }
     }
 
-    return Compiler.init;
+    return CompilerBinary.init;
 }
 
 /**
@@ -444,26 +461,28 @@ private Compiler getCompilerFromCache(JSONValue allCompilersInfo, string compile
  *   compiler = The new compiler to add. It will also save usesGnuLinker inside compiler
  *   isDefault = saves the compiler as the default compiler
  *   isGlobal = Saves the compiler as a globalPath. For example, it will use the path whenever expected to find in global path when "dmd" is sent or "ldc2" (i.e: no real path)
+ *   isC = If is a C compiler
  */
-private void saveCompilerInfo(JSONValue allCompilersInfo, ref Compiler compiler, bool isDefault, bool isGlobal)
+private void saveCompilerInfo(JSONValue allCompilersInfo, ref CompilerBinary compiler, bool isDefault, bool isGlobal, bool isC)
 {
     import redub.meta;
     import std.conv:to;
     import redub.buildapi;
     import std.file;
 
+    string compilerStr = compiler.compiler.to!string;
+
     if(isDefault)
-    {
-        allCompilersInfo["defaultCompiler"] = JSONValue(compiler.compiler.to!string);
-    }
+        allCompilersInfo[isC ? "defaultCCompiler" : "defaultCompiler"] = JSONValue(compilerStr);
+
+
     if(isGlobal)
     {
         if(!("globalPaths" in allCompilersInfo))
             allCompilersInfo["globalPaths"] = JSONValue.emptyObject;
-        allCompilersInfo["globalPaths"][compiler.compiler.to!string] = JSONValue(compiler.binOrPath);
+        allCompilersInfo["globalPaths"][compilerStr] = JSONValue(compiler.bin);
     }
-    if(!("version" in allCompilersInfo))
-        allCompilersInfo["version"] = JSONValue(RedubVersionOnly);
+
     if(!("defaultArchiver" in allCompilersInfo))
     {
         JSONValue defaultArchiver = JSONValue.emptyObject;
@@ -475,28 +494,27 @@ private void saveCompilerInfo(JSONValue allCompilersInfo, ref Compiler compiler,
 
     if(!("defaultLinker" in allCompilersInfo))
         allCompilersInfo["defaultLinker"] = getDefaultLinker.to!string;
-    compiler.linker = acceptedLinkerfromString(allCompilersInfo["defaultLinker"].str);
 
     if(!("compilers" in allCompilersInfo))
         allCompilersInfo["compilers"] = JSONValue.emptyObject;
 
 
-    allCompilersInfo["compilers"][compiler.binOrPath] = JSONValue([
-        JSONValue(compiler.compiler.to!string),
+    allCompilersInfo["compilers"][compiler.bin] = JSONValue([
+        JSONValue(compilerStr),
         JSONValue(compiler.version_.toString),
         JSONValue(compiler.frontendVersion.toString),
         JSONValue(compiler.versionString),
-        JSONValue(timeLastModified(compiler.binOrPath).stdTime)
+        JSONValue(timeLastModified(compiler.bin).stdTime)
     ]);
-    saveRedubMeta(allCompilersInfo.toString);
+    saveRedubMeta(allCompilersInfo);
 }
 
-private Compiler assumeCompiler(string compilerOrPath, string compilerAssumption)
+private CompilerBinary assumeCompiler(string compilerOrPath, string compilerAssumption)
 {
     import std.string;
     import std.exception;
-    Compiler ret;
-    ret.binOrPath = compilerOrPath;
+    CompilerBinary ret;
+    ret.bin = compilerOrPath;
     ret.versionString = compilerAssumption;
     ptrdiff_t compEndIndex = indexOfAny(compilerAssumption, [' ']);
     enforce(compEndIndex != -1, "Expected 'compiler v[...] f[...]'. The compiler assumption must have a space between it and its version/frontend");
@@ -567,7 +585,7 @@ Archiver getDefaultArchiver()
     }
 }
 
-private bool tryInferLdc(string compilerOrPath, string vString, out Compiler comp)
+private bool tryInferLdc(string compilerOrPath, string vString, out CompilerBinary comp)
 {
     import std.exception;
     import std.string;
@@ -585,12 +603,12 @@ private bool tryInferLdc(string compilerOrPath, string vString, out Compiler com
     string frontEndVer = inBetweenAny(vString, "based on DMD v", [' ', '\t', '\n', '\r'], indexRight);
     enforce(indexRight != -1, "Found LDC but coult not find DMD Frontend version");
 
-    comp = Compiler(AcceptedCompiler.ldc2, SemVer(ldcVerStr), SemVer(frontEndVer), vString, compilerOrPath);
+    comp = CompilerBinary(AcceptedCompiler.ldc2, compilerOrPath, SemVer(ldcVerStr), SemVer(frontEndVer), vString);
     return true;
 }
 
 
-private bool tryInferDmd(string compilerOrPath, string vString, out Compiler comp)
+private bool tryInferDmd(string compilerOrPath, string vString, out CompilerBinary comp)
 {
     import std.string;
     import std.exception;
@@ -605,11 +623,11 @@ private bool tryInferDmd(string compilerOrPath, string vString, out Compiler com
     if(dmdIndex == -1) return false;
 
     SemVer dmdVer = SemVer(dmdVerString);
-    comp = Compiler(AcceptedCompiler.dmd, dmdVer, dmdVer, vString, compilerOrPath);
+    comp = CompilerBinary(AcceptedCompiler.dmd, compilerOrPath, dmdVer, dmdVer, vString);
     return true;
 }
 
-private bool tryInferGcc(string compilerOrPath, string _vString, out Compiler comp)
+private bool tryInferGcc(string compilerOrPath, string _vString, out CompilerBinary comp)
 {
     import std.path;
     import redub.logging;
@@ -617,19 +635,19 @@ private bool tryInferGcc(string compilerOrPath, string _vString, out Compiler co
     switch(type)
     {
         case "gcc", "tcc":
-            comp = Compiler(AcceptedCompiler.gcc, SemVer.init, SemVer.init, _vString, compilerOrPath); 
+            comp = CompilerBinary(AcceptedCompiler.gcc, compilerOrPath, SemVer.init, SemVer.init, _vString);
             error("GCC Compiler detected. Beware that it is still very untested.");
             return true;
         default: return false;
     }
 }
-private bool tryInferGxx(string compilerOrPath, string _vString, out Compiler comp)
+private bool tryInferGxx(string compilerOrPath, string _vString, out CompilerBinary comp)
 {
     import std.path;
     import redub.logging;
     string type = compilerOrPath.baseName.stripExtension;
     if(type != "g++") return false;
-    comp = Compiler(AcceptedCompiler.gxx, SemVer.init, SemVer.init, _vString, compilerOrPath);
+    comp = CompilerBinary(AcceptedCompiler.gxx, compilerOrPath, SemVer.init, SemVer.init, _vString);
     error("G++ Compiler detected. Beware that it is still very untested.");
     return true;
 }
