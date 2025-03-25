@@ -23,12 +23,13 @@ string escapeCompilationCommands(string compilerBin, string[] flags)
  */
 string[] getCompilationFlags(const BuildConfiguration cfg, CompilingSession s, string mainPackHash, bool isRoot)
 {
+    import redub.command_generators.commons;
     switch(s.compiler.compiler) with(AcceptedCompiler)
     {
         case gxx:
-            return redub.command_generators.gnu_based.parseBuildConfiguration(cfg, s, mainPackHash, isRoot, ".c", ".cpp", ".cc", ".i", ".cxx", ".c++");
+            return redub.command_generators.gnu_based.parseBuildConfiguration(cfg, s, mainPackHash, isRoot, cppExt);
         case gcc:
-            return redub.command_generators.gnu_based.parseBuildConfiguration(cfg, s, mainPackHash, isRoot, ".c", ".i");
+            return redub.command_generators.gnu_based.parseBuildConfiguration(cfg, s, mainPackHash, isRoot, cExt);
         case dmd:
             return redub.command_generators.dmd.parseBuildConfiguration(cfg, s, mainPackHash, isRoot);
         case ldc2:
@@ -48,9 +49,7 @@ string[] getLinkFlags(const ThreadBuildData data, CompilingSession s, string mai
 
 string getLinkerBin(Compiler compiler)
 {
-    if(compiler.isDCompiler)
-        return compiler.binOrPath;
-    return compiler.linker.bin;
+    return compiler.binOrPath;
 }
 
 
@@ -61,9 +60,7 @@ string getLinkCommands(const ThreadBuildData data, CompilingSession s, string ma
     if(s.compiler.compiler == AcceptedCompiler.invalid)
         throw new Exception("Unsupported compiler '" ~ s.compiler.binOrPath~"'");
 
-    if(s.compiler.isDCompiler)
-        return escapeShellCommand(s.compiler.binOrPath) ~ " "~ processFlags(flags);
-    return escapeShellCommand(s.compiler.linker.bin) ~ " " ~ processFlags(flags);
+    return escapeShellCommand(s.compiler.binOrPath) ~ " "~ processFlags(flags);
 }
 
 

@@ -7,6 +7,13 @@ public import redub.compiler_identification;
 import redub.buildapi;
 public import std.file:DirEntry;
 
+///Valid d extensions
+immutable string[] dExt   = [".d"];
+///Valid c extensions
+immutable string[] cExt   = [".c", ".i"];
+///Valid c++ extensions
+immutable string[] cppExt = [".c", ".cpp", ".cc", ".i", ".cxx", ".c++"];
+
 
 OS osFromArch(string arch)
 {

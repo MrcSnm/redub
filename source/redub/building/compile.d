@@ -126,13 +126,13 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
             if(!pack.isCopyEnough)
                 ret = cast(ExecutionResult)execCompiler(cfg, compiler.binOrPath, getCompilationFlags(cfg, info, hash.rootHash, data.extra.isRoot), res.compilationCommand, compiler, inDir);
 
-            if(!isDCompiler(compiler) && !ret.status) //Always requires link.
+            if(!isDCompiler(compiler) && !ret.status && isStaticLibrary(data.cfg.targetType)) //Must call archiver when
             {
                 string cmd ;
                 auto archiverRes = executeArchiver(data, info, cmd);
                 ret.status = archiverRes.status;
                 ret.output~= archiverRes.output;
-                res.compilationCommand~= cmd;
+                res.compilationCommand~= "\n\nArchiving: \n\t"~cmd;
             }
 
             copyDir(inDir, dirName(outDir));

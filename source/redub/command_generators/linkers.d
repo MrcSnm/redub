@@ -10,14 +10,13 @@ string[] parseLinkConfiguration(const ThreadBuildData data, CompilingSession s, 
     import redub.misc.path;
     import redub.building.cache;
     string[] commands;
-    AcceptedLinker linker = s.compiler.linker.type;
+    AcceptedLinker linker = s.compiler.linker;
     bool emitStartGroup = s.isa != ISA.webAssembly && linker != AcceptedLinker.ld64;
 
 
     const BuildConfiguration b = data.cfg;
     with(b)
     {
-        if(s.compiler.isDCompiler)
         {
             import redub.command_generators.d_compilers;
 
@@ -25,15 +24,24 @@ string[] parseLinkConfiguration(const ThreadBuildData data, CompilingSession s, 
             {
                 string cacheDir = getCacheOutputDir(requirementCache, b, s, data.extra.isRoot);
                 string objExtension = getObjectExtension(s.os);
-                commands~= "-of"~buildNormalizedPath(cacheDir, getOutputName(b, s.os)).escapePath;
+                if(s.compiler.isDCompiler)
+                    commands~= "-of"~buildNormalizedPath(cacheDir, getOutputName(b, s.os)).escapePath;
+                else
+                {
+                    commands~= "-o";
+                    commands~= buildNormalizedPath(cacheDir, getOutputName(b, s.os)).escapePath;
+                }
                 if(b.outputsDeps)
                     putSourceFiles(commands, null, [getObjectDir(cacheDir)], null, null, objExtension);
                 else
                     commands~= buildNormalizedPath(outputDirectory, targetName~objExtension).escapePath;
             }
-            string arch = mapArch(s.compiler.compiler, b.arch);
-            if(arch)
-                commands~= arch;
+            if(s.compiler.isDCompiler)
+            {
+                string arch = mapArch(s.compiler.compiler, b.arch);
+                if(arch)
+                    commands~= arch;
+            }
             commands~= filterLinkFlags(b.dFlags);
         }
         if(targetType == TargetType.dynamicLibrary)
@@ -56,13 +64,6 @@ string[] parseLinkConfiguration(const ThreadBuildData data, CompilingSession s, 
             commands~= getLinkFiles(b.sourceFiles);
             commands = mapAppend(commands, libraries, (string l) => "-L-l"~stripLibraryExtension(l));
             
-        }
-        else if(!s.compiler.isDCompiler) //Generates a static library using archiver. FIXME: BuildRequirements should know its files.
-        {
-            commands~= "--format=default";
-            commands~= "rcs";
-            commands~= buildNormalizedPath(outputDirectory, getOutputName(b, s.os));
-            putObjectFiles(commands, b, s.os, ".c", ".cpp", ".cc", ".i", ".cxx", ".c++");
         }
     }
 
@@ -133,11 +134,3 @@ string getTargetTypeFlag(TargetType o, Compiler compiler)
 }
 
 
-private void putObjectFiles(ref string[] target, const BuildConfiguration b, OS os, scope const string[] extensions...)
-{
-    import std.file;
-    import std.path;
-    string[] objectFiles;
-    putSourceFiles(objectFiles, b.workingDir, b.sourcePaths, b.sourceFiles, b.excludeSourceFiles, extensions);
-    target = mapAppend(target, objectFiles, (string src) => setExtension(src, getObjectExtension(os)));
-}

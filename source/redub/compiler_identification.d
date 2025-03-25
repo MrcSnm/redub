@@ -44,11 +44,6 @@ struct Archiver
     AcceptedArchiver type;
     string bin;
 }
-struct Linker
-{
-    AcceptedLinker type;
-    string bin;
-}
 
 AcceptedCompiler acceptedCompilerfromString(string str)
 {
@@ -89,14 +84,6 @@ AcceptedArchiver acceptedArchiverFromString(string str)
         default:
             return AcceptedArchiver.none;
     }
-}
-
-private Linker acceptedLinker(JSONValue v)
-{
-    JSONValue* acc = "defaultLinker" in v;
-    if(!acc)
-        return Linker(AcceptedLinker.unknown);
-    return Linker(acceptedLinkerfromString(acc.object["type"].str), acc.object["bin"].str);
 }
 
 private Archiver acceptedArchiver(JSONValue v)
@@ -141,7 +128,7 @@ struct Compiler
 
     ///Currently unused. Was used before for checking whether --start-group should be emitted or not. Since it is emitted
     ///by default, only on webAssembly which is not, it lost its usage for now.
-    Linker linker = Linker(AcceptedLinker.unknown);
+    AcceptedLinker linker = AcceptedLinker.unknown;
 
 
     string getCompilerString() const
@@ -298,7 +285,7 @@ Compiler getCompiler(string compilerOrPath = "dmd", string compilerAssumption = 
     if(ret == Compiler.init)
         ret = inferCompiler(compilerOrPath, compilerAssumption, compilersInfo, isDefault, isGlobal);
 
-    ret.linker = acceptedLinker(compilersInfo);
+    ret.linker = acceptedLinkerfromString(compilersInfo["defaultLinker"].str);
     ret.archiver = acceptedArchiver(compilersInfo);
 
     //Checks for ldc.conf switches to see if it is using gnu linker by default
@@ -436,7 +423,7 @@ private Compiler getCompilerFromCache(JSONValue allCompilersInfo, string compile
                     SemVer(arr[VERSION_].str),
                     SemVer(arr[FRONTEND_VERSION].str),
                     arr[VERSION_STRING].str,
-                    key, acceptedArchiver(allCompilersInfo), false, acceptedLinker(allCompilersInfo)
+                    key, acceptedArchiver(allCompilersInfo), false, acceptedLinkerfromString(allCompilersInfo["defaultLinker"].str)
                 );
             }
         }
@@ -487,14 +474,8 @@ private void saveCompilerInfo(JSONValue allCompilersInfo, ref Compiler compiler,
     }
 
     if(!("defaultLinker" in allCompilersInfo))
-    {
-        JSONValue defaultLinker = JSONValue.emptyObject;
-        auto def = getDefaultLinker();
-        defaultLinker["type"] = def.type.to!string;
-        defaultLinker["bin"] = def.bin;
-        allCompilersInfo["defaultLinker"] = defaultLinker;
-    }
-    compiler.linker = acceptedLinker(allCompilersInfo);
+        allCompilersInfo["defaultLinker"] = getDefaultLinker.to!string;
+    compiler.linker = acceptedLinkerfromString(allCompilersInfo["defaultLinker"].str);
 
     if(!("compilers" in allCompilersInfo))
         allCompilersInfo["compilers"] = JSONValue.emptyObject;
@@ -548,7 +529,7 @@ private Compiler assumeCompiler(string compilerOrPath, string compilerAssumption
 }
 
 
-Linker getDefaultLinker()
+AcceptedLinker getDefaultLinker()
 {
     with(AcceptedLinker)
     {
@@ -560,12 +541,12 @@ Linker getDefaultLinker()
             if(res.status == 0)
             {
                 if(res.output.startsWith("GNU ld"))
-                    return Linker(gnuld, "ld");
+                    return gnuld;
                 else if(res.output.startsWith("@(#)PROGRAM:ld"))
-                    return Linker(ld64, "ld");
+                    return ld64;
             }
         }
-        return Linker(unknown);
+        return unknown;
     }
 }
 

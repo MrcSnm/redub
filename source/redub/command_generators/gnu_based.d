@@ -4,6 +4,7 @@ public import redub.buildapi;
 public import std.system;
 import redub.command_generators.commons;
 import redub.logging;
+import redub.building.cache;
 
 /// Parse G++ configuration
 string[] parseBuildConfiguration(const BuildConfiguration b, CompilingSession s, string requirementCache, bool isRoot, const string[] extensions...)
@@ -16,6 +17,7 @@ string[] parseBuildConfiguration(const BuildConfiguration b, CompilingSession s,
     with(b)
     {
         if(isDebug) commands~= "-g";
+        if(targetType.isLinkedSeparately) commands~= "-c";
 
         commands = mapAppendPrefix(commands, versions, "-D", false);
         commands~= dFlags;
@@ -29,10 +31,9 @@ string[] parseBuildConfiguration(const BuildConfiguration b, CompilingSession s,
         if(targetType.isLinkedSeparately)
         {
             commands~= "-o";
-            commands ~= buildNormalizedPath(outputDirectory, getOutputName(targetType, name, os));
+            string cacheDir = getCacheOutputDir(requirementCache, b, s, isRoot);
+            commands ~= buildNormalizedPath(cacheDir, getConfigurationOutputName(b, s.os)).escapePath;
         }
-
-
     }
 
     return commands;

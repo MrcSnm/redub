@@ -60,6 +60,13 @@ auto linkBase(const ThreadBuildData data, CompilingSession session, string rootH
     );
 }
 
+/**
+ * Generates a static library using archiver. FIXME: BuildRequirements should know its files.
+ * Params:
+ *   data = The data containing project information
+ *   s = Compiling Session
+ *   command = Command for being able to print it later
+ */
 auto executeArchiver(const ThreadBuildData data, CompilingSession s, out string command)
 {
     import std.process;
@@ -72,17 +79,25 @@ auto executeArchiver(const ThreadBuildData data, CompilingSession s, out string 
     string[] cmd = [a.bin];
     final switch(a.type) with(AcceptedArchiver)
     {
-        case ar, llvmAr: cmd~= "rcs"; break;
+        case ar, llvmAr: cmd~= ["rcs"]; break;
         case libtool: cmd~= ["-static", "-o"]; break;
         case none: break;
     }
 
-    cmd~= getOutputName(data.cfg, s.os, s.isa);
+    cmd~= buildNormalizedPath(data.cfg.outputDirectory, getOutputName(data.cfg, s.os, s.isa));
 
-    string objExt = getObjectExtension(s.os);
-    cmd = mapAppend(cmd, data.cfg.sourceFiles, (string src) => stripExtension(src)~ objExt);
-
+    putObjectFiles(cmd, data.cfg, s.os, s.compiler.compiler.gcc ? cExt : cppExt);
     command = cmd.join(" ");
 
     return executeShell(command);
+}
+
+private void putObjectFiles(ref string[] target, const BuildConfiguration b, OS os, scope const string[] extensions...)
+{
+    import redub.command_generators.commons;
+    import std.file;
+    import std.path;
+    string[] objectFiles;
+    putSourceFiles(objectFiles, b.workingDir, b.sourcePaths, b.sourceFiles, b.excludeSourceFiles, extensions);
+    target = mapAppend(target, objectFiles, (string src) => setExtension(src, getObjectExtension(os)));
 }
