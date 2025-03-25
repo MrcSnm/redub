@@ -85,6 +85,21 @@ For using it on prebuild, you simply specify the module and its arguments:
 - [**GetModule plugin**](./plugins/getmodules/source/getmodules.d)
 - [**Example Usage**](./tests/plugin_test/dub.json)
 
+## Multi language
+
+Redub has also an experimental support for building and linking C/C++ code together with D code. For that, you need to define a dub.json:
+```json
+{
+  "language": "C"
+}
+```
+
+With that, you'll be able to specify that your dependency is a C/C++ dependency. then, you'll be able to build it by calling `redub --cc=gcc`. You can also
+specify both D and C at the same time `redub --cc=gcc --dc=dmd`. Which will use DMD to build D and GCC to C.
+
+You can see that in the example project: [**Multi Language Redub Project**](./tests/multi_lang/dub.json)
+
+
 # Project Meta
 
 
@@ -143,6 +158,3 @@ Those projects were fairly tested while building this one
 - dplug
 - arsd-official
 - Hipreme Engine
-
-## Package manager
-- Will be implemented as a hook in the build system. I'm accepting PRs, but I'm not implementing myself.
