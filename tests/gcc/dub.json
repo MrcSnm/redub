@@ -1,19 +1,9 @@
 {
 	"authors": [
-		"Amlal El Mahrouss"
+		"Marcelo Mancini", "Amlal El Mahrouss"
 	],
-	"sourcePaths": ["source"],
-	"targetType": "staticLibrary",
-	"configurations": [
-		{
-			"name": "Linux",
-			"platforms": ["linux"]
-		},
-		{
-			"name": "MacOS",
-			"platforms": ["osx"]
-		}
-	],
+	"language": "C",
+	"targetType": "executable",
 	"copyright": "Copyright © 2024, Amlal El Mahrouss",
 	"description": "A minimal C++ application.",
 	"license": "MIT",
