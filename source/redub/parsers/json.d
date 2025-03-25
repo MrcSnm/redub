@@ -42,6 +42,7 @@ BuildRequirements parse(string filePath,
     string version_, 
     BuildRequirements.Configuration subConfiguration,
     string subPackage,
+    out BuildConfiguration pending,
     string parentName,
     bool isDescribeOnly = false,
     bool isRoot = false
@@ -49,7 +50,7 @@ BuildRequirements parse(string filePath,
 {
     import std.path;
     ParseConfig c = ParseConfig(projectWorkingDir, subConfiguration, subPackage, version_, cInfo, defaultPackageName, ParseSubConfig(null,parentName), preGenerateRun: !isDescribeOnly);
-    return parse(parseJSONCached(filePath), c, isRoot);
+    return parse(parseJSONCached(filePath), c, pending, isRoot);
 }
 
 /**
@@ -75,6 +76,7 @@ BuildRequirements parseWithData(string filePath,
     string version_,
     BuildRequirements.Configuration subConfiguration,
     string subPackage,
+    out BuildConfiguration pending,
     string parentName,
     bool isDescribeOnly = false,
     bool isRoot = false
@@ -82,7 +84,7 @@ BuildRequirements parseWithData(string filePath,
 {
     import std.path;
     ParseConfig c = ParseConfig(projectWorkingDir, subConfiguration, subPackage, version_, cInfo, defaultPackageName, ParseSubConfig(null, parentName), preGenerateRun: !isDescribeOnly);
-    return parse(parseJSONCached(filePath, fileData), c, isRoot);
+    return parse(parseJSONCached(filePath, fileData), c, pending, isRoot);
 }
 
 
@@ -127,7 +129,7 @@ public void clearJsonRecipeCache(){jsonCache = null;}
  *   json = A dub.json equivalent
  * Returns: 
  */
-BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
+BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration pending, bool isRoot = false)
 {
     import std.exception;
     cfg.isRoot = isRoot;
@@ -146,13 +148,11 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
         putRootPackageInCache(cfg.extra.requiredBy, cfg.workingDir);
         vlog("Added project ", cfg.extra.requiredBy, " to memory cache.");
     }
-    BuildRequirements buildRequirements = getDefaultBuildRequirement(cfg);
-    buildRequirements.cfg.language = tryStr(json, "language", "D");
-    enforce(buildRequirements.cfg.language == "C" || buildRequirements.cfg.language == "D", "\"language\" must only be set as language C and D for redub projects.");
+    BuildRequirements buildRequirements = getDefaultBuildRequirement(cfg, json);
 
     immutable static requirementsRun = [
-        "name": (ref BuildRequirements req, JSONValue v, ParseConfig c){},
-        "plugins": (ref BuildRequirements req, JSONValue v, ParseConfig c)
+        "name": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){},
+        "plugins": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _)
         {
             enforce(v.type == JSONType.object, "\"plugins\" in json must be an object.");
             foreach(key, value; v.object)
@@ -161,36 +161,36 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
                 baseLoadPlugin(key, value.str, c.workingDir, c.cInfo);
             }
         },
-        "preBuildPlugins": (ref BuildRequirements req, JSONValue v, ParseConfig c)
+        "preBuildPlugins": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _)
         {
             foreach(key, value; v.object)
                 addPreBuildPlugins(req, key, value.strArr, c);
         },
-        // "buildTypes": (ref BuildRequirements req, JSONValue v, ParseConfig c)
+        // "buildTypes": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _)
         // {
         //     enforce(false, "Redub does not support buildTypes and has no plan to support it. Use \"configurations\" for achieving the same thing.");
         // },
-        "targetName": (ref BuildRequirements req, JSONValue v, ParseConfig c){setTargetName(req, v.str, c);},
-        "targetType": (ref BuildRequirements req, JSONValue v, ParseConfig c){setTargetType(req, v.str, c);},
-        "targetPath": (ref BuildRequirements req, JSONValue v, ParseConfig c){setTargetPath(req, v.str, c);},
-        "importPaths": (ref BuildRequirements req, JSONValue v, ParseConfig c){addImportPaths(req, v.strArr, c);},
-        "stringImportPaths": (ref BuildRequirements req, JSONValue v, ParseConfig c){addStringImportPaths(req, v.strArr, c);},
-        "preGenerateCommands": (ref BuildRequirements req, JSONValue v, ParseConfig c){addPreGenerateCommands(req, v.strArr, c);},
-        "postGenerateCommands": (ref BuildRequirements req, JSONValue v, ParseConfig c){addPostGenerateCommands(req, v.strArr, c);},
-        "preBuildCommands": (ref BuildRequirements req, JSONValue v, ParseConfig c){addPreBuildCommands(req, v.strArr, c);},
-        "postBuildCommands": (ref BuildRequirements req, JSONValue v, ParseConfig c){addPostBuildCommands(req, v.strArr, c);},
-        "copyFiles": (ref BuildRequirements req, JSONValue v, ParseConfig c){addFilesToCopy(req, v.strArr, c);},
-        "extraDependencyFiles": (ref BuildRequirements req, JSONValue v, ParseConfig c){addExtraDependencyFiles(req, v.strArr, c);},
-        "sourcePaths": (ref BuildRequirements req, JSONValue v, ParseConfig c){addSourcePaths(req, v.strArr, c);},
-        "sourceFiles": (ref BuildRequirements req, JSONValue v, ParseConfig c){addSourceFiles(req, v.strArr, c);},
-        "excludedSourceFiles": (ref BuildRequirements req, JSONValue v, ParseConfig c){addExcludedSourceFiles(req, v.strArr, c);},
-        "libPaths":  (ref BuildRequirements req, JSONValue v, ParseConfig c){addLibPaths(req, v.strArr, c);},
-        "libs":  (ref BuildRequirements req, JSONValue v, ParseConfig c){addLibs(req, v.strArr, c);},
-        "versions":  (ref BuildRequirements req, JSONValue v, ParseConfig c){addVersions(req, v.strArr, c);},
-        "debugVersions":  (ref BuildRequirements req, JSONValue v, ParseConfig c){addDebugVersions(req, v.strArr, c);},
-        "lflags":  (ref BuildRequirements req, JSONValue v, ParseConfig c){addLinkFlags(req, v.strArr, c);},
-        "dflags":  (ref BuildRequirements req, JSONValue v, ParseConfig c){addDflags(req, v.strArr, c);},
-        "configurations": (ref BuildRequirements req, JSONValue v, ParseConfig c)
+        "targetName": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){setTargetName(req, v.str, c);},
+        "targetType": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){setTargetType(req, v.str, c);},
+        "targetPath": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){setTargetPath(req, v.str, c);},
+        "importPaths": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){addImportPaths(req, v.strArr, c);},
+        "stringImportPaths": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){addStringImportPaths(req, v.strArr, c);},
+        "preGenerateCommands": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){addPreGenerateCommands(req, v.strArr, c);},
+        "postGenerateCommands": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){addPostGenerateCommands(req, v.strArr, c);},
+        "preBuildCommands": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){addPreBuildCommands(req, v.strArr, c);},
+        "postBuildCommands": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){addPostBuildCommands(req, v.strArr, c);},
+        "copyFiles": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){addFilesToCopy(req, v.strArr, c);},
+        "extraDependencyFiles": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){addExtraDependencyFiles(req, v.strArr, c);},
+        "sourcePaths": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){addSourcePaths(req, v.strArr, c);},
+        "sourceFiles": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){addSourceFiles(req, v.strArr, c);},
+        "excludedSourceFiles": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){addExcludedSourceFiles(req, v.strArr, c);},
+        "libPaths":  (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){addLibPaths(req, v.strArr, c);},
+        "libs":  (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){addLibs(req, v.strArr, c);},
+        "versions":  (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){addVersions(req, v.strArr, c);},
+        "debugVersions":  (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){addDebugVersions(req, v.strArr, c);},
+        "lflags":  (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){addLinkFlags(req, v.strArr, c);},
+        "dflags":  (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){addDflags(req, v.strArr, c);},
+        "configurations": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration pending)
         {
             ///If it is a recursive call (not firstRun), it won't care about configurations
             if(c.firstRun)
@@ -237,14 +237,14 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
 
                     c.subConfiguration = BuildRequirements.Configuration(cfgName, preferredConfiguration == 0);
                     c.firstRun = false;
-                    BuildRequirements subCfgReq = parse(configurationToUse, c);
+                    BuildRequirements subCfgReq = parse(configurationToUse, c, pending);
                     req.configuration = c.subConfiguration;
                     req = req.mergeDependencies(subCfgReq);
-                    req = req.addPending(PendingMergeConfiguration(true, subCfgReq.cfg));
+                    pending = subCfgReq.cfg;
                 }
             }
         },
-        "dependencies": (ref BuildRequirements req, JSONValue v, ParseConfig c)
+        "dependencies": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _)
         {
             import std.path;
             import std.exception;
@@ -327,14 +327,14 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
             }
 
         },
-        "subConfigurations": (ref BuildRequirements req, JSONValue v, ParseConfig c)
+        "subConfigurations": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _)
         {
             enforce(v.type == JSONType.object, "subConfigurations must be an object conversible to string[string]");
             
             foreach(string key, JSONValue value; v)
                 addSubConfiguration(req, c, key, value.str);
         },
-        "subPackages": (ref BuildRequirements req, JSONValue v, ParseConfig c){}
+        "subPackages": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){}
     ];
 
 
@@ -387,7 +387,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
             {
                 const(JSONValue)* name = "name" in p;
                 if(name.str == cfg.subPackage)
-                    return parse(p, ParseConfig(cfg.workingDir, cfg.subConfiguration, null, cfg.version_, cfg.cInfo, null, ParseSubConfig(cfg.extra.requiredBy, buildRequirements.name), true, true));
+                    return parse(p, ParseConfig(cfg.workingDir, cfg.subConfiguration, null, cfg.version_, cfg.cInfo, null, ParseSubConfig(cfg.extra.requiredBy, buildRequirements.name), true, true), pending);
             }
             else ///Subpackage is on other file
             {
@@ -417,7 +417,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
     string[] unusedKeys;
 
     setName(buildRequirements, tryStr(json, "name", cfg.defaultPackageName), cfg);
-    runHandlers(requirementsRun, buildRequirements, cfg, json, false, unusedKeys);
+    runHandlers(requirementsRun, buildRequirements, cfg, json, false, unusedKeys, pending);
 
     if(cfg.firstRun && unusedKeys.length) warn("Unused Keys -> ", unusedKeys);
 
@@ -425,9 +425,9 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, bool isRoot = false)
 }
 
 private void runHandlers(
-    immutable void function(ref BuildRequirements req, JSONValue v, ParseConfig c)[string] handler,
+    immutable void function(ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration pending)[string] handler,
     ref BuildRequirements buildRequirements, ParseConfig cfg,
-    JSONValue target, bool bGetUnusedKeys, out string[] unusedKeys)
+    JSONValue target, bool bGetUnusedKeys, out string[] unusedKeys, ref BuildConfiguration pending)
 {
     import std.algorithm.searching;
     foreach(string key, JSONValue v; target)
@@ -446,7 +446,7 @@ private void runHandlers(
             mustExecuteHandler = filtered.matchesPlatform(osToMatch, cfg.cInfo.isa, cfg.cInfo.compiler) && fn;
         }
         if(mustExecuteHandler)
-            (*fn)(buildRequirements, v, cfg);
+            (*fn)(buildRequirements, v, cfg, pending);
         else if(bGetUnusedKeys)
             unusedKeys~= key;
     }
@@ -662,11 +662,13 @@ private bool platformMatches(JSONValue[] platforms, OS os, ISA isa)
     return false;
 }
 
-BuildRequirements getDefaultBuildRequirement(ParseConfig cfg)
+BuildRequirements getDefaultBuildRequirement(ParseConfig cfg, JSONValue json)
 {
     BuildRequirements req;
+
+    RedubLanguages l = tryStr(json, "language", "D").redubLanguage;
     ///defaultPackageName is only ever sent whenever --single is being used.
-    if(cfg.firstRun && !cfg.defaultPackageName) req = BuildRequirements.defaultInit(cfg.workingDir);
+    if(cfg.firstRun && !cfg.defaultPackageName) req = BuildRequirements.defaultInit(cfg.workingDir, l);
     req.version_ = cfg.version_;
     req.configuration = cfg.subConfiguration;
     req.cfg.workingDir = cfg.workingDir;

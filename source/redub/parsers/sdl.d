@@ -28,6 +28,7 @@ BuildRequirements parse(
     string version_, 
     BuildRequirements.Configuration subConfiguration, 
     string subPackage,
+    out BuildConfiguration pending,
     string parentName,
     bool isDescribeOnly = false,
     bool isRoot = false
@@ -42,6 +43,7 @@ BuildRequirements parse(
         version_,
         subConfiguration,
         subPackage,
+        pending,
         parentName,
         isDescribeOnly,
         isRoot,
@@ -73,6 +75,7 @@ BuildRequirements parseWithData(
     string version_,
     BuildRequirements.Configuration subConfiguration,
     string subPackage,
+    out BuildConfiguration pending,
     string parentName,
     bool isDescribeOnly = false,
     bool isRoot = false
@@ -83,7 +86,7 @@ BuildRequirements parseWithData(
 
     ParseConfig c = ParseConfig(workingDir, subConfiguration, subPackage, version_, cInfo, defaultPackageName, ParseSubConfig(null, parentName), preGenerateRun: !isDescribeOnly);
     JSONValue json = parseSdlCached(filePath, fileData);
-    BuildRequirements ret = redub.parsers.json.parse(json, c, isRoot);
+    BuildRequirements ret = redub.parsers.json.parse(json, c, pending, isRoot);
     return ret;
 }
 

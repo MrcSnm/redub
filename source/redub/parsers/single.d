@@ -47,17 +47,18 @@ BuildRequirements parseProject(
 
     inLogLevel(LogLevel.vverbose, infos("Single Recipe", "'", singleInfo.defaultPackageName, "': ", singleInfo.recipe));
     BuildRequirements req;
+    BuildConfiguration pending;
     switch(extension(singleInfo.fileName))
     {
-        case ".sdl":   req = redub.parsers.sdl.parseWithData(recipe, singleInfo.recipe, projectWorkingDir, cInfo, singleInfo.defaultPackageName, version_, subConfiguration, subPackage, "", false, isRoot); break;
-        case ".json":  req = redub.parsers.json.parseWithData(recipe, singleInfo.recipe, projectWorkingDir, cInfo, singleInfo.defaultPackageName ,version_, subConfiguration, subPackage, "", false, isRoot); break;
+        case ".sdl":   req = redub.parsers.sdl.parseWithData(recipe, singleInfo.recipe, projectWorkingDir, cInfo, singleInfo.defaultPackageName, version_, subConfiguration, subPackage, pending, "", false, isRoot); break;
+        case ".json":  req = redub.parsers.json.parseWithData(recipe, singleInfo.recipe, projectWorkingDir, cInfo, singleInfo.defaultPackageName ,version_, subConfiguration, subPackage, pending, "", false, isRoot); break;
         default: throw new Exception("Unsupported project type "~recipe~" at dir "~projectWorkingDir);
     }
     req.cfg.targetType = TargetType.executable;
     req.cfg.outputDirectory = dirName(recipe);
     req.cfg.sourceFiles.exclusiveMerge([recipe]);
 
-    return postProcessBuildRequirements(req, cInfo, isRoot, useExistingObj);
+    return postProcessBuildRequirements(req, pending, cInfo, isRoot, useExistingObj);
 }
 
 

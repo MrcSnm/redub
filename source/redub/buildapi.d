@@ -47,7 +47,7 @@ struct CompilingSession
     }
 }
 
-enum TargetType
+enum TargetType : ubyte
 {
     invalid = 0, //Bug
     none,
@@ -140,9 +140,39 @@ struct PluginExecution
     }
 }
 
+RedubLanguages redubLanguage(string input)
+{
+    import redub.api;
+    switch(input)
+    {
+        static foreach(mem; __traits(allMembers, RedubLanguages))
+        {
+            case mem:
+                return __traits(getMember, RedubLanguages, mem);
+        }
+        default:break;
+    }
+    throw new RedubException("Invalid language '"~input~"' received.");
+}
+
+enum RedubLanguages : ubyte
+{
+    D,
+    C
+}
+
+enum RedubCommands : ubyte
+{
+    preGenerate,
+    postGenerate,
+    preBuild,
+    postBuild
+}
+
+
+
 struct BuildConfiguration
 {
-    bool isDebug;
     string name;
     string[] versions;
     string[] debugVersions;
@@ -157,31 +187,27 @@ struct BuildConfiguration
     string[] excludeSourceFiles;
     string[] extraDependencyFiles;
     string[] filesToCopy;
-    string[] preGenerateCommands;
-    string[] postGenerateCommands;
-    string[] preBuildCommands;
+    string[][] commands;
     PluginExecution[] preBuildPlugins;
-    string[] postBuildCommands;
-    ///Unused
-    string sourceEntryPoint;
-    string language = "D";
+    string workingDir;
+    string arch;
     @cacheExclude string targetName;
 
     ///When having those files, the build will use them instead of sourcePaths + sourceFiles
     @cacheExclude string[] changedBuildFiles;
     @excludeRoot string outputDirectory;
+
+    bool isDebug;
     ///Whenever present, --deps= will be pased to the compiler for using advanced compilation mode
     @cacheExclude bool outputsDeps;
     ///Uses --oq on ldc, -op on dmd (rename+move while bug exists)
     @cacheExclude bool preservePath = true;
     @cacheExclude bool compilerVerbose;
     @cacheExclude bool compilerVerboseCodeGen;
-
-    string workingDir;
-    string arch;
+    RedubLanguages language = RedubLanguages.D;
     TargetType targetType;
 
-    static BuildConfiguration defaultInit(string workingDir)
+    static BuildConfiguration defaultInit(string workingDir, RedubLanguages l)
     {
         import redub.misc.path;
         import std.file;
@@ -213,6 +239,7 @@ struct BuildConfiguration
 
         
         BuildConfiguration ret;
+        ret.language = l;
         if(initialSource)
         {
             ret.sourcePaths = [initialSource];
@@ -220,7 +247,6 @@ struct BuildConfiguration
         }
         if(initialStringImport) ret.stringImportPaths = [initialStringImport];
         ret.targetType = TargetType.autodetect;
-        ret.sourceEntryPoint = "source/app.d";
         ret.outputDirectory = ".";
         return ret;
     }
@@ -248,8 +274,8 @@ struct BuildConfiguration
         BuildConfiguration ret;
         static foreach(i, value; BuildConfiguration.tupleof)
         {
-            static if(is(typeof(ret.tupleof[i]) == string[]))
-                ret.tupleof[i] = cast(string[])this.tupleof[i].idup;
+            static if(is(typeof(ret.tupleof[i]) == string[]) || is(typeof(ret.tupleof[i]) == string[][]))
+                ret.tupleof[i] = cast(typeof(ret.tupleof[i]))this.tupleof[i].dup;
             else static if(is(typeof(ret.tupleof[i]) == PluginExecution[]))
             {
                 ret.tupleof[i] = cast(PluginExecution[])this.tupleof[i].map!((const PluginExecution p) => p.idup).array;
@@ -264,8 +290,8 @@ struct BuildConfiguration
     {
         final switch(language)
         {
-            case "C": return c.c;
-            case "D": return c.d;
+            case RedubLanguages.C: return c.c;
+            case RedubLanguages.D: return c.d;
         }
     }
 
@@ -309,10 +335,10 @@ struct BuildConfiguration
     {
         BuildConfiguration ret = clone;
         ret.preBuildPlugins~= other.preBuildPlugins;
-        ret.preBuildCommands~= other.preBuildCommands;
-        ret.postBuildCommands~= other.postBuildCommands;
-        ret.preGenerateCommands~= other.preGenerateCommands;
-        ret.postGenerateCommands~= other.postGenerateCommands;
+        if(other.commands.length > ret.commands.length)
+            ret.commands.length = other.commands.length;
+        foreach(i, list; other.commands)
+            ret.commands[i]~= list;
         return ret;
     }
     BuildConfiguration mergeLibraries(const BuildConfiguration other) const
@@ -404,6 +430,25 @@ struct BuildConfiguration
         BuildConfiguration ret = clone;
         ret.sourceFiles.exclusiveMerge(getLinkFiles(other.sourceFiles));
         return ret;
+    }
+    pragma(inline, true)
+    {
+        const(string[]) preBuildCommands() const
+        {
+            return commands.length > RedubCommands.preBuild ? commands[RedubCommands.preBuild] : null;
+        }
+        const(string[]) postBuildCommands() const
+        {
+            return commands.length > RedubCommands.postBuild ? commands[RedubCommands.postBuild] : null;
+        }
+        const(string[]) preGenerateCommands() const
+        {
+            return commands.length > RedubCommands.preGenerate ? commands[RedubCommands.preGenerate] : null;
+        }
+        const(string[]) postGenerateCommands() const
+        {
+            return commands.length > RedubCommands.postGenerate ? commands[RedubCommands.postGenerate] : null;
+        }
     }
 }
 
@@ -553,20 +598,6 @@ struct Dependency
     bool isSameAs(Dependency other) const{return isSameAs(other.name, other.subPackage);}
 }
 
-struct PendingMergeConfiguration
-{
-    bool isPending = false;
-    BuildConfiguration configuration;
-
-    immutable(PendingMergeConfiguration) idup() inout
-    {
-        return immutable PendingMergeConfiguration(
-            isPending,
-            configuration.idup
-        );
-    }
-}
-
 /**
 *   The information inside this struct is not used directly on the build process,
 *   but may be used in other areas. One such example is for `describe`. Which will
@@ -612,12 +643,6 @@ struct BuildRequirements
     }
 
     Configuration configuration;
-    /**
-    *   Should not be managed directly. This member is used
-    * for holding configuration until the parsing is finished.
-    * This will guarantee the correct evaluation order.
-    */
-    private PendingMergeConfiguration pending;
 
     ExtraInformation extra;
 
@@ -631,23 +656,6 @@ struct BuildRequirements
         return cfg.getCompiler(c);
     }
 
-
-
-    BuildRequirements addPending(PendingMergeConfiguration pending) const
-    {
-        BuildRequirements ret = cast()this;
-        ret.pending = pending;
-        return ret;
-    }
-
-    BuildRequirements mergePending() const
-    {
-        if(!pending.isPending) return cast()this;
-        BuildRequirements ret = cast()this;
-        ret.cfg = ret.cfg.merge(ret.pending.configuration);
-        ret.pending = PendingMergeConfiguration.init;
-        return ret;
-    }
 
     string targetConfiguration() const { return configuration.name; }
     string[string] getSubConfigurations() const
@@ -683,10 +691,10 @@ struct BuildRequirements
         );
     }
 
-    static BuildRequirements defaultInit(string workingDir)
+    static BuildRequirements defaultInit(string workingDir, RedubLanguages l)
     {
         BuildRequirements req;
-        req.cfg = BuildConfiguration.defaultInit(workingDir);
+        req.cfg = BuildConfiguration.defaultInit(workingDir, l);
         return req;
     }
 
@@ -734,6 +742,7 @@ struct ThreadBuildData
 {
     BuildConfiguration cfg;
     ExtraInformation extra;
+
     bool isRoot;
 }
 
@@ -742,9 +751,9 @@ class ProjectNode
     BuildRequirements requirements;
     ProjectNode[] parent;
     ProjectNode[] dependencies;
+    private ProjectNode[] collapsedRef;
     private bool shouldRebuild = false;
     private bool needsCopyOnly = false;
-    private ProjectNode[] collapsedRef;
     private bool _isOptional = false;
     private string[] dirtyFiles;
 
@@ -800,7 +809,7 @@ class ProjectNode
 
     bool isFullyParallelizable()
     {
-        bool parallelizable = 
+        bool parallelizable =
             requirements.cfg.preBuildCommands.length == 0 &&
             requirements.cfg.postBuildCommands.length == 0;
         foreach(dep; dependencies)

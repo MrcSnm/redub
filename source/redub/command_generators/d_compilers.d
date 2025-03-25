@@ -11,14 +11,14 @@ string[] parseBuildConfiguration(AcceptedCompiler comp, const BuildConfiguration
     string function(ValidDFlags) mapper = getFlagMapper(comp);
 
     
-    string[] commands = [mapper(ValidDFlags.enableColor)];
+    string[] cmds = [mapper(ValidDFlags.enableColor)];
     string preserve = mapper(ValidDFlags.preserveNames);
-    if(preserve) commands ~= preserve;
+    if(preserve) cmds ~= preserve;
     with(b)
     {
-        if(isDebug) commands~= "-debug";
-        if(compilerVerbose) commands~= mapper(ValidDFlags.verbose);
-        if(compilerVerboseCodeGen) commands~= mapper(ValidDFlags.verboseCodeGen);
+        if(isDebug) cmds~= "-debug";
+        if(compilerVerbose) cmds~= mapper(ValidDFlags.verbose);
+        if(compilerVerboseCodeGen) cmds~= mapper(ValidDFlags.verboseCodeGen);
 
 
         string cacheDir = getCacheOutputDir(mainPackhash, b, s, isRoot);
@@ -30,53 +30,53 @@ string[] parseBuildConfiguration(AcceptedCompiler comp, const BuildConfiguration
             string ldcObjOutDir = escapePath(cacheDir~ "_obj");
             mkdirRecurse(ldcObjOutDir);
 
-            commands~= mapper(ValidDFlags.objectDir) ~ ldcObjOutDir;
+            cmds~= mapper(ValidDFlags.objectDir) ~ ldcObjOutDir;
         }
         else if(b.outputsDeps)
-            commands~= mapper(ValidDFlags.objectDir)~getObjectDir(cacheDir).escapePath;
+            cmds~= mapper(ValidDFlags.objectDir)~getObjectDir(cacheDir).escapePath;
 
-        commands~= dFlags;
+        cmds~= dFlags;
         if(comp == AcceptedCompiler.ldc2)
         {
-            ///commands~= "--cache-retrieval=hardlink"; // Doesn't work on Windows when using a multi drives projects
-            commands~= "--cache=.ldc2_cache";
-            commands~= "--cache-prune";
+            ///cmds~= "--cache-retrieval=hardlink"; // Doesn't work on Windows when using a multi drives projects
+            cmds~= "--cache=.ldc2_cache";
+            cmds~= "--cache-prune";
         }
 
 
-        commands = mapAppendPrefix(commands, debugVersions, mapper(ValidDFlags.debugVersions), false);
-        commands = mapAppendPrefix(commands, versions, mapper(ValidDFlags.versions), false);
-        commands = mapAppendPrefix(commands, importDirectories, mapper(ValidDFlags.importPaths), true);
+        cmds = mapAppendPrefix(cmds, debugVersions, mapper(ValidDFlags.debugVersions), false);
+        cmds = mapAppendPrefix(cmds, versions, mapper(ValidDFlags.versions), false);
+        cmds = mapAppendPrefix(cmds, importDirectories, mapper(ValidDFlags.importPaths), true);
 
-        commands = mapAppendPrefix(commands, stringImportPaths, mapper(ValidDFlags.stringImportPaths), true);
+        cmds = mapAppendPrefix(cmds, stringImportPaths, mapper(ValidDFlags.stringImportPaths), true);
 
         if(changedBuildFiles.length)
-            commands~= changedBuildFiles;
+            cmds~= changedBuildFiles;
         else 
-            putSourceFiles(commands, workingDir, sourcePaths, sourceFiles, excludeSourceFiles, ".d");
+            putSourceFiles(cmds, workingDir, sourcePaths, sourceFiles, excludeSourceFiles, ".d");
 
         string arch = mapArch(comp, b.arch);
         if(arch)
-            commands~= arch;
+            cmds~= arch;
 
         if(targetType.isLinkedSeparately)
-            commands~= mapper(ValidDFlags.compileOnly);
+            cmds~= mapper(ValidDFlags.compileOnly);
         if(targetType.isStaticLibrary)
-            commands~= mapper(ValidDFlags.buildAsLibrary);
+            cmds~= mapper(ValidDFlags.buildAsLibrary);
         else if(targetType == TargetType.dynamicLibrary)
-            commands~= mapper(ValidDFlags.buildAsShared);
+            cmds~= mapper(ValidDFlags.buildAsShared);
 
 
         //Output path for libs must still be specified
         if(!b.outputsDeps || targetType.isStaticLibrary)
-            commands~= mapper(ValidDFlags.outputFile) ~ buildNormalizedPath(cacheDir, getConfigurationOutputName(b, s.os)).escapePath;
+            cmds~= mapper(ValidDFlags.outputFile) ~ buildNormalizedPath(cacheDir, getConfigurationOutputName(b, s.os)).escapePath;
 
         if(b.outputsDeps)
-            commands~= mapper(ValidDFlags.deps) ~ (buildNormalizedPath(cacheDir)~".deps").escapePath;
+            cmds~= mapper(ValidDFlags.deps) ~ (buildNormalizedPath(cacheDir)~".deps").escapePath;
 
     }
 
-    return commands;
+    return cmds;
 }
 
 string getTargetTypeFlag(TargetType t, AcceptedCompiler c)

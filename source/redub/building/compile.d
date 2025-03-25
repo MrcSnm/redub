@@ -48,16 +48,18 @@ string[string] getCurrentEnv()
 /**
 *   If any command has status, it will stop executing them and return
 */
-private ExecutionResult executeCommands(const string[] commandsList, string listName, ref CompilationResult res, string workingDir, immutable string[string] env)
+private ExecutionResult executeCommands(const(string[])[] commands, RedubCommands list, ref CompilationResult res, string workingDir, immutable string[string] env)
 {
     import std.process;
+    const string[] commandsList = commands.length > list ? commands[list] : null;
     foreach(cmd; commandsList)
     {
         auto execRes  = cast(ExecutionResult)executeShell(cmd, env, Config.none, size_t.max, workingDir);
         if(execRes.status)
         {
+            import std.conv:to;
             res.status = execRes.status;
-            res.message = "Result of "~listName~" command '"~cmd~"' "~execRes.output;
+            res.message = "Result of "~list.to!string~" command '"~cmd~"' "~execRes.output;
             return execRes;
         }
     }
@@ -105,7 +107,7 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
         if(exists(outDir))
             remove(outDir);
         
-        if(executeCommands(cfg.preBuildCommands, "preBuildCommand", res, cfg.workingDir, env).status)
+        if(executeCommands(cfg.commands, RedubCommands.preBuild, res, cfg.workingDir, env).status)
             return res;
 
         import redub.plugin.load;
@@ -153,9 +155,9 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
 
         if(res.status == 0)
         {
-            if(!cfg.targetType.isLinkedSeparately && executeCommands(cfg.postBuildCommands, "postBuildCommand", res, cfg.workingDir, env).status)
+            if(!cfg.targetType.isLinkedSeparately && executeCommands(cfg.commands, RedubCommands.postBuild, res, cfg.workingDir, env).status)
                 return res;
-            if(!cfg.targetType.isLinkedSeparately && executeCommands(cfg.postGenerateCommands, "postGenerateCommand", res, cfg.workingDir, env).status)
+            if(!cfg.targetType.isLinkedSeparately && executeCommands(cfg.commands, RedubCommands.postGenerate, res, cfg.workingDir, env).status)
                 return res;
         }
     }
@@ -213,9 +215,9 @@ CompilationResult link(ProjectNode root, string rootHash, const ThreadBuildData 
 
     if(data.cfg.targetType.isLinkedSeparately)
     {
-        if(executeCommands(data.cfg.postBuildCommands, "postBuildCommand", ret, data.cfg.workingDir, env).status)
+        if(executeCommands(data.cfg.commands, RedubCommands.postBuild, ret, data.cfg.workingDir, env).status)
             return ret;
-        if(executeCommands(data.cfg.postGenerateCommands, "postGenerateCommand", ret, data.cfg.workingDir, env).status)
+        if(executeCommands(data.cfg.commands, RedubCommands.postGenerate, ret, data.cfg.workingDir, env).status)
             return ret;
     }
 

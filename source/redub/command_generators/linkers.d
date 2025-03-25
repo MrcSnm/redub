@@ -9,7 +9,7 @@ string[] parseLinkConfiguration(const ThreadBuildData data, CompilingSession s, 
 {
     import redub.misc.path;
     import redub.building.cache;
-    string[] commands;
+    string[] cmds;
     AcceptedLinker linker = s.compiler.linker;
     bool emitStartGroup = s.isa != ISA.webAssembly && linker != AcceptedLinker.ld64;
 
@@ -26,49 +26,49 @@ string[] parseLinkConfiguration(const ThreadBuildData data, CompilingSession s, 
                 string cacheDir = getCacheOutputDir(requirementCache, b, s, data.extra.isRoot);
                 string objExtension = getObjectExtension(s.os);
                 if(c.isDCompiler)
-                    commands~= "-of"~buildNormalizedPath(cacheDir, getOutputName(b, s.os)).escapePath;
+                    cmds~= "-of"~buildNormalizedPath(cacheDir, getOutputName(b, s.os)).escapePath;
                 else
                 {
-                    commands~= "-o";
-                    commands~= buildNormalizedPath(cacheDir, getOutputName(b, s.os)).escapePath;
+                    cmds~= "-o";
+                    cmds~= buildNormalizedPath(cacheDir, getOutputName(b, s.os)).escapePath;
                 }
                 if(b.outputsDeps)
-                    putSourceFiles(commands, null, [getObjectDir(cacheDir)], null, null, objExtension);
+                    putSourceFiles(cmds, null, [getObjectDir(cacheDir)], null, null, objExtension);
                 else
-                    commands~= buildNormalizedPath(outputDirectory, targetName~objExtension).escapePath;
+                    cmds~= buildNormalizedPath(outputDirectory, targetName~objExtension).escapePath;
             }
             if(c.isDCompiler)
             {
                 string arch = mapArch(c.compiler, b.arch);
                 if(arch)
-                    commands~= arch;
+                    cmds~= arch;
             }
-            commands~= filterLinkFlags(b.dFlags);
+            cmds~= filterLinkFlags(b.dFlags);
         }
         if(targetType == TargetType.dynamicLibrary)
-            commands~= getTargetTypeFlag(targetType, c);
+            cmds~= getTargetTypeFlag(targetType, c);
         
         if (targetType.isLinkedSeparately)
         {
             //Only linux supports start/end group and no-as-needed. OSX does not
             if(emitStartGroup)
             {
-                commands~= "-L--no-as-needed";
-                commands~= "-L--start-group";
+                cmds~= "-L--no-as-needed";
+                cmds~= "-L--start-group";
             }
             ///Use library full path for the base file
-            commands = mapAppendReverse(commands, data.extra.librariesFullPath, (string l) => "-L"~getOutputName(TargetType.staticLibrary, l, s.os));
+            cmds = mapAppendReverse(cmds, data.extra.librariesFullPath, (string l) => "-L"~getOutputName(TargetType.staticLibrary, l, s.os));
             if(emitStartGroup)
-                commands~= "-L--end-group";
-            commands = mapAppendPrefix(commands, linkFlags, "-L", false);
-            commands = mapAppendPrefix(commands, libraryPaths, "-L-L", true);
-            commands~= getLinkFiles(b.sourceFiles);
-            commands = mapAppend(commands, libraries, (string l) => "-L-l"~stripLibraryExtension(l));
+                cmds~= "-L--end-group";
+            cmds = mapAppendPrefix(cmds, linkFlags, "-L", false);
+            cmds = mapAppendPrefix(cmds, libraryPaths, "-L-L", true);
+            cmds~= getLinkFiles(b.sourceFiles);
+            cmds = mapAppend(cmds, libraries, (string l) => "-L-l"~stripLibraryExtension(l));
             
         }
     }
 
-    return commands;
+    return cmds;
 }
 
 string[] parseLinkConfigurationMSVC(const ThreadBuildData data, CompilingSession s, string requirementCache)
@@ -80,45 +80,45 @@ string[] parseLinkConfigurationMSVC(const ThreadBuildData data, CompilingSession
 
 
     if(!s.os.isWindows) return parseLinkConfiguration(data, s, requirementCache);
-    string[] commands;
+    string[] cmds;
     const BuildConfiguration b = data.cfg;
     CompilerBinary c = b.getCompiler(s.compiler);
     with(b)
     {
         string cacheDir = getCacheOutputDir(requirementCache, b, s, data.extra.isRoot);
-        commands~= "-of"~buildNormalizedPath(cacheDir, getOutputName(b, s.os)).escapePath;
+        cmds~= "-of"~buildNormalizedPath(cacheDir, getOutputName(b, s.os)).escapePath;
         string objExtension = getObjectExtension(s.os);
         if(b.outputsDeps)
-            putSourceFiles(commands, null, [getObjectDir(cacheDir)], null, null, objExtension);
+            putSourceFiles(cmds, null, [getObjectDir(cacheDir)], null, null, objExtension);
         else
-            commands~= buildNormalizedPath(outputDirectory, targetName~objExtension).escapePath;
+            cmds~= buildNormalizedPath(outputDirectory, targetName~objExtension).escapePath;
 
         if(c.isDCompiler)
         {
             import redub.command_generators.d_compilers;
             string arch = mapArch(c.compiler, b.arch);
             if(arch)
-                commands~= arch;
-            commands~= filterLinkFlags(b.dFlags);
+                cmds~= arch;
+            cmds~= filterLinkFlags(b.dFlags);
         }
         if(!s.compiler.usesIncremental)
         {
-            commands~= "-L/INCREMENTAL:NO";
+            cmds~= "-L/INCREMENTAL:NO";
         }
         
         if(targetType == TargetType.dynamicLibrary)
-            commands~= getTargetTypeFlag(targetType, c);
+            cmds~= getTargetTypeFlag(targetType, c);
         
-        commands = mapAppendReverse(commands, data.extra.librariesFullPath, (string l) => (l~getLibraryExtension(s.os)).escapePath);
+        cmds = mapAppendReverse(cmds, data.extra.librariesFullPath, (string l) => (l~getLibraryExtension(s.os)).escapePath);
 
-        commands = mapAppendPrefix(commands, linkFlags, "-L", false);
+        cmds = mapAppendPrefix(cmds, linkFlags, "-L", false);
 
-        commands = mapAppendPrefix(commands, libraryPaths, "-L/LIBPATH:", true);
-        commands~= getLinkFiles(b.sourceFiles);
-        commands = mapAppend(commands, libraries, (string l) => "-L"~stripLibraryExtension(l)~".lib");
+        cmds = mapAppendPrefix(cmds, libraryPaths, "-L/LIBPATH:", true);
+        cmds~= getLinkFiles(b.sourceFiles);
+        cmds = mapAppend(cmds, libraries, (string l) => "-L"~stripLibraryExtension(l)~".lib");
 
     }
-    return commands;
+    return cmds;
 }
 
 

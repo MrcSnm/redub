@@ -48,13 +48,14 @@ BuildRequirements parseProject(
 
     vlog("Parsing ", projectFile, " at ", projectWorkingDir, " with :",  subPackage, " -c ", subConfiguration.name);
 
+    BuildConfiguration pending;
     switch(extension(projectFile))
     {
-        case ".sdl":   req = redub.parsers.sdl.parse(projectFile, projectWorkingDir, cInfo, null, version_, subConfiguration, subPackage, parentName, isDescribeOnly, isRoot); break;
-        case ".json":  req = redub.parsers.json.parse(projectFile, projectWorkingDir, cInfo, null, version_, subConfiguration, subPackage, parentName, isDescribeOnly, isRoot); break;
+        case ".sdl":   req = redub.parsers.sdl.parse(projectFile, projectWorkingDir, cInfo, null, version_, subConfiguration, subPackage, pending, parentName, isDescribeOnly, isRoot); break;
+        case ".json":  req = redub.parsers.json.parse(projectFile, projectWorkingDir, cInfo, null, version_, subConfiguration, subPackage, pending, parentName, isDescribeOnly, isRoot); break;
         default: throw new Exception("Unsupported project type "~projectFile~" at dir "~projectWorkingDir);
     }
-    return postProcessBuildRequirements(req, cInfo, isRoot, useExistingObj);
+    return postProcessBuildRequirements(req, pending, cInfo, isRoot, useExistingObj);
 }
 
 /**
@@ -68,7 +69,7 @@ BuildRequirements parseProject(
  *   useExistingObj = Decides whether to output objects or not
  * Returns: Post processed build requirements and now ready to use
  */
-BuildRequirements postProcessBuildRequirements(BuildRequirements req, CompilationInfo cInfo, bool isRoot, bool useExistingObj)
+BuildRequirements postProcessBuildRequirements(BuildRequirements req, BuildConfiguration pending, CompilationInfo cInfo, bool isRoot, bool useExistingObj)
 {
     redub.parsers.environment.setupEnvironmentVariablesForPackage(req.cfg);
     req.cfg.arch = cInfo.arch;
@@ -76,7 +77,7 @@ BuildRequirements postProcessBuildRequirements(BuildRequirements req, Compilatio
     if(isRoot && useExistingObj)
         req.cfg.outputsDeps = true;
 
-    partiallyFinishBuildRequirements(req);
+    partiallyFinishBuildRequirements(req, pending);
     ///Merge need to happen after partial finish, since other configuration will be merged
     req.cfg = redub.parsers.environment.parseEnvironment(req.cfg);
     return req;
@@ -93,11 +94,11 @@ BuildRequirements postProcessBuildRequirements(BuildRequirements req, Compilatio
  * Params:
  *   req = Any build requirement
  */
-private void partiallyFinishBuildRequirements(ref BuildRequirements req)
+private void partiallyFinishBuildRequirements(ref BuildRequirements req, BuildConfiguration pending)
 {
     import std.path;
     import redub.misc.path;
-    req = req.mergePending();
+    req.cfg = req.cfg.merge(pending);
     if(!isAbsolute(req.cfg.outputDirectory))
         req.cfg.outputDirectory = redub.misc.path.buildNormalizedPath(req.cfg.workingDir, req.cfg.outputDirectory);
 

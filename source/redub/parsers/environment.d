@@ -212,8 +212,7 @@ PackageDubVariables getEnvironmentVariablesForPackage(const BuildConfiguration c
         DUB_PACKAGE_DIR: dir,
         DUB_TARGET_TYPE: cfg.targetType.to!string,
         DUB_TARGET_PATH: cfg.outputDirectory,
-        DUB_TARGET_NAME: cfg.name,
-        DUB_MAIN_SOURCE_FILE: cfg.sourceEntryPoint,
+        DUB_TARGET_NAME: cfg.name
     );
 }
 
@@ -336,10 +335,15 @@ BuildConfiguration parseEnvironment(BuildConfiguration cfg)
         libraryPaths = arrParseEnv(libraryPaths);
         dFlags = arrParseEnv(dFlags);
         linkFlags = arrParseEnv(linkFlags);
-        preGenerateCommands = arrParseEnv(preGenerateCommands);
-        postGenerateCommands = arrParseEnv(postGenerateCommands);
-        preBuildCommands = arrParseEnv(preBuildCommands);
-        postBuildCommands = arrParseEnv(postBuildCommands);
+
+        if(cfg.commands.length > RedubCommands.preGenerate)
+            cfg.commands[RedubCommands.preGenerate] = arrParseEnv(cfg.commands[RedubCommands.preGenerate]);
+        if(cfg.commands.length > RedubCommands.postGenerate)
+            cfg.commands[RedubCommands.postGenerate] = arrParseEnv(cfg.commands[RedubCommands.postGenerate]);
+        if(cfg.commands.length > RedubCommands.preBuild)
+            cfg.commands[RedubCommands.preBuild] = arrParseEnv(cfg.commands[RedubCommands.preBuild]);
+        if(cfg.commands.length > RedubCommands.postBuild)
+            cfg.commands[RedubCommands.postBuild] = arrParseEnv(cfg.commands[RedubCommands.postBuild]);
         stringImportPaths = arrParseEnv(stringImportPaths);
         filesToCopy = arrParseEnv(filesToCopy);
     }

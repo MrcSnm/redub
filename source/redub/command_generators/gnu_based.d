@@ -13,17 +13,17 @@ string[] parseBuildConfiguration(const BuildConfiguration b, CompilingSession s,
     import std.file;
     import redub.misc.path;
     
-    string[] commands;
+    string[] cmds;
     
     with(b)
     {
-        if(isDebug) commands~= "-g";
-        commands~= "-r";
+        if(isDebug) cmds~= "-g";
+        cmds~= "-r";
 
-        commands = mapAppendPrefix(commands, versions, "-D", false);
-        commands~= dFlags;
-        commands = mapAppendPrefix(commands, importDirectories, "-I", true);
-        putSourceFiles(commands, workingDir, sourcePaths, sourceFiles, excludeSourceFiles, extensions);
+        cmds = mapAppendPrefix(cmds, versions, "-D", false);
+        cmds~= dFlags;
+        cmds = mapAppendPrefix(cmds, importDirectories, "-I", true);
+        putSourceFiles(cmds, workingDir, sourcePaths, sourceFiles, excludeSourceFiles, extensions);
 
 
         string outFlag = getTargetTypeFlag(targetType);
@@ -31,15 +31,15 @@ string[] parseBuildConfiguration(const BuildConfiguration b, CompilingSession s,
 
         mkdirRecurse(cacheDir);
         if(outFlag)
-            commands~= outFlag;
-        commands~= "-o";
+            cmds~= outFlag;
+        cmds~= "-o";
         if(outFlag)
-            commands ~= buildNormalizedPath(cacheDir, getConfigurationOutputName(b, s.os)).escapePath;
+            cmds ~= buildNormalizedPath(cacheDir, getConfigurationOutputName(b, s.os)).escapePath;
         else
-            commands ~= buildNormalizedPath(cacheDir, getObjectOutputName(b, os)).escapePath;
+            cmds ~= buildNormalizedPath(cacheDir, getObjectOutputName(b, os)).escapePath;
     }
 
-    return commands;
+    return cmds;
 }
 
 string getTargetTypeFlag(TargetType o)

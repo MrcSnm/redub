@@ -94,16 +94,41 @@ void addPreGenerateCommands(ref BuildRequirements req, JSONStringArray cmds, Par
                 throw new Exception("preGenerateCommand '"~cmd.str~"' exited with code "~status.to!string);
         }
     }
-    req.cfg.preGenerateCommands = req.cfg.preGenerateCommands.append(cmds);
+    if(req.cfg.commands.length < RedubCommands.preGenerate)
+    {
+        req.cfg.commands.length = RedubCommands.preGenerate + 1;
+        req.cfg.commands[RedubCommands.preGenerate] = req.cfg.commands[RedubCommands.preGenerate].append(cmds);
+    }
 }
-void addPostGenerateCommands(ref BuildRequirements req, JSONStringArray cmds, ParseConfig c){req.cfg.postGenerateCommands = req.cfg.postGenerateCommands.append(cmds);}
+void addPostGenerateCommands(ref BuildRequirements req, JSONStringArray cmds, ParseConfig c)
+{
+    if(req.cfg.commands.length < RedubCommands.postGenerate)
+    {
+        req.cfg.commands.length = RedubCommands.postGenerate + 1;
+        req.cfg.commands[RedubCommands.postGenerate] = req.cfg.commands[RedubCommands.postGenerate].append(cmds);
+    }
+}
 void addPreBuildPlugins(ref BuildRequirements req, string pluginName, JSONStringArray cmds, ParseConfig c)
 {
     string[] output;
     req.cfg.preBuildPlugins~= PluginExecution(pluginName, append(output, cmds));
 }
-void addPreBuildCommands(ref BuildRequirements req, JSONStringArray cmds, ParseConfig c){req.cfg.preBuildCommands = req.cfg.preBuildCommands.append(cmds);}
-void addPostBuildCommands(ref BuildRequirements req, JSONStringArray cmds, ParseConfig c){req.cfg.postBuildCommands = req.cfg.postBuildCommands.append(cmds);}
+void addPreBuildCommands(ref BuildRequirements req, JSONStringArray cmds, ParseConfig c)
+{
+    if(req.cfg.commands.length < RedubCommands.preBuild)
+    {
+        req.cfg.commands.length = RedubCommands.preBuild + 1;
+        req.cfg.commands[RedubCommands.preBuild] = req.cfg.commands[RedubCommands.preBuild].append(cmds);
+    }
+}
+void addPostBuildCommands(ref BuildRequirements req, JSONStringArray cmds, ParseConfig c)
+{
+    if(req.cfg.commands.length < RedubCommands.postBuild)
+    {
+        req.cfg.commands.length = RedubCommands.postBuild + 1;
+        req.cfg.commands[RedubCommands.postBuild] = req.cfg.commands[RedubCommands.postBuild].append(cmds);
+    }
+}
 void addSourcePaths(ref BuildRequirements req, JSONStringArray paths, ParseConfig c)
 {
     import std.array;
