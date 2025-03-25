@@ -3,7 +3,7 @@ public import redub.libs.semver;
 import hipjson;
 
 
-enum AcceptedCompiler
+enum AcceptedCompiler : ubyte
 {
     invalid,
     dmd,
@@ -12,7 +12,7 @@ enum AcceptedCompiler
     gxx
 }
 
-enum AcceptedLinker
+enum AcceptedLinker : ubyte
 {
     unknown,
     gnuld,
@@ -20,11 +20,34 @@ enum AcceptedLinker
     ///I know there a plenty more, but still..
 }
 
+enum AcceptedArchiver : ubyte
+{
+    ar,
+    llvmAr,
+    libtool,
+    /**
+     * D compiler will be used for creating the library
+     */
+    none
+}
+
 enum UsesGnuLinker
 {
     unknown,
     yes,
     no
+}
+
+
+struct Archiver
+{
+    AcceptedArchiver type;
+    string bin;
+}
+struct Linker
+{
+    AcceptedLinker type;
+    string bin;
 }
 
 AcceptedCompiler acceptedCompilerfromString(string str)
@@ -54,6 +77,35 @@ AcceptedLinker acceptedLinkerfromString(string str)
     }
 }
 
+AcceptedArchiver acceptedArchiverFromString(string str)
+{
+    switch(str)
+    {
+        static foreach(mem; __traits(allMembers, AcceptedArchiver))
+        {
+            case mem:
+                return __traits(getMember, AcceptedArchiver, mem);
+        }
+        default:
+            return AcceptedArchiver.none;
+    }
+}
+
+private Linker acceptedLinker(JSONValue v)
+{
+    JSONValue* acc = "defaultLinker" in v;
+    if(!acc)
+        return Linker(AcceptedLinker.unknown);
+    return Linker(acceptedLinkerfromString(acc.object["type"].str), acc.object["bin"].str);
+}
+
+private Archiver acceptedArchiver(JSONValue v)
+{
+    JSONValue* acc = "defaultArchiver" in v;
+    if(!acc)
+        return Archiver(AcceptedArchiver.none);
+    return Archiver(acceptedArchiverFromString(acc.object["type"].str), acc.object["bin"].str);
+}
 
 
 /** 
@@ -75,14 +127,21 @@ struct Compiler
     ///Accepts both a complete path to an executable or a global environment search path name
     string binOrPath;
 
-    ///Librarian tool
-    string archiver = "llvm-ar";
+    /**
+     * For generating libraries, redub might use dmd/ldc2 by default since that simplifies the logic.
+     * Although it is slightly slower, this is also a compromise one takes by using integration with C
+     */
+    Archiver archiver = Archiver(AcceptedArchiver.none);
 
+    /**
+     * Currently a flag that only affects Windows. Usually it is turned off since depending on the case, it might
+     * make compilation slower
+     */
     bool usesIncremental = false;
 
     ///Currently unused. Was used before for checking whether --start-group should be emitted or not. Since it is emitted
     ///by default, only on webAssembly which is not, it lost its usage for now.
-    AcceptedLinker linker = AcceptedLinker.unknown;
+    Linker linker = Linker(AcceptedLinker.unknown);
 
 
     string getCompilerString() const
@@ -239,7 +298,8 @@ Compiler getCompiler(string compilerOrPath = "dmd", string compilerAssumption = 
     if(ret == Compiler.init)
         ret = inferCompiler(compilerOrPath, compilerAssumption, compilersInfo, isDefault, isGlobal);
 
-    ret.linker = acceptedLinkerfromString(compilersInfo["defaultLinker"].str);
+    ret.linker = acceptedLinker(compilersInfo);
+    ret.archiver = acceptedArchiver(compilersInfo);
 
     //Checks for ldc.conf switches to see if it is using gnu linker by default
     ///TODO: Might be reactivated if that issue shows again.
@@ -376,7 +436,7 @@ private Compiler getCompilerFromCache(JSONValue allCompilersInfo, string compile
                     SemVer(arr[VERSION_].str),
                     SemVer(arr[FRONTEND_VERSION].str),
                     arr[VERSION_STRING].str,
-                    key, null, false, acceptedLinkerfromString(allCompilersInfo["defaultLinker"].str)
+                    key, acceptedArchiver(allCompilersInfo), false, acceptedLinker(allCompilersInfo)
                 );
             }
         }
@@ -417,11 +477,24 @@ private void saveCompilerInfo(JSONValue allCompilersInfo, ref Compiler compiler,
     }
     if(!("version" in allCompilersInfo))
         allCompilersInfo["version"] = JSONValue(RedubVersionOnly);
+    if(!("defaultArchiver" in allCompilersInfo))
+    {
+        JSONValue defaultArchiver = JSONValue.emptyObject;
+        auto def = getDefaultArchiver();
+        defaultArchiver["type"] = def.type.to!string;
+        defaultArchiver["bin"] = def.bin;
+        allCompilersInfo["defaultArchiver"] = defaultArchiver;
+    }
 
     if(!("defaultLinker" in allCompilersInfo))
-        allCompilersInfo["defaultLinker"] = JSONValue(getDefaultLinker().to!string);
-
-    compiler.linker = acceptedLinkerfromString(allCompilersInfo["defaultLinker"].str);
+    {
+        JSONValue defaultLinker = JSONValue.emptyObject;
+        auto def = getDefaultLinker();
+        defaultLinker["type"] = def.type.to!string;
+        defaultLinker["bin"] = def.bin;
+        allCompilersInfo["defaultLinker"] = defaultLinker;
+    }
+    compiler.linker = acceptedLinker(allCompilersInfo);
 
     if(!("compilers" in allCompilersInfo))
         allCompilersInfo["compilers"] = JSONValue.emptyObject;
@@ -475,23 +548,42 @@ private Compiler assumeCompiler(string compilerOrPath, string compilerAssumption
 }
 
 
-AcceptedLinker getDefaultLinker()
+Linker getDefaultLinker()
 {
-    version(Posix)
+    with(AcceptedLinker)
     {
-        import std.process;
-        import std.string;
-        auto res = executeShell("ld -v");
-        if(res.status != 0)
-            return AcceptedLinker.unknown;
-
-        if(res.output.startsWith("GNU ld"))
-            return AcceptedLinker.gnuld;
-        else if(res.output.startsWith("@(#)PROGRAM:ld"))
-            return AcceptedLinker.ld64;
+        version(Posix)
+        {
+            import std.process;
+            import std.string;
+            auto res = executeShell("ld -v");
+            if(res.status == 0)
+            {
+                if(res.output.startsWith("GNU ld"))
+                    return Linker(gnuld, "ld");
+                else if(res.output.startsWith("@(#)PROGRAM:ld"))
+                    return Linker(ld64, "ld");
+            }
+        }
+        return Linker(unknown);
     }
+}
 
-    return AcceptedLinker.unknown;
+
+Archiver getDefaultArchiver()
+{
+    import std.array:staticArray;
+    import std.process;
+    with(AcceptedArchiver)
+    {
+        foreach(Archiver v; [Archiver(ar, "ar"), Archiver(llvmAr, "llvm-ar"), Archiver(libtool, "libtool")].staticArray)
+        {
+            auto res = executeShell(v.bin~" --help");
+            if(res.status == 0)
+                return v;
+        }
+        return Archiver(none);
+    }
 }
 
 private bool tryInferLdc(string compilerOrPath, string vString, out Compiler comp)

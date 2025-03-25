@@ -128,10 +128,11 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
 
             if(!isDCompiler(compiler) && !ret.status) //Always requires link.
             {
-                CompilationResult linkRes = link(cast()pack, hash.requirementHash, data, info, env);
-                ret.status = linkRes.status;
-                ret.output~= linkRes.message;
-                res.compilationCommand~= linkRes.compilationCommand;
+                string cmd ;
+                auto archiverRes = executeArchiver(data, info, cmd);
+                ret.status = archiverRes.status;
+                ret.output~= archiverRes.output;
+                res.compilationCommand~= cmd;
             }
 
             copyDir(inDir, dirName(outDir));

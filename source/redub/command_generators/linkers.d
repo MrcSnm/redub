@@ -10,7 +10,7 @@ string[] parseLinkConfiguration(const ThreadBuildData data, CompilingSession s, 
     import redub.misc.path;
     import redub.building.cache;
     string[] commands;
-    AcceptedLinker linker = s.compiler.linker;
+    AcceptedLinker linker = s.compiler.linker.type;
     bool emitStartGroup = s.isa != ISA.webAssembly && linker != AcceptedLinker.ld64;
 
 

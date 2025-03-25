@@ -51,7 +51,7 @@ string getLinkerBin(Compiler compiler)
 {
     if(compiler.isDCompiler)
         return compiler.binOrPath;
-    return compiler.archiver;
+    return compiler.linker.bin;
 }
 
 
@@ -64,7 +64,7 @@ string getLinkCommands(const ThreadBuildData data, CompilingSession s, string ma
 
     if(s.compiler.isDCompiler)
         return escapeShellCommand(s.compiler.binOrPath) ~ " "~ processFlags(flags);
-    return escapeShellCommand(s.compiler.archiver) ~ " " ~ processFlags(flags);
+    return escapeShellCommand(s.compiler.linker.bin) ~ " " ~ processFlags(flags);
 }
 
 

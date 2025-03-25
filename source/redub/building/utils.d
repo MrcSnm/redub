@@ -59,3 +59,26 @@ auto linkBase(const ThreadBuildData data, CompilingSession session, string rootH
         session.compiler.isDCompiler,
     );
 }
+
+auto executeArchiver(const ThreadBuildData data, CompilingSession s, out string command)
+{
+    import std.process;
+    import std.array;
+    import redub.command_generators.commons;
+    import redub.compiler_identification;
+    Archiver a = s.compiler.archiver;
+
+    string cmd = a.bin;
+    final switch(a.type) with(AcceptedArchiver)
+    {
+        case ar, llvmAr: cmd~= " rcs "; break;
+        case libtool: cmd~= " -static -o "; break;
+        case none: break;
+    }
+
+    cmd~= getOutputName(data.cfg, s.os, s.isa);
+
+    command = join([cmd] ~ data.cfg.sourceFiles, " ");
+
+    return executeShell(command);
+}

@@ -143,10 +143,10 @@ string function(ValidDFlags) getFlagMapper(AcceptedCompiler comp)
     {
         case AcceptedCompiler.dmd: return &dmdFlags;
         case AcceptedCompiler.ldc2: return &ldcFlags;
+        case AcceptedCompiler.gcc, AcceptedCompiler.gxx: return &gccFlags;
         default: throw new Exception("Compiler sent is not a D compiler.");
     }
 }
-
 
 string dmdFlags(ValidDFlags flag)
 {
@@ -219,6 +219,43 @@ string ldcFlags(ValidDFlags flag)
         case arch: return "--mtriple=";
         case preserveNames: return "--oq";
         case deps: return "--deps=";
+    }
+}
+
+string gccFlags(ValidDFlags flag)
+{
+    final switch(flag) with (ValidDFlags)
+    {
+        case debugMode: return null;
+        case debugInfo: return "-g";
+        case releaseMode: return "-O3";
+        case optimize: return "-O3";
+        case inline: return "-finline";
+        case noBoundsCheck: return null;
+        case unittests: return null;
+        case syntaxOnly: return "-S";
+        case profile: return null;
+        case profileGC: return null;
+        case coverage: return null;
+        case coverageCTFE: return null;
+        case mixinFile: return null;
+        case verbose: return "-v";
+        case verboseCodeGen: return null;
+        case timeTrace: return null;
+        case timeTraceFile: return null;
+        case enableColor: return null;
+        case stringImportPaths: return "-I";
+        case versions: return "-D";
+        case debugVersions: return "-D";
+        case importPaths: return "-I";
+        case objectDir: return null;
+        case outputFile: return "-o";
+        case buildAsLibrary: return null;
+        case buildAsShared: return "-shared";
+        case compileOnly: return "-c";
+        case arch: return null;
+        case preserveNames: return null;
+        case deps: return null;
     }
 }
 
