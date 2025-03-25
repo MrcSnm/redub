@@ -19,11 +19,16 @@ private string getRedubMetaFileName()
 
 void saveRedubMeta(JSONValue content)
 {
+    import redub.buildapi;
     import std.file;
     import std.path;
     string dir = dirName(getRedubMetaFileName);
     if(!std.file.exists(dir))
         mkdirRecurse(dir);
+
+    if(!("version" in content))
+        content["version"] = JSONValue(RedubVersionOnly);
+
     std.file.write(getRedubMetaFileName, content.toString);
 }
 

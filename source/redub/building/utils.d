@@ -68,13 +68,14 @@ auto linkBase(const ThreadBuildData data, CompilingSession session, string rootH
  *   s = Compiling Session
  *   command = Command for being able to print it later
  */
-auto executeArchiver(const ThreadBuildData data, CompilingSession s, out string command)
+auto executeArchiver(const ThreadBuildData data, CompilingSession s, string mainPackHash, out string command)
 {
     import std.process;
     import std.array;
     import redub.command_generators.commons;
     import redub.compiler_identification;
     import std.path;
+    import redub.building.cache;
     Archiver a = s.compiler.archiver;
 
     string[] cmd = [a.bin];
@@ -87,18 +88,10 @@ auto executeArchiver(const ThreadBuildData data, CompilingSession s, out string 
 
     cmd~= buildNormalizedPath(data.cfg.outputDirectory, getOutputName(data.cfg, s.os, s.isa));
 
-    putObjectFiles(cmd, data.cfg, s.os, data.cfg.getCompiler(s.compiler).compiler == AcceptedCompiler.gcc ? cExt : cppExt);
+    string cacheDir = getCacheOutputDir(mainPackHash, data.cfg, s, data.extra.isRoot);
+
+    putSourceFiles(cmd, null, [cacheDir], data.cfg.sourceFiles, data.cfg.excludeSourceFiles, ".o", ".obj");
     command = cmd.join(" ");
 
     return executeShell(command);
-}
-
-private void putObjectFiles(ref string[] target, const BuildConfiguration b, OS os, scope const string[] extensions...)
-{
-    import redub.command_generators.commons;
-    import std.file;
-    import std.path;
-    string[] objectFiles;
-    putSourceFiles(objectFiles, b.workingDir, b.sourcePaths, b.sourceFiles, b.excludeSourceFiles, extensions);
-    target = mapAppend(target, objectFiles, (string src) => setExtension(src, getObjectExtension(os)));
 }

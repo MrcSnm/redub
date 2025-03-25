@@ -7,8 +7,9 @@ import redub.logging;
 import redub.building.cache;
 
 /// Parse G++ configuration
-string[] parseBuildConfiguration(const BuildConfiguration b, CompilingSession s, string requirementCache, bool isRoot, const string[] extensions...)
+string[] parseBuildConfiguration(const BuildConfiguration b, CompilingSession s, string mainPackHash, bool isRoot, const string[] extensions...)
 {
+    import std.file;
     import std.algorithm.iteration:map;
     import redub.misc.path;
     
@@ -17,7 +18,7 @@ string[] parseBuildConfiguration(const BuildConfiguration b, CompilingSession s,
     with(b)
     {
         if(isDebug) commands~= "-g";
-        if(targetType.isLinkedSeparately) commands~= "-c";
+        commands~= "-c";
 
         commands = mapAppendPrefix(commands, versions, "-D", false);
         commands~= dFlags;
@@ -26,14 +27,15 @@ string[] parseBuildConfiguration(const BuildConfiguration b, CompilingSession s,
 
 
         string outFlag = getTargetTypeFlag(targetType);
-        if(outFlag) commands~= outFlag;
-
-        if(targetType.isLinkedSeparately)
-        {
-            commands~= "-o";
-            string cacheDir = getCacheOutputDir(requirementCache, b, s, isRoot);
+        string cacheDir = getCacheOutputDir(mainPackHash, b, s, isRoot);
+        mkdirRecurse(cacheDir);
+        if(outFlag)
+            commands~= outFlag;
+        commands~= "-o";
+        if(outFlag)
             commands ~= buildNormalizedPath(cacheDir, getConfigurationOutputName(b, s.os)).escapePath;
-        }
+        else
+            commands ~= buildNormalizedPath(cacheDir, getObjectOutputName(b, os)).escapePath;
     }
 
     return commands;
@@ -44,8 +46,7 @@ string getTargetTypeFlag(TargetType o)
     final switch(o) with(TargetType)
     {
         case invalid, none: throw new Exception("Invalid targetType");
-        case autodetect, executable, sourceLibrary: return null;
+        case autodetect, executable, sourceLibrary, staticLibrary, library: return null;
         case dynamicLibrary: return "-shared";
-        case staticLibrary, library: return "-c";
     }
 }

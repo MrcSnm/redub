@@ -130,7 +130,7 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
             if(!isDCompiler(c) && !ret.status && isStaticLibrary(data.cfg.targetType)) //Must call archiver when
             {
                 string cmd ;
-                auto archiverRes = executeArchiver(data, info, cmd);
+                auto archiverRes = executeArchiver(data, info, hash.rootHash, cmd);
                 ret.status = archiverRes.status;
                 ret.output~= archiverRes.output;
                 res.compilationCommand~= "\n\nArchiving: \n\t"~cmd;

@@ -110,14 +110,21 @@ string getLibraryPath(string libName, string outputDir, OS os)
  */
 string getConfigurationOutputName(const BuildConfiguration conf, OS os)
 {
-    import redub.building.cache;
     with(conf)
     {
         if(targetType.isStaticLibrary)
             return getOutputName(targetType, targetName, os);
-        return targetName~getObjectExtension(os);
+        return getObjectOutputName(conf, os);
     }
 }
+/**
+ *
+ * Params:
+ *   conf = The configuration
+ *   os = OS in which is being built for
+ * Returns: A name with an extension that should be used for compiling
+ */
+string getObjectOutputName(const BuildConfiguration conf, OS os){ return conf.targetName~getObjectExtension(os);}
 
 string getDepsFilePath(ProjectNode root, CompilingSession s)
 {
