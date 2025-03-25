@@ -4,7 +4,6 @@ public import redub.buildapi;
 public import redub.compiler_identification;
 
 static import redub.command_generators.gnu_based;
-static import redub.command_generators.gnu_based_ccplusplus;
 static import redub.command_generators.dmd;
 static import redub.command_generators.ldc;
 
@@ -27,9 +26,9 @@ string[] getCompilationFlags(const BuildConfiguration cfg, CompilingSession s, s
     switch(s.compiler.compiler) with(AcceptedCompiler)
     {
         case gxx:
-            return redub.command_generators.gnu_based_ccplusplus.parseBuildConfiguration(cfg, s, mainPackHash, isRoot);
+            return redub.command_generators.gnu_based.parseBuildConfiguration(cfg, s, mainPackHash, isRoot, ".c", ".cpp", ".cc", ".i", ".cxx", ".c++");
         case gcc:
-            return redub.command_generators.gnu_based.parseBuildConfiguration(cfg, s, mainPackHash, isRoot);
+            return redub.command_generators.gnu_based.parseBuildConfiguration(cfg, s, mainPackHash, isRoot, ".c", ".i");
         case dmd:
             return redub.command_generators.dmd.parseBuildConfiguration(cfg, s, mainPackHash, isRoot);
         case ldc2:

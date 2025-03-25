@@ -6,7 +6,7 @@ import redub.command_generators.commons;
 import redub.logging;
 
 /// Parse G++ configuration
-string[] parseBuildConfiguration(const BuildConfiguration b, CompilingSession s, string requirementCache, bool isRoot)
+string[] parseBuildConfiguration(const BuildConfiguration b, CompilingSession s, string requirementCache, bool isRoot, const string[] extensions...)
 {
     import std.algorithm.iteration:map;
     import redub.misc.path;
@@ -15,15 +15,12 @@ string[] parseBuildConfiguration(const BuildConfiguration b, CompilingSession s,
     
     with(b)
     {
-        import std.algorithm: canFind;
-
         if(isDebug) commands~= "-g";
 
-        commands = commands.append(versions.map!((v) => "-D"~v~"=1"));
+        commands = mapAppendPrefix(commands, versions, "-D", false);
         commands~= dFlags;
-        commands~="-v";
-        commands = commands.append(importDirectories.map!((i) => "-I"~i));
-        putSourceFiles(commands, workingDir, sourcePaths, sourceFiles, excludeSourceFiles, ".c", ".i");
+        commands = mapAppendPrefix(commands, importDirectories, "-I", true);
+        putSourceFiles(commands, workingDir, sourcePaths, sourceFiles, excludeSourceFiles, extensions);
 
 
         string outFlag = getTargetTypeFlag(targetType);

@@ -123,13 +123,11 @@ string getTargetTypeFlag(TargetType o, Compiler compiler)
 {
     static import redub.command_generators.d_compilers;
     static import redub.command_generators.gnu_based;
-    static import redub.command_generators.gnu_based_ccplusplus;
 
     switch(compiler.compiler) with(AcceptedCompiler)
     {
         case dmd, ldc2: return redub.command_generators.d_compilers.getTargetTypeFlag(o, compiler.compiler);
-        case gcc: return redub.command_generators.gnu_based.getTargetTypeFlag(o);
-        case gxx: return redub.command_generators.gnu_based_ccplusplus.getTargetTypeFlag(o);
+        case gcc, gxx: return redub.command_generators.gnu_based.getTargetTypeFlag(o);
         default: throw new Exception("Unsupported compiler "~compiler.binOrPath);
     }
 }
