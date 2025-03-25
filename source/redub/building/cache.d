@@ -257,6 +257,19 @@ string hashFrom(const BuildRequirements req, CompilingSession s)
     return hashFrom(req.cfg, s, req.extra.isRoot);
 }
 
+DirectoryFilterType filterTypeFromCompiler(const ref BuildRequirements cfg, const CompilingSession s )
+{
+    CompilerBinary b = cfg.getCompiler(s.compiler);
+
+    final switch(b.compiler) with(AcceptedCompiler)
+    {
+        case dmd, ldc2: return DirectoryFilterType.d;
+        case gcc: return DirectoryFilterType.c;
+        case gxx: return DirectoryFilterType.cpp;
+        case invalid: return DirectoryFilterType.none;
+    }
+}
+
 /** 
  * This function will generate a formula based on its inputs. Every dependency will check for its output artifact. This is the most reliable way
  * to build across multiple compilers and configurations without having a separate cache.
@@ -288,9 +301,9 @@ AdvCacheFormula getCompilationCacheFormula(const BuildRequirements req, string m
     return AdvCacheFormula.make(
         &hashFunction,//DO NOT use sourcePaths since importPaths is always custom + sourcePaths
         [
-            DirectoriesWithFilter(req.cfg.importDirectories, true),
-            DirectoriesWithFilter(req.cfg.stringImportPaths, false),
-            DirectoriesWithFilter(dirs, false, true)
+            DirectoriesWithFilter(req.cfg.importDirectories, filterTypeFromCompiler(req, s)),
+            DirectoriesWithFilter(req.cfg.stringImportPaths, DirectoryFilterType.none, false),
+            DirectoriesWithFilter(dirs, DirectoryFilterType.none, true) //Use simplified hashing for other object dirs
         ], ///This is causing problems when using subPackages without output path, they may clash after
         // the compilation is finished. Solving this would require hash calculation after linking
         joiner([
@@ -341,7 +354,7 @@ AdvCacheFormula getCopyCacheFormula(string mainPackHash, const BuildRequirements
 
     return AdvCacheFormula.make(
         &hashFunction,//DO NOT use sourcePaths since importPaths is always custom + sourcePaths
-        [DirectoriesWithFilter([], false)],
+        [DirectoriesWithFilter([], DirectoryFilterType.none)],
         joiner([getExpectedArtifacts(req, s.os, s.isa), extraRequirements]),
         existing,
         preprocessed,

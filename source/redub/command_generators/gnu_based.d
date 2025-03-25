@@ -7,10 +7,10 @@ import redub.logging;
 import redub.building.cache;
 
 /// Parse G++ configuration
-string[] parseBuildConfiguration(const BuildConfiguration b, CompilingSession s, string mainPackHash, bool isRoot, const string[] extensions...)
+string[] parseBuildConfiguration(const BuildConfiguration b, CompilingSession s, string mainPackhash, bool isRoot, const string[] extensions...)
 {
-    import std.file;
     import std.algorithm.iteration:map;
+    import std.file;
     import redub.misc.path;
     
     string[] commands;
@@ -18,7 +18,7 @@ string[] parseBuildConfiguration(const BuildConfiguration b, CompilingSession s,
     with(b)
     {
         if(isDebug) commands~= "-g";
-        commands~= "-c";
+        commands~= "-r";
 
         commands = mapAppendPrefix(commands, versions, "-D", false);
         commands~= dFlags;
@@ -27,7 +27,8 @@ string[] parseBuildConfiguration(const BuildConfiguration b, CompilingSession s,
 
 
         string outFlag = getTargetTypeFlag(targetType);
-        string cacheDir = getCacheOutputDir(mainPackHash, b, s, isRoot);
+        string cacheDir = getCacheOutputDir(mainPackhash, b, s, isRoot);
+
         mkdirRecurse(cacheDir);
         if(outFlag)
             commands~= outFlag;

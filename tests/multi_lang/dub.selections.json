@@ -1,0 +1,7 @@
+{
+	"fileVersion": 1,
+	"versions": {
+		"multi_lang":  {"path": "/home/hipreme/redub/tests/multi_lang"},
+		"c_dep":  {"path": "/home/hipreme/redub/tests/multi_lang/c_dep"}
+	}
+}

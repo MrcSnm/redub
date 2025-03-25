@@ -1,0 +1,11 @@
+{
+	"authors": [
+		"hipreme"
+	],
+	"dependencies": {
+		"c_dep": {"path": "c_dep"}
+	},
+	"description": "A minimal D application.",
+	"license": "proprietary",
+	"name": "multi_lang"
+}

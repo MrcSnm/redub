@@ -1,0 +1,16 @@
+.dub
+docs.json
+__dummy.html
+docs/
+/multi_lang
+multi_lang.so
+multi_lang.dylib
+multi_lang.dll
+multi_lang.a
+multi_lang.lib
+multi_lang-test-*
+*.exe
+*.pdb
+*.o
+*.obj
+*.lst

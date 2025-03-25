@@ -90,11 +90,18 @@ struct AdvDirectory
 	}
 }
 
+enum DirectoryFilterType : ubyte
+{
+	none,
+	d,
+	c,
+	cpp,
+}
 struct DirectoriesWithFilter
 {
 	const string[] dirs;
 	///Ends with filter, usually .d and .di. Since they are both starting with .d, function will use an optimized way to check
-	bool usesDFilters;
+	DirectoryFilterType filterType;
 
 	///Uses the simplified hashing whenever inside that dir. May be used on directories with bigger files
 	bool useSimplifiedHashing;
@@ -102,17 +109,24 @@ struct DirectoriesWithFilter
 	pragma(inline, true) bool shouldInclude(string target)
 	{
 		import std.path;
-		if(usesDFilters)
+		final switch(filterType)
 		{
-			string ext = target.extension;
-			if(ext.length == 0 || ext.length > 3) return false;
-			if(ext[1] == 'd') {
-				return ext.length == 2 ||
-					(ext.length == 3 && ext[2] == 'i');
-			}
-			return false;
+			case DirectoryFilterType.c:
+				string ext = target.extension;
+				return ext == ".c" || ext == ".i" || ext == ".h";
+			case DirectoryFilterType.cpp:
+				string ext = target.extension;
+				return ext == ".c" || ext == ".i" || ext == ".h" || ext == ".cpp" || ext == ".cc" || ext == ".cxx" || ext == ".c++" || ext == ".hpp";
+			case DirectoryFilterType.d:
+				string ext = target.extension;
+				if(ext.length == 0 || ext.length > 3) return false;
+				if(ext[1] == 'd') {
+					return ext.length == 2 ||
+						(ext.length == 3 && ext[2] == 'i');
+				}
+				return false;
+			case DirectoryFilterType.none: return true;
 		}
-		return true;
 	}
 }
 
