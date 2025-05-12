@@ -75,10 +75,9 @@ BuildRequirements postProcessBuildRequirements(BuildRequirements req, BuildConfi
     req.cfg.arch = cInfo.arch;
     req.extra.isRoot = isRoot;
     if(isRoot && useExistingObj)
-        req.cfg.outputsDeps = true;
+        req.cfg.flags|= BuildConfigurationFlags.outputsDeps;
 
-    partiallyFinishBuildRequirements(req, pending);
-    ///Merge need to happen after partial finish, since other configuration will be merged
+    partiallyFinishBuildRequirements(req, pending);    ///Merge need to happen after partial finish, since other configuration will be merged
     req.cfg = redub.parsers.environment.parseEnvironment(req.cfg);
     return req;
 }
@@ -97,6 +96,7 @@ BuildRequirements postProcessBuildRequirements(BuildRequirements req, BuildConfi
 private void partiallyFinishBuildRequirements(ref BuildRequirements req, BuildConfiguration pending)
 {
     import std.path;
+    import std.algorithm.searching:startsWith;
     import redub.misc.path;
     req.cfg = req.cfg.merge(pending);
     if(!isAbsolute(req.cfg.outputDirectory))
@@ -120,6 +120,34 @@ private void partiallyFinishBuildRequirements(ref BuildRequirements req, BuildCo
             import redub.command_generators.commons : escapePath;
             if(!isAbsolute(dir)) 
                 dir = redub.misc.path.buildNormalizedPath(req.cfg.workingDir, dir);
+        }
+    }
+
+    for(int i = 1; i < req.cfg.sourcePaths.length; i++)
+    {
+        //[src, src/folder]
+        //[src/folder, src]
+        string pathRemoved;
+        string specificPath;
+        if(req.cfg.sourcePaths[i].length > req.cfg.sourcePaths[i-1].length &&
+            req.cfg.sourcePaths[i].startsWith(req.cfg.sourcePaths[i-1]))
+        {
+            specificPath = req.cfg.sourcePaths[i];
+            pathRemoved = req.cfg.sourcePaths[i-1];
+            req.cfg.sourcePaths[i-1] = req.cfg.sourcePaths[$-1];
+        }
+        else if(req.cfg.sourcePaths[i-1].length > req.cfg.sourcePaths[i].length &&
+                req.cfg.sourcePaths[i-1].startsWith(req.cfg.sourcePaths[i]))
+        {
+            specificPath = req.cfg.sourcePaths[i-1];
+            pathRemoved = req.cfg.sourcePaths[i];
+            req.cfg.sourcePaths[i] = req.cfg.sourcePaths[$-1];
+        }
+        if(pathRemoved !is null)
+        {
+            warn("Path ",pathRemoved," was removed from sourcePaths since a more specific path was specified [", specificPath,"] . Please use \"sourcePaths\": [] instead for removing that warn and be clear about your intention");
+            req.cfg.sourcePaths.length--;
+            i--;
         }
     }
 

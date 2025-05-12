@@ -269,7 +269,15 @@ ProjectDetails buildProject(ProjectDetails d)
     bool buildSucceeded = result.value;
     if(!buildSucceeded)
         throw new BuildException();
-    infos("Finished ", d.tree.name, " - ", result.msecs, "ms - To force a rebuild of up-to-date targets, run again with --force");
+
+    import redub.misc.file_size_format;
+    import std.path;
+    string generatedBin = d.getOutputFile();
+
+    string binShortName = relativePath(generatedBin);
+    binShortName = binShortName.length < generatedBin.length ? binShortName : generatedBin;
+
+    infos("Finished: ", d.tree.name, " - ", result.msecs, "ms - Generated ",binShortName,"(",getFileSizeFormatted(generatedBin),") - Rebuild up-to-date targets with --force");
 
     return d;
 }
@@ -471,7 +479,7 @@ ProjectDetails resolveDependencies(
 
 
     infos(
-        "Dependencies resolved", " - ", (st.peek.total!"msecs"), " ms \"",
+        "Resolved:", " - ", (st.peek.total!"msecs"), " ms \"",
         color(buildType, fg.magenta),"\" using ", cBin.bin," v", cBin.version_,
         color(" ["~ cInfo.targetOS.to!string~ "-"~cInfo.isa.to!string~ "]", fg.light_cyan),
         " - ", color(inferParallel(ret).to!string~" parallel", fg.light_green)

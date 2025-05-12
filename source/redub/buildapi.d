@@ -8,7 +8,7 @@ import redub.package_searching.api;
 
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.22.1";
+enum RedubVersionOnly = "v1.22.2";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -169,6 +169,22 @@ enum RedubCommands : ubyte
     postBuild
 }
 
+enum BuildConfigurationFlags : ubyte
+{
+    none = 0,
+    ///Whenever present, --deps= will be pased to the compiler for using advanced compilation mode
+    outputsDeps           = 1 << 0,
+    ///Uses --oq on ldc, -op on dmd (rename+move while bug exists)
+    preservePath          = 1 << 1,
+    compilerVerbose       = 1 << 2,
+    compilerVerboseCodeGen= 1 << 3,
+    defaultSource         = 1 << 4,
+    defaultStringImport   = 1 << 5,
+
+
+    defaultInit = preservePath
+}
+
 
 
 struct BuildConfiguration
@@ -198,12 +214,7 @@ struct BuildConfiguration
     @excludeRoot string outputDirectory;
 
     bool isDebug;
-    ///Whenever present, --deps= will be pased to the compiler for using advanced compilation mode
-    @cacheExclude bool outputsDeps;
-    ///Uses --oq on ldc, -op on dmd (rename+move while bug exists)
-    @cacheExclude bool preservePath = true;
-    @cacheExclude bool compilerVerbose;
-    @cacheExclude bool compilerVerboseCodeGen;
+    @cacheExclude BuildConfigurationFlags flags = BuildConfigurationFlags.defaultInit;
     RedubLanguages language = RedubLanguages.D;
     TargetType targetType;
 
@@ -219,11 +230,14 @@ struct BuildConfiguration
 
         string initialSource;
         string initialStringImport;
+        BuildConfiguration ret;
+
         foreach(sourceFolder; inferredSourceFolder)
         {
             if(exists(normalizePath(temp, workingDir, sourceFolder)))
             {
                 initialSource = sourceFolder;
+                ret.flags|= BuildConfigurationFlags.defaultSource;
                 break;
             }
         }
@@ -233,12 +247,12 @@ struct BuildConfiguration
             if(exists(normalizePath(temp, workingDir, striFolder)))
             {
                 initialStringImport = striFolder;
+                ret.flags|= BuildConfigurationFlags.defaultStringImport;
                 break;
             }
         }
 
         
-        BuildConfiguration ret;
         ret.language = l;
         if(initialSource)
         {
@@ -266,6 +280,14 @@ struct BuildConfiguration
             __traits(getMember, ret, mem) = __traits(getMember, pluginData, mem);
         return ret;
     }
+
+    bool outputsDeps() const {return (flags & BuildConfigurationFlags.outputsDeps) != 0;}
+    bool preservePath() const {return (flags & BuildConfigurationFlags.preservePath) != 0;}
+    bool compilerVerbose() const {return (flags & BuildConfigurationFlags.compilerVerbose) != 0;}
+    bool compilerVerboseCodeGen() const {return (flags & BuildConfigurationFlags.compilerVerboseCodeGen) != 0;}
+    bool defaultSource() const {return (flags & BuildConfigurationFlags.defaultSource) != 0;}
+    bool defaultStringImport() const {return (flags & BuildConfigurationFlags.defaultStringImport) != 0;}
+
 
     immutable(BuildConfiguration) idup() const
     {
@@ -313,8 +335,7 @@ struct BuildConfiguration
         ret.targetName = either(other.targetName, ret.targetName);
         ret.outputDirectory = either(other.outputDirectory, ret.outputDirectory);
         ret = ret.mergeCommands(other);
-        ret.compilerVerbose = other.compilerVerbose;
-        ret.compilerVerboseCodeGen = other.compilerVerboseCodeGen;
+        ret.flags = other.flags;
         ret.extraDependencyFiles.exclusiveMergePaths(other.extraDependencyFiles);
         ret.filesToCopy.exclusiveMergePaths(other.filesToCopy);
         ret.stringImportPaths.exclusiveMergePaths(other.stringImportPaths);
