@@ -191,10 +191,15 @@ string[] getChangedBuildFiles(ProjectNode root, CompilingSession s)
 
 void createSelectionsFile(ProjectNode tree)
 {
+    import redub.misc.path;
     import std.file;
     import std.array:appender;
     import std.string:replace;
-    if(exists("dub.selections.json"))
+    char[512] selectionsPathCache;
+    char[] temp = selectionsPathCache;
+
+    string selectionsPath = normalizePath(temp, tree.requirements.cfg.workingDir, "dub.selections.json") ;
+    if(exists(selectionsPath))
         return;
     auto dubSelections = appender!string;
     dubSelections~= "{\n\t\"fileVersion\": 1,\n\t\"versions\": {";
@@ -215,7 +220,7 @@ void createSelectionsFile(ProjectNode tree)
 
     dubSelections~= "\n\t}\n}";
 
-    std.file.write("dub.selections.json", dubSelections.data);
+    std.file.write(selectionsPath, dubSelections.data);
 }
 
 
