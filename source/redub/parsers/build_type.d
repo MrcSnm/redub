@@ -3,10 +3,21 @@ public import redub.buildapi;
 public import redub.compiler_identification;
 import redub.command_generators.d_compilers;
 
-BuildConfiguration parse(BuildType buildType, AcceptedCompiler comp)
+
+
+__gshared BuildConfiguration[string] registeredBuildTypes;
+public void clearBuildTypesCache(){registeredBuildTypes = null; }
+
+
+BuildConfiguration parse(string buildType, AcceptedCompiler comp)
 {
     auto m = getFlagMapper(comp);
+    BuildConfiguration* ret = buildType in registeredBuildTypes;
+    if(ret)
+        return *ret;
     BuildConfiguration b;
+
+
     switch(buildType) with(ValidDFlags)
     {
         case BuildType.debug_:            b.dFlags = [m(debugMode), m(debugInfo)]; break;

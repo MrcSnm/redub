@@ -217,6 +217,10 @@ struct DubBuildArguments
     @("Uses breadth first search for source files, replicating how dub adds files to project. Might be a little slower")
     bool breadth;
 
+    @("Lists the available build types and which one is the default.")
+    @("print-builds")
+    bool printBuilds;
+
 
     @("Forces a recompilation even if the target is up to date")
     @("f|force")

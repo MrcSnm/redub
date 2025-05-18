@@ -8,7 +8,7 @@ import redub.package_searching.api;
 
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.22.2";
+enum RedubVersionOnly = "v1.23.0";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -59,7 +59,7 @@ enum TargetType : ubyte
     sourceLibrary
 }
 
-enum BuildType
+enum BuildType : string
 {
     debug_ = "debug",
     plain = "plain",
@@ -80,17 +80,6 @@ enum BuildType
     unittest_cov = "unittest-cov",
     unittest_cov_ctfe = "unittest-cov-ctfe",
     syntax = "syntax",
-}
-
-BuildType buildTypeFromString(string bt)
-{
-    switch(bt)
-    {
-        static foreach(member; __traits(allMembers, BuildType))
-            case __traits(getMember, BuildType, member):
-                return __traits(getMember, BuildType, member);
-        default: throw new Exception("Could not find build type for string "~bt);
-    }
 }
 
 bool isStaticLibrary(TargetType t)

@@ -3,7 +3,6 @@ import redub.logging;
 import std.system;
 import redub.buildapi;
 import hipjson;
-// import std.json;
 import std.file;
 import redub.parsers.base;
 import redub.command_generators.commons;
@@ -88,7 +87,7 @@ BuildRequirements parseWithData(string filePath,
 }
 
 
-private JSONValue[string] jsonCache;
+private __gshared JSONValue[string] jsonCache;
 /**
  *
  * Params:
@@ -108,12 +107,15 @@ private JSONValue parseJSONCached(string filePath)
 */
 private JSONValue parseJSONCached(string filePath, string fileData)
 {
-    JSONValue* cached = filePath in jsonCache;
-    if(cached) return *cached;
-    jsonCache[filePath] = parseJSON(fileData);
-    if(jsonCache[filePath].hasErrorOccurred)
-        throw new Exception(jsonCache[filePath].error);
-    return jsonCache[filePath];
+    synchronized
+    {
+        JSONValue* cached = filePath in jsonCache;
+        if(cached) return *cached;
+        jsonCache[filePath] = parseJSON(fileData);
+        if(jsonCache[filePath].hasErrorOccurred)
+            throw new Exception(jsonCache[filePath].error);
+        return jsonCache[filePath];
+    }
 }
 
 /** 
@@ -166,10 +168,19 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
             foreach(key, value; v.object)
                 addPreBuildPlugins(req, key, value.strArr, c);
         },
-        // "buildTypes": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _)
-        // {
-        //     enforce(false, "Redub does not support buildTypes and has no plan to support it. Use \"configurations\" for achieving the same thing.");
-        // },
+        "buildTypes": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _)
+        {
+            static import redub.parsers.build_type;
+            if(c.isRoot)
+            {
+                BuildConfiguration ignored = void;
+                c.extra.requiredBy = req.name;
+                c.firstRun = false;
+                foreach(buildTypeName, value; v.object)
+                    redub.parsers.build_type.registeredBuildTypes[buildTypeName] = parse(value, c, ignored).cfg;
+            }
+
+        },
         "targetName": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){setTargetName(req, v.str, c);},
         "targetType": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){setTargetType(req, v.str, c);},
         "targetPath": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){setTargetPath(req, v.str, c);},

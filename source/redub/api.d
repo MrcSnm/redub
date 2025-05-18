@@ -228,6 +228,7 @@ ProjectDetails buildProject(ProjectDetails d)
 {
     import redub.building.compile;
     import redub.building.cache;
+    import redub.parsers.build_type;
     import redub.command_generators.commons;
     import redub.misc.console_control_handler;
 
@@ -271,6 +272,7 @@ ProjectDetails buildProject(ProjectDetails d)
         }
     });
     clearJsonCompilationInfoCache();
+    clearBuildTypesCache();
     bool buildSucceeded = result.value;
     if(!buildSucceeded)
         throw new BuildException();
@@ -349,8 +351,6 @@ bool cleanProject(ProjectDetails d, bool showMessages)
                     }
                 }
             }
-
-            removeFile(redub.misc.path.buildNormalizedPath(node.requirements.cfg.workingDir, "dub.sdl.redub_cache_json"), showMessages, "Removing redub json cache file");
             removeFile(redub.misc.path.buildNormalizedPath(node.requirements.cfg.workingDir, ".ldc2_cache"), showMessages, "Removing ldc2 cache");
             foreach(copiedFile; node.requirements.cfg.filesToCopy)
             {
@@ -392,7 +392,7 @@ ProjectDetails resolveDependencies(
     CompilationDetails cDetails = CompilationDetails.init,
     ProjectToParse proj = ProjectToParse.init,
     InitialDubVariables dubVars = InitialDubVariables.init,
-    BuildType buildType = BuildType.debug_
+    string buildType = BuildType.debug_
 )
 {
     import std.datetime.stopwatch;
@@ -470,6 +470,8 @@ ProjectDetails resolveDependencies(
         tree.combine();
     compiler.usesIncremental = isIncremental(cDetails.incremental, tree);
     redub.parsers.environment.setupEnvironmentVariablesForPackageTree(tree);
+
+
 
 
     import redub.libs.colorize;

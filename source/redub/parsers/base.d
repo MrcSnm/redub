@@ -95,18 +95,14 @@ void addPreGenerateCommands(ref BuildRequirements req, JSONStringArray cmds, Par
         }
     }
     if(req.cfg.commands.length < RedubCommands.preGenerate)
-    {
         req.cfg.commands.length = RedubCommands.preGenerate + 1;
-        req.cfg.commands[RedubCommands.preGenerate] = req.cfg.commands[RedubCommands.preGenerate].append(cmds);
-    }
+    req.cfg.commands[RedubCommands.preGenerate] = req.cfg.commands[RedubCommands.preGenerate].append(cmds);
 }
 void addPostGenerateCommands(ref BuildRequirements req, JSONStringArray cmds, ParseConfig c)
 {
     if(req.cfg.commands.length < RedubCommands.postGenerate)
-    {
         req.cfg.commands.length = RedubCommands.postGenerate + 1;
-        req.cfg.commands[RedubCommands.postGenerate] = req.cfg.commands[RedubCommands.postGenerate].append(cmds);
-    }
+    req.cfg.commands[RedubCommands.postGenerate] = req.cfg.commands[RedubCommands.postGenerate].append(cmds);
 }
 void addPreBuildPlugins(ref BuildRequirements req, string pluginName, JSONStringArray cmds, ParseConfig c)
 {
@@ -116,18 +112,14 @@ void addPreBuildPlugins(ref BuildRequirements req, string pluginName, JSONString
 void addPreBuildCommands(ref BuildRequirements req, JSONStringArray cmds, ParseConfig c)
 {
     if(req.cfg.commands.length < RedubCommands.preBuild)
-    {
         req.cfg.commands.length = RedubCommands.preBuild + 1;
-        req.cfg.commands[RedubCommands.preBuild] = req.cfg.commands[RedubCommands.preBuild].append(cmds);
-    }
+    req.cfg.commands[RedubCommands.preBuild] = req.cfg.commands[RedubCommands.preBuild].append(cmds);
 }
 void addPostBuildCommands(ref BuildRequirements req, JSONStringArray cmds, ParseConfig c)
 {
     if(req.cfg.commands.length < RedubCommands.postBuild)
-    {
         req.cfg.commands.length = RedubCommands.postBuild + 1;
-        req.cfg.commands[RedubCommands.postBuild] = req.cfg.commands[RedubCommands.postBuild].append(cmds);
-    }
+    req.cfg.commands[RedubCommands.postBuild] = req.cfg.commands[RedubCommands.postBuild].append(cmds);
 }
 void addSourcePaths(ref BuildRequirements req, JSONStringArray paths, ParseConfig c)
 {

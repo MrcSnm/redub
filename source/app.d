@@ -400,7 +400,6 @@ ProjectDetails resolveDependencies(string[] args, bool isDescribeOnly = false)
     string recipe;
 
     DubArguments bArgs;
-    string[] unmodArgs = args.dup;
     GetoptResult res = betterGetopt(args, bArgs);
     updateVerbosity(bArgs.cArgs);
     if(res.helpWanted)
@@ -452,8 +451,7 @@ update
     }
 
 
-    BuildType bt = BuildType.debug_;
-    if(bArgs.buildType) bt = buildTypeFromString(bArgs.buildType);
+    string bt = either(bArgs.buildType, BuildType.debug_);
 
     ProjectDetails ret =  redub.api.resolveDependencies(
         bArgs.build.force,
@@ -468,6 +466,19 @@ update
         ret.tree.requirements.cfg.outputDirectory = bArgs.targetPath;
     if(bArgs.targetName)
         ret.tree.requirements.cfg.targetName = bArgs.targetName;
+
+    if(bArgs.build.printBuilds)
+    {
+        import redub.parsers.build_type;
+        info("\tAvailable build types:");
+        foreach(string buildType, value; registeredBuildTypes)
+            info("\t ", buildType);
+        foreach(mem; __traits(allMembers, BuildType))
+        {
+            if(__traits(getMember, BuildType, mem) !in registeredBuildTypes)
+                info("\t ", __traits(getMember, BuildType, mem));
+        }
+    }
 
     return ret;
 }
