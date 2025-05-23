@@ -131,6 +131,12 @@ void putPackageInCache(string packageName, string version_, string path)
     }
 }
 
+void clearPackageCache()
+{
+    synchronized(cacheMtx)
+        packagesCache = null;
+}
+
 string getPackagePath(string packageName, string repo, string packageVersion, string requiredBy)
 {
     return findPackage(packageName, repo ,packageVersion, requiredBy).path;

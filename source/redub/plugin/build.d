@@ -9,6 +9,11 @@ import redub.buildapi;
 import core.simd;
 import redub.tree_generators.dub;
 
+version(DigitalMars)
+    enum DefaultCompiler = "dmd";
+else
+    enum DefaultCompiler = "ldc2";
+
 
 private immutable string apiImport = import("redub/plugin/api.d");
 
@@ -78,7 +83,7 @@ void buildPlugin(string pluginName, string inputFile, CompilationInfo cInfo)
     b.sourceFiles = [inputFile];
 
 
-    CompilingSession s = CompilingSession(getCompiler, os, instructionSetArchitecture);
+    CompilingSession s = CompilingSession(getCompiler(DefaultCompiler), os, instructionSetArchitecture);
 
     string buildCmds;
     string pluginHash = hashFrom(b, s, true);

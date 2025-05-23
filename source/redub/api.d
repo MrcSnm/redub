@@ -228,6 +228,7 @@ ProjectDetails buildProject(ProjectDetails d)
 {
     import redub.building.compile;
     import redub.building.cache;
+    import redub.package_searching.cache;
     import redub.parsers.build_type;
     import redub.command_generators.commons;
     import redub.misc.console_control_handler;
@@ -273,6 +274,7 @@ ProjectDetails buildProject(ProjectDetails d)
     });
     clearJsonCompilationInfoCache();
     clearBuildTypesCache();
+    clearPackageCache();
     bool buildSucceeded = result.value;
     if(!buildSucceeded)
         throw new BuildException();

@@ -46,7 +46,18 @@ BuildRequirements parseProject(
         throw new Exception("Directory '"~projectWorkingDir~"' has no recipe or does not exists.");
     BuildRequirements req;
 
-    vlog("Parsing ", projectFile, " at ", projectWorkingDir, " with :",  subPackage, " -c ", subConfiguration.name);
+    if(getLogLevel() >= LogLevel.verbose)
+    {
+        import std.string;
+        if(projectFile.startsWith(projectWorkingDir))
+            vlog("Parsing ", projectFile);
+        else
+            vlog("Parsing ", projectFile, " at ", projectWorkingDir);
+        if(subPackage)
+            vlog("\tSubPackage: ", subPackage);
+        if(subConfiguration.name)
+            vlog("\tConfiguration: ", subConfiguration.name);
+    }
 
     BuildConfiguration pending;
     switch(extension(projectFile))
