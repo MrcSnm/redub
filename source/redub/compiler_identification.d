@@ -693,7 +693,7 @@ private string inBetweenAny(string input, string left, scope const(char)[] anyRi
 `
 DMD64 D Compiler v2.106.0-dirty                                                                                                                                          Copyright (C) 1999-2023 by The D Language Foundation, All Rights Reserved written by Walter Bright
 `;
-Compiler comp;
+CompilerBinary comp;
 assert(tryInferDmd(null, dmdVerString, comp));
 assert(SemVer("2.106.0").satisfies(comp.version_));
 assert(SemVer("2.106.0").satisfies(comp.frontendVersion));
@@ -706,7 +706,7 @@ string ldcVerString =
 `
 LDC - the LLVM D compiler (1.36.0):                                                                                                                                        based on DMD v2.106.1 and LLVM 17.0.6                                                                                                                                    built with LDC - the LLVM D compiler (1.36.0)                                                                                                                            Default target: x86_64-pc-windows-msvc                                                                                                                                   Host CPU: znver1                                                                                                                                                         http://dlang.org - http://wiki.dlang.org/LDC
 `;
-Compiler comp;
+CompilerBinary comp;
 assert(tryInferLdc(null, ldcVerString, comp));
 assert(SemVer("1.36.0").satisfies(comp.version_));
 assert(SemVer("2.106.1").satisfies(comp.frontendVersion));
@@ -714,7 +714,7 @@ assert(SemVer("2.106.1").satisfies(comp.frontendVersion));
 
 @"Test Compiler Inference" unittest
 {
-    assert(getCompiler("ldc2", null).compiler == AcceptedCompiler.ldc2);
-    assert(getCompiler("dmd", null).compiler == AcceptedCompiler.dmd);
+    assert(getCompiler("ldc2", null).d.compiler == AcceptedCompiler.ldc2);
+    assert(getCompiler("dmd", null).d.compiler == AcceptedCompiler.dmd);
     // assert(getCompiler("tcc", null).compiler == AcceptedCompiler.gcc);
 }

@@ -234,6 +234,8 @@ void setupEnvironmentVariablesForPackage(const BuildConfiguration cfg)
 string parseStringWithEnvironment(string str)
 {
     import std.process;
+    import std.exception;
+    import std.string;
     import std.ascii:isAlphaNum;
     struct VarPos
     {
@@ -245,11 +247,21 @@ string parseStringWithEnvironment(string str)
     {
         if(str[i] == '$')
         {
-            size_t start = i+1;
-            size_t end = start;
-            while(end < str.length && (str[end].isAlphaNum || str[end] == '_')) end++;
-            variables~= VarPos(i, end);
-            i = cast(int)end;
+            if(i + 1 < str.length && str[i+1] == '{')
+            {
+                int end = cast(int)indexOf(str, '}', i);
+                enforce(++end != 0, "Could not find matching brackets at "~str);
+                variables~= VarPos(i, end);
+                i = end;
+            }
+            else
+            {
+                size_t start = i+1;
+                size_t end = start;
+                while(end < str.length && (str[end].isAlphaNum || str[end] == '_')) end++;
+                variables~= VarPos(i, end);
+                i = cast(int)end;
+            }
         }
     }
     if(variables.length == 0)
@@ -260,8 +272,11 @@ string parseStringWithEnvironment(string str)
     for(int i = 0; i < variables.length; i++)
     {
         VarPos v = variables[i];
-        string strVar = str[v.start+1..v.end];
-        diffLength-= 1+strVar.length; //$.length + (abcd).length
+        bool useBrackets = v.end > 0 && str[v.end - 1] == '}';
+        int bracketOffset = useBrackets ? 1 : 0;
+        string strVar = str[v.start+1 + bracketOffset..v.end - bracketOffset];
+        diffLength-= 1+strVar.length + bracketOffset*2; //$.length + (abcd).length {}.length (optionally)
+
         if(strVar.length == 0) //$
             continue;
         else if(!(strVar in redubEnv))
@@ -287,8 +302,9 @@ string parseStringWithEnvironment(string str)
     ///Starts appending text or variable depending on the variable positions
 	foreach(v; variables)
 	{
-		//Remove the $
-		string envVar = str[v.start+1..v.end];
+		//Remove the $ {} optionally
+        int bracketOffset = v.end > 0 && str[v.end - 1] == '}';
+		string envVar = str[v.start+1 + bracketOffset..v.end - bracketOffset];
 
         ///Copy text up to the variable 
         string leftText = str[srcStart..v.start];
@@ -310,11 +326,12 @@ string parseStringWithEnvironment(string str)
 
 unittest
 {
-    import std.process;
+    import std.stdio;
     assert(parseStringWithEnvironment("$$ORIGIN") == "$ORIGIN");
     assert(parseStringWithEnvironment("'-rpath=$$ORIGIN'") == "'-rpath=$ORIGIN'");
     redubEnv["HOME"] = "test";
     assert(parseStringWithEnvironment("$HOME") == "test");
+    assert(parseStringWithEnvironment("${HOME}") == "test");
     assert(parseStringWithEnvironment("$HOME $$ORIGIN") == "test $ORIGIN");
 }
 

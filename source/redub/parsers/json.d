@@ -181,6 +181,16 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
             }
 
         },
+        "environments": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _)
+        {
+            enforce(v.type == JSONType.object, "`environments` must be an object.");
+            foreach(key, value; v.object)
+            {
+                import redub.parsers.environment;
+                enforce(value.type == JSONType.string, "Environments value can only be a string.");
+                redubEnv[key] = value.str;
+            }
+        },
         "targetName": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){setTargetName(req, v.str, c);},
         "targetType": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){setTargetType(req, v.str, c);},
         "targetPath": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){setTargetPath(req, v.str, c);},
