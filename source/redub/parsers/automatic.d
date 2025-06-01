@@ -89,7 +89,6 @@ BuildRequirements postProcessBuildRequirements(BuildRequirements req, BuildConfi
         req.cfg.flags|= BuildConfigurationFlags.outputsDeps;
 
     partiallyFinishBuildRequirements(req, pending);    ///Merge need to happen after partial finish, since other configuration will be merged
-    req.cfg = redub.parsers.environment.parseEnvironment(req.cfg);
     return req;
 }
 

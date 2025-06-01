@@ -191,7 +191,7 @@ void setupEnvironmentVariablesForPackageTree(ProjectNode root)
     ///Path to a specific package that is part of the package's dependency graph. $ must be in uppercase letters without the semver string.
     // <PKG>_PACKAGE_DIR ;
     foreach(ProjectNode mem; root.collapse)
-        setEnvVariable(mem.name.toUppercase~"_PACKAGE_DIR",  mem.requirements.cfg.workingDir.forceTrailingDirSeparator);
+        setEnvVariable(asPackageVariable(mem.name)~"_PACKAGE_DIR",  mem.requirements.cfg.workingDir.forceTrailingDirSeparator);
 }
 
 /** 
@@ -279,13 +279,13 @@ string parseStringWithEnvironment(string str)
 
         if(strVar.length == 0) //$
             continue;
-        else if(!(strVar in redubEnv))
+        else if(!getEnvVariable(strVar))
         {
             variables = variables[0..i] ~ variables[i+1..$];
             i--;
             continue;
         }
-        diffLength+= redubEnv[strVar].length;
+        diffLength+= getEnvVariable(strVar).length;
     }
 	if(variables.length == 0) return str;
 	
@@ -312,7 +312,7 @@ string parseStringWithEnvironment(string str)
 
         ///Insert the variable value
         if(envVar.length)
-            appendToRet(redubEnv[envVar]);
+            appendToRet(getEnvVariable(envVar));
 
         ///Move the start pointer past the variable
 		srcStart = v.end;
@@ -333,6 +333,12 @@ unittest
     assert(parseStringWithEnvironment("$HOME") == "test");
     assert(parseStringWithEnvironment("${HOME}") == "test");
     assert(parseStringWithEnvironment("$HOME $$ORIGIN") == "test $ORIGIN");
+    redubEnv["SOKOL_D_PACKAGE_DIR"] = "test";
+    assert(
+        parseStringWithEnvironment(`C:\Users\Marcelo\Documents\D\test\sokol-d\${SOKOL_D_PACKAGE_DIR}\src\sokol\c\sokol_log.c`) ==
+        `C:\Users\Marcelo\Documents\D\test\sokol-d\test\src\sokol\c\sokol_log.c`
+    );
+
 }
 
 /** 
@@ -378,12 +384,23 @@ string[] arrParseEnv(const string[] input)
     return ret;
 }
 
-private string toUppercase(string a)
+/**
+ *
+ * Params:
+ *   a = Input package name
+ * Returns: The package name in uppercase and with '-' turnt into '_'
+ */
+private string asPackageVariable(string a)
 {
     import std.ascii:toUpper;
     char[] ret = new char[](a.length);
     for(int i = 0; i < a.length; i++)
-        ret[i] = a[i].toUpper;
+    {
+        if(a[i] == '-')
+            ret[i] = '_';
+        else
+            ret[i] = a[i].toUpper;
+    }
     return cast(string)ret;
 }
 
@@ -436,8 +453,20 @@ version(AsLibrary) //Library version will use environment instead of redubEnv si
      */
     string getEnvVariable(string key)
     {
-        if(key in environment)
-            return environment[key];
+        while(key in environment)
+        {
+            key = environment[key];
+            if(key.length == 0)
+                return null;
+            else if(key[0] != '$')
+                return environment[key];
+            else
+            {
+                key = key[1..$];
+                if(key.length > 1 && key[0] == '{' && key[$-1] == '}')
+                    key = key[1..$-1];
+            }
+        }
         return null;
     }
 }

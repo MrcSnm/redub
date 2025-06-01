@@ -472,6 +472,9 @@ ProjectDetails resolveDependencies(
         tree.combine();
     compiler.usesIncremental = isIncremental(cDetails.incremental, tree);
     redub.parsers.environment.setupEnvironmentVariablesForPackageTree(tree);
+    ///That now only happens at the last stage since some environment variables only finished the definition at that stage
+    foreach(ProjectNode n; tree.collapse)
+        n.requirements.cfg = redub.parsers.environment.parseEnvironment(n.requirements.cfg);
 
 
 
