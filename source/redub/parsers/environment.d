@@ -468,7 +468,7 @@ version(AsLibrary) //Library version will use environment instead of redubEnv si
             if(key.length == 0)
                 return null;
             else if(key[0] != '$')
-                return environment[key];
+                return key;
             else
             {
                 key = key[1..$];

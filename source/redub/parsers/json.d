@@ -432,7 +432,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
 
         throw new Exception("subPackage named '"~cfg.subPackage~"' could not be found " ~
             "while looking inside the requested package '"~buildRequirements.name ~ "' in path "~ cfg.workingDir~".\nAvailable subpackages:\n\t"~
-            subPackages.array.map!((JSONValue v) => v["name"].str).join("\n\t")
+            subPackages.array.map!((JSONValue v) => v.type == JSONType.string_ ? v.str : v["name"].str).join("\n\t")
         );
     }
     string[] unusedKeys;
