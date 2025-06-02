@@ -82,13 +82,13 @@ BuildRequirements parseProject(
  */
 BuildRequirements postProcessBuildRequirements(BuildRequirements req, BuildConfiguration pending, CompilationInfo cInfo, bool isRoot, bool useExistingObj)
 {
-    redub.parsers.environment.setupEnvironmentVariablesForPackage(req.cfg);
     req.cfg.arch = cInfo.arch;
     req.extra.isRoot = isRoot;
     if(isRoot && useExistingObj)
         req.cfg.flags|= BuildConfigurationFlags.outputsDeps;
 
     partiallyFinishBuildRequirements(req, pending);    ///Merge need to happen after partial finish, since other configuration will be merged
+    req.cfg = redub.parsers.environment.parseEnvironment(req.cfg);
     return req;
 }
 

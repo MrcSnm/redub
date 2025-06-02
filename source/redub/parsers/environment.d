@@ -349,6 +349,7 @@ unittest
  */
 BuildConfiguration parseEnvironment(BuildConfiguration cfg)
 {
+    redub.parsers.environment.setupEnvironmentVariablesForPackage(cfg);
     with(cfg)
     {
         importDirectories = arrParseEnv(importDirectories);
@@ -378,10 +379,18 @@ string[] arrParseEnv(const string[] input)
 {
     if(input.length == 0)
         return null;
-    string[] ret = new string[](input.length);
+    string[] ret;
     foreach(i, str; input)
-        ret[i] = parseStringWithEnvironment(str);
-    return ret;
+    {
+        string temp = parseStringWithEnvironment(str);
+        if(temp != str)
+        {
+            if(ret is null)
+                ret = input.dup;
+            ret[i] = temp;
+        }
+    }
+    return ret is null ? cast(string[])input : ret;
 }
 
 /**
