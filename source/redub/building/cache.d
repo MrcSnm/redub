@@ -301,9 +301,9 @@ AdvCacheFormula getCompilationCacheFormula(const BuildRequirements req, string m
     return AdvCacheFormula.make(
         &hashFunction,//DO NOT use sourcePaths since importPaths is always custom + sourcePaths
         [
-            DirectoriesWithFilter(req.cfg.importDirectories, filterTypeFromCompiler(req, s)),
-            DirectoriesWithFilter(req.cfg.stringImportPaths, DirectoryFilterType.none, false),
-            DirectoriesWithFilter(dirs, DirectoryFilterType.none, true) //Use simplified hashing for other object dirs
+            DirectoriesWithFilter(req.cfg.importDirectories, filterTypeFromCompiler(req, s), req.cfg.excludeSourceFiles),
+            DirectoriesWithFilter(req.cfg.stringImportPaths, DirectoryFilterType.none, null, false),
+            DirectoriesWithFilter(dirs, DirectoryFilterType.none, null, true) //Use simplified hashing for other object dirs
         ], ///This is causing problems when using subPackages without output path, they may clash after
         // the compilation is finished. Solving this would require hash calculation after linking
         joiner([

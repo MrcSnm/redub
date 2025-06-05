@@ -103,22 +103,23 @@ struct DirectoriesWithFilter
 	///Ends with filter, usually .d and .di. Since they are both starting with .d, function will use an optimized way to check
 	DirectoryFilterType filterType;
 
+	const string[] ignoreFiles;
+
 	///Uses the simplified hashing whenever inside that dir. May be used on directories with bigger files
 	bool useSimplifiedHashing;
 
-	pragma(inline, true) bool shouldInclude(string target)
+	pragma(inline, true)
+	bool shouldIncludeByExt(string target)
 	{
 		import std.path;
+		string ext = target.extension;
 		final switch(filterType)
 		{
 			case DirectoryFilterType.c:
-				string ext = target.extension;
 				return ext == ".c" || ext == ".i" || ext == ".h";
 			case DirectoryFilterType.cpp:
-				string ext = target.extension;
 				return ext == ".c" || ext == ".i" || ext == ".h" || ext == ".cpp" || ext == ".cc" || ext == ".cxx" || ext == ".c++" || ext == ".hpp";
 			case DirectoryFilterType.d:
-				string ext = target.extension;
 				if(ext.length == 0 || ext.length > 3) return false;
 				if(ext[1] == 'd') {
 					return ext.length == 2 ||
@@ -127,6 +128,12 @@ struct DirectoriesWithFilter
 				return false;
 			case DirectoryFilterType.none: return true;
 		}
+	}
+
+	pragma(inline, true) bool shouldInclude(string target)
+	{
+		import std.algorithm.searching;
+		return shouldIncludeByExt(target) && countUntil(ignoreFiles, target) == -1;
 	}
 }
 
