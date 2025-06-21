@@ -399,7 +399,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
                 enforce(std.file.isDir(subPackagePath), "subPackage path '"~subPackagePath~"' must be a directory " );
                 subPackageName = pathSplitter(subPackagePath).back;
             }
-            redub.package_searching.cache.putPackageInCache(buildRequirements.name~":"~subPackageName, cfg.version_, subPackagePath);
+            redub.package_searching.cache.putPackageInCache(buildRequirements.name~":"~subPackageName, cfg.version_, cfg.workingDir, cfg.extra.requiredBy);
         }
 
         foreach(JSONValue p; subPackages.array)

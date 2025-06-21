@@ -152,7 +152,7 @@ void addDependency(
     if(path.length && !isAbsolute(path)) 
         path = redub.misc.path.buildNormalizedPath(c.workingDir, path);
     Dependency dep = dependency(name, path, version_, req.name, c.workingDir, subConfiguration, visibility, info, isOptional);
-    vvlog("Added dependency ", dep.name, ":", dep.subPackage, " [", dep.version_, "] ", "to ", req.name);
+    vvlog("Added dependency ", dep.name, " [", dep.version_, "] ", "to ", req.name);
     //If dependency already exists, use the existing one
     ptrdiff_t depIndex = countUntil!((a) => a.isSameAs(dep))(req.dependencies);
     if(depIndex == -1)

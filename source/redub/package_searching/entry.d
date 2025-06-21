@@ -1,5 +1,5 @@
 module redub.package_searching.entry;
-immutable string[] validEntryFiles = ["dub.json", "dub.sdl"];
+immutable string[] validEntryFiles = ["dub.json", "dub.sdl", "package.json"];
 
 /** 
  * 

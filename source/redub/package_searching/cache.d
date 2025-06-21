@@ -30,7 +30,11 @@ shared static this()
  */
 PackageInfo* findPackage(string packageName, string repo, string packageVersion, string requiredBy, string path)
 {
-    PackageInfo* pkg = packageName in packagesCache;
+    PackageInfo* pkg;
+    synchronized(cacheMtx)
+    {
+        pkg = packageName in packagesCache;
+    }
     if(pkg) return pkg;
     if(path.length == 0) return findPackage(packageName, repo, packageVersion, requiredBy);
 
@@ -39,19 +43,22 @@ PackageInfo* findPackage(string packageName, string repo, string packageVersion,
     synchronized(cacheMtx)
     {
         packagesCache[packageName] = localPackage;
+        return packageName in packagesCache;
     }
-    return packageName in packagesCache;
 }
 
 private string getBetterPackageInfo(PackageInfo* input, string packageName)
 {
     string ret = packageName;
-    while(input != null)
+    synchronized(cacheMtx)
     {
-        if(input.requiredBy == null)
-            break;
-        ret = input.requiredBy~"->"~ret;
-        input = input.requiredBy in packagesCache;
+        while(input != null)
+        {
+            if(input.requiredBy == null)
+                break;
+            ret = input.requiredBy~"->"~ret;
+            input = input.requiredBy in packagesCache;
+        }
     }
     return ret;
 }
@@ -68,7 +75,9 @@ private string getBetterPackageInfo(PackageInfo* input, string packageName)
 PackageInfo* findPackage(string packageName, string repo, string packageVersion, string requiredBy)
 {
     import redub.package_searching.dub;
-    PackageInfo* pkg = packageName in packagesCache;
+    PackageInfo* pkg;
+    synchronized(cacheMtx)
+        pkg = packageName in packagesCache;
     if(!pkg)
     {
         PackageInfo info = getPackage(packageName, repo, packageVersion, requiredBy);
@@ -98,7 +107,8 @@ PackageInfo* findPackage(string packageName, string repo, string packageVersion,
         vlog("Using ", packageName, " with version: ", pkg.bestVersion, ". Initial requirement was '", pkg.requiredVersion, ". Current is ", packageVersion);
         return pkg;
     }
-    return packageName in packagesCache;
+    synchronized(cacheMtx)
+        return packageName in packagesCache;
 }
 
 
@@ -122,12 +132,18 @@ void putRootPackageInCache(string packageName, string path)
  *   packageName = The full package name
  *   version_ = Which version is it
  *   path = Where is it located
+ *   requiredBy = Which package required that
  */
-void putPackageInCache(string packageName, string version_, string path)
+void putPackageInCache(string packageName, string version_, string path, string requiredBy)
 {
     synchronized(cacheMtx)
     {
-        packagesCache[packageName] = PackageInfo(packageName, null, SemVer(version_), SemVer(version_), path, null,);
+        if(!(packageName in packagesCache))
+        {
+            PackageInfo p = basePackage(packageName, version_, requiredBy);
+            p.path = path;
+            packagesCache[packageName] = p;
+        }
     }
 }
 
