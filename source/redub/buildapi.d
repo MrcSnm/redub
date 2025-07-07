@@ -8,7 +8,7 @@ import redub.package_searching.api;
 
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.23.6";
+enum RedubVersionOnly = "v1.23.7";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -603,6 +603,14 @@ struct Dependency
     bool isSubConfigurationOnly() const
     {
         return path.length == 0 && subConfiguration.name.length != 0;
+    }
+
+    ///If the pkgInfo is an internal subpackage, there's no need to rebuild the parent name.
+    string parentName() const
+    {
+        if(subPackage && !pkgInfo.isInternalSubPackage)
+            return name[0..(cast(ptrdiff_t)name.length - cast(ptrdiff_t)subPackage.length) - 1];
+        return null;
     }
 
     bool isSameAs(Dependency other) const{return isSameAs(other.name, other.subPackage);}

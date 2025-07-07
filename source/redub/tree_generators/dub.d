@@ -176,7 +176,10 @@ private BuildRequirements parseDependency(Dependency dep, BuildRequirements pare
         sw.start();
         vvlog("Parsing ",parent.name, "->", dep.name, " ", dep.version_);
     }
-    BuildRequirements depReq = parseProject(dep.pkgInfo.path, info, dep.subConfiguration, dep.subPackage, null);
+
+    string subPkg = dep.pkgInfo.isInternalSubPackage ? dep.subPackage : null;
+    string parentName = dep.subPackage ? dep.parentName : null;
+    BuildRequirements depReq = parseProject(dep.pkgInfo.path, info, dep.subConfiguration, subPkg, null, parentName);
     if(getLogLevel() >= LogLevel.vverbose)
     {
         infos(dep.name, " parsed in ", sw.peek.total!"msecs", "ms");

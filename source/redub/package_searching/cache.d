@@ -133,17 +133,15 @@ void putRootPackageInCache(string packageName, string path)
  *   version_ = Which version is it
  *   path = Where is it located
  *   requiredBy = Which package required that
+ *   isInternalSubPackage = Information to tell whether this is a subPackage in a separate file or not
  */
-void putPackageInCache(string packageName, string version_, string path, string requiredBy)
+void putPackageInCache(string packageName, string version_, string path, string requiredBy, bool isInternalSubPackage)
 {
     synchronized(cacheMtx)
     {
-        if(!(packageName in packagesCache))
-        {
-            PackageInfo p = basePackage(packageName, version_, requiredBy);
-            p.path = path;
-            packagesCache[packageName] = p;
-        }
+        PackageInfo p = basePackage(packageName, version_, requiredBy, isInternalSubPackage);
+        p.path = path;
+        packagesCache[packageName] = p;
     }
 }
 

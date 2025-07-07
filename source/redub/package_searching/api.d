@@ -10,6 +10,8 @@ struct PackageInfo
     SemVer bestVersion;
     string path;
     string requiredBy;
+    ///Additional property to save whether the package information is inside the main package or not
+    bool isInternalSubPackage;
 }
 
 struct ReducedPackageInfo
@@ -74,11 +76,12 @@ string getSubPackageInfoRequiredBy(string packageName, string requiredBy, out st
 }
 
 
-PackageInfo basePackage(string packageName, string packageVersion, string requiredBy)
+PackageInfo basePackage(string packageName, string packageVersion, string requiredBy, bool isInternalSubPackage = true)
 {
     PackageInfo pack;
     pack.subPackage =  getSubPackageInfoRequiredBy(packageName, requiredBy, pack.packageName);
     pack.requiredBy = requiredBy;
     pack.requiredVersion = SemVer(packageVersion);
+    pack.isInternalSubPackage = isInternalSubPackage;
     return pack;
 }

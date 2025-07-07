@@ -358,23 +358,17 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
         "subPackages": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){}
     ];
 
-
-    if(cfg.subPackage)
+    setName(buildRequirements, tryStr(json, "name", cfg.defaultPackageName), cfg);
+    //If the package has subPackages, already register them so in the future they may be accessed
+    JSONValue* subPackages = "subPackages" in json;
+    if(subPackages)
     {
-        enforce("name" in json, 
+        enforce("name" in json,
             "dub.json at "~cfg.workingDir~
             " which contains subPackages, must contain a name"
         );
-
-        JSONValue* subPackages = "subPackages" in json;
-        enforce(subPackages,
-            "dub.json at "~cfg.workingDir~
-            " must contain a subPackages property since it has a subPackage named "~cfg.subPackage
-        );
         enforce(subPackages.type == JSONType.array, "subPackages property must be an Array");
-
-        setName(buildRequirements, json["name"].str, cfg);
-
+        // setName(buildRequirements, json["name"].str, cfg);
         ///Iterate first all subpackages and add each of them inside the cache
         foreach(JSONValue p; subPackages.array)
         {
@@ -383,7 +377,8 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
 
             string subPackageName;
             string subPackagePath = cfg.workingDir;
-            if(p.type == JSONType.object)
+            bool isInternalSubPackage = p.type == JSONType.object;
+            if(isInternalSubPackage)
             {
                 const(JSONValue)* name = "name" in p;
                 enforce(name, "All subPackages entries must contain a name.");
@@ -399,8 +394,17 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
                 enforce(std.file.isDir(subPackagePath), "subPackage path '"~subPackagePath~"' must be a directory " );
                 subPackageName = pathSplitter(subPackagePath).back;
             }
-            redub.package_searching.cache.putPackageInCache(buildRequirements.name~":"~subPackageName, cfg.version_, cfg.workingDir, cfg.extra.requiredBy);
+            redub.package_searching.cache.putPackageInCache(buildRequirements.name~":"~subPackageName, cfg.version_, subPackagePath, cfg.extra.requiredBy, isInternalSubPackage);
         }
+    }
+
+    if(cfg.subPackage)
+    {
+
+        enforce(subPackages,
+            "dub.json at "~cfg.workingDir~
+            " must contain a subPackages property since it has a subPackage named "~cfg.subPackage
+        );
 
         foreach(JSONValue p; subPackages.array)
         {
@@ -437,7 +441,6 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
     }
     string[] unusedKeys;
 
-    setName(buildRequirements, tryStr(json, "name", cfg.defaultPackageName), cfg);
     runHandlers(requirementsRun, buildRequirements, cfg, json, false, unusedKeys, pending);
 
     if(cfg.firstRun && unusedKeys.length) warn("Unused Keys -> ", unusedKeys);
