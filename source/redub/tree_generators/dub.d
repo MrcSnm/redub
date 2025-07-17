@@ -57,19 +57,30 @@ ProjectNode getProjectTree(BuildRequirements req, CompilationInfo info)
 
 void detectCycle(ProjectNode t)
 {
+    import redub.api;
     bool[ProjectNode] visited;
     bool[ProjectNode] inStack;
-
+    ProjectNode[] path;
     void impl(ProjectNode node)
     {
-        if(node in inStack) throw new Exception("Found a cycle at "~node.name);
-        inStack[node] = true;
         visited[node] = true;
-        
+        inStack[node] = true;
+        path~= node;
         foreach(n; node.dependencies)
         {
-            if(!(n in visited)) impl(n);
+            if(!(n in visited))
+                impl(n);
+            else if(n in inStack)
+            {
+                string printCycle;
+                foreach(c; path)
+                {
+                    printCycle~= c.name~"<-";
+                }
+                return throw new BuildException("Found a cycle at "~printCycle);
+            }
         }
+        path = path[0..$-1];
         inStack.remove(node);
     }
     impl(t);
@@ -143,13 +154,13 @@ private void getProjectTreeImpl(
             if(dep.name != depNode.name)
             {
                 import redub.api;
-                throw new RedubException("Dependency '"~dep.name~"' specified at path '"~dep.path~"' matches '"~depNode.name~"'. The dependency name should correctly match the one found at that path.");
+                throw new BuildException("Dependency '"~dep.name~"' specified at path '"~dep.path~"' matches '"~depNode.name~"'. The dependency name should correctly match the one found at that path.");
             }
             ///TODO: Improve dependency cycle detection
             if(dep.name == node.name)
             {
                 import redub.api;
-                throw new RedubException("Package '"~dep.name~"' at path '"~dep.path~"' can't depend on itself.");
+                throw new BuildException("Package '"~dep.name~"' at path '"~dep.path~"' can't depend on itself.");
             }
             subConfigurations = depNode.requirements.mergeSubConfigurations(subConfigurations);
             visited[dep.name] = depNode;
@@ -190,9 +201,10 @@ private BuildRequirements parseDependency(Dependency dep, BuildRequirements pare
 
 private BuildRequirements mergeDifferentSubConfigurations(BuildRequirements existingReq, BuildRequirements newReq)
 {
+    import redub.api;
     if(existingReq.configuration.isDefault)
         return newReq;
-    throw new Exception(
+    throw new BuildException(
         "Error in project: '"~existingReq.name~"' Can't merge different subConfigurations at this " ~
         "moment: "~existingReq.targetConfiguration~ " vs " ~ newReq.targetConfiguration
     );
