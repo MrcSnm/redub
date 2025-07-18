@@ -11,7 +11,7 @@ string[] parseLinkConfiguration(const ThreadBuildData data, CompilingSession s, 
     import redub.building.cache;
     string[] cmds;
     AcceptedLinker linker = s.compiler.linker;
-    bool emitStartGroup = s.isa != ISA.webAssembly && linker != AcceptedLinker.ld64;
+    bool emitStartGroup = s.isa != ISA.webAssembly && linker != AcceptedLinker.ld64 && cast(OSExtension)s.os != OSExtension.emscripten;
 
 
     const BuildConfiguration b = data.cfg;

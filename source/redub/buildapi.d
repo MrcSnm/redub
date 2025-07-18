@@ -8,7 +8,7 @@ import redub.package_searching.api;
 
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.23.9";
+enum RedubVersionOnly = "v1.23.10";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -19,6 +19,12 @@ private string getDFrontendVersion()
     import std.conv:to;
     string ret = __VERSION__.to!string;
     return ret[0..$-3]~"."~ret[$-3..$];
+}
+
+enum OSExtension
+{
+    webAssembly = OS.unknown + 1,
+    emscripten = webAssembly + 1
 }
 
 /**

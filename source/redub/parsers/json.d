@@ -502,16 +502,11 @@ private JSONStringArray strArr(JSONValue target, string prop)
     return JSONStringArray();
 }
 
-enum OSExtension
-{
-    webAssembly = OS.unknown + 1
-}
-
 private bool isOS(string osRep)
 {
     switch(osRep)
     {
-        case "posix", "linux", "osx", "darwin", "windows", "freebsd", "netbsd", "openbsd", "dragonflybsd", "solaris", "watchos", "tvos", "ios", "webassembly": return true;
+        case "posix", "linux", "osx", "darwin", "windows", "freebsd", "netbsd", "openbsd", "dragonflybsd", "solaris", "watchos", "tvos", "ios", "webassembly", "emscripten": return true;
         default: return false;
     }
 }
@@ -560,6 +555,7 @@ private bool matchesOS(string osRep, OS os)
         case "ios": return os == iOS;
         case "windows": return os == win32 || os == win64;
         case "webassembly", "wasm": return cast(OSExtension)os == OSExtension.webAssembly;
+        case "emscripten": return cast(OSExtension)os == OSExtension.emscripten;
         default: throw new Exception("No appropriate switch clause found for the OS '"~osRep~"'");
     }
 }
