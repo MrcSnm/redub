@@ -75,9 +75,9 @@ void detectCycle(ProjectNode t)
                 string printCycle;
                 foreach(c; path)
                 {
-                    printCycle~= c.name~"<-";
+                    printCycle~= c.name~"->";
                 }
-                return throw new BuildException("Found a cycle at "~printCycle);
+                return throw new BuildException("Found a cycle at "~printCycle~n.name);
             }
         }
         path = path[0..$-1];

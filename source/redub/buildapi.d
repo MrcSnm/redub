@@ -8,7 +8,7 @@ import redub.package_searching.api;
 
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.23.10";
+enum RedubVersionOnly = "v1.23.11";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -24,7 +24,8 @@ private string getDFrontendVersion()
 enum OSExtension
 {
     webAssembly = OS.unknown + 1,
-    emscripten = webAssembly + 1
+    emscripten = webAssembly,
+    visionOS
 }
 
 /**

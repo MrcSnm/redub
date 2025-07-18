@@ -144,7 +144,6 @@ void putPackageInCache(string packageName, string version_, string path, string 
         packagesCache[packageName] = p;
     }
 }
-
 void clearPackageCache()
 {
     synchronized(cacheMtx)

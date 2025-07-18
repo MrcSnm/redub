@@ -88,6 +88,8 @@ BuildRequirements parseWithData(string filePath,
 
 
 private __gshared JSONValue[string] jsonCache;
+///Saves information about which JSONValues has already registered subPackages for.
+private __gshared bool[JSONValue] registeredSubpackages;
 /**
  *
  * Params:
@@ -122,7 +124,11 @@ private JSONValue parseJSONCached(string filePath, string fileData)
  * This function was created since on libraries, they may be reusing multiple times and thus
  * storing the cache between runs may trigger errors.
  */
-public void clearJsonRecipeCache(){jsonCache = null;}
+public void clearJsonRecipeCache()
+{
+    jsonCache = null;
+    registeredSubpackages = null;
+}
 
 
 
@@ -361,8 +367,11 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
     setName(buildRequirements, tryStr(json, "name", cfg.defaultPackageName), cfg);
     //If the package has subPackages, already register them so in the future they may be accessed
     JSONValue* subPackages = "subPackages" in json;
-    if(subPackages)
+    if(json !in registeredSubpackages && subPackages)
     {
+        import std.algorithm.searching:countUntil;
+        registeredSubpackages[json] = true;
+        string[] existingSubpackages;
         enforce("name" in json,
             "dub.json at "~cfg.workingDir~
             " which contains subPackages, must contain a name"
@@ -394,7 +403,13 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
                 enforce(std.file.isDir(subPackagePath), "subPackage path '"~subPackagePath~"' must be a directory " );
                 subPackageName = pathSplitter(subPackagePath).back;
             }
-            redub.package_searching.cache.putPackageInCache(buildRequirements.name~":"~subPackageName, cfg.version_, subPackagePath, cfg.extra.requiredBy, isInternalSubPackage);
+            if(countUntil(existingSubpackages, subPackageName) != -1)
+                errorTitle("Redundant SubPackage Definition: ", "SubPackage '"~subPackageName~"' was already registered. The subPackage for path " ~subPackagePath~" will be ignored");
+            else
+            {
+                redub.package_searching.cache.putPackageInCache(buildRequirements.name~":"~subPackageName, cfg.version_, subPackagePath, cfg.extra.requiredBy, isInternalSubPackage);
+                existingSubpackages~= subPackageName;
+            }
         }
     }
 
@@ -506,7 +521,7 @@ private bool isOS(string osRep)
 {
     switch(osRep)
     {
-        case "posix", "linux", "osx", "darwin", "windows", "freebsd", "netbsd", "openbsd", "dragonflybsd", "solaris", "watchos", "tvos", "ios", "webassembly", "emscripten": return true;
+        case "posix", "linux", "osx", "darwin", "windows", "freebsd", "netbsd", "openbsd", "dragonflybsd", "solaris", "watchos", "tvos", "ios", "visionos", "webassembly", "emscripten": return true;
         default: return false;
     }
 }
@@ -549,10 +564,11 @@ private bool matchesOS(string osRep, OS os)
         case "dragonflybsd": return os == dragonFlyBSD;
         case "solaris": return os == solaris;
         case "linux": return os == linux || os == android;
-        case "darwin", "osx": return os == osx || os == iOS || os == tvOS || os == watchOS;
+        case "darwin", "osx": return os == osx || os == iOS || os == tvOS || os == watchOS || cast(OSExtension)os == OSExtension.visionOS;
         case "watchos": return os == watchOS;
         case "tvos": return os == tvOS;
         case "ios": return os == iOS;
+        case "visionos": return cast(OSExtension)os == OSExtension.visionOS;
         case "windows": return os == win32 || os == win64;
         case "webassembly", "wasm": return cast(OSExtension)os == OSExtension.webAssembly;
         case "emscripten": return cast(OSExtension)os == OSExtension.emscripten;
