@@ -87,7 +87,7 @@ int main(string[] args)
     }
     catch(BuildException e)
     {
-        errorTitle("Build Failure");
+        errorTitle("Build Failure: ", e.msg);
         version(Developer) throw e;
         return 1;
     }

@@ -139,6 +139,7 @@ ParallelType inferParallel(ProjectDetails d)
     return d.parallelType;
 }
 
+///Used when redub can't handle a situation
 class RedubException : Exception
 {
     this(string msg, string file = __FILE__, size_t line = __LINE__, Throwable nextInChain = null)
@@ -146,11 +147,13 @@ class RedubException : Exception
         super(msg, file, line, nextInChain);
     }
 }
+
+///Used when the user does something for the exception being thrown
 class BuildException : Exception
 {
-    this(string file = __FILE__, size_t line = __LINE__, Throwable nextInChain = null)
+    this(string msg, string file = __FILE__, size_t line = __LINE__, Throwable nextInChain = null)
     {
-        super(null, file, line, nextInChain );
+        super(msg, file, line, nextInChain );
     }
 }
 
@@ -277,7 +280,7 @@ ProjectDetails buildProject(ProjectDetails d)
     clearPackageCache();
     bool buildSucceeded = result.value;
     if(!buildSucceeded)
-        throw new BuildException();
+        throw new BuildException(null);
 
     import redub.misc.file_size_format;
     import std.path;

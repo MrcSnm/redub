@@ -156,6 +156,7 @@ string dmdFlags(ValidDFlags flag)
         case debugInfo: return "-g";
         case releaseMode: return "-release";
         case optimize: return "-O";
+        case optimizeSize: return "-O";
         case inline: return "-inline";
         case noBoundsCheck: return "-noboundscheck";
         case unittests: return "-unittest";
@@ -193,6 +194,7 @@ string ldcFlags(ValidDFlags flag)
         case debugInfo: return "-g";
         case releaseMode: return "-release";
         case optimize: return "-O3";
+        case optimizeSize: return "-Oz";
         case inline: return "-enable-inlining";
         case noBoundsCheck: return "-boundscheck=off";
         case unittests: return "-unittest";
@@ -230,6 +232,7 @@ string gccFlags(ValidDFlags flag)
         case debugInfo: return "-g";
         case releaseMode: return "-O3";
         case optimize: return "-O3";
+        case optimizeSize: return "-Oz";
         case inline: return "-finline";
         case noBoundsCheck: return null;
         case unittests: return null;
@@ -322,6 +325,7 @@ enum ValidDFlags
     @"buildOption" debugInfo,
     @"buildOption" releaseMode,
     @"buildOption" optimize,
+    @"buildOption" optimizeSize,
     @"buildOption" inline,
     @"buildOption" noBoundsCheck,
     @"buildOption" unittests,

@@ -11,6 +11,7 @@ public void clearBuildTypesCache(){registeredBuildTypes = null; }
 
 BuildConfiguration parse(string buildType, AcceptedCompiler comp)
 {
+    import redub.api;
     auto m = getFlagMapper(comp);
     BuildConfiguration* ret = buildType in registeredBuildTypes;
     if(ret)
@@ -23,6 +24,7 @@ BuildConfiguration parse(string buildType, AcceptedCompiler comp)
         case BuildType.debug_:            b.dFlags = [m(debugMode), m(debugInfo)]; break;
         case BuildType.plain: break;
         case BuildType.release:           b.dFlags = [m(releaseMode), m(optimize), m(inline)]; break;
+        case BuildType.release_size:      b.dFlags = [m(releaseMode), m(optimizeSize), m(inline)]; break;
         case BuildType.release_debug:     b.dFlags = [m(releaseMode), m(optimize), m(inline), m(debugInfo)]; break;
         case BuildType.compiler_verbose:  b.flags|= BuildConfigurationFlags.compilerVerbose; break;
         case BuildType.codegen_verbose:   b.flags|= BuildConfigurationFlags.compilerVerboseCodeGen; break;
@@ -39,7 +41,21 @@ BuildConfiguration parse(string buildType, AcceptedCompiler comp)
         case BuildType.unittest_cov:      b.dFlags = [m(unittests), m(coverage), m(debugMode), m(debugInfo)]; break;
         case BuildType.unittest_cov_ctfe: b.dFlags = [m(unittests), m(coverageCTFE), m(debugMode), m(debugInfo)]; break;
         case BuildType.syntax:            b.dFlags = [m(syntaxOnly)]; break;
-        default: throw new Exception("Unknown build type "~buildType);
+        default:
+            string validBuildTypes = "Define custom build types by specifying \"buildTypes\" on your dub.json\n";
+            if(registeredBuildTypes.length)
+            {
+                validBuildTypes = "*: Custom build types";
+                foreach(string key; registeredBuildTypes.byKey)
+                    validBuildTypes~= "\n\t*"~key;
+            }
+            validBuildTypes~= "\nCommon build types\n";
+            foreach(string mem; __traits(allMembers, BuildType))
+            {
+                if(mem != "docs" && mem != "ddox")
+                    validBuildTypes~= "\n\t" ~ __traits(getMember, BuildType, mem);
+            }
+            throw new BuildException("Unknown build type '"~buildType ~ "'. Valid build types:" ~ validBuildTypes);
     }
     return b;
 }

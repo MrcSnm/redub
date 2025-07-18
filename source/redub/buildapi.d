@@ -8,7 +8,7 @@ import redub.package_searching.api;
 
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.23.8";
+enum RedubVersionOnly = "v1.23.9";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -64,6 +64,7 @@ enum BuildType : string
     debug_ = "debug",
     plain = "plain",
     release = "release",
+    release_size = "release-size",
     release_debug = "release-debug",
     compiler_verbose = "compiler-verbose",
     codegen_verbose = "codegen-verbose",
@@ -141,7 +142,7 @@ RedubLanguages redubLanguage(string input)
         }
         default:break;
     }
-    throw new RedubException("Invalid language '"~input~"' received.");
+    throw new BuildException("Invalid language '"~input~"' received.");
 }
 
 enum RedubLanguages : ubyte
