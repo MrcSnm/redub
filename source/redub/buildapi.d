@@ -1084,12 +1084,12 @@ class ProjectNode
         StopWatch sw = StopWatch(AutoStart.no);
         if(hasLogLevel(LogLevel.vverbose))
             sw.start();
-        mergeParentInDependencies(this);
-        inLogLevel(LogLevel.vverbose, vvlog("mergeParentInDependencies finished at ", sw.peek.total!"msecs", "ms"));
-
         string[] removedOptionals;
         transferDependenciesAndClearOptional(this, removedOptionals);
         inLogLevel(LogLevel.vverbose, vvlog("transferDependenciesAndClearOptional finished at ", sw.peek.total!"msecs", "ms"));
+
+        mergeParentInDependencies(this);
+        inLogLevel(LogLevel.vverbose, vvlog("mergeParentInDependencies finished at ", sw.peek.total!"msecs", "ms"));
 
         if(removedOptionals.length)
             warn("Optional Dependencies ", removedOptionals, " not included since they weren't requested as non optional from other places.");
