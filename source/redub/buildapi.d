@@ -709,11 +709,13 @@ struct BuildRequirements
         return output;
     }
 
-    immutable(ThreadBuildData) buildData() inout
+    immutable(ThreadBuildData) buildData(bool isLeaf) inout
     {
         return immutable ThreadBuildData(
             cfg.idup,
             extra.idup,
+            false,
+            isLeaf
         );
     }
 
@@ -770,6 +772,8 @@ struct ThreadBuildData
     ExtraInformation extra;
 
     bool isRoot;
+    ///Used for letting it get high priority so redub may exit fast.
+    bool isLeaf;
 }
 
 class ProjectNode
@@ -1211,6 +1215,31 @@ class ProjectNode
         }
         generateCollapsedImpl(this, collapsedList, visitedMap);
         return collapsedList;
+    }
+
+    ///Will find the deepest node in the tree which is not up to date
+    ProjectNode findPriorityNode() const
+    {
+        ProjectNode deepestDirtyNode = cast()this;
+        bool[const ProjectNode] vis;
+        int maxDepth = 0;
+
+        static void impl(ref bool[const ProjectNode] visited, const ProjectNode curr, ref ProjectNode deepest, ref int maxDepth, int depth)
+        {
+            visited[curr] = true;
+            if(depth > maxDepth)
+            {
+                maxDepth = depth;
+                deepest = cast()curr;
+            }
+            foreach(dep; curr.dependencies)
+            {
+                if(dep !in visited && !dep.isUpToDate)
+                    impl(visited, dep, deepest, maxDepth, depth + 1);
+            }
+        }
+        impl(vis, this, deepestDirtyNode, maxDepth, 0);
+        return deepestDirtyNode;
     }
 
     ProjectNode[] findLeavesNodes()

@@ -1,26 +1,41 @@
 module redub.building.utils;
 import redub.buildapi;
 
-auto execCompilerBase(const BuildConfiguration cfg, string compilerBin, string[] compileFlags, out string compilationCommands, bool isDCompiler)
+string getHighPriorityCmd()
+{
+    version(Posix)
+    {
+        return "nice -n 0 ";
+    }
+    else version(Windows)
+    {
+        return "/realtime ";
+    }
+    else return "";
+}
+
+auto execCompilerBase(const BuildConfiguration cfg, string compilerBin, string[] compileFlags, out string compilationCommands, bool isDCompiler, bool hasHighPriority)
 {
     import std.system;
     import std.process;
     import std.file;
     import redub.command_generators.automatic;
     import redub.command_generators.commons;
+
+    string high = hasHighPriority ? getHighPriorityCmd : "";
     if(std.system.os.isWindows && isDCompiler)
     {
         string cmdFile = createCommandFile(cfg, compileFlags, compilationCommands);
         compilationCommands = compilerBin ~ " "~compilationCommands;
         scope(exit)
             std.file.remove(cmdFile);
-        return executeShell(compilerBin~ " @"~cmdFile, null, Config.none, size_t.max, cfg.workingDir);
+        return executeShell(high ~ compilerBin~ " @"~cmdFile, null, Config.none, size_t.max, cfg.workingDir);
     }
     compilationCommands = escapeCompilationCommands(compilerBin, compileFlags);
-    return executeShell(compilationCommands, null, Config.none, size_t.max, cfg.workingDir);
+    return executeShell(high ~ compilationCommands, null, Config.none, size_t.max, cfg.workingDir);
 }
 
-auto execCompiler(const BuildConfiguration cfg, string compilerBin, string[] compileFlags, out string compilationCommands, Compiler compiler, string inputDir)
+auto execCompiler(const BuildConfiguration cfg, string compilerBin, string[] compileFlags, out string compilationCommands, Compiler compiler, string inputDir, bool hasHighPriority)
 {
     import std.file;
     import redub.api;
@@ -33,7 +48,7 @@ auto execCompiler(const BuildConfiguration cfg, string compilerBin, string[] com
     if(exists(outDir))
         remove(outDir);
 
-    auto ret = execCompilerBase(cfg, compilerBin, compileFlags, compilationCommands, cfg.getCompiler(compiler).isDCompiler);
+    auto ret = execCompilerBase(cfg, compilerBin, compileFlags, compilationCommands, cfg.getCompiler(compiler).isDCompiler, hasHighPriority);
 
     if(ret.status == 0)
     {
@@ -58,6 +73,7 @@ auto linkBase(const ThreadBuildData data, CompilingSession session, string rootH
         getLinkFlags(data, session,  rootHash),
         compilationCommand,
         c.isDCompiler,
+        true
     );
 }
 

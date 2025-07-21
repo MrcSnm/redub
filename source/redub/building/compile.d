@@ -77,7 +77,6 @@ void execCompilationThread(immutable ThreadBuildData data, shared ProjectNode pa
     }
 }
 
-
 CompilationResult execCompilation(immutable ThreadBuildData data, shared ProjectNode pack, CompilingSession info, HashPair hash, immutable string[string] env)
 {
     import std.file;
@@ -127,7 +126,7 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
 
             ExecutionResult ret;
             if(!pack.isCopyEnough)
-                ret = cast(ExecutionResult)execCompiler(cfg, c.bin, getCompilationFlags(cfg, info, hash.rootHash, data.extra.isRoot), res.compilationCommand, compiler, inDir);
+                ret = cast(ExecutionResult)execCompiler(cfg, c.bin, getCompilationFlags(cfg, info, hash.rootHash, data.extra.isRoot), res.compilationCommand, compiler, inDir, data.isLeaf);
 
             if(!isDCompiler(c) && !ret.status && isStaticLibrary(data.cfg.targetType)) //Must call archiver when
             {
@@ -247,7 +246,7 @@ bool buildProjectParallelSimple(ProjectNode root, CompilingSession s, const(AdvC
                 {
                     spawned[dep] = true;
                     spawn(&execCompilationThread,
-                        dep.requirements.buildData, cast(shared)dep, 
+                        dep.requirements.buildData(false), cast(shared)dep, 
                         s, HashPair(mainPackHash, hashFrom(dep.requirements, s)),
                         getEnvForProject(dep, env),
                         0
@@ -295,13 +294,14 @@ bool buildProjectFullyParallelized(ProjectNode root, CompilingSession s, const(A
     size_t i = 0;
     size_t sentPackages = 0;
     size_t execID = buildExecutions++;
+    ProjectNode priority = root.findPriorityNode();
     foreach(ProjectNode pack; root.collapse)
     {
         if(pack.shouldEnterCompilationThread)
         {
             sentPackages++;
             spawn(&execCompilationThread,
-                pack.requirements.buildData,
+                pack.requirements.buildData(pack is priority),
                 cast(shared)pack, 
                 s,
                 HashPair(mainPackHash, hashFrom(pack.requirements, s)),
@@ -332,6 +332,8 @@ bool buildProjectFullyParallelized(ProjectNode root, CompilingSession s, const(A
         {
             failedPackage = finishedPackage;
             failedRes = res;
+            if(failedPackage == priority)
+                break;
         }
         else
         {
@@ -380,7 +382,7 @@ bool buildProjectSingleThread(ProjectNode root, CompilingSession s, const(AdvCac
         {
             if(dep.shouldEnterCompilationThread)
             {
-                CompilationResult res = execCompilation(dep.requirements.buildData, cast(shared)dep, 
+                CompilationResult res = execCompilation(dep.requirements.buildData(true), cast(shared)dep, 
                     s,
                     HashPair(mainPackHash,  hashFrom(dep.requirements, s)), getEnvForProject(dep, env)
                 );
@@ -554,7 +556,7 @@ private bool doLink(ProjectNode root, CompilingSession info, string mainPackHash
     {
         CompilationResult linkRes;
         auto result = timed(() {
-             linkRes = link(root, mainPackHash, root.requirements.buildData, info, getEnvForProject(root, env ? env : cast(const)getCurrentEnv()));
+             linkRes = link(root, mainPackHash, root.requirements.buildData(true), info, getEnvForProject(root, env ? env : cast(const)getCurrentEnv()));
              return true;
         });
         if(linkRes.status)

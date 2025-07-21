@@ -91,7 +91,7 @@ void buildPlugin(string pluginName, string inputFile, CompilationInfo cInfo)
 
     errorTitle(pluginHash, " ", hashFrom(b, s, false));
 
-    errorTitle("", execCompiler(b, s.compiler.d.bin, getCompilationFlags(b, s, pluginHash, true), buildCmds, s.compiler, inDir).output);
+    errorTitle("", execCompiler(b, s.compiler.d.bin, getCompilationFlags(b, s, pluginHash, true), buildCmds, s.compiler, inDir, true).output);
     errorTitle("Plugin Flags: ", buildCmds);
     errorTitle("", linkBase(const ThreadBuildData(b, ExtraInformation()), s, pluginHash, buildCmds).output);
     errorTitle("Plugin Flags: ", buildCmds);
