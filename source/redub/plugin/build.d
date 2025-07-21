@@ -91,10 +91,20 @@ void buildPlugin(string pluginName, string inputFile, CompilationInfo cInfo)
 
     errorTitle(pluginHash, " ", hashFrom(b, s, false));
 
-    errorTitle("", execCompiler(b, s.compiler.d.bin, getCompilationFlags(b, s, pluginHash, true), buildCmds, s.compiler, inDir, true).output);
+    string cmdFile1, cmdFile2;
+
+    errorTitle("", finishCompilerExec(b, s.compiler, inDir, b.outputDirectory, execCompiler(b, s.compiler, getCompilationFlags(b, s, pluginHash, true), buildCmds, true, cmdFile1)).output);
     errorTitle("Plugin Flags: ", buildCmds);
-    errorTitle("", linkBase(const ThreadBuildData(b, ExtraInformation()), s, pluginHash, buildCmds).output);
+    ProcessExec2 linkProcess = linkBase(const ThreadBuildData(b, ExtraInformation()), s, pluginHash, buildCmds, cmdFile2);
+    errorTitle("", waitProcessExec(linkProcess).output);
     errorTitle("Plugin Flags: ", buildCmds);
+    scope(exit)
+    {
+        if(cmdFile1)
+            std.file.remove(cmdFile1);
+        if(cmdFile2)
+            std.file.remove(cmdFile2);
+    }
 }
 
 

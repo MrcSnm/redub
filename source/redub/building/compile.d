@@ -15,6 +15,10 @@ import std.concurrency:Tid;
  * To solve that problem, finishedPackages will only ever add to it if the buildExecutions id is the same.
  */
 size_t buildExecutions;
+/** 
+ * Saves which PIDs are currently running. Used whenever some process fails and kills all of them.
+ */
+bool[shared Pid] runningProcesses;
 
 struct CompilationResult
 {
@@ -23,13 +27,13 @@ struct CompilationResult
     size_t msNeeded;
     int status;
     shared ProjectNode node;
+    shared Pid pid;
     size_t id;
 }
 
 struct ProcessInfo
 {
-    size_t threadID;
-    Pid pid;
+    shared Pid pid;
 }
 
 struct HashPair
@@ -82,7 +86,7 @@ void execCompilationThread(immutable ThreadBuildData data, shared ProjectNode pa
     res.id = id;
     scope(exit)
     {
-        owner.send(res);
+        owner.send(ProcessInfo.init, res);
     }
 }
 
@@ -135,7 +139,20 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
 
             ExecutionResult ret;
             if(!pack.isCopyEnough)
-                ret = cast(ExecutionResult)execCompiler(cfg, c.bin, getCompilationFlags(cfg, info, hash.rootHash, data.extra.isRoot), res.compilationCommand, compiler, inDir, data.isLeaf);
+            {
+                import std.concurrency;
+                string cmdFile;
+                ProcessExec2 ex = execCompiler(cfg, compiler, getCompilationFlags(cfg, info, hash.rootHash, data.extra.isRoot), res.compilationCommand, data.isLeaf, cmdFile);
+                scope(exit)
+                {
+                    if(cmdFile)
+                        std.file.remove(cmdFile);
+                }
+                res.pid = cast(shared)ex.pipe.pid;
+                if(owner != Tid.init)
+                    owner.send(ProcessInfo(res.pid), CompilationResult.init);
+                ret = cast(ExecutionResult)finishCompilerExec(cfg, compiler, inDir, outDir, ex);
+            }
 
             if(!isDCompiler(c) && !ret.status && isStaticLibrary(data.cfg.targetType)) //Must call archiver when
             {
@@ -198,10 +215,16 @@ CompilationResult link(ProjectNode root, string rootHash, const ThreadBuildData 
     OS os = info.os;
 
     CompilationResult ret;
-
     if(!root.isCopyEnough)
     {
-        auto exec = linkBase(data, info, rootHash, ret.compilationCommand);
+        string cmdFile;
+        ProcessExec2 linkProcess = linkBase(data, info, rootHash, ret.compilationCommand, cmdFile);
+        scope(exit)
+        {
+            if(cmdFile)
+                std.file.remove(cmdFile);
+        }
+        auto exec = waitProcessExec(linkProcess);
         ret.status = exec.status;
         ret.message = exec.output;
         if(exec.status != 0)
@@ -265,7 +288,14 @@ bool buildProjectParallelSimple(ProjectNode root, CompilingSession s, const(AdvC
                     dep.becomeIndependent();
             }
         }
-        CompilationResult res = receiveOnly!CompilationResult;
+        auto info = receiveOnly!(ProcessInfo, CompilationResult);
+        if(info[0] != ProcessInfo.init)
+        {
+            runningProcesses[info[0].pid] = true;
+            continue;
+        }
+        auto res = info[1];
+        runningProcesses[res.pid] = false;
         ProjectNode finishedPackage = cast()res.node;
         if(res.status)
         {
@@ -328,7 +358,15 @@ bool buildProjectFullyParallelized(ProjectNode root, CompilingSession s, const(A
 
     for(int _ = 0; _ < sentPackages; _++)
     {
-        CompilationResult res = receiveOnly!CompilationResult;
+        auto info = receiveOnly!(ProcessInfo, CompilationResult);
+        if(info[0] != ProcessInfo.init)
+        {
+            runningProcesses[info[0].pid] = true;
+            _--;
+            continue;
+        }
+        auto res = info[1];
+        runningProcesses[res.pid] = false;
         ///Workaround on not actually killing threads when build fail and using redub as a library.
         if(res.id != execID)
         {
@@ -341,8 +379,15 @@ bool buildProjectFullyParallelized(ProjectNode root, CompilingSession s, const(A
         {
             failedPackage = finishedPackage;
             failedRes = res;
-            if(failedPackage == priority)
+            if(failedPackage is priority)
+            {
+                foreach(v, isRunning; runningProcesses)
+                {
+                    if(isRunning)
+                        kill(cast()v);
+                }
                 break;
+            }
         }
         else
         {
@@ -356,6 +401,7 @@ bool buildProjectFullyParallelized(ProjectNode root, CompilingSession s, const(A
             }
         }
     }
+    runningProcesses.clear();
     if(failedPackage)
     {
         import core.thread;
@@ -393,7 +439,7 @@ bool buildProjectSingleThread(ProjectNode root, CompilingSession s, const(AdvCac
             {
                 CompilationResult res = execCompilation(dep.requirements.buildData(true), cast(shared)dep, 
                     s,
-                    HashPair(mainPackHash,  hashFrom(dep.requirements, s)), getEnvForProject(dep, env)
+                    HashPair(mainPackHash, hashFrom(dep.requirements, s)), getEnvForProject(dep, env), Tid.init
                 );
                 if(res.status)
                 {
@@ -413,6 +459,7 @@ bool buildProjectSingleThread(ProjectNode root, CompilingSession s, const(AdvCac
         if(finishedPackage is root)
             break;
     }
+    runningProcesses.clear();
     return doLink(root, s, mainPackHash, null, env, existingSharedFormula) && copyFiles(root);
 }
 
