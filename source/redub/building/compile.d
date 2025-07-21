@@ -6,6 +6,8 @@ import redub.buildapi;
 import std.system;
 import redub.compiler_identification;
 import redub.command_generators.automatic;
+import std.process:Pid;
+import std.concurrency:Tid;
 
 /** 
  * When using redub as a library, one may spawn multiple times the same package, having a bug on it.
@@ -22,6 +24,12 @@ struct CompilationResult
     int status;
     shared ProjectNode node;
     size_t id;
+}
+
+struct ProcessInfo
+{
+    size_t threadID;
+    Pid pid;
 }
 
 struct HashPair
@@ -69,15 +77,16 @@ private ExecutionResult executeCommands(const(string[])[] commands, RedubCommand
 void execCompilationThread(immutable ThreadBuildData data, shared ProjectNode pack, CompilingSession info, HashPair hash, immutable string[string] env, size_t id)
 {
     import std.concurrency;
-    CompilationResult res = execCompilation(data, pack, info, hash, env);
+    Tid owner = ownerTid;
+    CompilationResult res = execCompilation(data, pack, info, hash, env, owner);
     res.id = id;
     scope(exit)
     {
-        ownerTid.send(res);
+        owner.send(res);
     }
 }
 
-CompilationResult execCompilation(immutable ThreadBuildData data, shared ProjectNode pack, CompilingSession info, HashPair hash, immutable string[string] env)
+CompilationResult execCompilation(immutable ThreadBuildData data, shared ProjectNode pack, CompilingSession info, HashPair hash, immutable string[string] env, Tid owner)
 {
     import std.file;
     import std.process;
