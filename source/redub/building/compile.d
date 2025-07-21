@@ -384,7 +384,25 @@ bool buildProjectFullyParallelized(ProjectNode root, CompilingSession s, const(A
                 foreach(v, isRunning; runningProcesses)
                 {
                     if(isRunning)
-                        kill(cast()v);
+                    {
+                        Pid p = cast()v;
+                        try
+                        {
+                            version(Posix)
+                            {
+                                if(cast(size_t)p.osHandle != -2 && cast(size_t)p.osHandle != -1)
+                                    kill(p);
+                            }
+                            else version(Windows)
+                            {
+                                import core.sys.windows.winbase:INVALID_HANDLE_VALUE;
+                                if(p.osHandle != INVALID_HANDLE_VALUE)
+                                    kill(p);
+                            }
+                        }
+                        catch(ProcessException e){} //Nothing to do here. All it matters is closing the processes
+                        //Terminated or invalid
+                    }
                 }
                 break;
             }

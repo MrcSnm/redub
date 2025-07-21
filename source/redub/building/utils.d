@@ -1,16 +1,13 @@
 module redub.building.utils;
 import redub.buildapi;
 public import redub.misc.shell;
+import core.sys.posix.sys.ioctl;
 
 string getHighPriorityCmd()
 {
     version(Posix)
     {
         return "nice -n 0 ";
-    }
-    else version(Windows)
-    {
-        return "/realtime ";
     }
     else return "";
 }
@@ -26,16 +23,25 @@ ProcessExec2 execCompiler(const BuildConfiguration cfg, Compiler compiler, strin
     CompilerBinary cBin = cfg.getCompiler(compiler);
     string compilerBin = cBin.bin;
 
-
-    string high = hasHighPriority ? getHighPriorityCmd : "";
     if(std.system.os.isWindows && cBin.isDCompiler)
     {
         cmdFile = createCommandFile(cfg, compileFlags, compilationCommands);
         compilationCommands = compilerBin ~ " "~compilationCommands;
-        return executeShell2(high ~ compilerBin~ " @"~cmdFile, null, Config.none, size_t.max, cfg.workingDir);
+        ProcessExec2 ret = executeShell2(compilerBin~ " @"~cmdFile, null, Config.none, size_t.max, cfg.workingDir);
+
+        version(Windows)
+        {
+            if(hasHighPriority)
+            {
+                import core.sys.windows.winbase;
+                SetPriorityClass(ret.pipe.pid.osHandle, REALTIME_PRIORITY_CLASS);
+            }
+        }
+
+        return ret;
     }
     compilationCommands = escapeCompilationCommands(compilerBin, compileFlags);
-    return executeShell2(high ~ compilationCommands, null, Config.none, size_t.max, cfg.workingDir);
+    return executeShell2(getHighPriorityCmd ~ compilationCommands, null, Config.none, size_t.max, cfg.workingDir);
 }
 
 
