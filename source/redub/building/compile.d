@@ -314,6 +314,9 @@ bool buildProjectFullyParallelized(ProjectNode root, CompilingSession s, const(A
     printCachedBuildInfo(root);
     AdvCacheFormula formulaCache;
 
+    ProjectNode failedPackage;
+    CompilationResult failedRes;
+
     for(int _ = 0; _ < sentPackages; _++)
     {
         CompilationResult res = receiveOnly!CompilationResult;
@@ -325,12 +328,10 @@ bool buildProjectFullyParallelized(ProjectNode root, CompilingSession s, const(A
         }
         ProjectNode finishedPackage = cast()res.node;
 
-        if(res.status)
+        if(res.status && !failedPackage)
         {
-            import core.thread;
-            buildFailed(finishedPackage, res, s, finishedBuilds, mainPackHash, &formulaCache, existingSharedFormula);
-            thread_joinAll();
-            return false;
+            failedPackage = finishedPackage;
+            failedRes = res;
         }
         else
         {
@@ -343,6 +344,13 @@ bool buildProjectFullyParallelized(ProjectNode root, CompilingSession s, const(A
                 updateCache(mainPackHash, CompilationCache.make(reqHash, mainPackHash, finishedPackage.requirements, s, existingSharedFormula, &formulaCache));
             }
         }
+    }
+    if(failedPackage)
+    {
+        import core.thread;
+        buildFailed(failedPackage, failedRes, s, finishedBuilds, mainPackHash, &formulaCache, existingSharedFormula);
+        thread_joinAll();
+        return false;
     }
     return doLink(root, s, mainPackHash, &formulaCache, env, existingSharedFormula) && copyFiles(root);
 }
@@ -526,7 +534,6 @@ private void saveFinishedBuilds(ProjNodeRange)(ProjNodeRange finishedProjects, s
     {
         bool hasAlreadyWrittenInCache = formulaCache != null && !node.requirements.cfg.targetType.isLinkedSeparately;
         // bool hasAlreadyWrittenInCache = false;
-
         if(!node.isUpToDate && !hasAlreadyWrittenInCache)
         {
             updateCache(mainPackHash, CompilationCache.make(hashFrom(node.requirements, s), mainPackHash, node.requirements, s, existingSharedFormula, &cache));
