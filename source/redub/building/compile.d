@@ -28,6 +28,10 @@ struct CompilationResult
     int status;
     shared ProjectNode node;
     shared Pid pid;
+}
+
+struct CompilationID
+{
     size_t id;
 }
 
@@ -82,15 +86,14 @@ void execCompilationThread(immutable ThreadBuildData data, shared ProjectNode pa
 {
     import std.concurrency;
     Tid owner = ownerTid;
-    CompilationResult res = execCompilation(data, pack, info, hash, env, owner);
-    res.id = id;
+    CompilationResult res = execCompilation(data, pack, info, hash, env, owner, id);
     scope(exit)
     {
-        owner.send(ProcessInfo.init, res);
+        owner.send(CompilationID(id), ProcessInfo.init, res);
     }
 }
 
-CompilationResult execCompilation(immutable ThreadBuildData data, shared ProjectNode pack, CompilingSession info, HashPair hash, immutable string[string] env, Tid owner)
+CompilationResult execCompilation(immutable ThreadBuildData data, shared ProjectNode pack, CompilingSession info, HashPair hash, immutable string[string] env, Tid owner, size_t id)
 {
     import std.file;
     import std.process;
@@ -150,11 +153,11 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
                 }
                 res.pid = cast(shared)ex.pipe.pid;
                 if(owner != Tid.init)
-                    owner.send(ProcessInfo(res.pid), CompilationResult.init);
+                    owner.send(CompilationID(id), ProcessInfo(res.pid), CompilationResult.init);
                 ret = cast(ExecutionResult)finishCompilerExec(cfg, compiler, inDir, outDir, ex);
             }
 
-            if(!isDCompiler(c) && !ret.status && isStaticLibrary(data.cfg.targetType)) //Must call archiver when
+            if(!ret.status && !isDCompiler(c) && isStaticLibrary(data.cfg.targetType)) //Must call archiver when
             {
                 string cmd ;
                 auto archiverRes = executeArchiver(data, info, hash.rootHash, cmd);
@@ -163,10 +166,11 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
                 res.compilationCommand~= "\n\nArchiving: \n\t"~cmd;
             }
 
-            copyDir(inDir, dirName(outDir));
+            if(!ret.status)
+                copyDir(inDir, dirName(outDir));
 
             ///Shared Library(mostly?)
-            if(isDCompiler(c) && isLinkedSeparately(data.cfg.targetType) && !pack.isRoot)
+            if(!ret.status && isDCompiler(c) && isLinkedSeparately(data.cfg.targetType) && !pack.isRoot)
             {
                 CompilationResult linkRes = link(cast()pack, hash.requirementHash, data, info, env);
                 ret.status = linkRes.status;
@@ -358,21 +362,21 @@ bool buildProjectFullyParallelized(ProjectNode root, CompilingSession s, const(A
 
     for(int _ = 0; _ < sentPackages; _++)
     {
-        auto info = receiveOnly!(ProcessInfo, CompilationResult);
-        if(info[0] != ProcessInfo.init)
-        {
-            runningProcesses[info[0].pid] = true;
-            _--;
-            continue;
-        }
-        auto res = info[1];
-        runningProcesses[res.pid] = false;
+        auto info = receiveOnly!(CompilationID, ProcessInfo, CompilationResult);
         ///Workaround on not actually killing threads when build fail and using redub as a library.
-        if(res.id != execID)
+        if(info[0].id != execID)
         {
             _--;
             continue;
         }
+        if(info[1] != ProcessInfo.init)
+        {
+            runningProcesses[info[1].pid] = true;
+            _--;
+            continue;
+        }
+        auto res = info[2];
+        runningProcesses[res.pid] = false;
         ProjectNode finishedPackage = cast()res.node;
 
         if(res.status && !failedPackage)
@@ -460,7 +464,7 @@ bool buildProjectSingleThread(ProjectNode root, CompilingSession s, const(AdvCac
             {
                 CompilationResult res = execCompilation(dep.requirements.buildData(true), cast(shared)dep, 
                     s,
-                    HashPair(mainPackHash, hashFrom(dep.requirements, s)), getEnvForProject(dep, env), Tid.init
+                    HashPair(mainPackHash, hashFrom(dep.requirements, s)), getEnvForProject(dep, env), Tid.init, 0
                 );
                 if(res.status)
                 {
@@ -535,13 +539,35 @@ private void buildFailed(const ProjectNode node, CompilationResult res, Compilin
 )
 {
     import redub.misc.github_tag_check;
+    import std.algorithm.iteration;
+    import std.conv:to;
+    bool interruptByUser = false;
+    string msg = res.message ? " with message\n\t" ~res.message : null;
+    version(Windows)
+    {
+        import core.sys.windows.winbase:STATUS_CONTROL_C_EXIT;
+        interruptByUser = res.status == STATUS_CONTROL_C_EXIT;
+    }
+    else version(Posix)
+    {
+        interruptByUser = res.status > 128;
+    }
+
+    if(interruptByUser)
+    {
+        errorTitle("Build Interrupted:", " No cache will be saved for that build.");
+        return;
+    }
+
+
     errorTitle("Build Failure: '", node.name, " ",node.requirements.version_," [", node.requirements.targetConfiguration,"]' \n\t",
         RedubVersionShort, "\n\t", node.getCompiler(s.compiler).getCompilerWithVersion, "\n\tFailed with flags: \n\n\t",
-        res.compilationCommand, 
-        "\nFailed after ", res.msNeeded,"ms with message\n\t", res.message
+        res.compilationCommand,
+        "\nStatus '"~res.status.to!string~"' after ", res.msNeeded,"ms "~msg
     );
     showNewerVersionMessage();
-    saveFinishedBuilds(finishedPackages, mainPackHash, s, formulaCache, existingSharedFormula);
+    ///It can save anything, except the root project as it would make it up to date while it actually requires the .lib files to be up to date.
+    saveFinishedBuilds(filter!((ProjectNode n) => !n.isRoot)(finishedPackages), mainPackHash, s, formulaCache, existingSharedFormula);
 }
 
 
