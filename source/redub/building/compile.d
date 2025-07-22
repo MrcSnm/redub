@@ -420,6 +420,9 @@ bool buildProjectFullyParallelized(ProjectNode root, CompilingSession s, const(A
         }
     }
     runningProcesses.clear();
+
+    //TODO: What happens if the root builds first and the dependency fails? It will skip everything and just try running the .exe
+    //TODO: What happens if a higher dependency finished first than a lower one? It may simply skip the lower since the parent has already finished.
     if(failedPackage)
     {
         import core.thread;

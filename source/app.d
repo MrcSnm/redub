@@ -10,10 +10,7 @@ import redub.command_generators.commons;
 import redub.libs.package_suppliers.utils;
 
 
-extern(C) __gshared string[] rt_options = [ "gcopt=initReserve:200" ];
-
-
-
+extern(C) __gshared string[] rt_options = [ "gcopt=initReserve:200 cleanup:none"];
 
 string formatError(string err)
 {

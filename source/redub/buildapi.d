@@ -8,7 +8,7 @@ import redub.package_searching.api;
 
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.24.1";
+enum RedubVersionOnly = "v1.24.2";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -432,6 +432,12 @@ struct BuildConfiguration
     {
         BuildConfiguration ret = clone;
         ret.sourceFiles.exclusiveMerge(other.sourceFiles);
+        return ret;
+    }
+    BuildConfiguration mergeExcludedSourceFiles(const BuildConfiguration other) const
+    {
+        BuildConfiguration ret = clone;
+        ret.excludeSourceFiles.exclusiveMerge(other.excludeSourceFiles);
         return ret;
     }
     BuildConfiguration mergeSourcePaths(const BuildConfiguration other) const
@@ -1012,6 +1018,7 @@ class ProjectNode
             import redub.misc.path;
             vvlog("Merging ", input.name, " into ", target.name);
             target.requirements.cfg = target.requirements.cfg.mergeImport(input.requirements.cfg);
+            target.requirements.cfg = target.requirements.cfg.mergeExcludedSourceFiles(input.requirements.cfg);
             target.requirements.cfg = target.requirements.cfg.mergeStringImport(input.requirements.cfg);
             target.requirements.cfg = target.requirements.cfg.mergeVersions(input.requirements.cfg);
             target.requirements.cfg = target.requirements.cfg.mergeFilteredDflags(input.requirements.cfg);
