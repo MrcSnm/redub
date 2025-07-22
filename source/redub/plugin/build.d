@@ -48,9 +48,12 @@ private void writePluginImport()
 BuildConfiguration injectPluginCfg(BuildConfiguration base, string pluginName, CompilationInfo cInfo)
 {
     import redub.building.cache;
-    base.targetName = base.name = pluginName;
+    base.targetName = base.name = pluginName ~"_"~DefaultCompiler;
     base.versions~= "RedubPlugin";
     base.dFlags~= "-i";
+    ///DO NOT SHARE D RUNTIME AS WE CAN'T GUARANTEE REDUB IS BEING BUILT TO SHARE IT.
+    if(DefaultCompiler == "ldc2")
+        base.dFlags~= "-link-defaultlib-shared=false";
     base.sourcePaths~= getPluginImportDir();
     base.importDirectories~= getPluginImportDir();
     base.targetType = TargetType.dynamicLibrary;
@@ -84,6 +87,8 @@ void buildPlugin(string pluginName, string inputFile, CompilationInfo cInfo)
 
 
     CompilingSession s = CompilingSession(getCompiler(DefaultCompiler), os, instructionSetArchitecture);
+    import std.stdio;
+    writeln("Building Plugin with compiler ", s.compiler.d.bin, " ", s.compiler.d.version_);
 
     string buildCmds;
     string pluginHash = hashFrom(b, s, true);
