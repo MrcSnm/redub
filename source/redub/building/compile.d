@@ -23,9 +23,9 @@ bool[shared Pid] runningProcesses;
 struct CompilationResult
 {
     string compilationCommand;
-    string message;
+    string message = "No compilation was executed";
     size_t msNeeded;
-    int status;
+    int status = 1;
     shared ProjectNode node;
     shared Pid pid;
 }
@@ -86,7 +86,8 @@ void execCompilationThread(immutable ThreadBuildData data, shared ProjectNode pa
 {
     import std.concurrency;
     Tid owner = ownerTid;
-    CompilationResult res = execCompilation(data, pack, info, hash, env, owner, id);
+    CompilationResult res;
+    res = execCompilation(data, pack, info, hash, env, owner, id);
     scope(exit)
     {
         owner.send(CompilationID(id), ProcessInfo.init, res);
@@ -379,36 +380,39 @@ bool buildProjectFullyParallelized(ProjectNode root, CompilingSession s, const(A
         runningProcesses[res.pid] = false;
         ProjectNode finishedPackage = cast()res.node;
 
-        if(res.status && !failedPackage)
+        if(res.status)
         {
-            failedPackage = finishedPackage;
-            failedRes = res;
-            if(failedPackage is priority)
+            if(!failedPackage)
             {
-                foreach(v, isRunning; runningProcesses)
+                failedPackage = finishedPackage;
+                failedRes = res;
+                if(failedPackage is priority)
                 {
-                    if(isRunning)
+                    foreach(v, isRunning; runningProcesses)
                     {
-                        Pid p = cast()v;
-                        try
+                        if(isRunning)
                         {
-                            version(Posix)
+                            Pid p = cast()v;
+                            try
                             {
-                                if(cast(size_t)p.osHandle != -2 && cast(size_t)p.osHandle != -1)
-                                    kill(p);
+                                version(Posix)
+                                {
+                                    if(cast(size_t)p.osHandle != -2 && cast(size_t)p.osHandle != -1)
+                                        kill(p);
+                                }
+                                else version(Windows)
+                                {
+                                    import core.sys.windows.winbase:INVALID_HANDLE_VALUE;
+                                    if(p.osHandle != INVALID_HANDLE_VALUE)
+                                        kill(p);
+                                }
                             }
-                            else version(Windows)
-                            {
-                                import core.sys.windows.winbase:INVALID_HANDLE_VALUE;
-                                if(p.osHandle != INVALID_HANDLE_VALUE)
-                                    kill(p);
-                            }
+                            catch(ProcessException e){} //Nothing to do here. All it matters is closing the processes
+                            //Terminated or invalid
                         }
-                        catch(ProcessException e){} //Nothing to do here. All it matters is closing the processes
-                        //Terminated or invalid
                     }
+                    break;
                 }
-                break;
             }
         }
         else
@@ -541,24 +545,7 @@ private void buildFailed(const ProjectNode node, CompilationResult res, Compilin
     import redub.misc.github_tag_check;
     import std.algorithm.iteration;
     import std.conv:to;
-    bool interruptByUser = false;
     string msg = res.message ? " with message\n\t" ~res.message : null;
-    version(Windows)
-    {
-        import core.sys.windows.winbase:STATUS_CONTROL_C_EXIT;
-        interruptByUser = res.status == STATUS_CONTROL_C_EXIT;
-    }
-    else version(Posix)
-    {
-        interruptByUser = res.status > 128;
-    }
-
-    if(interruptByUser)
-    {
-        errorTitle("Build Interrupted:", " No cache will be saved for that build.");
-        return;
-    }
-
 
     errorTitle("Build Failure: '", node.name, " ",node.requirements.version_," [", node.requirements.targetConfiguration,"]' \n\t",
         RedubVersionShort, "\n\t", node.getCompiler(s.compiler).getCompilerWithVersion, "\n\tFailed with flags: \n\n\t",
