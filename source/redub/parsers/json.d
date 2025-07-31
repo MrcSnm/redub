@@ -237,7 +237,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
                     if(platforms)
                     {
                         enforce(platforms.type == JSONType.array, 
-                            "'platforms' on configuration "~name.str~" at project "~req.name
+                            "'platforms' on configuration "~name.str~" at project "~req.name ~ " must be an array"
                         );
                         if(!platformMatches(platforms.array, os, c.cInfo.isa))
                             continue;
@@ -254,8 +254,16 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
                 {
                     import std.algorithm:map;
                     import std.array:join;
-                    string availableConfigs = v.array.map!((JSONValue v) => v["name"].str).join("\n\t");
-                    throw new Exception("Configuration '"~c.subConfiguration.name~"' specified for dependency '"~req.name~"' but wasn't found or its platform didn't match. Avaiable Configurations:\n\t"~availableConfigs);
+                    string availableConfigs = v.array.map!((JSONValue v)
+                    {
+                        JSONValue* plats = "platforms" in v;
+                        if(!plats || platformMatches(plats.array, os, c.cInfo.isa))
+                            return v["name"].str;
+                        else
+                            return v["name"].str ~ " [OS-ISA Incompatible]";
+                    }).join("\n\t");
+                    
+                    throw new Exception("Configuration '"~c.subConfiguration.name~"' specified for dependency '"~req.name~"' but wasn't found or its platform is incompatible. Preferred subConfiguratio was '" ~ v.array[preferredConfiguration]["name"].str~"' . Available Configurations:\n\t"~availableConfigs);
                 }
                 if(preferredConfiguration != -1)
                 {
