@@ -223,7 +223,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
             if(c.firstRun)
             {
                 import std.conv:to;
-                enforce(v.type == JSONType.array, "'configurations' must be an array.");
+                enforce(v.type == JSONType.array, "'configurations' must be an array, not " ~ v.type.to!string ~ " at file "~ c.workingDir);
                 enforce(v.array.length, "'configurations' must have at least one member.");
                 ///Start looking for a configuration that matches the user preference if exists
                 ///If "platform" didn't match, then it will skip it.
@@ -254,14 +254,25 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
                 {
                     import std.algorithm:map;
                     import std.array:join;
-                    string availableConfigs = v.array.map!((JSONValue v)
+                    string availableConfigs;
+                    foreach(JSONValue conf; v.array)
                     {
                         JSONValue* plats = "platforms" in v;
                         if(!plats || platformMatches(plats.array, os, c.cInfo.isa))
-                            return v["name"].str;
+                            availableConfigs~= v["name"].str;
                         else
-                            return v["name"].str ~ " [OS-ISA Incompatible]";
-                    }).join("\n\t");
+                            availableConfigs~= v["name"].str ~ " [OS-ISA Incompatible]";
+                        availableConfigs~= "\n\t";
+                    } //Using array.map is causing a memory corruption on macOS somehow. 
+                    
+                    // string availableConfigs = v.array.map!((JSONValue e)
+                    // {
+                    //     JSONValue* plats = "platforms" in e;
+                    //     if(!plats || platformMatches(plats.array, os, c.cInfo.isa))
+                    //         return e["name"].str;
+                    //     else
+                    //         return e["name"].str ~ " [OS-ISA Incompatible]";
+                    // }).join("\n\t");
                     
                     throw new Exception("Configuration '"~c.subConfiguration.name~"' specified for dependency '"~req.name~"' but wasn't found or its platform is incompatible. Preferred subConfiguratio was '" ~ v.array[preferredConfiguration]["name"].str~"' . Available Configurations:\n\t"~availableConfigs);
                 }
