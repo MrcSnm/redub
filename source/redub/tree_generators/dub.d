@@ -174,7 +174,7 @@ private void getProjectTreeImpl(
 }
 
 
-private BuildRequirements parseDependency(Dependency dep, BuildRequirements parent, CompilationInfo info)
+private BuildRequirements parseDependency(const ref Dependency dep, const ref BuildRequirements parent, const ref CompilationInfo info)
 {
     import redub.package_searching.cache;
     import redub.logging;
@@ -199,7 +199,7 @@ private BuildRequirements parseDependency(Dependency dep, BuildRequirements pare
 }
 
 
-private BuildRequirements mergeDifferentSubConfigurations(BuildRequirements existingReq, BuildRequirements newReq)
+private BuildRequirements mergeDifferentSubConfigurations(ref BuildRequirements existingReq, ref BuildRequirements newReq)
 {
     import redub.api;
     if(existingReq.configuration.isDefault)

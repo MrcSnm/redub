@@ -324,7 +324,7 @@ struct BuildConfiguration
      *   other = The other configuration to merge
      * Returns: 
      */
-    BuildConfiguration merge(BuildConfiguration other) const
+    BuildConfiguration merge()(const auto ref BuildConfiguration other) const
     {
         import std.algorithm.comparison:either;
         BuildConfiguration ret = clone;
@@ -349,35 +349,35 @@ struct BuildConfiguration
         return ret;
     }
 
-    BuildConfiguration mergeCommands(BuildConfiguration other) const
+    BuildConfiguration mergeCommands(const ref BuildConfiguration other) const
     {
         BuildConfiguration ret = clone;
-        ret.preBuildPlugins~= other.preBuildPlugins;
+        ret.preBuildPlugins~= cast(PluginExecution[])other.preBuildPlugins;
         if(other.commands.length > ret.commands.length)
             ret.commands.length = other.commands.length;
         foreach(i, list; other.commands)
             ret.commands[i]~= list;
         return ret;
     }
-    BuildConfiguration mergeLibraries(const BuildConfiguration other) const
+    BuildConfiguration mergeLibraries(const ref BuildConfiguration other) const
     {
         BuildConfiguration ret = clone;
         ret.libraries.exclusiveMerge(other.libraries);
         return ret;
     }
-    BuildConfiguration mergeLibPaths(const BuildConfiguration other) const
+    BuildConfiguration mergeLibPaths(const ref BuildConfiguration other) const
     {
         BuildConfiguration ret = clone;
         ret.libraryPaths.exclusiveMergePaths(other.libraryPaths);
         return ret;
     }
-    BuildConfiguration mergeImport(const BuildConfiguration other) const
+    BuildConfiguration mergeImport(const ref BuildConfiguration other) const
     {
         BuildConfiguration ret = clone;
         ret.importDirectories.exclusiveMergePaths(other.importDirectories);
         return ret;
     }
-    BuildConfiguration mergeStringImport(const BuildConfiguration other) const
+    BuildConfiguration mergeStringImport(const ref BuildConfiguration other) const
     {
         BuildConfiguration ret = clone;
         ret.stringImportPaths.exclusiveMergePaths(other.stringImportPaths);
@@ -385,21 +385,21 @@ struct BuildConfiguration
     }
 
 
-    BuildConfiguration mergeDFlags(const BuildConfiguration other) const
+    BuildConfiguration mergeDFlags(const ref BuildConfiguration other) const
     {
         BuildConfiguration ret = clone;
         ret.dFlags.exclusiveMerge(other.dFlags);
         return ret;
     }
 
-    BuildConfiguration mergeLinkFlags(const BuildConfiguration other) const
+    BuildConfiguration mergeLinkFlags(const ref BuildConfiguration other) const
     {
         BuildConfiguration ret = clone;
         ret.linkFlags.exclusiveMerge(other.linkFlags);
         return ret;
     }
 
-    BuildConfiguration mergeFilteredDflags(const BuildConfiguration other) const
+    BuildConfiguration mergeFilteredDflags(const ref BuildConfiguration other) const
     {
         immutable string[] filterDflags = [
             "-betterC",
@@ -415,32 +415,32 @@ struct BuildConfiguration
         return ret;
     }
     
-    BuildConfiguration mergeVersions(const BuildConfiguration other) const
+    BuildConfiguration mergeVersions(const ref BuildConfiguration other) const
     {
         BuildConfiguration ret = clone;
         ret.versions.exclusiveMerge(other.versions);
         return ret;
     }
 
-    BuildConfiguration mergeDebugVersions(const BuildConfiguration other) const
+    BuildConfiguration mergeDebugVersions(const ref BuildConfiguration other) const
     {
         BuildConfiguration ret = clone;
         ret.debugVersions.exclusiveMerge(other.debugVersions);
         return ret;
     }
-    BuildConfiguration mergeSourceFiles(const BuildConfiguration other) const
+    BuildConfiguration mergeSourceFiles(const ref BuildConfiguration other) const
     {
         BuildConfiguration ret = clone;
         ret.sourceFiles.exclusiveMerge(other.sourceFiles);
         return ret;
     }
-    BuildConfiguration mergeExcludedSourceFiles(const BuildConfiguration other) const
+    BuildConfiguration mergeExcludedSourceFiles(const ref BuildConfiguration other) const
     {
         BuildConfiguration ret = clone;
         ret.excludeSourceFiles.exclusiveMerge(other.excludeSourceFiles);
         return ret;
     }
-    BuildConfiguration mergeSourcePaths(const BuildConfiguration other) const
+    BuildConfiguration mergeSourcePaths(const ref BuildConfiguration other) const
     {
         BuildConfiguration ret = clone;
         ret.sourcePaths.exclusiveMergePaths(other.sourcePaths);
@@ -448,7 +448,7 @@ struct BuildConfiguration
     }
 
 
-    BuildConfiguration mergeLinkFilesFromSource(const BuildConfiguration other) const
+    BuildConfiguration mergeLinkFilesFromSource(const ref BuildConfiguration other) const
     {
         import redub.command_generators.commons;
         BuildConfiguration ret = clone;
