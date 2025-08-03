@@ -238,7 +238,7 @@ struct JSONValue
 		}
 		else static if(is(T == JSONValue))
 		{
-			type = value.type;
+			_length = value._length;
 			data = value.data;
 		}
 		else static if(is(T == typeof(null)))
