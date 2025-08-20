@@ -45,12 +45,11 @@ struct SString
 private	enum GrowthFactor = 2;
 float getGrowthFactor(uint length)
 {
-	if(length <= 32)
-		return GrowthFactor;
-	else if(length <= 128)
-		return GrowthFactor - 0.25;
-	else
-		return GrowthFactor - 0.5;
+	// if(length <= 128)
+	// 	return 16;
+	// else if(length <= 2 << 16)
+	// 	return 8;
+	return GrowthFactor;
 }
 
 struct HashMap(K, V)
@@ -64,8 +63,11 @@ struct HashMap(K, V)
 		private K* _keys;
 	private V* _values;
 	uint capacity, length;
+	uint collisionsInLength;
 	enum DefaultInitSize = 8;
-	enum ResizeFactor = 0.7;
+	enum ResizeFactor = 0.75;
+	enum UseCollisionRateThreshold = 64;
+	enum CollisionFactor = 0.25;
 
 	static if(SeparateSlotState)
 	{
@@ -137,6 +139,7 @@ struct HashMap(K, V)
 		size_t oldCapacity = capacity;
 		auto oldKeys = _keys;
 		auto oldValues = _values;
+		collisionsInLength = 0;
 		static if(SeparateSlotState)
 		{
 			auto oldStates = states;
@@ -177,11 +180,11 @@ struct HashMap(K, V)
 	private pragma(inline, true) size_t getHash(K key) const
 	{
 		static if(is(K == string))
-			return xxhash(cast(ubyte*)key.ptr, key.length) % capacity;
-			// return hash_64_fnv1a(key.ptr, cast(ulong)key.length) % capacity;
+			// return xxhash(cast(ubyte*)key.ptr, key.length) % capacity;
+			return hash_64_fnv1a(key.ptr, cast(ulong)key.length) % capacity;
 		else 
-			return xxhash(cast(ubyte*)&key, key.sizeof) % capacity;
-			// return hash_64_fnv1a(&key, cast(ulong)key.sizeof) % capacity;
+			// return xxhash(cast(ubyte*)&key, key.sizeof) % capacity;
+			return hash_64_fnv1a(&key, cast(ulong)key.sizeof) % capacity;
 	}
 
 	ref auto opIndex(K key)
@@ -206,6 +209,7 @@ struct HashMap(K, V)
 	void uncheckedPut(K key, V value)
 	{
 		size_t hash = getHash(key);
+		bool hasCollision = false;
 		while(true)
 		{
 			SlotState st = getState(hash);
@@ -217,7 +221,6 @@ struct HashMap(K, V)
 					_keys[hash] = SString(key.length, key.ptr);
 				_values[hash] = value;
 				setState(hash, SlotState.alive);
-				length++;
 				return;
 			}
 			else
@@ -228,6 +231,11 @@ struct HashMap(K, V)
 					return;
 				}
 			}
+			if(!hasCollision)
+			{
+				hasCollision = true;
+				collisionsInLength++;
+			}
 			hash = (hash + 1) % capacity;
 		}
 	}
@@ -235,9 +243,13 @@ struct HashMap(K, V)
 	{
 		if(capacity == 0)
 			setCapacity(DefaultInitSize);
-		if((length + 1) / capacity > ResizeFactor)
+
+		if((length > UseCollisionRateThreshold && cast(float)collisionsInLength / length > CollisionFactor) ||
+			(length + 1) / capacity > ResizeFactor
+		)
 			rehash();
 		uncheckedPut(key, value);
+		length++;
 	}
 
 	inout(V)* get(K key) inout
