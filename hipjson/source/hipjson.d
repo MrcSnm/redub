@@ -1,11 +1,18 @@
 module hipjson;
+import hashmap;
 
 JSONValue parseJSON(string jsonData)
 {
     return JSONValue.parse(jsonData);
 }
 
-alias JSONObject = JSONValue[string];
+// alias JSONObject = JSONValue[string];
+alias JSONObject = HashMap!(string, JSONValue)*;
+
+private JSONObject newObject()
+{
+	return new HashMap!(string, JSONValue);
+}
 
 struct JSONArray
 {
@@ -371,7 +378,7 @@ struct JSONValue
 	{
 		JSONValue ret;
 		ret.type = JSONType.object;
-		ret.data.object = new JSONObject();
+		ret.data.object = newObject();
 		return ret;
 	}
 	static JSONValue emptyArray()
@@ -506,7 +513,7 @@ struct JSONValue
 				{
 					if(state != JSONState.value)
 						return JSONValue.errorObj(getErr());
-					JSONValue obj = JSONValue(new JSONObject);
+					JSONValue obj = emptyObject;
 					if(!pushNewScope(obj, current, stackLength, stack, lastKey))
 						return JSONValue.errorObj(getErr("Could not push new scope in JSON. Only array, object or null are valid"));
 
@@ -639,20 +646,20 @@ struct JSONValue
 	const(JSONValue) opIndex(string key) const
 	{
 		assert(type == JSONType.object, "Can't get a member from a non object.");
-		return data.object[key];
+		return (*data.object)[key];
 	}
 	JSONValue opIndex(string key)
 	{
 		assert(type == JSONType.object, "Can't get a member from a non object.");
-		return data.object[key];
+		return (*data.object)[key];
 	}
 	JSONValue opIndexAssign(JSONValue v, string key)
 	{
 		import std.exception;
 		enforce(type == JSONType.object, "Can't get a member from a non object.");
 		enforce(data.object !is null, "Can't access a null object");
-		data.object[key] = v;
-		return data.object[key];
+		(*data.object)[key] = v;
+		return v;
 	}
 
 	JSONValue opIndexAssign(T)(T value, string key) if(!is(T == JSONValue))
@@ -680,7 +687,7 @@ struct JSONValue
             assert(false, "Can't iterate with key[string] and value[JSONValue] an object of type "~getTypeName);
         }
         int result = 0;
-        foreach (k, v ; data.object)
+        foreach (k, v ; *data.object)
         {
             result = dg(k, v);
             if (result)
@@ -796,7 +803,7 @@ struct JSONValue
 
 				ret~= '{';
 				bool isFirst = true;
-				foreach(k, v; data.object)
+				foreach(k, v; *data.object)
 				{
 					static if(compressed)
 					{
@@ -827,7 +834,7 @@ struct JSONValue
     {
         if(type == JSONType.object)
         {
-            foreach(v; data.object)
+            foreach(v; *data.object)
                 v.dispose();
         }
         else if(type == JSONType.array)
@@ -933,7 +940,7 @@ bool pushNewScope(JSONValue val, ref JSONValue* current, ref ptrdiff_t stackLeng
 	switch(currTemp.type)
 	{
 		case JSONType.object:
-			currTemp.data.object[key] = *current;
+			(*currTemp.data.object)[key] = *current;
 			break;
 		case JSONType.array:
 			currTemp.data.array = JSONArray.append(currTemp.data.array, *current);
@@ -971,7 +978,7 @@ void pushToStack(JSONValue val, ref JSONValue* current, ref JSONValue lastValue,
 	switch(current.type) with(JSONType)
 	{
 		case object:
-			current.data.object[lastKey] = val;
+			(*current.data.object)[lastKey] = val;
 			break;
 		case array:
 			current.data.array = JSONArray.append(current.data.array, val);
@@ -1048,4 +1055,35 @@ unittest
     ]
 }`;
 	assert(parseJSON(json)["D5F04185E96CC720"].array[1].array[0].toString == `"Second Value"`);
+}
+unittest
+{
+	enum path = `/Users/Hipreme/.dub/.redub/9707C1D9C6FEFA48.json`;
+	// enum path = `/Users/Hipreme/Documents/dubv2/hipjson/testJson.json`;
+	// enum tests = 5;
+	enum tests = 30_000;
+	import core.memory;
+	import std.datetime.stopwatch;
+	import std.file;
+	import std.stdio;
+
+	string file = readText(path);
+
+	auto res = benchmark!(()
+	{
+		parseJSON(file);
+	})(tests);
+
+	size_t bytesRead = file.length * tests;
+
+
+	writeln("MB per Second: ", bytesRead / 1_000_000.0 / (res[0].total!"msecs" / 1000.0) );
+
+	writeln("Allocated: ", GC.stats.allocatedInCurrentThread / 1_000_000.0, " MB");
+	writeln("Free: ", GC.stats.freeSize / 1_000_000.0, " MB");
+	writeln("Used: ", GC.stats.usedSize / 1_000_000.0, " MB");
+	writeln("Collection Count: ", GC.profileStats.numCollections);
+	writeln("Collection Time: ", GC.profileStats.totalCollectionTime);
+
+
 }
