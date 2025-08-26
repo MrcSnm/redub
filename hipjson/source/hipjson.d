@@ -1,5 +1,5 @@
 module hipjson;
-import hashmap;
+import hip.util.shashmap;
 
 JSONValue parseJSON(string jsonData)
 {
@@ -671,13 +671,13 @@ struct JSONValue
 	if(op == "in")
 	{
 		if(type != JSONType.object)	return null;
-		return key in data.object;
+		return key in *data.object;
 	}
     JSONValue* opBinaryRight(string op)(string key)
 	if(op == "in")
 	{
 		if(type != JSONType.object)	return null;
-		return key in data.object;
+		return key in *data.object;
 	}
 
     int opApply(scope int delegate(string key, JSONValue v) dg)
@@ -1056,34 +1056,32 @@ unittest
 }`;
 	assert(parseJSON(json)["D5F04185E96CC720"].array[1].array[0].toString == `"Second Value"`);
 }
-unittest
-{
-	enum path = `/Users/Hipreme/.dub/.redub/9707C1D9C6FEFA48.json`;
-	// enum path = `/Users/Hipreme/Documents/dubv2/hipjson/testJson.json`;
-	// enum tests = 5;
-	enum tests = 30_000;
-	import core.memory;
-	import std.datetime.stopwatch;
-	import std.file;
-	import std.stdio;
+// unittest
+// {
+// 	// enum path = `/Users/Hipreme/Documents/dubv2/hipjson/testJson.json`;
+// 	// enum tests = 5;
+// 	enum tests = 30_000;
+// 	import core.memory;
+// 	import std.datetime.stopwatch;
+// 	import std.file;
+// 	import std.stdio;
 
-	string file = readText(path);
+// 	string file = readText(path);
 
-	auto res = benchmark!(()
-	{
-		parseJSON(file);
-	})(tests);
+// 	auto res = benchmark!(()
+// 	{
+// 		parseJSON(file);
+// 	})(tests);
 
-	size_t bytesRead = file.length * tests;
-
-
-	writeln("MB per Second: ", bytesRead / 1_000_000.0 / (res[0].total!"msecs" / 1000.0) );
-
-	writeln("Allocated: ", GC.stats.allocatedInCurrentThread / 1_000_000.0, " MB");
-	writeln("Free: ", GC.stats.freeSize / 1_000_000.0, " MB");
-	writeln("Used: ", GC.stats.usedSize / 1_000_000.0, " MB");
-	writeln("Collection Count: ", GC.profileStats.numCollections);
-	writeln("Collection Time: ", GC.profileStats.totalCollectionTime);
+// 	size_t bytesRead = file.length * tests;
 
 
-}
+// 	writeln("Took: ", res[0].total!"msecs");
+// 	writeln("MB per Second: ", bytesRead / 1_000_000.0 / (res[0].total!"msecs" / 1000.0) );
+
+// 	writeln("Allocated: ", GC.stats.allocatedInCurrentThread / 1_000_000.0, " MB");
+// 	writeln("Free: ", GC.stats.freeSize / 1_000_000.0, " MB");
+// 	writeln("Used: ", GC.stats.usedSize / 1_000_000.0, " MB");
+// 	writeln("Collection Count: ", GC.profileStats.numCollections);
+// 	writeln("Collection Time: ", GC.profileStats.totalCollectionTime);
+// }

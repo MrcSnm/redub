@@ -2,6 +2,9 @@
 	"authors": [
 		"Hipreme"
 	],
+	"dependencies": {
+		"d-segmented-hashmap": "~>1.0.2"
+	},
 	"copyright": "Copyright © 2024, Hipreme",
 	"description": "HipJSON parser. Faster than STD one.",
 	"license": "proprietary",
