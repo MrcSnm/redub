@@ -123,6 +123,14 @@ JSONValue sdlToJSON(SDLNode[] sdl)
 				JSONValue buildTypeSDL = sdlToJSON(v.children);
 				buildTypes[v.values[0].textValue] = buildTypeSDL;
 				break;
+			case "toolchainRequirements":
+				if(v.attributes.length == 0)
+					break;
+				JSONValue requirements = JSONValue.emptyObject;
+				foreach(a; v.attributes)
+					requirements[a.name] = toJSONValue(a.value);
+				ret["toolchainRequirements"] = requirements;
+				break;
 			case "subConfiguration":
 				enforce(v.values.length == 2, "subConfiguration must contain a two values.");
 				enforce(v.values[0].isText, "subConfiguration value 1 must be a text.");

@@ -6,12 +6,20 @@ JSONValue parseJSON(string jsonData)
     return JSONValue.parse(jsonData);
 }
 
-// alias JSONObject = JSONValue[string];
-alias JSONObject = HashMap!(string, JSONValue)*;
+version(AArch64)
+	version = UseDHashMap;
+
+version(UseDHashMap)
+	alias JSONObject = JSONValue[string];
+else
+	alias JSONObject = HashMap!(string, JSONValue)*;
 
 private JSONObject newObject()
 {
-	return new HashMap!(string, JSONValue);
+	version(UseDHashMap)
+		return new JSONValue[string];
+	else
+		return new HashMap!(string, JSONValue);
 }
 
 struct JSONArray
@@ -643,22 +651,23 @@ struct JSONValue
 		return ret;
 	}
 
-	const(JSONValue) opIndex(string key) const
+	inout(JSONValue) opIndex(string key) inout
 	{
 		assert(type == JSONType.object, "Can't get a member from a non object.");
-		return (*data.object)[key];
-	}
-	JSONValue opIndex(string key)
-	{
-		assert(type == JSONType.object, "Can't get a member from a non object.");
-		return (*data.object)[key];
+		version(UseDHashMap)
+			return (data.object)[key];
+		else
+			return (*data.object)[key];
 	}
 	JSONValue opIndexAssign(JSONValue v, string key)
 	{
 		import std.exception;
 		enforce(type == JSONType.object, "Can't get a member from a non object.");
 		enforce(data.object !is null, "Can't access a null object");
-		(*data.object)[key] = v;
+		version(UseDHashMap)
+			(data.object)[key] = v;
+		else
+			(*data.object)[key] = v;
 		return v;
 	}
 
@@ -667,19 +676,16 @@ struct JSONValue
 		return opIndexAssign(JSONValue(value), key);
 	}
 
-	const(JSONValue)* opBinaryRight(string op)(string key) const
+	inout(JSONValue)* opBinaryRight(string op)(string key) inout
 	if(op == "in")
 	{
 		if(type != JSONType.object)	return null;
-		return key in *data.object;
+		version(UseDHashMap)
+			return key in data.object;
+		else
+			return key in *data.object;
 	}
-    JSONValue* opBinaryRight(string op)(string key)
-	if(op == "in")
-	{
-		if(type != JSONType.object)	return null;
-		return key in *data.object;
-	}
-
+    
     int opApply(scope int delegate(string key, JSONValue v) dg)
     {
         if(type != JSONType.object)
@@ -687,7 +693,11 @@ struct JSONValue
             assert(false, "Can't iterate with key[string] and value[JSONValue] an object of type "~getTypeName);
         }
         int result = 0;
-        foreach (k, v ; *data.object)
+		version(UseDHashMap)
+			auto obj = data.object;
+		else
+			auto obj = *data.object;
+        foreach (k, v ; obj)
         {
             result = dg(k, v);
             if (result)
@@ -803,7 +813,11 @@ struct JSONValue
 
 				ret~= '{';
 				bool isFirst = true;
-				foreach(k, v; *data.object)
+				version(UseDHashMap)
+					auto obj = data.object;
+				else
+					auto obj = *data.object;
+				foreach(k, v; obj)
 				{
 					static if(compressed)
 					{
@@ -834,7 +848,11 @@ struct JSONValue
     {
         if(type == JSONType.object)
         {
-            foreach(v; *data.object)
+			version(UseDHashMap)
+				auto obj = data.object;
+			else
+				auto obj = *data.object;
+            foreach(v; obj)
                 v.dispose();
         }
         else if(type == JSONType.array)
@@ -940,7 +958,10 @@ bool pushNewScope(JSONValue val, ref JSONValue* current, ref ptrdiff_t stackLeng
 	switch(currTemp.type)
 	{
 		case JSONType.object:
-			(*currTemp.data.object)[key] = *current;
+			version(UseDHashMap)
+				(currTemp.data.object)[key] = *current;
+			else
+				(*currTemp.data.object)[key] = *current;
 			break;
 		case JSONType.array:
 			currTemp.data.array = JSONArray.append(currTemp.data.array, *current);
@@ -978,7 +999,10 @@ void pushToStack(JSONValue val, ref JSONValue* current, ref JSONValue lastValue,
 	switch(current.type) with(JSONType)
 	{
 		case object:
-			(*current.data.object)[lastKey] = val;
+			version(UseDHashMap)
+				current.data.object[lastKey] = val;
+			else
+				(*current.data.object)[lastKey] = val;
 			break;
 		case array:
 			current.data.array = JSONArray.append(current.data.array, val);

@@ -230,10 +230,13 @@ private string getActualCompilerToUse(string preferredCompiler, ref string actua
             break;
         }
     }
-    enforce(compVersionRes.status == 0, preferredCompiler~ " --version returned a non zero code. "~
-        "In Addition, dmd and ldc2 were also tested and were not found. You may need to download or specify them before using redub."
-    );
 
+    if(compVersionRes.status != 0)
+    {
+        throw new Exception(preferredCompiler~ " --version returned a non zero code. "~
+        "In Addition, dmd and ldc2 were also tested and were not found. You may need to download or specify them before using redub.\n" ~
+        "Last Shell Output: "~ compVersionRes.output);
+    }
     if(actualCompiler != preferredCompiler)
         warn("The compiler '"~preferredCompiler~"' that was specified in your system wasn't found. Redub found "~actualCompiler~" and it will use for this compilation.");
 
@@ -473,7 +476,9 @@ private void saveCompilerInfo(JSONValue allCompilersInfo, ref CompilerBinary com
     string compilerStr = compiler.compiler.to!string;
 
     if(isDefault)
+    {
         allCompilersInfo[isC ? "defaultCCompiler" : "defaultCompiler"] = JSONValue(compilerStr);
+    }
 
 
     if(isGlobal)
@@ -506,6 +511,7 @@ private void saveCompilerInfo(JSONValue allCompilersInfo, ref CompilerBinary com
         JSONValue(compiler.versionString),
         JSONValue(timeLastModified(compiler.bin).stdTime)
     ]);
+
     saveRedubMeta(allCompilersInfo);
 }
 
