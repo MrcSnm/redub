@@ -426,7 +426,9 @@ struct JSONValue
 
 			while(i < data.length)
 			{
-				ch = data[i];
+				foreach(_; 0..32)
+				{
+					ch = data.ptr[i];
 				switch(ch)
 				{
 					case '"':
@@ -442,11 +444,11 @@ struct JSONValue
 					default: break;
 
 				}
-				if(returnLength >= ret.length)
-					ret = pool.resizeString(ret, ret.length*2);
-
 				ret[returnLength++] = ch;
 				i++;
+				}
+				if(returnLength >= ret.length)
+					ret = pool.resizeString(ret, ret.length*2);
 			}
 			return false;
 		}
