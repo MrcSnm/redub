@@ -257,11 +257,11 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
                     string availableConfigs;
                     foreach(JSONValue conf; v.array)
                     {
-                        JSONValue* plats = "platforms" in v;
+                        JSONValue* plats = "platforms" in conf;
                         if(!plats || platformMatches(plats.array, os, c.cInfo.isa))
-                            availableConfigs~= v["name"].str;
+                            availableConfigs~= conf["name"].str;
                         else
-                            availableConfigs~= v["name"].str ~ " [OS-ISA Incompatible]";
+                            availableConfigs~= conf["name"].str ~ " [OS-ISA Incompatible]";
                         availableConfigs~= "\n\t";
                     } //Using array.map is causing a memory corruption on macOS somehow. 
                     
