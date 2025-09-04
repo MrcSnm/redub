@@ -47,7 +47,8 @@ struct JSONArray
 
 		private void set(T[] values)
 		{
-			if(values.length <= N)
+			this.usingDynamic = values.length > N;
+			if(!usingDynamic)
 				staticData.ptr[0..values.length] = values[];
 			else
 				dynData = values.dup;
