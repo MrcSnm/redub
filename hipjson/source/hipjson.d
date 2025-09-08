@@ -47,12 +47,12 @@ struct JSONArray
 
 		private void set(T[] values)
 		{
-			this.usingDynamic = values.length > N;
+			usingDynamic = values.length > N;
+			actualLength = cast(uint)values.length;
 			if(!usingDynamic)
 				staticData.ptr[0..values.length] = values[];
 			else
 				dynData = values.dup;
-			actualLength = cast(uint)values.length;
 		}
 		private void append(T value)
 		{
@@ -195,7 +195,7 @@ struct JSONValue
 		private static enum lengthMask = 0x1FFFFFFFFFFFFFFF;
 	}
 	///Used only for the string.
-	private size_t _length;
+	private size_t _length = cast(size_t)JSONType.null_ << bitOffset;
 
 	pragma(inline, true) JSONType type(JSONType t)
 	{
@@ -1090,7 +1090,8 @@ unittest
 }
 // unittest
 // {
-// 	// enum path = `/Users/Hipreme/Documents/dubv2/hipjson/testJson.json`;
+	// enum path = `C:\Users\Marcelo\AppData\Local\dub\.redub\E22653FD6E9559C4.json`;
+	// enum path = `C:\Users\Marcelo\Documents\D\redub\hipjson\testJson.json`;
 // 	// enum tests = 5;
 // 	enum tests = 30_000;
 // 	import core.memory;
