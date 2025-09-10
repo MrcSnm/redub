@@ -328,6 +328,35 @@ bool buildProjectParallelSimple(ProjectNode root, CompilingSession s, const(AdvC
 }
 
 
+
+
+private void killRunningProcesses()
+{
+    foreach(v, isRunning; runningProcesses)
+    {
+        if(isRunning)
+        {
+            Pid p = cast()v;
+            try
+            {
+                version(Posix)
+                {
+                    if(cast(size_t)p.osHandle != -2 && cast(size_t)p.osHandle != -1)
+                        kill(p);
+                }
+                else version(Windows)
+                {
+                    import core.sys.windows.winbase:INVALID_HANDLE_VALUE;
+                    if(p.osHandle != INVALID_HANDLE_VALUE)
+                        kill(p);
+                }
+            }
+            catch(ProcessException e){} //Nothing to do here. All it matters is closing the processes
+            //Terminated or invalid
+        }
+    }
+    runningProcesses.clear();
+}
 bool buildProjectFullyParallelized(ProjectNode root, CompilingSession s, const(AdvCacheFormula)* existingSharedFormula)
 {
     import std.concurrency;
@@ -337,6 +366,7 @@ bool buildProjectFullyParallelized(ProjectNode root, CompilingSession s, const(A
 
     size_t i = 0;
     size_t sentPackages = 0;
+    size_t processedPackages = 0;
     size_t execID = buildExecutions++;
     ProjectNode priority = root.findPriorityNode();
     foreach(ProjectNode pack; root.collapse)
@@ -376,6 +406,7 @@ bool buildProjectFullyParallelized(ProjectNode root, CompilingSession s, const(A
             _--;
             continue;
         }
+        processedPackages++;
         auto res = info[2];
         runningProcesses[res.pid] = false;
         ProjectNode finishedPackage = cast()res.node;
@@ -388,29 +419,7 @@ bool buildProjectFullyParallelized(ProjectNode root, CompilingSession s, const(A
                 failedRes = res;
                 if(failedPackage is priority)
                 {
-                    foreach(v, isRunning; runningProcesses)
-                    {
-                        if(isRunning)
-                        {
-                            Pid p = cast()v;
-                            try
-                            {
-                                version(Posix)
-                                {
-                                    if(cast(size_t)p.osHandle != -2 && cast(size_t)p.osHandle != -1)
-                                        kill(p);
-                                }
-                                else version(Windows)
-                                {
-                                    import core.sys.windows.winbase:INVALID_HANDLE_VALUE;
-                                    if(p.osHandle != INVALID_HANDLE_VALUE)
-                                        kill(p);
-                                }
-                            }
-                            catch(ProcessException e){} //Nothing to do here. All it matters is closing the processes
-                            //Terminated or invalid
-                        }
-                    }
+                    killRunningProcesses();
                     break;
                 }
             }
@@ -427,15 +436,24 @@ bool buildProjectFullyParallelized(ProjectNode root, CompilingSession s, const(A
             }
         }
     }
-    runningProcesses.clear();
 
     //TODO: What happens if the root builds first and the dependency fails? It will skip everything and just try running the .exe
     //TODO: What happens if a higher dependency finished first than a lower one? It may simply skip the lower since the parent has already finished.
     if(failedPackage)
     {
-        import core.thread;
         buildFailed(failedPackage, failedRes, s, finishedBuilds, mainPackHash, &formulaCache, existingSharedFormula);
-        thread_joinAll();
+        killRunningProcesses();
+        for(int count = 0; count < sentPackages - processedPackages; count++)
+        {
+            auto _ = receiveOnly!(CompilationID, ProcessInfo, CompilationResult); 
+            if(_[0].id != execID || _[1] != ProcessInfo.init)
+            {
+                count--;
+                continue;
+            }
+            // import core.thread;
+            // thread_joinAll();// Use receiveOnly for waiting the threads to finish instead of joinAll as it breaks lib work
+        }
         return false;
     }
     return doLink(root, s, mainPackHash, &formulaCache, env, existingSharedFormula) && copyFiles(root);
