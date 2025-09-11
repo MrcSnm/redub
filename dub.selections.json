@@ -3,7 +3,7 @@
 	"versions": {
 		"adv_diff": {"path":"adv_diff"},
 		"colorize": {"path":"colorize"},
-		"d-segmented-hashmap": "1.0.4",
+		"d-segmented-hashmap": "1.0.5",
 		"d_dependencies": {"path":"d_dependencies"},
 		"dub_sdl_to_json": {"path":"dub_sdl_to_json"},
 		"hipjson": {"path":"hipjson"},

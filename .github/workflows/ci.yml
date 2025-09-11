@@ -44,7 +44,7 @@ jobs:
         if: runner.os == 'Windows'
         run: |
           dir
-          move build/redub.exe redub-windows-${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'latest' }}-${{ matrix.arch }}.exe
+          move build/redub.exe redub-${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'latest' }}-windows-${{ matrix.arch }}.exe
       - name: Upload artifacts on Windows
         uses: actions/upload-artifact@v4
         if: runner.os == 'Windows'
