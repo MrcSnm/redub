@@ -14,13 +14,21 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
+            os_name: linux
             arch: x86_64
           - os: ubuntu-24.04-arm
+            os_name: linux
             arch: arm64
           - os: macos-latest
+            os_name: osx
             arch: arm64
           - os: windows-latest
+            os_name: windows
             arch: x86_64
+          - os: windows-latest
+            os_name: windows
+            arch: arm64
+
       fail-fast: false
     runs-on: ${{matrix.os}}
     steps:
@@ -36,25 +44,25 @@ jobs:
         if: runner.os == 'Windows'
         run: |
           dir
-          move build/redub.exe redub-${{ matrix.os }}-${{ matrix.arch }}.exe
+          move build/redub.exe redub-windows-${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'latest' }}-${{ matrix.arch }}.exe
       - name: Upload artifacts on Windows
         uses: actions/upload-artifact@v4
         if: runner.os == 'Windows'
         with:
-          name: redub-windows-latest-x86_64.exe
-          path: redub-windows-latest-x86_64.exe
+          name: redub-${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'latest' }}-windows-${{ matrix.arch }}.exe
+          path: redub-${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'latest' }}-windows-${{ matrix.arch }}.exe
         
       - name: Rename artifact Unix
         if: runner.os != 'Windows'
         run: |
           ls -R
-          mv build/redub redub-${{ matrix.os }}-${{ matrix.arch }}
+          mv build/redub redub-${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'latest' }}-${{ matrix.os_name }}-${{ matrix.arch }}
       - name: Upload artifacts on Unix
         uses: actions/upload-artifact@v4
         if: runner.os != 'Windows'
         with:
-          name: redub-${{ matrix.os }}-${{ matrix.arch }}
-          path: redub-${{ matrix.os }}-${{ matrix.arch }}
+          name: redub-${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'latest' }}-${{ matrix.os_name }}-${{ matrix.arch }}
+          path: redub-${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'latest' }}-${{ matrix.os_name }}-${{ matrix.arch }}
 
   # freebsd:
   #   strategy:
@@ -99,12 +107,11 @@ jobs:
       - name: Build
         run: |
             dub build -b release-debug
-      - run: mv build/redub redub-alpine-x86_64
+      - run: mv build/redub redub-alpine-${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'latest' }}-x86_64
       - uses: actions/upload-artifact@v4
-        if: github.ref == 'refs/heads/main'
         with:
-          name: redub-alpine-x86_64
-          path: redub-alpine-x86_64
+          name: redub-alpine-${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'latest' }}-x86_64
+          path: redub-alpine-${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'latest' }}-x86_64
 
   update-release:
     runs-on: ubuntu-latest
