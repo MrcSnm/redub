@@ -44,7 +44,7 @@ jobs:
         if: runner.os == 'Windows'
         run: |
           dir
-          move build/redub.exe redub-windows-${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'latest' }}-${{ matrix.arch }}.exe
+          move build/redub.exe redub-${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'latest' }}-windows-${{ matrix.arch }}.exe
       - name: Upload artifacts on Windows
         uses: actions/upload-artifact@v4
         if: runner.os == 'Windows'
@@ -107,11 +107,11 @@ jobs:
       - name: Build
         run: |
             dub build -b release-debug
-      - run: mv build/redub redub-alpine-${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'latest' }}-x86_64
+      - run: mv build/redub redub-${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'latest' }}-alpine-${{ matrix.arch }}
       - uses: actions/upload-artifact@v4
         with:
-          name: redub-alpine-${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'latest' }}-x86_64
-          path: redub-alpine-${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'latest' }}-x86_64
+          name: redub-${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'latest' }}-alpine-${{ matrix.arch }}
+          path: redub-${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'latest' }}-alpine-${{ matrix.arch }}
 
   update-release:
     runs-on: ubuntu-latest
