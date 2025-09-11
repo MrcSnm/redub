@@ -220,7 +220,7 @@ int initMain(string[] args)
         return 0;
     }
     setLogLevel(LogLevel.info);
-    return createNewProject(initArgs.type);
+    return createNewProject(initArgs.type, args.length > 1 ? args[1] : null);
 }
 
 

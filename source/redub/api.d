@@ -192,7 +192,7 @@ string[] getChangedBuildFiles(ProjectNode root, CompilingSession s)
     return buildFiles;
 }
 
-int createNewProject(string projectType)
+int createNewProject(string projectType, string targetDirectory)
 {
     import redub.misc.username;
     import std.conv:text;
@@ -202,7 +202,15 @@ int createNewProject(string projectType)
     string projectName;
     string userName;
     string dependencies;
-    string path = getcwd;
+    string path;
+    if(targetDirectory is null)
+        path = getcwd;
+    else if(targetDirectory.isAbsolute)
+        path = targetDirectory;
+    else
+        path = buildNormalizedPath(getcwd, targetDirectory);
+    if(!exists(path))
+        mkdirRecurse(path);
     string targetDub = buildNormalizedPath(path, "dub.json");
     if(exists(targetDub))
     {
@@ -238,17 +246,18 @@ void main()
         PackageInfo pkg = getPackage(projectType~":init-exec", null, null, "user's "~userName~" 'redub init -t' command");
         ProjectDetails d = resolveDependencies(false, std.system.os, CompilationDetails.init, ProjectToParse(null, pkg.path, pkg.subPackage));
         dependencies = `
-    "dependencies" : {"` ~ pkg.packageName ~ `": `;
+    "dependencies": {`~ "\n\t\t\t\"" ~ pkg.packageName ~ `": `;
         if(!pkg.bestVersion.isMatchAll)
             dependencies~= `"~>`~pkg.bestVersion.toString~`"`;
         else
             dependencies~= `{"path": "`~ pkg.path ~ `"}`;
 
-        dependencies~= "},";
+        dependencies~= "\n\t\t},";
             
         d = buildProject(d);
         if(d.error)
             return d.getReturnCode;
+        chdir(path);
         returnCode = executeProgram(d.tree, null);
         if(returnCode)
             return returnCode;
