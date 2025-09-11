@@ -8,7 +8,7 @@ import redub.package_searching.api;
 
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.24.11";
+enum RedubVersionOnly = "v1.24.12";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -945,11 +945,13 @@ class ProjectNode
         static void transferDependenciesAndClearOptional(ProjectNode node, ref string[] removedOptionals)
         {
             ///Enters in the deepest node
+            import std.string:endsWith;
             for(int i = 0; i < node.dependencies.length; i++)
             {
-                if(node.dependencies[i].isOptional)
+                ///init-exec is a special case that redub will filter.
+                if(node.dependencies[i].isOptional || node.dependencies[i].name.endsWith("init-exec"))
                 {
-                    if(hasLogLevel(LogLevel.warn))
+                    if(node.dependencies[i].isOptional && hasLogLevel(LogLevel.warn))
                         removedOptionals~= node.dependencies[i].name;
                     node.dependencies[i].becomeIndependent();
                     i--;

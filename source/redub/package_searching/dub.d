@@ -158,16 +158,10 @@ PackageInfo getPackage(string packageName, string repo, string packageVersion, s
     );
 }
 
-
-
-
 string getPackagePath(string packageName, string repo, string packageVersion, string requiredBy)
 {
     return getPackage(packageName, repo, packageVersion, requiredBy).path;
 }
-
-
-
 
 private ReducedPackageInfo getPackageInJSON(JSONValue json, string packageName, string packageVersion)
 {

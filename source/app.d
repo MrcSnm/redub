@@ -59,6 +59,7 @@ int main(string[] args)
             "describe": &describeMain,
             "deps": &depsMain,
             "test": &testMain,
+            "init": &initMain,
             "run": cast(int function(string[]))null
         ];
 
@@ -111,18 +112,6 @@ int runMain(string[] args, string[] runArgs)
     if(d.tree.requirements.cfg.targetType != TargetType.executable)
         return 1;
     return executeProgram(d.tree, runArgs);
-}
-
-int executeProgram(ProjectNode tree, string[] args)
-{
-    import std.path;
-    import std.array:join;
-    import std.process;
-    import redub.command_generators.commons;
-    return wait(spawnShell(
-        escapeShellCommand(getOutputPath(tree.requirements.cfg, os)) ~ " "~ join(args, " ")
-        )
-    );
 }
 
 int describeMain(string[] args)
@@ -212,6 +201,26 @@ int testMain(string[] args)
         return d.getReturnCode();
 
     return executeProgram(d.tree, args);
+}
+
+int initMain(string[] args)
+{
+    import std.getopt;
+    struct InitArgs
+    {
+        @("Creates a project of the specified type")
+        @("t")
+        string type;
+    }
+    InitArgs initArgs;
+    GetoptResult res = betterGetopt(args, initArgs);
+    if(res.helpWanted)
+    {
+        defaultGetoptPrinter(RedubVersionShort~" init information:\n ", res.options);
+        return 0;
+    }
+    setLogLevel(LogLevel.info);
+    return createNewProject(initArgs.type);
 }
 
 
