@@ -108,7 +108,7 @@ jobs:
             apk add --no-cache ldc dub clang
       - name: Build
         run: |
-            redub build -b release-debug
+            dub build -b release-debug
       - run: mv build/redub redub-${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'latest' }}-alpine-${{ matrix.arch }}
       - uses: actions/upload-artifact@v4
         with:
