@@ -456,6 +456,15 @@ update
             recipe = bArgs.single;
     }
 
+    if(bArgs.prefetch)
+    {
+        import redub.misc.path;
+        import redub.package_searching.dub;
+        string selections = redub.misc.path.buildNormalizedPath(workingDir, "dub.selections.json");
+        auto timing = timed((){prefetchPackages(selections); return true;});
+        infos("Prefetchi Finished: ", timing.msecs,"ms");
+    }
+
 
     string bt = either(bArgs.buildType, BuildType.debug_);
 

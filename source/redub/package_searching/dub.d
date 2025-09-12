@@ -208,6 +208,41 @@ private ReducedPackageInfo getPackageInLocalPackages(string packageName, string 
     return getPackageInLocalPackages(packageName, packageVersion);
 }
 
+/**
+ * Downloads every package present in the dub.selections.json in parallel (prefetch)
+ * Might be way faster specially for job runners
+ * Params:
+ *   dubSelectionsPath = a dub.selections.json path
+ */
+void prefetchPackages(string dubSelectionsPath)
+{
+    import std.file;
+    import std.parallelism;
+    if(!exists(dubSelectionsPath))
+        return;
+    JSONValue v = parseJSON(readText(dubSelectionsPath));
+
+    string[2][] prefetchedPackages;
+    bool[string] addedPackages;
+    import redub.package_searching.cache;
+
+    foreach(key, value; v["versions"])
+    {
+        if(value.type == JSONType.string_) //Uses semver
+        {
+            prefetchedPackages~= [key, value.str];
+        }
+    }
+    foreach(pkg; parallel(prefetchedPackages, 1))
+    {
+        if(SemVer(pkg[1]).isInvalid)
+            continue;
+            // findPackage(pkg[0], pkg[1], null, "redub-prefetcher");
+        else
+            findPackage(pkg[0], null, pkg[1], "redub-prefetcher");
+    }
+}
+
 private string getDefaultLookupPathForPackages()
 {
     import redub.misc.path;

@@ -294,8 +294,6 @@ void createSelectionsFile(ProjectNode tree)
     char[] temp = selectionsPathCache;
 
     string selectionsPath = normalizePath(temp, tree.requirements.cfg.workingDir, "dub.selections.json") ;
-    if(exists(selectionsPath))
-        return;
     auto dubSelections = appender!string;
     dubSelections~= "{\n\t\"fileVersion\": 1,\n\t\"versions\": {";
 
@@ -526,7 +524,6 @@ ProjectDetails resolveDependencies(
         import std.file;
         proj.workingDir = std.file.getcwd;
     }
-
 
     BuildRequirements req;
     if(proj.isSingle)

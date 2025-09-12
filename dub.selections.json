@@ -1,16 +1,17 @@
 {
 	"fileVersion": 1,
 	"versions": {
-		"adv_diff": {"path":"adv_diff"},
-		"colorize": {"path":"colorize"},
+		"redub":  {"path": "C:\\Users\\Marcelo\\Documents\\D\\redub"},
+		"adv_diff":  {"path": "C:\\Users\\Marcelo\\Documents\\D\\redub\\adv_diff"},
+		"hipjson":  {"path": "C:\\Users\\Marcelo\\Documents\\D\\redub\\hipjson"},
 		"d-segmented-hashmap": "1.0.5",
-		"d_dependencies": {"path":"d_dependencies"},
-		"dub_sdl_to_json": {"path":"dub_sdl_to_json"},
-		"hipjson": {"path":"hipjson"},
-		"package_suppliers": {"path":"package_suppliers"},
+		"colorize":  {"path": "C:\\Users\\Marcelo\\Documents\\D\\redub\\colorize"},
+		"d_dependencies":  {"path": "C:\\Users\\Marcelo\\Documents\\D\\redub\\d_dependencies"},
+		"dub_sdl_to_json":  {"path": "C:\\Users\\Marcelo\\Documents\\D\\redub\\dub_sdl_to_json"},
 		"sdlite": "1.3.3",
-		"semver": {"path":"semver"},
 		"taggedalgebraic": "1.0.1",
+		"package_suppliers":  {"path": "C:\\Users\\Marcelo\\Documents\\D\\redub\\package_suppliers"},
+		"semver":  {"path": "C:\\Users\\Marcelo\\Documents\\D\\redub\\semver"},
 		"xxhash3": "0.0.5"
 	}
 }

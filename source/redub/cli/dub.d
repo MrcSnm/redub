@@ -202,6 +202,10 @@ struct DubArguments
 
     @("[Experimental] Filter version identifiers and debug version identifiers to improve build cache efficiency.")
     string[] filterVersions;
+
+
+    @("If a dub.selections.json is present, all non-path based packages are prefetched. Best for action runners.")
+    bool prefetch;
 }
 
 
