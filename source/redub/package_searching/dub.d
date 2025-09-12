@@ -218,28 +218,39 @@ void prefetchPackages(string dubSelectionsPath)
 {
     import std.file;
     import std.parallelism;
+    import redub.package_searching.downloader;
+    import redub.misc.path;
     if(!exists(dubSelectionsPath))
         return;
     JSONValue v = parseJSON(readText(dubSelectionsPath));
 
     string[2][] prefetchedPackages;
-    bool[string] addedPackages;
+    string[] packagesToLoadMetadata;
+
     import redub.package_searching.cache;
 
     foreach(key, value; v["versions"])
     {
         if(value.type == JSONType.string_) //Uses semver
         {
-            prefetchedPackages~= [key, value.str];
+            if(SemVer(value.str).isInvalid)
+                continue;
+            string pkgName;
+            getSubPackageInfo(key, pkgName);
+
+            string downloadedPackagePath = redub.misc.path.buildNormalizedPath(getDefaultLookupPathForPackages(), pkgName);
+            if(!std.file.exists(downloadedPackagePath))
+            {
+                packagesToLoadMetadata~= pkgName;
+                prefetchedPackages~= [pkgName, value.str];
+            }
         }
     }
+    prefetchPackagesMetadata(packagesToLoadMetadata);
     foreach(pkg; parallel(prefetchedPackages, 1))
     {
-        if(SemVer(pkg[1]).isInvalid)
-            continue;
             // findPackage(pkg[0], pkg[1], null, "redub-prefetcher");
-        else
-            findPackage(pkg[0], null, pkg[1], "redub-prefetcher");
+        findPackage(pkg[0], null, pkg[1], "redub-prefetcher");
     }
 }
 

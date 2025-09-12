@@ -4,6 +4,12 @@ import redub.libs.semver;
 import core.sync.mutex;
 RegistryPackageSupplier supplier;
 
+void prefetchPackagesMetadata(string[] packages)
+{
+    if(packages.length)
+        supplier.loadPackagesMetadata(packages);
+}
+
 string getGitDownloadLink(string packageName, string repo, string branch)
 {
     import std.algorithm.searching;

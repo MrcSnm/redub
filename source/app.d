@@ -462,7 +462,13 @@ update
         import redub.package_searching.dub;
         string selections = redub.misc.path.buildNormalizedPath(workingDir, "dub.selections.json");
         auto timing = timed((){prefetchPackages(selections); return true;});
-        infos("Prefetchi Finished: ", timing.msecs,"ms");
+
+        foreach(pkg; fetchedPackages)
+        {
+            infos("Fetch Success: ", pkg.name, " v",pkg.version_, " required by ", pkg.reqBy);
+        }
+        fetchedPackages.length = 0;
+        infos("Prefetch Finished: ", timing.msecs,"ms");
     }
 
 

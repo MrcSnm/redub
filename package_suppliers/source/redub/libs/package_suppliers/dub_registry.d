@@ -1,6 +1,7 @@
 module redub.libs.package_suppliers.dub_registry;
 import redub.libs.package_suppliers.utils;
 import redub.libs.semver;
+import core.sync.rwmutex;
 import hipjson;
 package enum PackagesPath = "packages";
 
@@ -14,7 +15,6 @@ package enum PackagesPath = "packages";
 */
 class RegistryPackageSupplier
 {
-
 	import std.uri : encodeComponent;
 	string registryUrl;
 
@@ -75,26 +75,46 @@ class RegistryPackageSupplier
 	}
 
 
-
-	JSONValue getMetadata(string packageName)
+	void loadPackagesMetadata(string[] packages)
 	{
 		import std.net.curl;
-		static JSONValue[string] metadataCache;
-
-		static string getMetadataUrl(string registryUrl, string packageName)
+		static string getMetadataUrl(string registryUrl, string[] packages)
 		{
+			import std.string:join;
+			string packageName = packages.join(",");
 			return  registryUrl ~ "api/packages/infos?packages="~
 				encodeComponent(`["`~packageName~`"]`)~
 				"&include_dependencies=true&minimize=true";
 		}
-
-		if(packageName in metadataCache)
-			return metadataCache[packageName];
-		string data = cast(string)downloadFile(getMetadataUrl(registryUrl, packageName));
+		string data = cast(string)downloadFile(getMetadataUrl(registryUrl, packages));
 		JSONValue parsed = parseJSON(data);
-		foreach(k, v; parsed.object)
-			metadataCache[k] = v;
-		return metadataCache[packageName];
+
+		synchronized(metadataMutex.writer)
+		{
+			foreach(k, v; parsed.object)
+			{
+				if(!(k in metadataCache))
+					metadataCache[k] = v;
+			}
+		}
+	}
+
+	JSONValue getMetadata(string packageName)
+	{
+		JSONValue* ret;
+		synchronized(metadataMutex.reader)
+		{
+			ret = packageName in metadataCache;
+		}
+		if(ret)
+			return *ret;
+		string[1] thePkg = [packageName];
+		string[] pkgs = thePkg;
+		loadPackagesMetadata(pkgs);
+
+		synchronized(metadataMutex.reader)
+			ret = packageName in metadataCache;
+		return *ret;
 	}
 
 }
@@ -120,4 +140,12 @@ unittest
 	// 	reg.downloadPackageTo("dub/packages/"~pkg, pkg, SemVer(">=0.0.0"));
 	// }
 	// writeln("Fetched packages ", packages, " in ", sw.peek.total!"msecs", "ms");
+}
+
+private __gshared JSONValue[string] metadataCache;
+private __gshared ReadWriteMutex metadataMutex;
+
+static this()
+{
+	metadataMutex = new ReadWriteMutex(ReadWriteMutex.Policy.PREFER_READERS);
 }
