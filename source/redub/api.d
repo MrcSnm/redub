@@ -290,6 +290,7 @@ void createSelectionsFile(ProjectNode tree)
     import std.file;
     import std.array:appender;
     import std.string:replace;
+    import std.path;
     char[512] selectionsPathCache;
     char[] temp = selectionsPathCache;
 
@@ -301,6 +302,8 @@ void createSelectionsFile(ProjectNode tree)
 
     foreach(ProjectNode node; tree.collapse)
     {
+        if(node is tree)
+            continue;
         if(!isFirst) dubSelections~=",";
         isFirst = false;
         auto req = node.requirements;
@@ -308,7 +311,7 @@ void createSelectionsFile(ProjectNode tree)
         if(req.version_.length != 0)
             dubSelections~= "\""~req.version_~"\"";
         else
-            dubSelections~= " {\"path\": \""~replace(req.cfg.workingDir, "\\", "\\\\")~"\"}";
+            dubSelections~= " {\"path\": \""~replace(relativePath(req.cfg.workingDir, tree.requirements.cfg.workingDir), "\\", "\\\\")~"\"}";
     }
 
     dubSelections~= "\n\t}\n}";
