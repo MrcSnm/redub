@@ -134,6 +134,23 @@ jobs:
     - name: Display structure of downloaded files
       run: ls -R
 
+    - name: Get latest and previous tag
+      run: |
+        latest=$(git describe --tags --abbrev=0)
+        previous=$(git describe --tags --abbrev=0 $latest^)
+        echo "latest_tag=$latest" >> $GITHUB_ENV
+        echo "previous_tag=$previous" >> $GITHUB_ENV
+
+    - name: Generate release changelog
+      if: startsWith(github.ref, 'ref/tags/')
+      run: |
+        git log --oneline ${{ env.previous_tag }}..${{ env.latest_tag }} > release_notes.txt
+
+    - name: Generate nightly changelog
+      if: startsWith(github.ref, 'refs/heads/main')
+      run: |
+        git log --oneline ${{ env.latest_tag }}..HEAD > release_notes.txt
+
     - name: Publish release
       uses: ncipollo/release-action@v1
       with:
@@ -142,3 +159,4 @@ jobs:
         tag: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'nightly' }}
         name: ${{ startsWith(github.ref, 'refs/tags/') && format('Redub {0}', github.ref_name) || 'Redub Nightly' }}
         prerelease: ${{ startsWith(github.ref, 'refs/tags/') && 'false' || 'true' }}
+        bodyFile: release_notes.txt
