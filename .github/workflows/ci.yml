@@ -1,4 +1,4 @@
-name: Artifacts
+name: Update release and nightly
 on:
   pull_request:
   push:

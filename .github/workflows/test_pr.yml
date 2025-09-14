@@ -1,0 +1,38 @@
+name: Test Pull Request
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            os_name: linux
+            arch: x86_64
+          - os: ubuntu-24.04-arm
+            os_name: linux
+            arch: arm64
+          - os: macos-latest
+            os_name: osx
+            arch: arm64
+          - os: windows-latest
+            os_name: windows
+            arch: x86_64
+          - os: windows-latest
+            os_name: windows
+            arch: arm64
+
+      fail-fast: false
+    runs-on: ${{matrix.os}}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: MrcSnm/setup-dlang@v2
+        with:
+          compiler: ldc-latest
+          redub: master
+
+      - name: Test building
+        run: |
+          redub build -b release-debug --prefetch

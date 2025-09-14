@@ -406,13 +406,15 @@ ProjectDetails resolveDependencies(string[] args, bool isDescribeOnly = false)
     import std.algorithm.comparison:either;
     import std.getopt;
     import redub.api;
-    string subPackage = parseSubpackageFromCli(args);
     string workingDir = std.file.getcwd();
+    string targetPackage = getPackageFromCli(args);
+    string packageVersion = getVersionFromPackage(targetPackage);
+    string subPackage = getSubPackage(targetPackage);
     string recipe;
 
     DubArguments bArgs;
     GetoptResult res = betterGetopt(args, bArgs);
-    updateVerbosity(bArgs.cArgs);
+
     if(res.helpWanted)
     {
         import std.getopt;
@@ -429,6 +431,21 @@ update
         defaultGetoptPrinter(RedubVersionShort~" build information: \n\t"~newCommands, res.options);
         return ProjectDetails.init;
     }
+    updateVerbosity(bArgs.cArgs);
+
+
+    if(targetPackage)
+    {
+        import redub.package_searching.cache;
+        import redub.package_searching.entry;
+        import std.stdio;
+        PackageInfo* info = findPackage(targetPackage, null, packageVersion, "redub-run");
+        if(!info)
+            throw new RedubException("Could not find the package "~targetPackage~" with version "~packageVersion);
+        workingDir = info.path;
+        recipe = findEntryProjectFile(info.path);
+    }
+
     if(bArgs.version_)
     {
         import std.stdio;
@@ -440,7 +457,8 @@ update
     DubCommonArguments cArgs = bArgs.cArgs;
     if(cArgs.root)
         workingDir = cArgs.getRoot(workingDir);
-
+    if(recipe && (cArgs.recipe || cArgs.root))
+        throw new Error(`Can't specify a target package to build if you specify either --root or --recipe`);
     if(bArgs.single && cArgs.recipe)
         throw new RedubException("Can't set both --single and --recipe");
     if(cArgs.recipe)
@@ -519,16 +537,32 @@ void updateVerbosity(DubCommonArguments a)
     if(a.vverbose) return setLogLevel(LogLevel.vverbose);
     return setLogLevel(LogLevel.info);
 }
-
-private string parseSubpackageFromCli(ref string[] args)
+private string getPackageFromCli(ref string[] args)
 {
-    import std.string:startsWith;
-    import std.algorithm.searching;
-    ptrdiff_t subPackIndex = countUntil!((a => a.startsWith(':')))(args);
-    if(subPackIndex == -1) return null;
+    if(args.length > 0 && args[0][0] != '-')
+    {
+        args = args[1..$];
+        return args[0];
+    }
+    return null;
+}
 
-    string ret;
-    ret = args[subPackIndex][1..$];
-    args = args[0..subPackIndex] ~ args[subPackIndex+1..$];
+private string getVersionFromPackage(ref string pkg)
+{
+    import std.algorithm.searching;
+    ptrdiff_t ver = countUntil!((a => a == '@'))(pkg);
+    if(ver == -1) return null;
+    string ret = pkg[ver+2..$]; //Advance @ and v from the tag
+    pkg = pkg[0..ver];
+    return ret;
+}
+
+private string getSubPackage(ref string pkg)
+{
+    import std.algorithm.searching;
+    ptrdiff_t subPackIndex = countUntil!((a => a == ':'))(pkg);
+    if(subPackIndex == -1) return null;
+    string ret = pkg[subPackIndex+1..$];
+    pkg = pkg[0..subPackIndex];
     return ret;
 }
