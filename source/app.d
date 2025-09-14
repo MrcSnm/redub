@@ -420,6 +420,35 @@ ProjectDetails resolveDependencies(string[] args, bool isDescribeOnly = false)
         import std.getopt;
         string newCommands =
 `
+USAGE: redub [--version] [<command>] [<options...>] [-- [<application arguments...>]]
+
+Manages the redub project in the current directory. If the command is omitted,
+redub will default to "run". When running an application, "--" can be used to
+separate redub options from options passed to the application.
+
+Run "redub <command> --help" to get help for a specific command.
+
+Available commands
+==================
+
+  Package creation
+  ----------------
+  init [<directory> [<dependency>...]]
+                        Initializes an empty package skeleton
+
+  Build, test and run
+  -------------------
+  run [<package>[@<version-spec>]]
+                        Builds and runs a package (default command)
+  build [<package>[@<version-spec>]]
+                        Builds a package (uses the main package in the current
+                        working directory by default)
+  test [<package>[@<version-spec>]]
+                        Executes the tests of the selected package
+  describe [<package>[@<version-spec>]]
+                        Prints a description of the specified --data files
+  clean [<package>]     Removes intermediate build files and cached build
+                        results
 
 Additions to redub commands --
 
@@ -539,10 +568,11 @@ void updateVerbosity(DubCommonArguments a)
 }
 private string getPackageFromCli(ref string[] args)
 {
-    if(args.length > 0 && args[0][0] != '-')
+    if(args.length > 1 && args[1][0] != '-')
     {
-        args = args[1..$];
-        return args[0];
+        string ret = args[1];
+        args = args[0..$] ~ args[2..$];
+        return ret;
     }
     return null;
 }
