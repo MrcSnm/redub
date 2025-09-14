@@ -25,14 +25,13 @@
     ],
     "license": "MIT",
     "dependencies": {
-        "semver": {"path": "semver", "version": "*"},
-        "colorize": {"path": "colorize", "version": "*"},
-        "adv_diff": {"path": "adv_diff", "version": "*"},
-        "hipjson": {"path": "hipjson", "version": "*"},
-        "d_dependencies": {"path": "d_dependencies", "version": "*"},
-        "dub_sdl_to_json": {"path": "dub_sdl_to_json", "version": "*"},
-        "package_suppliers": {"path": "package_suppliers", "version": "*"},
+        "semver": {"path": "semver"},
+        "colorize": {"path": "colorize"},
+        "adv_diff": {"path": "adv_diff"},
+        "hipjson": {"path": "hipjson"},
+        "d_dependencies": {"path": "d_dependencies"},
+        "dub_sdl_to_json": {"path": "dub_sdl_to_json"},
+        "package_suppliers": {"path": "package_suppliers"},
         "xxhash3": "~>0.0.5"
     }
-
 }
