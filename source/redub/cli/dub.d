@@ -153,6 +153,7 @@ struct DubArguments
 
 
     @("Specifies where the target output is.")
+    @("targetPath|dest")
     string targetPath;
 
     @("Specifies the target name")

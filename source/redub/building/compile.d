@@ -565,7 +565,7 @@ private void buildFailed(const ProjectNode node, CompilationResult res, Compilin
     import std.conv:to;
     string msg = res.message ? " with message\n\t" ~res.message : null;
 
-    errorTitle("Build Failure: '", node.name, " ",node.requirements.version_," [", node.requirements.targetConfiguration,"]' \n\t",
+    errorTitle("Build Failure: ", "'", node.name, "' ",node.requirements.version_," [", node.requirements.targetConfiguration,"]' \n\t",
         RedubVersionShort, "\n\t", node.getCompiler(s.compiler).getCompilerWithVersion, "\n\tFailed with flags: \n\n\t",
         res.compilationCommand,
         "\nStatus '"~res.status.to!string~"' after ", res.msNeeded,"ms "~msg

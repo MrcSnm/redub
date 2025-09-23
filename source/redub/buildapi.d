@@ -8,7 +8,7 @@ import redub.package_searching.api;
 
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.24.16";
+enum RedubVersionOnly = "v1.24.17";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -193,6 +193,7 @@ struct BuildConfiguration
     string[] libraryPaths;
     string[] stringImportPaths;
     string[] libraries;
+    string[] frameworks;
     string[] linkFlags;
     string[] dFlags;
     string[] sourcePaths;
@@ -344,6 +345,7 @@ struct BuildConfiguration
         ret.debugVersions.exclusiveMerge(other.debugVersions);
         ret.dFlags.exclusiveMerge(other.dFlags);
         ret.libraries.exclusiveMerge(other.libraries);
+        ret.frameworks.exclusiveMerge(other.frameworks);
         ret.libraryPaths.exclusiveMergePaths(other.libraryPaths);
         ret.linkFlags.exclusiveMerge(other.linkFlags);
         return ret;
@@ -357,6 +359,12 @@ struct BuildConfiguration
             ret.commands.length = other.commands.length;
         foreach(i, list; other.commands)
             ret.commands[i]~= list;
+        return ret;
+    }
+    BuildConfiguration mergeFrameworks(const ref BuildConfiguration other) const
+    {
+        BuildConfiguration ret = clone;
+        ret.frameworks.exclusiveMerge(other.frameworks);
         return ret;
     }
     BuildConfiguration mergeLibraries(const ref BuildConfiguration other) const
@@ -941,23 +949,28 @@ class ProjectNode
          * Params:
          *   node = The root node
          *   removedOptionals = String container for printing later warnings
+         *   removedNull = String container for printing later warnings regarding dependencies without source files
          */
-        static void transferDependenciesAndClearOptional(ProjectNode node, ref string[] removedOptionals)
+        static void transferDependenciesAndClearOptional(ProjectNode node, ref string[] removedOptionals, ref string[] removedNull)
         {
             ///Enters in the deepest node
+            import redub.command_generators.commons;
             import std.string:endsWith;
             for(int i = 0; i < node.dependencies.length; i++)
             {
+                bool noSource = !hasAnySource(node.dependencies[i].requirements.cfg);
                 ///init-exec is a special case that redub will filter.
-                if(node.dependencies[i].isOptional || node.dependencies[i].name.endsWith("init-exec"))
+                if(node.dependencies[i].isOptional || node.dependencies[i].name.endsWith("init-exec") || noSource)
                 {
                     if(node.dependencies[i].isOptional && hasLogLevel(LogLevel.warn))
                         removedOptionals~= node.dependencies[i].name;
+                    else if(noSource && hasLogLevel(LogLevel.warn))
+                        removedNull~= node.dependencies[i].name;
                     node.dependencies[i].becomeIndependent();
                     i--;
                     continue;
                 }
-                transferDependenciesAndClearOptional(node.dependencies[i], removedOptionals);
+                transferDependenciesAndClearOptional(node.dependencies[i], removedOptionals, removedNull);
             }
             ///If the node is none or sourceLibrary, transfer all of its dependencies to all of its parents
             bool shouldTransfer = node.requirements.cfg.targetType == TargetType.none || node.requirements.cfg.targetType == TargetType.sourceLibrary;
@@ -1042,10 +1055,12 @@ class ProjectNode
                         target.requirements.extra.librariesFullPath.exclusiveMerge(
                             [buildNormalizedPath(other.outputDirectory, other.targetName)]
                         );
+                        target.requirements.cfg = target.requirements.cfg.mergeFrameworks(other);
                         target.requirements.cfg = target.requirements.cfg.mergeLibraries(other);
                         target.requirements.cfg = target.requirements.cfg.mergeLibPaths(other);
                     break;
                 case sourceLibrary: 
+                    target.requirements.cfg = target.requirements.cfg.mergeFrameworks(input.requirements.cfg);
                     target.requirements.cfg = target.requirements.cfg.mergeLibraries(input.requirements.cfg);
                     target.requirements.cfg = target.requirements.cfg.mergeLibPaths(input.requirements.cfg);
                     target.requirements.cfg = target.requirements.cfg.mergeSourcePaths(input.requirements.cfg);
@@ -1100,7 +1115,8 @@ class ProjectNode
         if(hasLogLevel(LogLevel.vverbose))
             sw.start();
         string[] removedOptionals;
-        transferDependenciesAndClearOptional(this, removedOptionals);
+        string[] removedNull;
+        transferDependenciesAndClearOptional(this, removedOptionals, removedNull);
         inLogLevel(LogLevel.vverbose, vvlog("transferDependenciesAndClearOptional finished at ", sw.peek.total!"msecs", "ms"));
 
         mergeParentInDependencies(this);
@@ -1108,6 +1124,8 @@ class ProjectNode
 
         if(removedOptionals.length)
             warn("Optional Dependencies ", removedOptionals, " not included since they weren't requested as non optional from other places.");
+        if(removedNull.length)
+            warn("Dependencies ", removedNull, " not included since they didn't have any source file to build.");
         finishPublic(this, visitedBuffer, privatesToMerge, dependenciesToRemove, targetOS, isa);
         inLogLevel(LogLevel.vverbose, vvlog("finishPublic finished at ", sw.peek.total!"msecs", "ms"));
 

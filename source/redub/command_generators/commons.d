@@ -212,6 +212,37 @@ bool isPosix(OS os)
     return !(os == OS.win32 || os == OS.win64);
 }
 
+bool isApple(OS os)
+{
+    return !(os == OS.osx || os == OS.iOS || os == OS.tvOS || os == OS.watchOS);
+}
+
+/**
+ *
+ * Params:
+ *   cfg = The target build configuration
+ * Returns: Whether it has any source to be built.
+ */
+bool hasAnySource(const ref BuildConfiguration cfg)
+{
+    import std.file;
+    import redub.libs.adv_diff.files;
+
+    if(cfg.sourceFiles.length) return true;
+
+    DirectoriesWithFilter filter = DirectoriesWithFilter(cfg.sourcePaths, cfg.language == RedubLanguages.D ? DirectoryFilterType.d : DirectoryFilterType.cpp, cfg.excludeSourceFiles);
+    foreach(path; cfg.sourcePaths)
+    {
+        foreach(DirEntry e; dirEntries(path, SpanMode.depth))
+        {
+            if(filter.shouldInclude(e.name))
+                return true;
+        }
+    }
+    return false;
+}
+
+
 string getExtension(TargetType t, OS target, ISA isa)
 {
     final switch(t)

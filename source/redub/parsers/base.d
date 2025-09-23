@@ -131,6 +131,11 @@ void addSourceFiles(ref BuildRequirements req, JSONStringArray files, ParseConfi
 void addExcludedSourceFiles(ref BuildRequirements req, JSONStringArray files, ParseConfig c){req.cfg.excludeSourceFiles.exclusiveMerge(files);}
 void addLibPaths(ref BuildRequirements req, JSONStringArray paths, ParseConfig c){req.cfg.libraryPaths.exclusiveMerge(paths);}
 void addLibs(ref BuildRequirements req, JSONStringArray libs, ParseConfig c){req.cfg.libraries.exclusiveMerge(libs);}
+void addFrameworks(ref BuildRequirements req, JSONStringArray frameworks, ParseConfig c)
+{
+    if(c.cInfo.targetOS.isApple)
+        req.cfg.frameworks.exclusiveMerge(frameworks);
+}
 void addVersions(ref BuildRequirements req, JSONStringArray vers, ParseConfig c){req.cfg.versions.exclusiveMerge(vers);}
 void addDebugVersions(ref BuildRequirements req, JSONStringArray vers, ParseConfig c){req.cfg.debugVersions.exclusiveMerge(vers);}
 void addLinkFlags(ref BuildRequirements req, JSONStringArray lFlags, ParseConfig c){req.cfg.linkFlags.exclusiveMerge(lFlags);}
