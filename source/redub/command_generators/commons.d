@@ -214,7 +214,7 @@ bool isPosix(OS os)
 
 bool isApple(OS os)
 {
-    return !(os == OS.osx || os == OS.iOS || os == OS.tvOS || os == OS.watchOS);
+    return (os == OS.osx || os == OS.iOS || os == OS.tvOS || os == OS.watchOS);
 }
 
 /**
