@@ -106,7 +106,12 @@ int main(string[] args)
 
 int runMain(string[] args, string[] runArgs)
 {
-    ProjectDetails d = buildProject(resolveDependencies(args));
+    ProjectDetails d = resolveDependencies(args);
+    if(!d.tree || d.usesExternalErrorCode)
+        return d.getReturnCode;
+    if(d.tree.name == "redub")
+        return updateMain(["", "--no-pull"]);
+    d = buildProject(d);
     if(!d.tree || d.usesExternalErrorCode)
         return d.getReturnCode;
     if(d.tree.requirements.cfg.targetType != TargetType.executable)
@@ -239,7 +244,10 @@ int cleanMain(string[] args)
 
 int buildMain(string[] args)
 {
-    return buildProject(resolveDependencies(args)).getReturnCode;
+    ProjectDetails d = resolveDependencies(args);
+    if(d.tree.name == "redub")
+        return updateMain(["", "--no-pull"]);
+    return buildProject(d).getReturnCode;
 }
 
 int updateMain(string[] args)
@@ -282,7 +290,6 @@ int updateMain(string[] args)
         defaultGetoptPrinter(RedubVersionShort~" update information: \n", res.options);
         return 0;
     }
-
     setLogLevel(update.vverbose ? LogLevel.vverbose : LogLevel.info);
 
     int gitCode = executeShell("git --help").status;
@@ -291,6 +298,7 @@ int updateMain(string[] args)
     enum hasNoGitPosix = 127;
 
     bool replaceRedub = false || update.noPull;
+
     if(gitCode == 0 && !update.noPull)
     {
         auto ret = executeShell("git pull", null, Config.none, size_t.max, redubPath);
@@ -460,20 +468,6 @@ update
         defaultGetoptPrinter(RedubVersionShort~" build information: \n\t"~newCommands, res.options);
         return ProjectDetails.init;
     }
-    updateVerbosity(bArgs.cArgs);
-
-
-    if(targetPackage)
-    {
-        import redub.package_searching.cache;
-        import redub.package_searching.entry;
-        import std.stdio;
-        PackageInfo* info = findPackage(targetPackage, null, packageVersion, "redub-run");
-        if(!info)
-            throw new RedubException("Could not find the package "~targetPackage~" with version "~packageVersion);
-        workingDir = info.path;
-        recipe = findEntryProjectFile(info.path);
-    }
 
     if(bArgs.version_)
     {
@@ -482,7 +476,8 @@ update
         return ProjectDetails(null, Compiler.init, ParallelType.auto_, CompilationDetails.init, false, true);
     }
 
-    if(bArgs.arch && !bArgs.compiler) bArgs.compiler = "ldc2";
+    updateVerbosity(bArgs.cArgs);
+
     DubCommonArguments cArgs = bArgs.cArgs;
     if(cArgs.root)
         workingDir = cArgs.getRoot(workingDir);
@@ -492,6 +487,23 @@ update
         throw new RedubException("Can't set both --single and --recipe");
     if(cArgs.recipe)
         recipe = cArgs.getRecipe(workingDir);
+
+    string localPackageName = getLocalPackageName(workingDir, recipe);
+    
+    if(shouldFetchPackage(localPackageName, targetPackage, subPackage))
+    {
+        import redub.package_searching.cache;
+        import redub.package_searching.entry;
+        PackageInfo* info = findPackage(targetPackage, null, packageVersion, "redub-run");
+        if(!info)
+            throw new RedubException("Could not find the package "~targetPackage~" with version "~packageVersion);
+        workingDir = info.path;
+        recipe = findEntryProjectFile(info.path);
+    }
+
+
+    if(bArgs.arch && !bArgs.compiler) bArgs.compiler = "ldc2";
+    
 
     if(bArgs.build.breadth)
     {

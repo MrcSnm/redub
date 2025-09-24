@@ -90,7 +90,18 @@ BuildRequirements parseWithData(
     return ret;
 }
 
-
+/** 
+ * 
+ * Params:
+ *   filePath = The path of the recipe file
+ * Returns: Only the file name. Way faster than parsing the configurations
+ */
+string getPackageName(string filePath)
+{
+    import std.file;
+    JSONValue v = parseSdlCached(filePath, readText(filePath));
+    return v["name"].str;
+}
 
 private JSONValue[string] sdlJsonCache;
 JSONValue parseSdlCached(string filePath, string fileData)

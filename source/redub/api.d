@@ -594,6 +594,33 @@ ProjectDetails resolveDependencies(
     return ret;
 }
 
+/** 
+ * 
+ * Params:
+ *   projectWorkingDir = The project working dir to get the recipe
+ *   recipe = The actual recipe. May be null for finding in the folder
+ * Returns: The found package name. May throw
+ */
+string getLocalPackageName(string projectWorkingDir, string recipe = null)
+{
+    import redub.parsers.automatic;
+    return getPackageName(projectWorkingDir, recipe);
+}
+
+/** 
+ * If the target package has the same name as local, do not fetch
+ * If the target package is empty, but the target sub package is not, assume local
+ * Params:
+ *   localPackageName = The local package name
+ *   targetPackage = The target package to build
+ *   targetSubPackage = The target subpackage to build
+ * Returns: Whether the target package should be fetched
+ */
+bool shouldFetchPackage(string localPackageName, string targetPackage, string targetSubPackage)
+{
+    return targetPackage.length && targetPackage != localPackageName;
+}
+
 
 /** 
  * 

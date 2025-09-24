@@ -52,6 +52,12 @@ BuildRequirements parse(string filePath,
     return parse(parseJSONCached(filePath), c, pending, isRoot);
 }
 
+string getPackageName(string filePath)
+{
+    JSONValue v = parseJSONCached(filePath);
+    return v["name"].str;
+}
+
 /**
  *
  * Params:

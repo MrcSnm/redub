@@ -69,6 +69,28 @@ BuildRequirements parseProject(
     return postProcessBuildRequirements(req, pending, cInfo, isRoot, useExistingObj);
 }
 
+/** 
+ * Used mostly to check the name of a package in the local directory and decide what to build
+ * Params:
+ *   projectWorkingDir = The working dir on where to get the package name
+ *   recipe = The actual recipe to read
+ * Returns: The found package name
+ */
+string getPackageName(string projectWorkingDir, string recipe)
+{
+    import redub.package_searching.entry;
+    import std.path;
+    string projectFile = findEntryProjectFile(projectWorkingDir, recipe);
+    if(!projectFile)
+        throw new Exception("Directory '"~projectWorkingDir~"' has no recipe or does not exists.");
+    switch(extension(projectFile))
+    {
+        case ".sdl":   return redub.parsers.sdl.getPackageName(projectFile); break;
+        case ".json":  return redub.parsers.json.getPackageName(projectFile); break;
+        default: throw new Exception("Unsupported project type "~projectFile);
+    }
+}
+
 /**
  * Post process for the parseProject operation.
  * Required for merge pending configuration, setup environment variables, parse environment variables inside its content
