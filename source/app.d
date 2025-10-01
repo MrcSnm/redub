@@ -60,6 +60,7 @@ int main(string[] args)
             "deps": &depsMain,
             "test": &testMain,
             "init": &initMain,
+            "watch": &watchMain,
             "run": cast(int function(string[]))null
         ];
 
@@ -249,6 +250,62 @@ int buildMain(string[] args)
         return updateMain(["", "--no-pull"]);
     return buildProject(d).getReturnCode;
 }
+
+
+int watchMain(string[] args)
+{
+    import fswatch;
+    import std.path;
+    import std.string;
+
+
+    static void buildWatchers(ref FileWatch[] ret, ProjectDetails d)
+    {
+        ret.length = 0;
+        string[] allDirs = d.tree.requirements.cfg.importDirectories ~ d.tree.requirements.cfg.stringImportPaths;
+        foreach(ProjectNode node; d.tree.collapse)
+        {
+            foreach(source; node.requirements.cfg.sourceFiles)
+                ret~= FileWatch(source, false);
+        }
+        foreach(dir; allDirs)
+            ret~= FileWatch(dir, true);
+    }
+
+    ProjectDetails d = resolveDependencies(args.dup);
+    FileWatch[] watchers;
+    buildWatchers(watchers, d);
+
+    while(true)
+    {
+        import core.thread;
+        WATCHERS_LOOP: foreach(ref watch; watchers)
+        {
+            foreach(event; watch.getEvents())
+            {
+                if(event.type == FileChangeEventType.modify)
+                {
+                    if(event.path.endsWith("dub.json") || event.path.endsWith("dub.sdl"))
+                    {
+                        d = resolveDependencies(args.dup);
+                        buildWatchers(watchers, d);
+                        break WATCHERS_LOOP;
+                    }
+                    else if(event.path.endsWith(".d") || event.path.endsWith(".di"))
+                    {
+                        buildProject(d);
+                        break WATCHERS_LOOP;
+                    }
+                }
+            }
+        }
+        Thread.sleep(dur!"msecs"(33));
+    }
+
+    return 0;
+
+}
+
 
 int updateMain(string[] args)
 {
