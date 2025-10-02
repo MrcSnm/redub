@@ -347,7 +347,7 @@ struct BuildConfiguration
         ret.libraries.exclusiveMerge(other.libraries);
         ret.frameworks.exclusiveMerge(other.frameworks);
         ret.libraryPaths.exclusiveMergePaths(other.libraryPaths);
-        ret.linkFlags.exclusiveMerge(other.linkFlags);
+        ret.linkFlags.exclusiveMerge(other.linkFlags, null, linkerMergeKeep);
         return ret;
     }
 
@@ -919,6 +919,7 @@ class ProjectNode
     void finish(OS targetOS, ISA isa)
     {
         scope bool[ProjectNode] visitedBuffer;
+        scope bool[ProjectNode] linkPropagatedBuffer;
         scope ProjectNode[] privatesToMerge;
         scope ProjectNode[] dependenciesToRemove;
         privatesToMerge.reserve(128);
@@ -1037,7 +1038,7 @@ class ProjectNode
             }
 
         }
-        static void finishMerging(ProjectNode target, ProjectNode input)
+        static void finishMerging(ProjectNode target, ProjectNode input, ref bool[ProjectNode] linkPropagated)
         {
             import redub.misc.path;
             vvlog("Merging ", input.name, " into ", target.name);
@@ -1046,7 +1047,11 @@ class ProjectNode
             target.requirements.cfg = target.requirements.cfg.mergeStringImport(input.requirements.cfg);
             target.requirements.cfg = target.requirements.cfg.mergeVersions(input.requirements.cfg);
             target.requirements.cfg = target.requirements.cfg.mergeFilteredDflags(input.requirements.cfg);
-            target.requirements.cfg = target.requirements.cfg.mergeLinkFlags(input.requirements.cfg);
+            if(input !in linkPropagated)
+            {
+                linkPropagated[input] = true;
+                target.requirements.cfg = target.requirements.cfg.mergeLinkFlags(input.requirements.cfg);
+            }
 
             target.requirements.cfg = target.requirements.cfg.mergeLinkFilesFromSource(input.requirements.cfg);
 
@@ -1079,7 +1084,7 @@ class ProjectNode
             }
         }
 
-        static void finishPublic(ProjectNode node, ref bool[ProjectNode] visited, ref ProjectNode[] privatesToMerge, ref ProjectNode[] dependenciesToRemove, OS targetOS, ISA isa)
+        static void finishPublic(ProjectNode node, ref bool[ProjectNode] visited, ref bool[ProjectNode] linkPropagated, ref ProjectNode[] privatesToMerge, ref ProjectNode[] dependenciesToRemove, OS targetOS, ISA isa)
         {
             if(node in visited) return;
             ///Enters in the deepest node
@@ -1087,7 +1092,7 @@ class ProjectNode
             {
                 ProjectNode dep = node.dependencies[i];
                 if(!(node in visited))
-                    finishPublic(dep, visited, privatesToMerge, dependenciesToRemove, targetOS, isa);
+                    finishPublic(dep, visited, linkPropagated, privatesToMerge, dependenciesToRemove, targetOS, isa);
             }
             ///Finish defining its self requirements so they can be transferred to its parents
             finishSelfRequirements(node, targetOS, isa);
@@ -1096,7 +1101,7 @@ class ProjectNode
             {
                 ProjectNode p = node.parent[i];
                 if(!hasPrivateRelationship(p, node))
-                   finishMerging(p, node);
+                   finishMerging(p, node, linkPropagated);
                 else
                     privatesToMerge~= [p, node];
             }
@@ -1104,10 +1109,10 @@ class ProjectNode
             if(node.requirements.cfg.targetType == TargetType.sourceLibrary || node.requirements.cfg.targetType == TargetType.none)
                 dependenciesToRemove~= node;
         }
-        static void finishPrivate(ProjectNode[] privatesToMerge, ProjectNode[] dependenciesToRemove)
+        static void finishPrivate(ProjectNode[] privatesToMerge, ProjectNode[] dependenciesToRemove, ref bool[ProjectNode] linkPropagated)
         {
             for(int i = 0; i < privatesToMerge.length; i+= 2)
-                finishMerging(privatesToMerge[i], privatesToMerge[i+1]);
+                finishMerging(privatesToMerge[i], privatesToMerge[i+1], linkPropagated);
             foreach(node; dependenciesToRemove)
             {
                 vlog("Project ", node.name, " is a ", node.requirements.cfg.targetType == TargetType.sourceLibrary ? "sourceLibrary" : "none",". Becoming independent.");
@@ -1133,13 +1138,14 @@ class ProjectNode
             warn("Optional Dependencies ", removedOptionals, " not included since they weren't requested as non optional from other places.");
         if(removedNull.length)
             warn("Dependencies ", removedNull, " not included since they didn't have any source file to build.");
-        finishPublic(this, visitedBuffer, privatesToMerge, dependenciesToRemove, targetOS, isa);
+        finishPublic(this, visitedBuffer, linkPropagatedBuffer, privatesToMerge, dependenciesToRemove, targetOS, isa);
         inLogLevel(LogLevel.vverbose, vvlog("finishPublic finished at ", sw.peek.total!"msecs", "ms"));
 
-        finishPrivate(privatesToMerge, dependenciesToRemove);
+        finishPrivate(privatesToMerge, dependenciesToRemove, linkPropagatedBuffer);
         inLogLevel(LogLevel.vverbose,  vvlog("finishPrivate finished at ", sw.peek.total!"msecs", "ms"));
 
         visitedBuffer.clear();
+        linkPropagatedBuffer.clear();
 
         dependenciesToRemove = null;
         privatesToMerge = null;
