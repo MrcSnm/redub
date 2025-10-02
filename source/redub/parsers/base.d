@@ -214,10 +214,3 @@ void addSubConfiguration(
     else
         req.dependencies[depIndex].subConfiguration = BuildRequirements.Configuration(subConfigurationName, false);
 }
-
-const string[] linkerMergeKeep = [
-    "-l",
-    "-framework",
-    "-L",
-    "/LIBPATH",
-];

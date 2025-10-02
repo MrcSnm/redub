@@ -8,7 +8,7 @@ import redub.package_searching.api;
 
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.24.18";
+enum RedubVersionOnly = "v1.24.19";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -403,7 +403,7 @@ struct BuildConfiguration
     BuildConfiguration mergeLinkFlags(const ref BuildConfiguration other) const
     {
         BuildConfiguration ret = clone;
-        ret.linkFlags.exclusiveMerge(other.linkFlags);
+        ret.linkFlags.exclusiveMerge(other.linkFlags, null, linkerMergeKeep);
         return ret;
     }
 
@@ -510,13 +510,15 @@ ref string[] exclusiveMerge(StringRange)(return scope ref string[] a, StringRang
     outer: foreach(bV; save(b))
     {
         if(bV.length == 0) continue;
-        if(countUntil(excludeFromMerge, bV) != -1) continue;
-        else if (countUntil(alwaysKeep, bV) != -1)
+        if(countUntil(excludeFromMerge, bV) != -1)
+            continue;
+        if (countUntil(alwaysKeep, bV) != -1)
         {
             app ~= bV;
-            continue outer;
+            continue;
         }
-        else foreach(aV; a)
+
+        foreach(aV; a)
         {
             if(aV == bV)
                 continue outer;
@@ -1399,3 +1401,10 @@ private bool matches(string inputName, string toMatch) @nogc nothrow
     }
     return true;
 }
+
+immutable string[] linkerMergeKeep = [
+    "-l",
+    "-framework",
+    "-L",
+    "/LIBPATH",
+];
