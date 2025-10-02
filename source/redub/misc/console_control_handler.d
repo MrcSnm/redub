@@ -1,12 +1,11 @@
 module redub.misc.console_control_handler;
 
-
 private void printPendingProjects() nothrow
 {
     try
     {
         import std.stdio;
-        // writeln("Executed CTRL+C");
+       // writeln("Executed CTRL+C");
     }
     catch(Exception e){}
 }
@@ -17,7 +16,7 @@ void startHandlingConsoleControl()
     if(!hasStarted)
     {
         hasStarted = true;
-        handleConsoleControl();
+        // handleConsoleControl();
     }
 }
 
@@ -31,7 +30,7 @@ version(Windows)
         {
             case CTRL_C_EVENT:
                 printPendingProjects();
-                return TRUE;
+                return FALSE;
             default:
                 return FALSE;
         }

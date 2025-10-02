@@ -9,12 +9,21 @@
     "configurations": [
         {
             "name": "cli",
-            "targetType": "executable"
+            "targetType": "executable",
+            "versions": ["FSWForcePoll"],
+            "dependencies": {
+                "fswatch": "~>0.6.1",
+                "arsd-official:terminal": "~>12.0"
+            }
         },
         {
             "name": "cli-dev",
-            "versions": ["Developer"],
-            "targetType": "executable"
+            "versions": ["Developer", "FSWForcePoll"],
+            "targetType": "executable",
+            "dependencies": {
+                "fswatch": "~>0.6.1",
+                "arsd-official:terminal": "~>12.0"
+            }
         },
         {
             "name": "library",
