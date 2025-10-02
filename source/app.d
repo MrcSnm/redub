@@ -245,8 +245,6 @@ int cleanMain(string[] args)
 int buildMain(string[] args)
 {
     ProjectDetails d = resolveDependencies(args);
-    if(d.tree.name == "redub")
-        return updateMain(["", "--no-pull"]);
     return buildProject(d).getReturnCode;
 }
 
