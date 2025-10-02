@@ -500,7 +500,7 @@ private auto save(TRange)(TRange input)
 */
 ref string[] exclusiveMerge(StringRange)(return scope ref string[] a, StringRange b, scope const string[] excludeFromMerge = null)
 {
-    import std.algorithm.searching:countUntil;
+    import std.algorithm.searching : countUntil;
     import std.array;
     auto app = appender!(string[]);
     scope(exit)
@@ -511,7 +511,7 @@ ref string[] exclusiveMerge(StringRange)(return scope ref string[] a, StringRang
     {
         if(bV.length == 0) continue;
         if(countUntil(excludeFromMerge, bV) != -1) continue;
-        foreach(aV; a)
+        else foreach(aV; a)
         {
             if(aV == bV)
                 continue outer;
