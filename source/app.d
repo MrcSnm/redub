@@ -109,8 +109,6 @@ int runMain(string[] args, string[] runArgs)
     ProjectDetails d = resolveDependencies(args);
     if(!d.tree || d.usesExternalErrorCode)
         return d.getReturnCode;
-    if(d.tree.name == "redub")
-        return updateMain(["", "--no-pull"]);
     d = buildProject(d);
     if(!d.tree || d.usesExternalErrorCode)
         return d.getReturnCode;
