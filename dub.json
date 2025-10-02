@@ -12,7 +12,8 @@
             "targetType": "executable",
             "versions": ["FSWForcePoll"],
             "dependencies": {
-                "fswatch": "~>0.6.1"
+                "fswatch": "~>0.6.1",
+                "arsd-official:terminal": "~>12.0"
             }
         },
         {
@@ -20,7 +21,8 @@
             "versions": ["Developer", "FSWForcePoll"],
             "targetType": "executable",
             "dependencies": {
-                "fswatch": "~>0.6.1"
+                "fswatch": "~>0.6.1",
+                "arsd-official:terminal": "~>12.0"
             }
         },
         {

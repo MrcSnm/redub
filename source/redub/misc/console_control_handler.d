@@ -16,7 +16,7 @@ void startHandlingConsoleControl()
     if(!hasStarted)
     {
         hasStarted = true;
-        handleConsoleControl();
+        // handleConsoleControl();
     }
 }
 

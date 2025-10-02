@@ -257,6 +257,74 @@ int watchMain(string[] args)
     import fswatch;
     import std.path;
     import std.string;
+    import arsd.terminal;
+
+
+    static void drawChoices(ref Terminal t, string[] choices, string title, string next, int startCursorY)
+    {
+        enum SelectionHint = "Select an option by using Arrow Up/Down and choose it by pressing Enter.";
+        t.flush();
+        t.moveTo(0, startCursorY, ForceOption.alwaysSend);
+
+        t.color(arsd.terminal.Color.yellow, arsd.terminal.Color.DEFAULT);
+        t.writeln(title);
+        t.color(arsd.terminal.Color.DEFAULT, arsd.terminal.Color.DEFAULT);
+        t.writeln(SelectionHint);
+        foreach(i, c; choices)
+        {
+            if(c == next)
+            {
+                t.color(arsd.terminal.Color.green, arsd.terminal.Color.DEFAULT);
+                t.writeln(">> ", c);
+                t.color(arsd.terminal.Color.DEFAULT, arsd.terminal.Color.DEFAULT);
+            }
+            else t.writeln(c);
+        }
+        t.flush;
+    }
+
+    static bool selectChoiceBase(ref Terminal terminal, dchar key, string[] choices,
+        string selectionTitle, ref ptrdiff_t selectedChoice, int startCursorY)
+    {
+        enum ESC = 983067;
+        enum ArrowUp = 983078;
+        enum ArrowDown = 983080;
+
+        int startLine = startCursorY;
+
+        bool selected = false;
+        switch(key)
+        {
+            case ArrowUp:
+                selectedChoice = (selectedChoice + choices.length - 1) % choices.length;
+                return false;
+            case ArrowDown:
+                selectedChoice = (selectedChoice+1) % choices.length;
+                return false;
+            case ESC:
+                selectedChoice = choices.length - 1;
+                selected = true;
+                break;
+            case '\n':
+                selected = true;
+                break;
+            default: return false;
+        }
+
+        import std.algorithm.searching;
+        terminal.moveTo(0, cast(int)startLine, ForceOption.alwaysSend);
+        //Title + SelectionHint
+        foreach(i; 0..choices.length+ ( count(selectionTitle, "\n")+2))
+            terminal.moveTo(0, cast(int)(startLine+i)), terminal.clearToEndOfLine();
+        terminal.moveTo(0, cast(int)startLine+1); //Jump title
+        terminal.color(arsd.terminal.Color.green, arsd.terminal.Color.DEFAULT);
+        terminal.writeln(">> ", choices[selectedChoice]);
+        terminal.color(arsd.terminal.Color.DEFAULT, arsd.terminal.Color.DEFAULT);
+        terminal.flush;
+
+        return selected;
+    }
+
 
 
     static void buildWatchers(ref FileWatch[] ret, ProjectDetails d)
@@ -275,7 +343,40 @@ int watchMain(string[] args)
     ProjectDetails d = resolveDependencies(args.dup);
     FileWatch[] watchers;
     buildWatchers(watchers, d);
+    auto terminal = Terminal(ConsoleOutputType.linear);
+    auto input = RealTimeConsoleInput(&terminal, ConsoleInputFlags.raw);
 
+    ptrdiff_t choice = 0;
+    string[] choices = [
+        "Run",
+        "Exit"
+    ];
+
+    scope(exit)
+    {
+        destroy(input);
+        destroy(terminal);
+    }
+
+    static void writeChoices(ref Terminal t, string[] choices, int selectedChoice)
+    {
+        foreach(i, ch; choices)
+        {
+            if(i == selectedChoice)
+            {
+                t.color(arsd.terminal.Color.green, arsd.terminal.Color.DEFAULT);
+                t.write(">> ");
+            }
+            t.writeln(ch);
+            t.color(arsd.terminal.Color.DEFAULT, arsd.terminal.Color.DEFAULT);
+        }
+        t.flush;
+    }
+
+
+    bool hasShownLastLineMessage = false;
+    terminal.updateCursorPosition();
+    int cursorY = terminal.cursorY;
     while(true)
     {
         import core.thread;
@@ -289,15 +390,44 @@ int watchMain(string[] args)
                     {
                         d = resolveDependencies(args.dup);
                         buildWatchers(watchers, d);
+                        terminal.updateCursorPosition();
+                        cursorY = terminal.cursorY;
+                        hasShownLastLineMessage = false;
+
                         break WATCHERS_LOOP;
                     }
                     else if(event.path.endsWith(".d") || event.path.endsWith(".di"))
                     {
                         buildProject(d);
+                        hasShownLastLineMessage = false;
+                        terminal.updateCursorPosition();
+                        cursorY = terminal.cursorY;
                         break WATCHERS_LOOP;
                     }
                 }
             }
+        }
+        import std.stdio;
+        // writeln(cursorY);
+        // terminal.moveTo(0, cursorY);
+        // terminal.clearToEndOfLine();
+
+
+        dchar k = input.getch(true);
+        if(k != dchar.init || !hasShownLastLineMessage)
+        {
+            drawChoices(terminal, choices, "Next Action: ", choices[choice], cursorY);
+            if(selectChoiceBase(terminal, k, choices, "Next Action: ", choice, cursorY))
+            {
+                final switch(choices[choice])
+                {
+                    case "Run":
+                        return 1;
+                    case "Exit":
+                        return 0;
+                }
+            }
+            hasShownLastLineMessage = true;
         }
         Thread.sleep(dur!"msecs"(33));
     }
@@ -396,9 +526,7 @@ int updateMain(string[] args)
         info("Preparing to build redub at ", redubPath);
         BuildType bt = BuildType.release_debug;
         if(update.fast)
-        {
-            update.compiler = "dmd";
-        }
+            bt = BuildType.debug_;
         
         ProjectDetails d = redub.api.resolveDependencies(false, os, CompilationDetails(update.compiler), ProjectToParse(update.dev ? "cli-dev" : null, redubPath), InitialDubVariables.init, bt);
         enforce(d.tree.name == "redub", "Redub update should only be used to update redub.");
@@ -545,7 +673,10 @@ update
     if(cArgs.recipe)
         recipe = cArgs.getRecipe(workingDir);
 
-    string localPackageName = getLocalPackageName(workingDir, recipe);
+    string localPackageName;
+
+    if(targetPackage || subPackage )
+        localPackageName = getLocalPackageName(workingDir, recipe);
     
     if(shouldFetchPackage(localPackageName, targetPackage, subPackage))
     {
