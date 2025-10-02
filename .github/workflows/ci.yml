@@ -45,7 +45,7 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           # Build arm64 version
-          redub build -b release-debug --prefetch --arch=aarch64
+          redub build -b release-debug --prefetch --arch=arm64-apple-darwin
           mv build/redub build/redub-arm64
 
           # Build x86_64 version
@@ -77,6 +77,7 @@ jobs:
         if: runner.os == 'macOS'
         with:
           name: redub-${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'latest' }}-${{ matrix.os_name }}-universal
+          path: redub-${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'latest' }}-${{ matrix.os_name }}-universal
         
       - name: Rename artifact on Linux
         if: runner.os == 'Linux'
