@@ -38,9 +38,23 @@ jobs:
           redub: 1.24.15
 
       - name: Build
+        if: runner.os != 'macOS'
         run: |
           redub build -b release-debug --prefetch
-      
+      - name: Build (OSX Universal)
+        if: runner.os == 'macOS'
+        run: |
+          # Build arm64 version
+          redub build -b release-debug --prefetch --arch=aarch64
+          mv build/redub build/redub-arm64
+
+          # Build x86_64 version
+          redub build -b release-debug --prefetch --arch=x86_64
+          mv build/redub build/redub-x86_64
+
+          lipo -create build/redub-arm64 build/redub-x86_64 -output build/redub
+          rm build/redub-arm64 build/redub-x86_64
+        
       - name: Rename artifact on Windows
         if: runner.os == 'Windows'
         run: |
@@ -53,14 +67,25 @@ jobs:
           name: redub-${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'latest' }}-windows-${{ matrix.arch }}.exe
           path: redub-${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'latest' }}-windows-${{ matrix.arch }}.exe
         
-      - name: Rename artifact Unix
-        if: runner.os != 'Windows'
+      - name: Rename artifact on macOS
+        if: runner.os == 'macOS'
+        run: |
+          ls -R
+          mv build/redub redub-${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'latest' }}-${{ matrix.os_name }}-universal
+      - name: Upload artifacts on macOS
+        uses: actions/upload-artifact@v4
+        if: runner.os == 'macOS'
+        with:
+          name: redub-${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'latest' }}-${{ matrix.os_name }}-universal
+        
+      - name: Rename artifact on Linux
+        if: runner.os == 'Linux'
         run: |
           ls -R
           mv build/redub redub-${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'latest' }}-${{ matrix.os_name }}-${{ matrix.arch }}
-      - name: Upload artifacts on Unix
+      - name: Upload artifacts on Linux
         uses: actions/upload-artifact@v4
-        if: runner.os != 'Windows'
+        if: runner.os == 'Linux'
         with:
           name: redub-${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'latest' }}-${{ matrix.os_name }}-${{ matrix.arch }}
           path: redub-${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'latest' }}-${{ matrix.os_name }}-${{ matrix.arch }}
