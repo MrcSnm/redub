@@ -138,7 +138,7 @@ void addFrameworks(ref BuildRequirements req, JSONStringArray frameworks, ParseC
 }
 void addVersions(ref BuildRequirements req, JSONStringArray vers, ParseConfig c){req.cfg.versions.exclusiveMerge(vers);}
 void addDebugVersions(ref BuildRequirements req, JSONStringArray vers, ParseConfig c){req.cfg.debugVersions.exclusiveMerge(vers);}
-void addLinkFlags(ref BuildRequirements req, JSONStringArray lFlags, ParseConfig c){req.cfg.linkFlags.exclusiveMerge(lFlags, null, linkerMergeKeep);}
+void addLinkFlags(ref BuildRequirements req, JSONStringArray lFlags, ParseConfig c){req.cfg.linkFlags.inclusiveMerge(lFlags);}
 void addDflags(ref BuildRequirements req, JSONStringArray dFlags, ParseConfig c){req.cfg.dFlags.exclusiveMerge(dFlags);}
 void addDependency(
     ref BuildRequirements req, 
@@ -214,10 +214,3 @@ void addSubConfiguration(
     else
         req.dependencies[depIndex].subConfiguration = BuildRequirements.Configuration(subConfigurationName, false);
 }
-
-const string[] linkerMergeKeep = [
-    "-l",
-    "-framework",
-    "-L",
-    "/LIBPATH",
-];

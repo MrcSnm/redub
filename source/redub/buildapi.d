@@ -403,7 +403,7 @@ struct BuildConfiguration
     BuildConfiguration mergeLinkFlags(const ref BuildConfiguration other) const
     {
         BuildConfiguration ret = clone;
-        ret.linkFlags.exclusiveMerge(other.linkFlags);
+        ret.linkFlags.inclusiveMerge(other.linkFlags);
         return ret;
     }
 
@@ -484,8 +484,6 @@ struct BuildConfiguration
     }
 }
 
-
-
 private auto save(TRange)(TRange input)
 {
     import std.traits:isArray;
@@ -493,6 +491,17 @@ private auto save(TRange)(TRange input)
         return input;
     else
         return input.save;
+}
+
+ref string[] inclusiveMerge(StringRange)(return scope ref string[] a, StringRange b)
+{
+    import std.array;
+    auto app = appender!(string[]);
+    scope(exit)
+        a ~= app.data;
+    foreach(bV; save(b))
+        app ~= bV;
+    return a;
 }
 
 /**
@@ -504,9 +513,8 @@ ref string[] exclusiveMerge(StringRange)(return scope ref string[] a, StringRang
     import std.array;
     auto app = appender!(string[]);
     scope(exit)
-    {
-        a~= app.data;
-    }
+        a ~= app.data;
+    
     outer: foreach(bV; save(b))
     {
         if(bV.length == 0) continue;
@@ -521,7 +529,7 @@ ref string[] exclusiveMerge(StringRange)(return scope ref string[] a, StringRang
             if(aV == bV)
                 continue outer;
         }
-        app~= bV;
+        app ~= bV;
     }
     return a;
 }
