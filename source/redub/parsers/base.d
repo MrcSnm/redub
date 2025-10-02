@@ -64,12 +64,7 @@ void setName(ref BuildRequirements req, string name, ParseConfig c)
 void setTargetName(ref BuildRequirements req, string name, ParseConfig c){req.cfg.targetName = name;}
 void setTargetPath(ref BuildRequirements req, string path, ParseConfig c){req.cfg.outputDirectory = path;}
 void setTargetType(ref BuildRequirements req, string targetType, ParseConfig c){req.cfg.targetType = targetFrom(targetType);}
-void addImportPaths(ref BuildRequirements req, JSONStringArray paths, ParseConfig c)
-{
-    import std.array;
-    if(c.firstRun) req.cfg.importDirectories = cast(string[])paths.array;
-    else req.cfg.importDirectories.exclusiveMerge(paths);
-}
+void addImportPaths(ref BuildRequirements req, JSONStringArray paths, ParseConfig c){req.cfg.importDirectories.exclusiveMerge(paths);}
 void addStringImportPaths(ref BuildRequirements req, JSONStringArray paths, ParseConfig c){req.cfg.stringImportPaths.exclusiveMergePaths(paths);}
 void addExtraDependencyFiles(ref BuildRequirements req, JSONStringArray files, ParseConfig c){req.cfg.extraDependencyFiles.exclusiveMerge(files);}
 void addFilesToCopy(ref BuildRequirements req, JSONStringArray files, ParseConfig c){req.cfg.filesToCopy = req.cfg.filesToCopy.append(files);}

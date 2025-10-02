@@ -8,7 +8,7 @@ import redub.package_searching.api;
 
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.25.0";
+enum RedubVersionOnly = "v1.25.1";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -253,10 +253,7 @@ struct BuildConfiguration
         
         ret.language = l;
         if(initialSource)
-        {
             ret.sourcePaths = [initialSource];
-            ret.importDirectories = [initialSource];
-        }
         if(initialStringImport) ret.stringImportPaths = [initialStringImport];
         ret.targetType = TargetType.autodetect;
         ret.outputDirectory = ".";
@@ -1041,7 +1038,7 @@ class ProjectNode
         static void finishMerging(ProjectNode target, ProjectNode input, ref bool[ProjectNode] linkPropagated)
         {
             import redub.misc.path;
-            vvlog("Merging ", input.name, " into ", target.name);
+            vvlog("Merge ", input.name, " ---> ", target.name);
             target.requirements.cfg = target.requirements.cfg.mergeImport(input.requirements.cfg);
             target.requirements.cfg = target.requirements.cfg.mergeExcludedSourceFiles(input.requirements.cfg);
             target.requirements.cfg = target.requirements.cfg.mergeStringImport(input.requirements.cfg);
