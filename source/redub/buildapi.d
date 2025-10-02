@@ -8,7 +8,7 @@ import redub.package_searching.api;
 
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.24.19";
+enum RedubVersionOnly = "v1.25.0";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -205,7 +205,7 @@ struct BuildConfiguration
     PluginExecution[] preBuildPlugins;
     string workingDir;
     string arch;
-    @cacheExclude string targetName;
+    string targetName;
 
     ///When having those files, the build will use them instead of sourcePaths + sourceFiles
     @cacheExclude string[] changedBuildFiles;

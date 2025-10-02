@@ -54,6 +54,7 @@ int main(string[] args)
 
         int function(string[])[string] entryPoints = [
             "build": &buildMain,
+            "build-universal": &buildUniversalMain,
             "update": &updateMain,
             "clean": &cleanMain,
             "describe": &describeMain,
@@ -246,6 +247,15 @@ int buildMain(string[] args)
     return buildProject(d).getReturnCode;
 }
 
+int buildUniversalMain(string[] args)
+{
+    ArgsDetails argsDetails = resolveArguments(args);
+    foreach(d; buildProjectUniversal(argsDetails))
+        if(d.error)
+            return d.getReturnCode;
+    return 0;
+}
+
 int updateMain(string[] args)
 {
     import core.runtime;
@@ -407,148 +417,26 @@ string findProgramPath(string program)
 ProjectDetails resolveDependencies(string[] args, bool isDescribeOnly = false)
 {
     import std.file;
-    import std.algorithm.comparison:either;
-    import std.getopt;
     import redub.api;
-    string workingDir = std.file.getcwd();
-    string targetPackage = getPackageFromCli(args);
-    string packageVersion = getVersionFromPackage(targetPackage);
-    string subPackage = getSubPackage(targetPackage);
-    string recipe;
 
-    DubArguments bArgs;
-    GetoptResult res = betterGetopt(args, bArgs);
-
-    if(res.helpWanted)
-    {
-        import std.getopt;
-        string newCommands =
-`
-USAGE: redub [--version] [<command>] [<options...>] [-- [<application arguments...>]]
-
-Manages the redub project in the current directory. If the command is omitted,
-redub will default to "run". When running an application, "--" can be used to
-separate redub options from options passed to the application.
-
-Run "redub <command> --help" to get help for a specific command.
-
-Available commands
-==================
-
-  Package creation
-  ----------------
-  init [<directory> [<dependency>...]]
-                        Initializes an empty package skeleton
-
-  Build, test and run
-  -------------------
-  run [<package>[@<version-spec>]]
-                        Builds and runs a package (default command)
-  build [<package>[@<version-spec>]]
-                        Builds a package (uses the main package in the current
-                        working directory by default)
-  test [<package>[@<version-spec>]]
-                        Executes the tests of the selected package
-  describe [<package>[@<version-spec>]]
-                        Prints a description of the specified --data files
-  clean [<package>]     Removes intermediate build files and cached build
-                        results
-
-Additions to redub commands --
-
-update
-    Usage: redub update
-    Description: Updates with 'git pull' redub if the current redub is a git repository. If it is not, it will download the newest git tag from redub
-        repository. After updating the source, it will also optimally rebuild redub and replace the current one with the new build.
-`;
-        defaultGetoptPrinter(RedubVersionShort~" build information: \n\t"~newCommands, res.options);
-        return ProjectDetails.init;
-    }
-
-    if(bArgs.version_)
-    {
-        import std.stdio;
-        writeln(RedubVersion);
-        return ProjectDetails(null, Compiler.init, ParallelType.auto_, CompilationDetails.init, false, true);
-    }
-
-    updateVerbosity(bArgs.cArgs);
-
-    DubCommonArguments cArgs = bArgs.cArgs;
-    if(cArgs.root)
-        workingDir = cArgs.getRoot(workingDir);
-    if(recipe && (cArgs.recipe || cArgs.root))
-        throw new Error(`Can't specify a target package to build if you specify either --root or --recipe`);
-    if(bArgs.single && cArgs.recipe)
-        throw new RedubException("Can't set both --single and --recipe");
-    if(cArgs.recipe)
-        recipe = cArgs.getRecipe(workingDir);
-
-    string localPackageName = getLocalPackageName(workingDir, recipe);
-    
-    if(shouldFetchPackage(localPackageName, targetPackage, subPackage))
-    {
-        import redub.package_searching.cache;
-        import redub.package_searching.entry;
-        PackageInfo* info = findPackage(targetPackage, null, packageVersion, "redub-run");
-        if(!info)
-            throw new RedubException("Could not find the package "~targetPackage~" with version "~packageVersion);
-        workingDir = info.path;
-        recipe = findEntryProjectFile(info.path);
-    }
-
-
-    if(bArgs.arch && !bArgs.compiler) bArgs.compiler = "ldc2";
-    
-
-    if(bArgs.build.breadth)
-    {
-        import redub.command_generators.commons;
-        setSpanModeAsBreadth(bArgs.build.breadth);
-    }
-
-    if(bArgs.single)
-    {
-        import std.path;
-        if(!isAbsolute(bArgs.single))
-            recipe = buildNormalizedPath(workingDir, bArgs.single);
-        else
-            recipe = bArgs.single;
-    }
-
-    if(bArgs.prefetch)
-    {
-        import redub.misc.path;
-        import redub.package_searching.dub;
-        string selections = redub.misc.path.buildNormalizedPath(workingDir, "dub.selections.json");
-        auto timing = timed((){prefetchPackages(selections); return true;});
-
-        foreach(pkg; fetchedPackages)
-        {
-            infos("Fetch Success: ", pkg.name, " v",pkg.version_, " required by ", pkg.reqBy);
-        }
-        fetchedPackages.length = 0;
-        infos("Prefetch Finished: ", timing.msecs,"ms");
-    }
-
-
-    string bt = either(bArgs.buildType, BuildType.debug_);
+    ArgsDetails argsD = resolveArguments(args, isDescribeOnly);
+   
 
     ProjectDetails ret =  redub.api.resolveDependencies(
-        bArgs.build.force,
+        argsD.args.build.force,
         os,
-        CompilationDetails(bArgs.compiler, bArgs.cCompiler, bArgs.arch, bArgs.compilerAssumption, bArgs.build.incremental, bArgs.build.useExistingObj, bArgs.build.combined, bArgs.build.parallel),
-        ProjectToParse(bArgs.config, workingDir, subPackage, recipe, bArgs.single.length != 0, isDescribeOnly),
-        getInitialDubVariablesFromArguments(bArgs, DubBuildArguments.init, os, args),
-        bt
+        argsD.cDetails,
+        argsD.proj,
+        argsD.dubVars,
+        argsD.buildType
     );
 
-    if(bArgs.targetPath)
-        ret.tree.requirements.cfg.outputDirectory = bArgs.targetPath;
-    if(bArgs.targetName)
-        ret.tree.requirements.cfg.targetName = bArgs.targetName;
+    if(argsD.args.targetPath)
+        ret.tree.requirements.cfg.outputDirectory = argsD.args.targetPath;
+    if(argsD.args.targetName)
+        ret.tree.requirements.cfg.targetName = argsD.args.targetName;
 
-    if(bArgs.build.printBuilds)
+    if(argsD.args.build.printBuilds)
     {
         import redub.parsers.build_type;
         info("\tAvailable build types:");
@@ -561,46 +449,5 @@ update
         }
     }
 
-    return ret;
-}
-
-void updateVerbosity(DubCommonArguments a)
-{
-    import redub.logging;
-    if(a.vquiet) return setLogLevel(LogLevel.none);
-    if(a.verror) return setLogLevel(LogLevel.error);
-    if(a.quiet) return setLogLevel(LogLevel.warn);
-    if(a.verbose) return setLogLevel(LogLevel.verbose);
-    if(a.vverbose) return setLogLevel(LogLevel.vverbose);
-    return setLogLevel(LogLevel.info);
-}
-private string getPackageFromCli(ref string[] args)
-{
-    if(args.length > 1 && args[1][0] != '-')
-    {
-        string ret = args[1];
-        args = args[0..$] ~ args[2..$];
-        return ret;
-    }
-    return null;
-}
-
-private string getVersionFromPackage(ref string pkg)
-{
-    import std.algorithm.searching;
-    ptrdiff_t ver = countUntil!((a => a == '@'))(pkg);
-    if(ver == -1) return null;
-    string ret = pkg[ver+2..$]; //Advance @ and v from the tag
-    pkg = pkg[0..ver];
-    return ret;
-}
-
-private string getSubPackage(ref string pkg)
-{
-    import std.algorithm.searching;
-    ptrdiff_t subPackIndex = countUntil!((a => a == ':'))(pkg);
-    if(subPackIndex == -1) return null;
-    string ret = pkg[subPackIndex+1..$];
-    pkg = pkg[0..subPackIndex];
     return ret;
 }

@@ -56,9 +56,8 @@ struct ProjectDetails
         import redub.misc.path;
         import redub.command_generators.commons;
 
-        return buildNormalizedPath(
-            tree.requirements.cfg.outputDirectory,
-            getOutputName(tree.requirements.cfg.targetType, tree.targetName, osFromArch(cDetails.arch), isaFromArch(cDetails.arch))
+        return tree.getOutputName(
+            osFromArch(cDetails.arch), isaFromArch(cDetails.arch)
         );
     }
 }
@@ -108,6 +107,15 @@ struct ProjectToParse
     bool isSingle;
     ///Optional single argument. Used for not running preGenerate commands
     bool isDescribeOnly;
+}
+
+struct ArgsDetails
+{
+    DubArguments args;
+    CompilationDetails cDetails;
+    ProjectToParse proj;
+    InitialDubVariables dubVars;
+    string buildType;
 }
 
 
@@ -387,6 +395,55 @@ ProjectDetails buildProject(ProjectDetails d)
     return d;
 }
 
+ProjectDetails[] buildProjectUniversal(ArgsDetails args)
+{
+    version(OSX)
+    {
+        import std.array;
+        import std.system;
+        import std.process;
+        import std.file;
+        auto archs = ["arm64-apple-darwin", "x86_64-apple-darwin"].staticArray;
+        ProjectDetails[] ret;
+        ArgsDetails other = args;
+
+        string lipoRun = "lipo -create ";
+        string oldTargetName;
+        foreach(arch; archs)
+        {
+            other.cDetails.arch = arch;
+            ProjectDetails d = resolveDependencies(other.args.build.force, os, other.cDetails, other.proj, other.dubVars, other.buildType);
+            if(!oldTargetName)
+                oldTargetName = d.tree.requirements.cfg.targetName;
+            d.tree.requirements.cfg.targetName~= "-"~arch;
+            d = buildProject(d);
+            ret~= d;
+            lipoRun~= " " ~ d.getOutputFile();
+        }
+
+        ret[0].tree.requirements.cfg.targetName = oldTargetName~"-osx-universal";
+        lipoRun~= " -output "~ret[0].getOutputFile();
+        ret[0].tree.requirements.cfg.targetName = oldTargetName~"-"~archs[0];
+
+        vvlog(lipoRun);
+        auto res = executeShell(lipoRun);
+        if(res.status)
+            throw new BuildException(res.output);
+        
+        foreach(d; ret)
+        {
+            vvlog("Removing ", d.getOutputFile);
+            std.file.remove(d.getOutputFile());
+        }
+        return ret;
+    }
+    else
+    {
+        ProjectDetails d = resolveDependencies(args.args.build.force, os, args.cDetails, args.proj, args.dubVars, args.buildType);
+        return [buildProject(d)];
+    }
+}
+
 
 
 bool cleanProject(ProjectDetails d, bool showMessages)
@@ -474,6 +531,152 @@ bool cleanProject(ProjectDetails d, bool showMessages)
         info("Finished cleaning project in ", res.msecs, "ms");
     return res.value;
 }
+
+ArgsDetails resolveArguments(string[] args, bool isDescribeOnly = false)
+{
+    import std.algorithm.comparison:either;
+    import std.getopt;
+    import std.file;
+
+    string workingDir = std.file.getcwd();
+    string targetPackage = getPackageFromCli(args);
+    string packageVersion = getVersionFromPackage(targetPackage);
+    string subPackage = getSubPackage(targetPackage);
+    string recipe;
+
+    DubArguments bArgs;
+    GetoptResult res = betterGetopt(args, bArgs);
+
+    if(res.helpWanted)
+    {
+        import std.getopt;
+        string newCommands =
+`
+USAGE: redub [--version] [<command>] [<options...>] [-- [<application arguments...>]]
+
+Manages the redub project in the current directory. If the command is omitted,
+redub will default to "run". When running an application, "--" can be used to
+separate redub options from options passed to the application.
+
+Run "redub <command> --help" to get help for a specific command.
+
+Available commands
+==================
+
+  Package creation
+  ----------------
+  init [<directory> [<dependency>...]]
+                        Initializes an empty package skeleton
+
+  Build, test and run
+  -------------------
+  run [<package>[@<version-spec>]]
+                        Builds and runs a package (default command)
+  build [<package>[@<version-spec>]]
+                        Builds a package (uses the main package in the current
+                        working directory by default)
+  test [<package>[@<version-spec>]]
+                        Executes the tests of the selected package
+  describe [<package>[@<version-spec>]]
+                        Prints a description of the specified --data files
+  clean [<package>]     Removes intermediate build files and cached build
+                        results
+
+Additions to redub commands --
+
+update
+    Usage: redub update
+    Description: Updates with 'git pull' redub if the current redub is a git repository. If it is not, it will download the newest git tag from redub
+        repository. After updating the source, it will also optimally rebuild redub and replace the current one with the new build.
+build-universal
+    Usage: redub build-universal
+    Description: 
+        Builds a package in non OSX (uses the main package in the  current working directory by default)
+        On OSX, generates a single binary using arm64 and x86_64 architectures
+`;
+        defaultGetoptPrinter(RedubVersionShort~" build information: \n\t"~newCommands, res.options);
+        return ArgsDetails.init;
+    }
+
+    if(bArgs.version_)
+    {
+        import std.stdio;
+        writeln(RedubVersion);
+        return ArgsDetails.init;
+    }
+
+    updateVerbosity(bArgs.cArgs);
+
+    DubCommonArguments cArgs = bArgs.cArgs;
+    if(cArgs.root)
+        workingDir = cArgs.getRoot(workingDir);
+    if(recipe && (cArgs.recipe || cArgs.root))
+        throw new Error(`Can't specify a target package to build if you specify either --root or --recipe`);
+    if(bArgs.single && cArgs.recipe)
+        throw new RedubException("Can't set both --single and --recipe");
+    if(cArgs.recipe)
+        recipe = cArgs.getRecipe(workingDir);
+
+    string localPackageName = getLocalPackageName(workingDir, recipe);
+    
+    if(shouldFetchPackage(localPackageName, targetPackage, subPackage))
+    {
+        import redub.package_searching.cache;
+        import redub.package_searching.entry;
+        PackageInfo* info = findPackage(targetPackage, null, packageVersion, "redub-run");
+        if(!info)
+            throw new RedubException("Could not find the package "~targetPackage~" with version "~packageVersion);
+        workingDir = info.path;
+        recipe = findEntryProjectFile(info.path);
+    }
+
+
+    if(bArgs.arch && !bArgs.compiler) bArgs.compiler = "ldc2";
+    
+
+    if(bArgs.build.breadth)
+    {
+        import redub.command_generators.commons;
+        setSpanModeAsBreadth(bArgs.build.breadth);
+    }
+
+    if(bArgs.single)
+    {
+        import std.path;
+        if(!isAbsolute(bArgs.single))
+            recipe = buildNormalizedPath(workingDir, bArgs.single);
+        else
+            recipe = bArgs.single;
+    }
+
+
+    if(bArgs.prefetch)
+    {
+        import redub.misc.path;
+        import redub.package_searching.dub;
+        string selections = redub.misc.path.buildNormalizedPath(workingDir, "dub.selections.json");
+        auto timing = timed((){prefetchPackages(selections); return true;});
+
+        foreach(pkg; fetchedPackages)
+        {
+            infos("Fetch Success: ", pkg.name, " v",pkg.version_, " required by ", pkg.reqBy);
+        }
+        fetchedPackages.length = 0;
+        infos("Prefetch Finished: ", timing.msecs,"ms");
+    }
+
+
+    string bt = either(bArgs.buildType, BuildType.debug_);
+    return ArgsDetails(
+        bArgs,
+        CompilationDetails(bArgs.compiler, bArgs.cCompiler, bArgs.arch, bArgs.compilerAssumption, bArgs.build.incremental, bArgs.build.useExistingObj, bArgs.build.combined, bArgs.build.parallel),
+        ProjectToParse(bArgs.config, workingDir, subPackage, recipe, bArgs.single.length != 0, isDescribeOnly),
+        getInitialDubVariablesFromArguments(bArgs, DubBuildArguments.init, os, args),
+        bt
+    );
+}
+
+
 /** 
  * Use this function to get a project information.
  * Params:
@@ -662,4 +865,46 @@ int executeProgram(ProjectNode tree, string[] args)
         escapeShellCommand(getOutputPath(tree.requirements.cfg, os)) ~ " "~ join(args, " ")
         )
     );
+}
+
+
+void updateVerbosity(DubCommonArguments a)
+{
+    import redub.logging;
+    if(a.vquiet) return setLogLevel(LogLevel.none);
+    if(a.verror) return setLogLevel(LogLevel.error);
+    if(a.quiet) return setLogLevel(LogLevel.warn);
+    if(a.verbose) return setLogLevel(LogLevel.verbose);
+    if(a.vverbose) return setLogLevel(LogLevel.vverbose);
+    return setLogLevel(LogLevel.info);
+}
+private string getPackageFromCli(ref string[] args)
+{
+    if(args.length > 1 && args[1][0] != '-')
+    {
+        string ret = args[1];
+        args = args[0..$] ~ args[2..$];
+        return ret;
+    }
+    return null;
+}
+
+private string getVersionFromPackage(ref string pkg)
+{
+    import std.algorithm.searching;
+    ptrdiff_t ver = countUntil!((a => a == '@'))(pkg);
+    if(ver == -1) return null;
+    string ret = pkg[ver+2..$]; //Advance @ and v from the tag
+    pkg = pkg[0..ver];
+    return ret;
+}
+
+private string getSubPackage(ref string pkg)
+{
+    import std.algorithm.searching;
+    ptrdiff_t subPackIndex = countUntil!((a => a == ':'))(pkg);
+    if(subPackIndex == -1) return null;
+    string ret = pkg[subPackIndex+1..$];
+    pkg = pkg[0..subPackIndex];
+    return ret;
 }

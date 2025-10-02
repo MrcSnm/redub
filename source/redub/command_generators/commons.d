@@ -26,7 +26,7 @@ OS osFromArch(string arch)
     else if(contains(arch, "i686-windows")) return OS.win32;
     else if(contains(arch, "android")) return OS.android;
     else if(contains(arch, "linux")) return OS.linux;
-    else if(contains(arch, "macos")) return OS.osx;
+    else if(contains(arch, "macos") || contains(arch, "osx") || contains(arch, "darwin")) return OS.osx;
     else if(contains(arch, "ios")) return OS.iOS;
     else if(contains(arch, "tvos")) return OS.tvOS;
     else if(contains(arch, "watchos")) return OS.watchOS;
