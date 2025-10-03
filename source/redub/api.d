@@ -327,6 +327,14 @@ void createSelectionsFile(ProjectNode tree)
     std.file.write(selectionsPath, dubSelections.data);
 }
 
+bool isProjectUpToDate(ProjectDetails d)
+{
+    import redub.building.cache;
+    AdvCacheFormula sharedFormula;
+    invalidateCaches(d.tree, CompilingSession(d.compiler, d.cDetails.arch), sharedFormula);
+    return d.tree.isUpToDate;
+}
+
 
 ProjectDetails buildProject(ProjectDetails d)
 {
