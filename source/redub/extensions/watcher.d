@@ -74,20 +74,22 @@ int watchMain(string[] args)
     bool hasShownLastLineMessage = false;
     terminal.updateCursorPosition();
     terminal.hideCursor();
-    int cursorY = terminal.cursorY + 1;
+    int cursorY = terminal.cursorY;
     int buildLinesCount = 0;
     int runLinesCount = 0;
-    int firstCursorY = cursorY - 1;
+    int firstCursorY = cursorY;
     int failureCursorYOffset = 0;
 
     bool autoRunScheduled = false;
 
-    while(true)
+    bool bRunning = true;
+
+    while(bRunning)
     {
         import core.thread;
         if(!drawnBuildStats)
         {
-            terminal.moveTo(0, cursorY - 1, ForceOption.alwaysSend);
+            terminal.moveTo(0, cursorY, ForceOption.alwaysSend);
             terminal.clearToEndOfLine();
             terminal.write("| Build ", buildCount, " | ");
             long min = minTime, max = maxTime;
@@ -123,10 +125,12 @@ int watchMain(string[] args)
 
         ProjectDetails doProjectBuild(ProjectDetails d)
         {
+            if(isProjectUpToDate(d))
+                return d;
             ulong clearCount = 1 + failureCursorYOffset; //The build stats at leat.
             if(!watchArgs.run) clearCount+= choices.length + 1; //Selection hint
 
-            clearLines(terminal, clearCount + buildLinesCount, firstCursorY); //-offset because I have no idea
+            clearLines(terminal, clearCount + buildLinesCount + runLinesCount, firstCursorY);
             failureCursorYOffset = 0;
 
             import std.datetime.stopwatch;
@@ -134,6 +138,7 @@ int watchMain(string[] args)
             try
             {
                 d = buildProject(d);
+                d = redub.extensions.cli.resolveDependencies(args.dup);
                 successCount++;
                 long buildTime = sw.peek.total!"msecs";
                 timeSpentBuilding+= buildTime;
@@ -141,7 +146,7 @@ int watchMain(string[] args)
                 terminal.updateCursorPosition();
 
                 buildLinesCount = (terminal.cursorY - 1) - firstCursorY; //-1 because of the | Build | stats
-                cursorY = terminal.cursorY + 1;
+                cursorY = terminal.cursorY;
 
 
                 if(buildTime > maxTime) maxTime = buildTime;
@@ -190,10 +195,10 @@ int watchMain(string[] args)
         {
             if(autoRunScheduled)
             {
-                terminal.moveTo(0, cursorY, ForceOption.alwaysSend);
+                terminal.moveTo(0, cursorY + 1, ForceOption.alwaysSend);
                 executeProgram(d.tree, null);
                 terminal.updateCursorPosition();
-                runLinesCount = terminal.cursorY - cursorY;
+                runLinesCount = (terminal.cursorY - cursorY);
                 autoRunScheduled = false;
             }
         }
@@ -205,7 +210,7 @@ int watchMain(string[] args)
                 auto selected = selectChoiceBase(terminal, k, choices, choice, cursorY+failureCursorYOffset);
                 if(!selected)
                 {
-                    drawChoices(terminal, choices, choices[choice], cursorY+failureCursorYOffset);
+                    drawChoices(terminal, choices, choices[choice], cursorY+1+failureCursorYOffset);
                     hasShownLastLineMessage = true;
                 }
                 else
@@ -217,8 +222,8 @@ int watchMain(string[] args)
                             terminal.writeln("Press any button to continue.");
                             input.getch();
                             terminal.updateCursorPosition();
-                            int newOffset = terminal.cursorY - cursorY;
-                            clearLines(terminal, newOffset, cursorY);
+                            runLinesCount = terminal.cursorY - cursorY;
+                            clearLines(terminal, runLinesCount, cursorY);
                             hasShownLastLineMessage = false;
                             drawnBuildStats = false;
                             break;
@@ -228,7 +233,8 @@ int watchMain(string[] args)
                             d.forceRebuild = false;
                             break;
                         case "Exit":
-                            return 0;
+                            bRunning = false;
+                            break;
                     }
                 }
             }
@@ -236,7 +242,7 @@ int watchMain(string[] args)
         Thread.sleep(dur!"msecs"(33));
     }
 
-    clearLines(terminal, buildLinesCount, cursorY);
+    clearLines(terminal, buildLinesCount+runLinesCount+choices.length+2, cursorY); //Selection hint + Build Stats
 
     terminal.showCursor();
 
