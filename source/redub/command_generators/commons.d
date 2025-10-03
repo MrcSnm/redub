@@ -223,21 +223,32 @@ bool isApple(OS os)
  *   cfg = The target build configuration
  * Returns: Whether it has any source to be built.
  */
-bool hasAnySource(const ref BuildConfiguration cfg)
+bool hasAnySource(const ref BuildConfiguration cfg, ref bool[string] sourceCache)
 {
     import std.file;
     import redub.libs.adv_diff.files;
 
     if(cfg.sourceFiles.length) return true;
-
     DirectoriesWithFilter filter = DirectoriesWithFilter(cfg.sourcePaths, cfg.language == RedubLanguages.D ? DirectoryFilterType.d : DirectoryFilterType.cpp, cfg.excludeSourceFiles);
+
     foreach(path; cfg.sourcePaths)
     {
+        bool* ret = path in sourceCache;
+        if(ret)
+        {
+            if(!(*ret))
+                continue;
+            return true;
+        }
         foreach(DirEntry e; dirEntries(path, SpanMode.depth))
         {
             if(filter.shouldInclude(e.name))
+            {
+                sourceCache[path] = true;
                 return true;
+            }
         }
+        sourceCache[path] = false;
     }
     return false;
 }

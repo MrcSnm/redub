@@ -8,7 +8,7 @@ import redub.package_searching.api;
 
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.25.1";
+enum RedubVersionOnly = "v1.25.2";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -956,14 +956,14 @@ class ProjectNode
          *   removedOptionals = String container for printing later warnings
          *   removedNull = String container for printing later warnings regarding dependencies without source files
          */
-        static void transferDependenciesAndClearOptional(ProjectNode node, ref string[] removedOptionals, ref string[] removedNull)
+        static void transferDependenciesAndClearOptional(ProjectNode node, ref string[] removedOptionals, ref string[] removedNull, ref bool[string] anySourceCache)
         {
             ///Enters in the deepest node
             import redub.command_generators.commons;
             import std.string:endsWith;
             for(int i = 0; i < node.dependencies.length; i++)
             {
-                bool noSource = !hasAnySource(node.dependencies[i].requirements.cfg);
+                bool noSource = !hasAnySource(node.dependencies[i].requirements.cfg, anySourceCache);
                 ///init-exec is a special case that redub will filter.
                 if(node.dependencies[i].isOptional || node.dependencies[i].name.endsWith("init-exec") || noSource)
                 {
@@ -975,7 +975,7 @@ class ProjectNode
                     i--;
                     continue;
                 }
-                transferDependenciesAndClearOptional(node.dependencies[i], removedOptionals, removedNull);
+                transferDependenciesAndClearOptional(node.dependencies[i], removedOptionals, removedNull, anySourceCache);
             }
             ///If the node is none or sourceLibrary, transfer all of its dependencies to all of its parents
             bool shouldTransfer = node.requirements.cfg.targetType == TargetType.none || node.requirements.cfg.targetType == TargetType.sourceLibrary;
@@ -1125,7 +1125,8 @@ class ProjectNode
             sw.start();
         string[] removedOptionals;
         string[] removedNull;
-        transferDependenciesAndClearOptional(this, removedOptionals, removedNull);
+        bool[string] anySourceCache;
+        transferDependenciesAndClearOptional(this, removedOptionals, removedNull, anySourceCache);
         inLogLevel(LogLevel.vverbose, vvlog("transferDependenciesAndClearOptional finished at ", sw.peek.total!"msecs", "ms"));
 
         mergeParentInDependencies(this);
