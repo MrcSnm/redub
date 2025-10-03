@@ -265,17 +265,24 @@ int watchMain(string[] args)
     import std.string;
     import arsd.terminal;
 
-
-    static void drawChoices(ref Terminal t, string[] choices, string title, string next, int startCursorY)
+    static void clearDrawnChoices(ref Terminal t, ulong linesToClear, int startCursorY)
     {
-        enum SelectionHint = "Select an option by using Arrow Up/Down and choose it by pressing Enter.";
-        t.flush();
-        t.moveTo(0, startCursorY, ForceOption.alwaysSend);
+        t.moveTo(0, cast(int)startCursorY, ForceOption.alwaysSend);
+        //SelectionHint
+        foreach(i; 0..linesToClear + 1)
+            t.moveTo(0, cast(int)(startCursorY+i), ForceOption.alwaysSend), t.clearToEndOfLine();
+        t.moveTo(0, cast(int)startCursorY, ForceOption.alwaysSend);
+    }
 
-        t.color(arsd.terminal.Color.yellow, arsd.terminal.Color.DEFAULT);
-        t.writeln(title);
-        t.color(arsd.terminal.Color.DEFAULT, arsd.terminal.Color.DEFAULT);
+
+    static void drawChoices(ref Terminal t, string[] choices, string next, int startCursorY)
+    {
+        enum SelectionHint = "--- Select an option by using Arrow Up/Down and choose it by pressing Enter. ---";
+        t.flush();
+        clearDrawnChoices(t, choices.length, startCursorY);
+        t.color(arsd.terminal.Color.yellow | Bright, arsd.terminal.Color.DEFAULT);
         t.writeln(SelectionHint);
+        t.color(arsd.terminal.Color.DEFAULT, arsd.terminal.Color.DEFAULT);
         foreach(i, c; choices)
         {
             if(c == next)
@@ -290,7 +297,7 @@ int watchMain(string[] args)
     }
 
     static bool selectChoiceBase(ref Terminal terminal, dchar key, string[] choices,
-        string selectionTitle, ref ptrdiff_t selectedChoice, int startCursorY)
+        ref ptrdiff_t selectedChoice, int startCursorY)
     {
         enum ESC = 983067;
         enum ArrowUp = 983078;
@@ -298,7 +305,6 @@ int watchMain(string[] args)
 
         int startLine = startCursorY;
 
-        bool selected = false;
         switch(key)
         {
             case ArrowUp:
@@ -309,26 +315,21 @@ int watchMain(string[] args)
                 return false;
             case ESC:
                 selectedChoice = choices.length - 1;
-                selected = true;
                 break;
             case '\n':
-                selected = true;
                 break;
             default: return false;
         }
 
         import std.algorithm.searching;
-        terminal.moveTo(0, cast(int)startLine, ForceOption.alwaysSend);
-        //Title + SelectionHint
-        foreach(i; 0..choices.length+ ( count(selectionTitle, "\n")+2))
-            terminal.moveTo(0, cast(int)(startLine+i)), terminal.clearToEndOfLine();
+        clearDrawnChoices(terminal, choices.length, startCursorY);
         terminal.moveTo(0, cast(int)startLine+1); //Jump title
         terminal.color(arsd.terminal.Color.green, arsd.terminal.Color.DEFAULT);
         terminal.writeln(">> ", choices[selectedChoice]);
         terminal.color(arsd.terminal.Color.DEFAULT, arsd.terminal.Color.DEFAULT);
         terminal.flush;
 
-        return selected;
+        return true;
     }
 
 
@@ -353,8 +354,17 @@ int watchMain(string[] args)
     auto input = RealTimeConsoleInput(&terminal, ConsoleInputFlags.raw);
 
     ptrdiff_t choice = 0;
+    int buildCount = 0;
+    int successCount = 0;
+    long timeSpentBuilding = 0;
+    long minTime = long.max;
+    long maxTime = long.min;
+    bool drawnBuildStats = false;
+
+
     string[] choices = [
-        "Run",
+        "Run Blocking",
+        "Force Rebuild",
         "Exit"
     ];
 
@@ -364,76 +374,151 @@ int watchMain(string[] args)
         destroy(terminal);
     }
 
-    static void writeChoices(ref Terminal t, string[] choices, int selectedChoice)
-    {
-        foreach(i, ch; choices)
-        {
-            if(i == selectedChoice)
-            {
-                t.color(arsd.terminal.Color.green, arsd.terminal.Color.DEFAULT);
-                t.write(">> ");
-            }
-            t.writeln(ch);
-            t.color(arsd.terminal.Color.DEFAULT, arsd.terminal.Color.DEFAULT);
-        }
-        t.flush;
-    }
-
-
     bool hasShownLastLineMessage = false;
     terminal.updateCursorPosition();
-    int cursorY = terminal.cursorY;
+    int cursorY = terminal.cursorY + 1;
+    int firstCursorY = cursorY;
+    int failureCursorYOffset = 0;
+
     while(true)
     {
         import core.thread;
+        if(!drawnBuildStats)
+        {
+            terminal.moveTo(0, cursorY - 1, ForceOption.alwaysSend);
+            terminal.clearToEndOfLine();
+            terminal.write("|Build ", buildCount, " | ");
+            long min = minTime, max = maxTime;
+            long avgTime = 0;
+            if(buildCount != 0)
+                avgTime = timeSpentBuilding / buildCount;
+            if(min == long.max) min = 0;
+            if(max == long.min) max = 0;
+
+            if(buildCount <= 1)
+                terminal.write("Time(ms): ", avgTime, " | ");
+            else
+                terminal.write("Time(ms): Avg ", avgTime, " Total ", timeSpentBuilding, " Min ", min, " Max ", max, " | ");
+
+            float successRatio = 0;
+            if(buildCount != 0)
+                successRatio = cast(float)successCount / buildCount;
+
+            arsd.terminal.Color c;
+            if(successRatio < 0.35)
+                c = arsd.terminal.Color.red;
+            else if(successRatio < 0.7)
+                c = arsd.terminal.Color.yellow;
+            else
+                c = arsd.terminal.Color.green;
+
+            terminal.color(c | Bright, arsd.terminal.Color.DEFAULT);
+            int successPercentage = cast(int)(successRatio * 100);
+            terminal.writeln(successPercentage, "% success");
+            terminal.color(arsd.terminal.Color.DEFAULT, arsd.terminal.Color.DEFAULT);
+            drawnBuildStats = true;
+        }
+
+        ProjectDetails doProjectBuild(ProjectDetails d)
+        {
+            ulong clearCount = choices.length + 1 + failureCursorYOffset;
+            clearDrawnChoices(terminal, clearCount, cursorY - 1);
+            if(cursorY != firstCursorY)
+            {
+                int realCursorY = cursorY - 1;
+                clearDrawnChoices(terminal, (realCursorY - firstCursorY), firstCursorY - 1);
+                // terminal.moveTo(0, firstCursorY)
+            }
+            failureCursorYOffset = 0;
+
+            static bool firstBuild = true;
+            import std.datetime.stopwatch;
+            StopWatch sw = StopWatch(AutoStart.yes);
+            try
+            {
+                d = buildProject(d);
+                successCount++;
+                long buildTime = sw.peek.total!"msecs";
+                timeSpentBuilding+= buildTime;
+
+                if(firstBuild)
+                {
+                    terminal.updateCursorPosition();
+                    cursorY = terminal.cursorY + 1;
+                    firstBuild = false;
+                }
+
+                if(buildTime > maxTime) maxTime = buildTime;
+                if(buildTime < minTime) minTime = buildTime;
+
+            }
+            catch(BuildException be)
+            {
+                terminal.updateCursorPosition();
+                failureCursorYOffset = terminal.cursorY - cursorY;
+            }
+            buildCount++;
+            hasShownLastLineMessage = false;
+            drawnBuildStats = false;
+            return d;
+        }
         WATCHERS_LOOP: foreach(ref watch; watchers)
         {
             foreach(event; watch.getEvents())
             {
                 if(event.type == FileChangeEventType.modify)
                 {
-                    if(event.path.endsWith("dub.json") || event.path.endsWith("dub.sdl"))
+                    //Unimplemented, might be more complex than I want to deal with
+                    // if(event.path.endsWith("dub.json") || event.path.endsWith("dub.sdl"))
+                    // {
+                    //     clearDrawnChoices(terminal, choices.length+1, cursorY - 1);
+                    //     d = resolveDependencies(args.dup);
+                    //     buildWatchers(watchers, d);
+                    //     hasShownLastLineMessage = false;
+                    //     drawnBuildStats = false;
+                    //     break WATCHERS_LOOP;
+                    // }
+                    // else
+                    if(event.path.endsWith(".d") || event.path.endsWith(".di"))
                     {
-                        d = resolveDependencies(args.dup);
-                        buildWatchers(watchers, d);
-                        terminal.updateCursorPosition();
-                        cursorY = terminal.cursorY;
-                        hasShownLastLineMessage = false;
-
-                        break WATCHERS_LOOP;
-                    }
-                    else if(event.path.endsWith(".d") || event.path.endsWith(".di"))
-                    {
-                        buildProject(d);
-                        hasShownLastLineMessage = false;
-                        terminal.updateCursorPosition();
-                        cursorY = terminal.cursorY;
+                        d = doProjectBuild(d);
                         break WATCHERS_LOOP;
                     }
                 }
             }
         }
-        import std.stdio;
-        // writeln(cursorY);
-        // terminal.moveTo(0, cursorY);
-        // terminal.clearToEndOfLine();
-
-
         dchar k = input.getch(true);
         if(k != dchar.init || !hasShownLastLineMessage)
         {
-            drawChoices(terminal, choices, "Next Action: ", choices[choice], cursorY);
-            if(selectChoiceBase(terminal, k, choices, "Next Action: ", choice, cursorY))
+            auto selected = selectChoiceBase(terminal, k, choices, choice, cursorY+failureCursorYOffset);
+            if(!selected)
+            {
+                drawChoices(terminal, choices, choices[choice], cursorY+failureCursorYOffset);
+                hasShownLastLineMessage = true;
+            }
+            else
             {
                 final switch(choices[choice])
                 {
-                    case "Run":
-                        return 1;
+                    case "Run Blocking":
+                        executeProgram(d.tree, null);
+                        terminal.writeln("Press any button to continue.");
+                        input.getch();
+                        terminal.updateCursorPosition();
+                        int newOffset = terminal.cursorY - cursorY;
+                        clearDrawnChoices(terminal, newOffset, cursorY);
+                        hasShownLastLineMessage = false;
+                        drawnBuildStats = false;
+                        break;
+                    case "Force Rebuild":
+                        d.forceRebuild = true;
+                        d = doProjectBuild(d);
+                        d.forceRebuild = false;
+                        break;
                     case "Exit":
                         return 0;
                 }
             }
-            hasShownLastLineMessage = true;
         }
         Thread.sleep(dur!"msecs"(33));
     }
