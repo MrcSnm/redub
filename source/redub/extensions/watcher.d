@@ -12,76 +12,7 @@ int watchMain(string[] args)
     import fswatch;
     import std.path;
     import std.string;
-    import arsd.terminal;
-
-    static void clearDrawnChoices(ref Terminal t, ulong linesToClear, int startCursorY)
-    {
-        t.moveTo(0, cast(int)startCursorY, ForceOption.alwaysSend);
-        //SelectionHint
-        foreach(i; 0..linesToClear + 1)
-            t.moveTo(0, cast(int)(startCursorY+i), ForceOption.alwaysSend), t.clearToEndOfLine();
-        t.moveTo(0, cast(int)startCursorY, ForceOption.alwaysSend);
-    }
-
-
-    static void drawChoices(ref Terminal t, string[] choices, string next, int startCursorY)
-    {
-        enum SelectionHint = "--- Select an option by using Arrow Up/Down and choose it by pressing Enter. ---";
-        t.flush();
-        clearDrawnChoices(t, choices.length, startCursorY);
-        t.color(arsd.terminal.Color.yellow | Bright, arsd.terminal.Color.DEFAULT);
-        t.writeln(SelectionHint);
-        t.color(arsd.terminal.Color.DEFAULT, arsd.terminal.Color.DEFAULT);
-        foreach(i, c; choices)
-        {
-            if(c == next)
-            {
-                t.color(arsd.terminal.Color.green, arsd.terminal.Color.DEFAULT);
-                t.writeln(">> ", c);
-                t.color(arsd.terminal.Color.DEFAULT, arsd.terminal.Color.DEFAULT);
-            }
-            else t.writeln(c);
-        }
-        t.flush;
-    }
-
-    static bool selectChoiceBase(ref Terminal terminal, dchar key, string[] choices,
-        ref ptrdiff_t selectedChoice, int startCursorY)
-    {
-        enum ESC = 983067;
-        enum ArrowUp = 983078;
-        enum ArrowDown = 983080;
-
-        int startLine = startCursorY;
-
-        switch(key)
-        {
-            case ArrowUp:
-                selectedChoice = (selectedChoice + choices.length - 1) % choices.length;
-                return false;
-            case ArrowDown:
-                selectedChoice = (selectedChoice+1) % choices.length;
-                return false;
-            case ESC:
-                selectedChoice = choices.length - 1;
-                break;
-            case '\n':
-                break;
-            default: return false;
-        }
-
-        import std.algorithm.searching;
-        clearDrawnChoices(terminal, choices.length, startCursorY);
-        terminal.moveTo(0, cast(int)startLine+1); //Jump title
-        terminal.color(arsd.terminal.Color.green, arsd.terminal.Color.DEFAULT);
-        terminal.writeln(">> ", choices[selectedChoice]);
-        terminal.color(arsd.terminal.Color.DEFAULT, arsd.terminal.Color.DEFAULT);
-        terminal.flush;
-
-        return true;
-    }
-
-
+    import redub.extensions.helper.terminal;
 
     static void buildWatchers(ref FileWatch[] ret, ProjectDetails d)
     {
@@ -115,8 +46,9 @@ int watchMain(string[] args)
     ProjectDetails d = redub.extensions.cli.resolveDependencies(args.dup);
     FileWatch[] watchers;
     buildWatchers(watchers, d);
-    auto terminal = Terminal(ConsoleOutputType.linear);
-    auto input = RealTimeConsoleInput(&terminal, ConsoleInputFlags.raw);
+
+    auto terminal = getTerminal();
+    auto input = getInput(terminal);
 
     ptrdiff_t choice = 0;
     int buildCount = 0;
@@ -141,8 +73,11 @@ int watchMain(string[] args)
 
     bool hasShownLastLineMessage = false;
     terminal.updateCursorPosition();
+    terminal.hideCursor();
     int cursorY = terminal.cursorY + 1;
-    int firstCursorY = cursorY;
+    int buildLinesCount = 0;
+    int runLinesCount = 0;
+    int firstCursorY = cursorY - 1;
     int failureCursorYOffset = 0;
 
     bool autoRunScheduled = false;
@@ -154,7 +89,7 @@ int watchMain(string[] args)
         {
             terminal.moveTo(0, cursorY - 1, ForceOption.alwaysSend);
             terminal.clearToEndOfLine();
-            terminal.write("|Build ", buildCount, " | ");
+            terminal.write("| Build ", buildCount, " | ");
             long min = minTime, max = maxTime;
             long avgTime = 0;
             if(buildCount != 0)
@@ -188,17 +123,12 @@ int watchMain(string[] args)
 
         ProjectDetails doProjectBuild(ProjectDetails d)
         {
-            ulong clearCount = choices.length + 1 + failureCursorYOffset;
-            clearDrawnChoices(terminal, clearCount, cursorY - 1);
-            if(cursorY != firstCursorY)
-            {
-                int realCursorY = cursorY - 1;
-                clearDrawnChoices(terminal, (realCursorY - firstCursorY), firstCursorY - 1);
-                // terminal.moveTo(0, firstCursorY)
-            }
+            ulong clearCount = 1 + failureCursorYOffset; //The build stats at leat.
+            if(!watchArgs.run) clearCount+= choices.length + 1; //Selection hint
+
+            clearLines(terminal, clearCount + buildLinesCount, firstCursorY); //-offset because I have no idea
             failureCursorYOffset = 0;
 
-            static bool firstBuild = true;
             import std.datetime.stopwatch;
             StopWatch sw = StopWatch(AutoStart.yes);
             try
@@ -208,12 +138,11 @@ int watchMain(string[] args)
                 long buildTime = sw.peek.total!"msecs";
                 timeSpentBuilding+= buildTime;
 
-                if(firstBuild)
-                {
-                    terminal.updateCursorPosition();
-                    cursorY = terminal.cursorY + 1;
-                    firstBuild = false;
-                }
+                terminal.updateCursorPosition();
+
+                buildLinesCount = (terminal.cursorY - 1) - firstCursorY; //-1 because of the | Build | stats
+                cursorY = terminal.cursorY + 1;
+
 
                 if(buildTime > maxTime) maxTime = buildTime;
                 if(buildTime < minTime) minTime = buildTime;
@@ -241,7 +170,7 @@ int watchMain(string[] args)
                     //Unimplemented, might be more complex than I want to deal with
                     // if(event.path.endsWith("dub.json") || event.path.endsWith("dub.sdl"))
                     // {
-                    //     clearDrawnChoices(terminal, choices.length+1, cursorY - 1);
+                    //     clearLines(terminal, choices.length+1, cursorY - 1);
                     //     d = resolveDependencies(args.dup);
                     //     buildWatchers(watchers, d);
                     //     hasShownLastLineMessage = false;
@@ -261,7 +190,10 @@ int watchMain(string[] args)
         {
             if(autoRunScheduled)
             {
+                terminal.moveTo(0, cursorY, ForceOption.alwaysSend);
                 executeProgram(d.tree, null);
+                terminal.updateCursorPosition();
+                runLinesCount = terminal.cursorY - cursorY;
                 autoRunScheduled = false;
             }
         }
@@ -286,7 +218,7 @@ int watchMain(string[] args)
                             input.getch();
                             terminal.updateCursorPosition();
                             int newOffset = terminal.cursorY - cursorY;
-                            clearDrawnChoices(terminal, newOffset, cursorY);
+                            clearLines(terminal, newOffset, cursorY);
                             hasShownLastLineMessage = false;
                             drawnBuildStats = false;
                             break;
@@ -303,6 +235,10 @@ int watchMain(string[] args)
         }
         Thread.sleep(dur!"msecs"(33));
     }
+
+    clearLines(terminal, buildLinesCount, cursorY);
+
+    terminal.showCursor();
 
     return 0;
 
