@@ -66,9 +66,12 @@ int main(string[] args)
             "deps": &depsMain,
             "test": &testMain,
             "init": &initMain,
-            "watch": &watchMain,
+            // "watch": &watchMain,
             "run": cast(int function(string[]))null
         ];
+
+        version(RedubWatcher)
+            entryPoints["watch"] = &watchMain;
 
 
         foreach(cmd; entryPoints.byKey)

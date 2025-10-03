@@ -113,36 +113,38 @@ jobs:
   #         name: redub-freebsd-14.2-x86_64
   #         path: build
 
-  alpine:
-    strategy:
-      matrix:
-        arch: [x86_64]
-      fail-fast: false
-    runs-on: ubuntu-latest
-    container:
-      image: alpine:latest
-    defaults:
-      run:
-        shell: sh
-    steps:
-      - uses: actions/checkout@v4
+  # alpine:
+  #   strategy:
+  #     matrix:
+  #       arch: [x86_64]
+  #     fail-fast: false
+  #   runs-on: ubuntu-latest
+  #   container:
+  #     image: alpine:latest
+  #   defaults:
+  #     run:
+  #       shell: sh
+  #   steps:
+  #     - uses: actions/checkout@v4
       
-      - name: Prepare
-        run: |
-            apk update
-            apk add --no-cache ldc dub clang
-      - name: Build
-        run: |
-            dub build -b release-debug
-      - run: mv build/redub redub-${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'latest' }}-alpine-${{ matrix.arch }}
-      - uses: actions/upload-artifact@v4
-        with:
-          name: redub-${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'latest' }}-alpine-${{ matrix.arch }}
-          path: redub-${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'latest' }}-alpine-${{ matrix.arch }}
+  #     - uses: MrcSnm/setup-dlang@v2
+  #       with:
+  #         compiler: ldc-latest
+  #         redub: 1.24.15
+
+  #     - name: Build
+  #       run: |
+  #           redub build -b release-debug
+  #     - run: mv build/redub redub-${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'latest' }}-alpine-${{ matrix.arch }}
+  #     - uses: actions/upload-artifact@v4
+  #       with:
+  #         name: redub-${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'latest' }}-alpine-${{ matrix.arch }}
+  #         path: redub-${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'latest' }}-alpine-${{ matrix.arch }}
 
   update-release:
     runs-on: ubuntu-latest
-    needs: [build, alpine]
+    # needs: [build, alpine]
+    needs: [build]
     permissions:
       contents: write
     steps:

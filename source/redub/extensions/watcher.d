@@ -1,6 +1,8 @@
 module redub.extensions.watcher;
 
 version(RedubCLI):
+version(RedubWatcher):
+
 import redub.extensions.cli;
 
 int watchMain(string[] args)
