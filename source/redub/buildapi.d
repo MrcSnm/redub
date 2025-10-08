@@ -8,7 +8,7 @@ import redub.package_searching.api;
 
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.25.2";
+enum RedubVersionOnly = "v1.25.3";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -210,6 +210,7 @@ struct BuildConfiguration
     ///When having those files, the build will use them instead of sourcePaths + sourceFiles
     @cacheExclude string[] changedBuildFiles;
     @excludeRoot string outputDirectory;
+    @cacheExclude string runtimeWorkingDir;
 
     bool isDebug;
     @cacheExclude BuildConfigurationFlags flags = BuildConfigurationFlags.defaultInit;
@@ -326,6 +327,7 @@ struct BuildConfiguration
     {
         import std.algorithm.comparison:either;
         BuildConfiguration ret = clone;
+        ret.runtimeWorkingDir = either(other.runtimeWorkingDir, ret.runtimeWorkingDir);
         ret.targetType = either(other.targetType, ret.targetType);
         ret.targetName = either(other.targetName, ret.targetName);
         ret.outputDirectory = either(other.outputDirectory, ret.outputDirectory);

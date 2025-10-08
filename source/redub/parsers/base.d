@@ -61,6 +61,7 @@ void setName(ref BuildRequirements req, string name, ParseConfig c)
             req.cfg.targetName = name;
     }
 }
+void setTargetRuntimeWorkingDir(ref BuildRequirements req, string workingDir, ParseConfig c){req.cfg.runtimeWorkingDir = workingDir;}
 void setTargetName(ref BuildRequirements req, string name, ParseConfig c){req.cfg.targetName = name;}
 void setTargetPath(ref BuildRequirements req, string path, ParseConfig c){req.cfg.outputDirectory = path;}
 void setTargetType(ref BuildRequirements req, string targetType, ParseConfig c){req.cfg.targetType = targetFrom(targetType);}

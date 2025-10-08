@@ -866,12 +866,14 @@ string getDubWorkspacePath()
 
 int executeProgram(ProjectNode tree, string[] args)
 {
+    import std.stdio;
     import std.path;
     import std.array:join;
     import std.process;
     import redub.command_generators.commons;
     return wait(spawnShell(
-        escapeShellCommand(getOutputPath(tree.requirements.cfg, os)) ~ " "~ join(args, " ")
+        escapeShellCommand(getOutputPath(tree.requirements.cfg, os)) ~ " "~ join(args, " "), stdin, stdout,
+        stderr, null, Config.none, tree.requirements.cfg.runtimeWorkingDir
         )
     );
 }
