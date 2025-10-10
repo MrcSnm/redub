@@ -82,7 +82,7 @@ void runPreGenerateCommands(ParseConfig c, ref BuildRequirements req)
     string[string] outRedubEnv;
     req.cfg = parseEnvironmentForPreGenerate(req.cfg, outRedubEnv);
     import redub.parsers.environment;
-    if(c.preGenerateRun)
+    if(c.preGenerateRun && req.cfg.preGenerateCommands.length)
     {
         infos("Pre-gen ", "Running commands for ", c.extra.requiredBy);
         foreach(string cmd; req.cfg.preGenerateCommands)

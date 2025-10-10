@@ -351,7 +351,7 @@ BuildConfiguration parseEnvironmentForPreGenerate(BuildConfiguration cfg, out st
         unlockEnv();
     static foreach(mem; __traits(allMembers, PackageDubVariables))
         setEnvVariableNoLock(mem, __traits(getMember, pack, mem));
-    outEnv = getRedubEnv();
+    outEnv = getRedubEnv().dup;
     redub.parsers.environment.setupEnvironmentVariablesForPackage(cfg);
     with(cfg)
     {
