@@ -486,7 +486,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
     runHandlers(requirementsRun, buildRequirements, cfg, json, false, unusedKeys, pending);
 
     if(cfg.firstRun && unusedKeys.length) warn("Unused Keys -> ", unusedKeys);
-
+    runPreGenerateCommands(cfg, buildRequirements);
     return buildRequirements;
 }
 

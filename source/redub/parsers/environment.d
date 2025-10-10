@@ -191,7 +191,7 @@ void setupEnvironmentVariablesForPackageTree(ProjectNode root)
     ///Path to a specific package that is part of the package's dependency graph. $ must be in uppercase letters without the semver string.
     // <PKG>_PACKAGE_DIR ;
     foreach(ProjectNode mem; root.collapse)
-        setEnvVariable(asPackageVariable(mem.name)~"_PACKAGE_DIR",  mem.requirements.cfg.workingDir.forceTrailingDirSeparator);
+        setEnvVariableNoLock(asPackageVariable(mem.name)~"_PACKAGE_DIR",  mem.requirements.cfg.workingDir.forceTrailingDirSeparator);
 }
 
 /** 
@@ -226,14 +226,12 @@ PackageDubVariables getEnvironmentVariablesForPackage(const BuildConfiguration c
  */
 void setupEnvironmentVariablesForPackage(const BuildConfiguration cfg)
 {
-    import std.process;
     PackageDubVariables pack = getEnvironmentVariablesForPackage(cfg);
     static foreach(mem; __traits(allMembers, PackageDubVariables))
-        setEnvVariable(mem, __traits(getMember, pack, mem));
+        setEnvVariableNoLock(mem, __traits(getMember, pack, mem));
 }
 string parseStringWithEnvironment(string str)
 {
-    import std.process;
     import std.exception;
     import std.string;
     import std.ascii:isAlphaNum;
@@ -338,7 +336,29 @@ unittest
         parseStringWithEnvironment(`C:\Users\Marcelo\Documents\D\test\sokol-d\${SOKOL_D_PACKAGE_DIR}\src\sokol\c\sokol_log.c`) ==
         `C:\Users\Marcelo\Documents\D\test\sokol-d\test\src\sokol\c\sokol_log.c`
     );
+}
 
+/**
+*   cfg = Config to parse environment inside the preGenerateCommands
+*   outEnv = Output environment to be used for the preGenerateCommands
+*/
+BuildConfiguration parseEnvironmentForPreGenerate(BuildConfiguration cfg, out string[string] outEnv)
+{
+    //In this part it does need to lock since it runs on parallel.
+    PackageDubVariables pack = getEnvironmentVariablesForPackage(cfg);
+    lockEnv();
+    scope(exit)
+        unlockEnv();
+    static foreach(mem; __traits(allMembers, PackageDubVariables))
+        setEnvVariableNoLock(mem, __traits(getMember, pack, mem));
+    outEnv = getRedubEnv();
+    redub.parsers.environment.setupEnvironmentVariablesForPackage(cfg);
+    with(cfg)
+    {
+        if(cfg.commands.length > RedubCommands.preGenerate)
+            cfg.commands[RedubCommands.preGenerate] = arrParseEnv(cfg.commands[RedubCommands.preGenerate]);
+    }
+    return cfg;
 }
 
 /** 
@@ -360,8 +380,6 @@ BuildConfiguration parseEnvironment(BuildConfiguration cfg)
         dFlags = arrParseEnv(dFlags);
         linkFlags = arrParseEnv(linkFlags);
 
-        if(cfg.commands.length > RedubCommands.preGenerate)
-            cfg.commands[RedubCommands.preGenerate] = arrParseEnv(cfg.commands[RedubCommands.preGenerate]);
         if(cfg.commands.length > RedubCommands.postGenerate)
             cfg.commands[RedubCommands.postGenerate] = arrParseEnv(cfg.commands[RedubCommands.postGenerate]);
         if(cfg.commands.length > RedubCommands.preBuild)
@@ -447,7 +465,9 @@ version(AsLibrary) //Library version will use environment instead of redubEnv si
      *   key =
      *   value =
      */
+    
     void setEnvVariable(string key, string value){environment[key] = value;}
+    alias setEnvVariableNoLock = setEnvVariable;
     /**
      * Gets the environment as a string[string] to be used inside a function
      * Returns:
@@ -478,6 +498,8 @@ version(AsLibrary) //Library version will use environment instead of redubEnv si
         }
         return null;
     }
+    void lockEnv(){}
+    alias unlockEnv = lockEnv;
 }
 else
 {
@@ -491,7 +513,12 @@ else
             redubEnv[key] = value;
         }
     }
+
+    void setEnvVariableNoLock(string key, string value){redubEnv[key] = value;}
     string[string] getRedubEnv(){return redubEnv;}
+
+    void lockEnv(){envMutex.lock();}
+    void unlockEnv(){envMutex.unlock();}
     string getEnvVariable(string key)
     {
         string* ret = key in redubEnv;

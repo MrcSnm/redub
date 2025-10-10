@@ -71,28 +71,34 @@ void addExtraDependencyFiles(ref BuildRequirements req, JSONStringArray files, P
 void addFilesToCopy(ref BuildRequirements req, JSONStringArray files, ParseConfig c){req.cfg.filesToCopy = req.cfg.filesToCopy.append(files);}
 void addPreGenerateCommands(ref BuildRequirements req, JSONStringArray cmds, ParseConfig c)
 {
-    import hipjson;
+    if(req.cfg.commands.length <= RedubCommands.preGenerate)
+        req.cfg.commands.length = RedubCommands.preGenerate + 1;
+    req.cfg.commands[RedubCommands.preGenerate] = req.cfg.commands[RedubCommands.preGenerate].append(cmds);
+}
+
+void runPreGenerateCommands(ParseConfig c, ref BuildRequirements req)
+{
+    import redub.parsers.environment;
+    string[string] outRedubEnv;
+    req.cfg = parseEnvironmentForPreGenerate(req.cfg, outRedubEnv);
     import redub.parsers.environment;
     if(c.preGenerateRun)
     {
         infos("Pre-gen ", "Running commands for ", c.extra.requiredBy);
-        foreach(JSONValue cmd; cmds.save)
+        foreach(string cmd; req.cfg.preGenerateCommands)
         {
             import std.process;
             import std.stdio;
             import std.conv:to;
 
             if(hasLogLevel(LogLevel.verbose))
-                vlog("Executing: ", executeShell("echo "~cmd.str, getRedubEnv, Config.none, size_t.max, c.workingDir).output, " at dir ", c.workingDir);
+                vlog("Executing: ", executeShell("echo "~cmd, outRedubEnv, Config.none, size_t.max, c.workingDir).output, " at dir ", c.workingDir);
 
-            auto status = wait(spawnShell(cmd.str, stdin, stdout, stderr, getRedubEnv, Config.none, c.workingDir));
+            auto status = wait(spawnShell(cmd, stdin, stdout, stderr, outRedubEnv, Config.none, c.workingDir));
             if(status)
-                throw new Exception("preGenerateCommand '"~cmd.str~"' exited with code "~status.to!string);
+                throw new Exception("preGenerateCommand '"~cmd~"' exited with code "~status.to!string);
         }
     }
-    if(req.cfg.commands.length <= RedubCommands.preGenerate)
-        req.cfg.commands.length = RedubCommands.preGenerate + 1;
-    req.cfg.commands[RedubCommands.preGenerate] = req.cfg.commands[RedubCommands.preGenerate].append(cmds);
 }
 void addPostGenerateCommands(ref BuildRequirements req, JSONStringArray cmds, ParseConfig c)
 {

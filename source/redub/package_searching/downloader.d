@@ -37,7 +37,8 @@ string getDownloadLink(string packageName, string repo, SemVer requirement, out 
     if(requirement.isInvalid)
     {
         if(!repo)
-            throw new Exception("Can't have invalid requirement '"~requirement.toString~"' and have no 'repo' information.");
+            throw new Exception("Can't have invalid requirement '"~requirement.toString~"' and have no 'repository' information.
+            \nExample of repository with branch usage: \"redub\": {\"version\": \"~master\", \"repository\": \"git+https://github.com/MrcSnm/redub.git\"}");
         actualVer = requirement;
         return getGitDownloadLink(packageName, repo, requirement.toString);
     }

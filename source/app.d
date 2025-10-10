@@ -119,16 +119,16 @@ int runMain(string[] args, string[] runArgs)
     ProjectDetails d = resolveDependencies(args);
     if(!d.tree || d.usesExternalErrorCode)
         return d.getReturnCode;
+    if(d.tree.name == "redub")
+        warnTitle("Attempt to build and run redub with redub: ", "For building redub with redub, use the command 'redub update' which already outputs an optimized build");
     d = buildProject(d);
     if(!d.tree || d.usesExternalErrorCode)
         return d.getReturnCode;
     if(d.tree.requirements.cfg.targetType != TargetType.executable)
         return 1;
+    
     if(d.tree.name == "redub")
-    {
-        warnTitle("Attempt to build and run redub with redub: ", "For building redub with redub, use the command 'redub update' which already outputs an optimized build");
         return 0;
-    }
     return executeProgram(d.tree, runArgs);
 }
 
