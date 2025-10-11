@@ -79,12 +79,12 @@ void addPreGenerateCommands(ref BuildRequirements req, JSONStringArray cmds, Par
 void runPreGenerateCommands(ParseConfig c, ref BuildRequirements req)
 {
     import redub.parsers.environment;
-    string[string] outRedubEnv;
-    req.cfg = parseEnvironmentForPreGenerate(req.cfg, outRedubEnv);
     import redub.parsers.environment;
     if(c.preGenerateRun && req.cfg.preGenerateCommands.length)
     {
         infos("Pre-gen ", "Running commands for ", c.extra.requiredBy);
+        string[string] outRedubEnv;
+        req.cfg = parseEnvironmentForPreGenerate(req.cfg, outRedubEnv);
         foreach(string cmd; req.cfg.preGenerateCommands)
         {
             import std.process;
