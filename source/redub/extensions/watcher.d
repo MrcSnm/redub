@@ -90,6 +90,7 @@ int watchMain(string[] args)
         if(!drawnBuildStats)
         {
             terminal.moveTo(0, cursorY, ForceOption.alwaysSend);
+            terminal.updateCursorPosition();
             terminal.clearToEndOfLine();
             terminal.write("| Build ", buildCount, " | ");
             long min = minTime, max = maxTime;
@@ -120,6 +121,7 @@ int watchMain(string[] args)
             int successPercentage = cast(int)(successRatio * 100);
             terminal.writeln(successPercentage, "% success");
             terminal.color(arsd.terminal.Color.DEFAULT, arsd.terminal.Color.DEFAULT);
+            terminal.flush;
             drawnBuildStats = true;
         }
 
@@ -196,6 +198,7 @@ int watchMain(string[] args)
             if(autoRunScheduled)
             {
                 terminal.moveTo(0, cursorY + 1, ForceOption.alwaysSend);
+                terminal.updateCursorPosition();
                 executeProgram(d.tree, null);
                 terminal.updateCursorPosition();
                 runLinesCount = (terminal.cursorY - cursorY);
