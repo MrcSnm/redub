@@ -255,5 +255,3 @@ int buildMain(string[] args)
     ProjectDetails d = resolveDependencies(args);
     return buildProject(d).getReturnCode;
 }
-
-

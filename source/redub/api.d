@@ -307,19 +307,27 @@ void createSelectionsFile(ProjectNode tree)
     dubSelections~= "{\n\t\"fileVersion\": 1,\n\t\"versions\": {";
 
     bool isFirst = true;
+    bool[string] usedPackages;
 
     foreach(ProjectNode node; tree.collapse)
     {
         if(node is tree)
             continue;
-        if(!isFirst) dubSelections~=",";
-        isFirst = false;
-        auto req = node.requirements;
-        dubSelections~= "\n\t\t\""~node.name~"\": ";
-        if(req.version_.length != 0)
-            dubSelections~= "\""~req.version_~"\"";
-        else
-            dubSelections~= " {\"path\": \""~replace(relativePath(req.cfg.workingDir, tree.requirements.cfg.workingDir), "\\", "\\\\")~"\"}";
+        string pkgName = node.name;
+        getSubPackage(pkgName);
+        if(pkgName !in usedPackages)
+        {
+            if(!isFirst) dubSelections~=",";
+            isFirst = false;
+            auto req = node.requirements;
+            dubSelections~= "\n\t\t\""~pkgName~"\": ";
+            if(req.version_.length != 0)
+                dubSelections~= "\""~req.version_~"\"";
+            else
+                dubSelections~= " {\"path\": \""~replace(relativePath(req.cfg.workingDir, tree.requirements.cfg.workingDir), "\\", "\\\\")~"\"}";
+            usedPackages[pkgName] = true;
+        }
+
     }
 
     dubSelections~= "\n\t}\n}";

@@ -36,7 +36,7 @@ string[] parseBuildConfiguration(AcceptedCompiler comp, const BuildConfiguration
             cmds~= mapper(ValidDFlags.objectDir)~getObjectDir(cacheDir).escapePath;
 
         cmds~= dFlags;
-        if(comp == AcceptedCompiler.ldc2)
+        if(comp == AcceptedCompiler.ldc2 && !s.os.isApple) //Broken on apple
         {
             ///cmds~= "--cache-retrieval=hardlink"; // Doesn't work on Windows when using a multi drives projects
             cmds~= "--cache=.ldc2_cache";
