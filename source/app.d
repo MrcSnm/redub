@@ -37,6 +37,7 @@ string formatError(string err)
 */
 int main(string[] args)
 {
+    import std.getopt;
     try
     {
         if(args.length == 1)
@@ -102,6 +103,15 @@ int main(string[] args)
     catch(NetworkException e)
     {
         errorTitle("Network Error: ", e.msg);
+        version(Developer) throw e;
+        return 1;
+    }
+    catch(GetOptException e)
+    {
+        import std.stdio;
+        setLogLevel(LogLevel.error);
+        errorTitle("Argument Error: ", e.msg);
+        writeln(getHelpInfo);
         version(Developer) throw e;
         return 1;
     }

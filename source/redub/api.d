@@ -566,51 +566,7 @@ ArgsDetails resolveArguments(string[] args, bool isDescribeOnly = false)
     if(res.helpWanted)
     {
         import std.getopt;
-        string newCommands =
-`
-USAGE: redub [--version] [<command>] [<options...>] [-- [<application arguments...>]]
-
-Manages the redub project in the current directory. If the command is omitted,
-redub will default to "run". When running an application, "--" can be used to
-separate redub options from options passed to the application.
-
-Run "redub <command> --help" to get help for a specific command.
-
-Available commands
-==================
-
-  Package creation
-  ----------------
-  init [<directory> [<dependency>...]]
-                        Initializes an empty package skeleton
-
-  Build, test and run
-  -------------------
-  run [<package>[@<version-spec>]]
-                        Builds and runs a package (default command)
-  build [<package>[@<version-spec>]]
-                        Builds a package (uses the main package in the current
-                        working directory by default)
-  test [<package>[@<version-spec>]]
-                        Executes the tests of the selected package
-  describe [<package>[@<version-spec>]]
-                        Prints a description of the specified --data files
-  clean [<package>]     Removes intermediate build files and cached build
-                        results
-
-Additions to redub commands --
-
-update
-    Usage: redub update
-    Description: Updates with 'git pull' redub if the current redub is a git repository. If it is not, it will download the newest git tag from redub
-        repository. After updating the source, it will also optimally rebuild redub and replace the current one with the new build.
-build-universal
-    Usage: redub build-universal
-    Description: 
-        Builds a package in non OSX (uses the main package in the  current working directory by default)
-        On OSX, generates a single binary using arm64 and x86_64 architectures
-`;
-        defaultGetoptPrinter(RedubVersionShort~" build information: \n\t"~newCommands, res.options);
+        defaultGetoptPrinter(RedubVersionShort~" build information: \n\t"~baseHelpInfo, res.options);
         return ArgsDetails.init;
     }
 
@@ -926,4 +882,62 @@ private string getSubPackage(ref string pkg)
     string ret = pkg[subPackIndex+1..$];
     pkg = pkg[0..subPackIndex];
     return ret;
+}
+
+immutable baseHelpInfo =
+`
+USAGE: redub [--version] [<command>] [<options...>] [-- [<application arguments...>]]
+
+Manages the redub project in the current directory. If the command is omitted,
+redub will default to "run". When running an application, "--" can be used to
+separate redub options from options passed to the application.
+
+Run "redub <command> --help" to get help for a specific command.
+
+Available commands
+==================
+
+  Package creation
+  ----------------
+  init [<directory> [<dependency>...]]
+                        Initializes an empty package skeleton
+
+  Build, test and run
+  -------------------
+  run [<package>[@<version-spec>]]
+                        Builds and runs a package (default command)
+  build [<package>[@<version-spec>]]
+                        Builds a package (uses the main package in the current
+                        working directory by default)
+  test [<package>[@<version-spec>]]
+                        Executes the tests of the selected package
+  describe [<package>[@<version-spec>]]
+                        Prints a description of the specified --data files
+  clean [<package>]     Removes intermediate build files and cached build
+                        results
+
+Additions to redub commands --
+
+update
+    Usage: redub update
+    Description: Updates with 'git pull' redub if the current redub is a git repository. If it is not, it will download the newest git tag from redub
+        repository. After updating the source, it will also optimally rebuild redub and replace the current one with the new build.
+build-universal
+    Usage: redub build-universal
+    Description: 
+        Builds a package in non OSX (uses the main package in the  current working directory by default)
+        On OSX, generates a single binary using arm64 and x86_64 architectures
+`;
+
+string getHelpInfo()
+{
+    import std.getopt;
+    import std.array;
+    string[2] fakeArgs;
+    string[] args = fakeArgs;
+    DubArguments dub;
+    GetoptResult res = betterGetopt(args, dub);
+    Appender!string ret;
+    defaultGetoptFormatter(&ret, RedubVersionShort~" build information: \n\t"~baseHelpInfo, res.options);
+    return ret.data;
 }
