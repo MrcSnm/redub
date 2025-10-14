@@ -66,7 +66,6 @@ JSONValue sdlToJSON(SDLNode[] sdl)
 	import std.exception;
 	import std.array;
 	import redub.libs.adv_diff.helpers.index_of;
-	import std.algorithm.searching:countUntil;
 
 	JSONValue ret = JSONValue.emptyObject;
 

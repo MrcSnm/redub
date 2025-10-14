@@ -214,6 +214,7 @@ struct BuildConfiguration
 
     bool isDebug;
     @cacheExclude BuildConfigurationFlags flags = BuildConfigurationFlags.defaultInit;
+    @cacheExclude bool isUsingDefaultSourcePaths = true;
     RedubLanguages language = RedubLanguages.D;
     TargetType targetType;
 
@@ -331,6 +332,7 @@ struct BuildConfiguration
         ret.targetType = either(other.targetType, ret.targetType);
         ret.targetName = either(other.targetName, ret.targetName);
         ret.outputDirectory = either(other.outputDirectory, ret.outputDirectory);
+        ret.isUsingDefaultSourcePaths = ret.isUsingDefaultSourcePaths && other.isUsingDefaultSourcePaths;
         ret = ret.mergeCommands(other);
         ret.flags = other.flags;
         ret.extraDependencyFiles.exclusiveMergePaths(other.extraDependencyFiles);

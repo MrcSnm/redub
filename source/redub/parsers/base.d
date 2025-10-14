@@ -126,8 +126,11 @@ void addPostBuildCommands(ref BuildRequirements req, JSONStringArray cmds, Parse
 void addSourcePaths(ref BuildRequirements req, JSONStringArray paths, ParseConfig c)
 {
     import std.array;
-    if(c.firstRun) req.cfg.sourcePaths = cast(string[])paths.array;
-    else req.cfg.sourcePaths.exclusiveMergePaths(paths);
+    req.cfg.isUsingDefaultSourcePaths = false;
+    if(c.firstRun)
+        req.cfg.sourcePaths = cast(string[])paths.array;
+    else
+        req.cfg.sourcePaths.exclusiveMergePaths(paths);
 }
 void addSourceFiles(ref BuildRequirements req, JSONStringArray files, ParseConfig c){req.cfg.sourceFiles.exclusiveMerge(files);}
 void addExcludedSourceFiles(ref BuildRequirements req, JSONStringArray files, ParseConfig c){req.cfg.excludeSourceFiles.exclusiveMerge(files);}

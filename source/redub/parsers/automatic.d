@@ -187,7 +187,10 @@ private void partiallyFinishBuildRequirements(ref BuildRequirements req, BuildCo
     import std.algorithm.iteration;
     auto libraries = req.cfg.sourceFiles.filter!((name) => name.extension.isLibraryExtension);
     req.cfg.libraries.exclusiveMergePaths(libraries);
-    req.cfg.importDirectories.exclusiveMergePaths(req.cfg.sourcePaths); //importPaths is always a mix of custom imports + sourcePaths
+
+    //importPaths will always contain sourcePath if it is using the default https://dub.pm/dub-reference/build_settings/#sourcepaths
+    if(req.cfg.isUsingDefaultSourcePaths)
+        req.cfg.importDirectories.exclusiveMergePaths(req.cfg.sourcePaths);
 
     ///Remove libraries from the sourceFiles.
     req.cfg.sourceFiles = inPlaceFilter(req.cfg.sourceFiles, (string file) => !file.extension.isLibraryExtension);
