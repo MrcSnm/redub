@@ -63,8 +63,8 @@ ReducedPackageInfo redubDownloadPackage(string packageName, string repo, string 
  */
 private ReducedPackageInfo getPackageInFolder(string folder, string packageName, string subPackage, string packageVersion)
 {
-    import std.path;
     import redub.misc.path;
+    import std.path;
     import std.file;
     import std.algorithm.sorting;
     import std.algorithm.iteration;
@@ -114,7 +114,6 @@ private ReducedPackageInfo getPackageInFolder(string folder, string packageName,
 PackageInfo getPackage(string packageName, string repo, string packageVersion, string requiredBy)
 {
     import std.file;
-    import std.path;
     import redub.misc.path;
     import std.algorithm;
     import std.array;
@@ -170,11 +169,32 @@ private ReducedPackageInfo getPackageInJSON(JSONValue json, string packageName, 
     {
         const(JSONValue)* nameJson = "name" in v;
         const(JSONValue)* ver = "version" in v;
-        SemVer packageVer = SemVer(ver.str);
-        if (nameJson && nameJson.str == packageName && packageVer.satisfies(requirement))
+        const(JSONValue)* pathJson = "path" in v;
+        if(nameJson)
         {
-            vlog("Using local package found at ", v["path"].str, " with version ", ver.str);
-            return ReducedPackageInfo(ver.str, v["path"].str);
+            if(!pathJson)
+            {
+                warn("Corrupted JSON ", getLocalPackagesPath(), " local-packages.json must always have a 'path'");
+                continue;
+            }
+            if(!ver)
+            {
+                static bool hasShown = false;
+                if(!hasShown)
+                {
+                    warn("dub add-path is not currently implemented. Please add your custom packages with dub add-local instead.",
+                        "Warning generated for path ", pathJson.str,
+                        ". Local packages is at ", getLocalPackagesPath());
+                    hasShown = true;
+                }
+                continue;
+            }
+            SemVer packageVer = SemVer(ver.str);
+            if (nameJson.str == packageName && packageVer.satisfies(requirement))
+            {
+                vlog("Using local package found at ", pathJson.str, " with version ", ver.str);
+                return ReducedPackageInfo(ver.str, pathJson.str);
+            }
         }
     }
     return ReducedPackageInfo.init;
@@ -202,7 +222,7 @@ private ReducedPackageInfo getPackageInLocalPackages(string packageName, string 
         return getPackageInJSON(localCache, packageName, packageVersion);
     }
     isCached = true;
-    string locPackages = buildNormalizedPath(getDefaultLookupPathForPackages(), "local-packages.json");
+    string locPackages = getLocalPackagesPath();
     if(std.file.exists(locPackages))
         localCache = parseJSON(std.file.readText(locPackages));
     return getPackageInLocalPackages(packageName, packageVersion);
@@ -258,6 +278,15 @@ private string getDefaultLookupPathForPackages()
 {
     import redub.misc.path;
     return buildNormalizedPath(getDubWorkspacePath, "packages");
+}
+
+private string getLocalPackagesPath()
+{
+    import redub.misc.path;
+    static string localPackages;
+    if(!localPackages)
+        localPackages = buildNormalizedPath(getDefaultLookupPathForPackages(), "local-packages.json");
+    return localPackages;
 }
 
 /** 

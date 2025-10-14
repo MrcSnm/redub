@@ -550,6 +550,7 @@ bool cleanProject(ProjectDetails d, bool showMessages)
 
 ArgsDetails resolveArguments(string[] args, bool isDescribeOnly = false)
 {
+    import core.stdc.stdlib;
     import std.algorithm.comparison:either;
     import std.getopt;
     import std.file;
@@ -567,14 +568,14 @@ ArgsDetails resolveArguments(string[] args, bool isDescribeOnly = false)
     {
         import std.getopt;
         defaultGetoptPrinter(RedubVersionShort~" build information: \n\t"~baseHelpInfo, res.options);
-        return ArgsDetails.init;
+        exit(0);
     }
 
     if(bArgs.version_)
     {
         import std.stdio;
         writeln(RedubVersion);
-        return ArgsDetails.init;
+        exit(0);
     }
 
     updateVerbosity(bArgs.cArgs);
