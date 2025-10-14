@@ -927,6 +927,11 @@ build-universal
     Description: 
         Builds a package in non OSX (uses the main package in the  current working directory by default)
         On OSX, generates a single binary using arm64 and x86_64 architectures
+watch
+    Usage: redub watch
+    Description:
+        Starts watching the folders which dub.json references. If anything changes, it builds its dependents.
+        You may also specify --run if you wish to run the program every time you have one change.
 `;
 
 string getHelpInfo()

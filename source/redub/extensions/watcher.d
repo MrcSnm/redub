@@ -36,11 +36,18 @@ int watchMain(string[] args)
     import std.getopt;
 
     WatchArgs watchArgs;
-    GetoptResult res = betterGetopt(args, watchArgs);
-    if(res.helpWanted)
+    try
     {
-        defaultGetoptPrinter(RedubVersionShort~" watch information: \n", res.options);
-        return 0;
+        GetoptResult res = betterGetopt(args, watchArgs);
+        if(res.helpWanted)
+        {
+            defaultGetoptPrinter(RedubVersionShort~" watch information: \n", res.options);
+            return 0;
+        }
+    }
+    catch(GetOptException e)
+    {
+        //Ignore for now since most of the arguments will be handled by resolveDependencies
     }
 
     ProjectDetails d = redub.extensions.cli.resolveDependencies(args.dup);
