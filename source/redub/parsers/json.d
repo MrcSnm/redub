@@ -327,7 +327,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
                 if(value.type == JSONType.object) ///Uses path style
                 {
                     path = tryStr(value, "path");
-                    version_ = tryStr(value, "version", "*");
+                    version_ = tryStr(value, "version");
                     repo = tryStr(value, "repository");
                     visibility = value.tryStr("visibility");
                     enforce(version_ || path,
@@ -337,7 +337,10 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
                     import redub.misc.path;
                     isOptional = tryBool(value, "optional") && !tryBool(value, "default");
                     if(path)
+                    {
                         path = isAbsolute(path) ? path : redub.misc.path.buildNormalizedPath(workingDir, path);
+                        version_ = null;
+                    }
                 }
                 else if(value.type == JSONType.string) ///Version style
                     version_ = value.str;
