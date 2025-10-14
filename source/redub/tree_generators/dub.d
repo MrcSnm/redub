@@ -190,7 +190,7 @@ private BuildRequirements parseDependency(const ref Dependency dep, const ref Bu
 
     string subPkg = dep.pkgInfo.isInternalSubPackage ? dep.subPackage : null;
     string parentName = dep.subPackage ? dep.parentName : null;
-    BuildRequirements depReq = parseProject(dep.pkgInfo.path, info, dep.subConfiguration, subPkg, null, parentName);
+    BuildRequirements depReq = parseProject(dep.pkgInfo.path, info, dep.subConfiguration, subPkg, null, parentName, false, dep.version_);
     if(getLogLevel() >= LogLevel.vverbose)
     {
         infos(dep.name, " parsed in ", sw.peek.total!"msecs", "ms");

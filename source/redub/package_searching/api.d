@@ -81,6 +81,7 @@ PackageInfo basePackage(string packageName, string packageVersion, string requir
     PackageInfo pack;
     pack.subPackage =  getSubPackageInfoRequiredBy(packageName, requiredBy, pack.packageName);
     pack.requiredBy = requiredBy;
+    pack.bestVersion = SemVer(packageVersion);
     pack.requiredVersion = SemVer(packageVersion);
     pack.isInternalSubPackage = isInternalSubPackage;
     return pack;

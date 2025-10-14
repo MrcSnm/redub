@@ -327,7 +327,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
                 if(value.type == JSONType.object) ///Uses path style
                 {
                     path = tryStr(value, "path");
-                    version_ = tryStr(value, "version");
+                    version_ = tryStr(value, "version", "*");
                     repo = tryStr(value, "repository");
                     visibility = value.tryStr("visibility");
                     enforce(version_ || path,
