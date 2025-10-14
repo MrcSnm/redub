@@ -75,15 +75,17 @@ int main(string[] args)
             entryPoints["watch"] = &watchMain;
 
 
-        foreach(cmd; entryPoints.byKey)
+        if(args.length >= 2)
         {
-            ptrdiff_t cmdPos = countUntil(args, cmd);
-            if(cmdPos != -1)
+            foreach(cmd; entryPoints.byKey)
             {
-                args = args[0..cmdPos] ~ args[cmdPos+1..$];
-                if(cmd == "run")
-                    return runMain(args, runArgs);
-                return entryPoints[cmd](args);
+                if(args[1] == cmd)
+                {
+                    args = args[0..1] ~ args[2..$];
+                    if(cmd == "run")
+                        return runMain(args, runArgs);
+                    return entryPoints[cmd](args);
+                }
             }
         }
         return runMain(args, runArgs);
