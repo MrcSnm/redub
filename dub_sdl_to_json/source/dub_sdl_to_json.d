@@ -64,6 +64,8 @@ string getName(SDLNode node)
 JSONValue sdlToJSON(SDLNode[] sdl)
 {
 	import std.exception;
+	import std.array;
+	import redub.libs.adv_diff.helpers.index_of;
 	import std.algorithm.searching:countUntil;
 
 	JSONValue ret = JSONValue.emptyObject;
@@ -154,7 +156,7 @@ JSONValue sdlToJSON(SDLNode[] sdl)
 				}
 				break;
 			default:
-				bool shouldForceArray = countUntil([
+				bool shouldForceArray = indexOf([
 					"dflags",
 					"lflags",
 					"libs",
@@ -178,7 +180,7 @@ JSONValue sdlToJSON(SDLNode[] sdl)
 
 					"buildOptions",
 					"buildRequirements",
-					], v.name) != -1;
+					].staticArray, v.name) != -1;
 				string name = getName(v);
 				JSONValue* json = name in ret;
 				if(json)

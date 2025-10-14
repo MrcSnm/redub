@@ -499,7 +499,7 @@ private auto save(TRange)(TRange input)
 */
 ref string[] exclusiveMerge(StringRange)(return scope ref string[] a, StringRange b, scope const string[] excludeFromMerge = null, scope const string[] alwaysKeep = null)
 {
-    import std.algorithm.searching : countUntil;
+    import redub.libs.adv_diff.helpers.index_of;
     import std.array;
     auto app = appender!(string[]);
     scope(exit)
@@ -509,9 +509,9 @@ ref string[] exclusiveMerge(StringRange)(return scope ref string[] a, StringRang
     outer: foreach(bV; save(b))
     {
         if(bV.length == 0) continue;
-        if(countUntil(excludeFromMerge, bV) != -1)
+        if(indexOf(excludeFromMerge, bV) != -1)
             continue;
-        if (countUntil(alwaysKeep, bV) != -1)
+        if(indexOf(alwaysKeep, bV) != -1)
         {
             app ~= bV;
             continue;

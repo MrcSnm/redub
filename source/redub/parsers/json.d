@@ -408,6 +408,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
         ///Iterate first all subpackages and add each of them inside the cache
         foreach(JSONValue p; subPackages.array)
         {
+            import redub.libs.adv_diff.helpers.index_of;
             import redub.package_searching.cache;
             enforce(p.type == JSONType.object || p.type == JSONType.string, "subPackages may only be either a string or an object");
 
@@ -430,7 +431,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
                 enforce(std.file.isDir(subPackagePath), "subPackage path '"~subPackagePath~"' must be a directory " );
                 subPackageName = pathSplitter(subPackagePath).back;
             }
-            if(countUntil(existingSubpackages, subPackageName) != -1)
+            if(indexOf(existingSubpackages, subPackageName) != -1)
                 errorTitle("Redundant SubPackage Definition: ", "SubPackage '"~subPackageName~"' was already registered. The subPackage for path " ~subPackagePath~" will be ignored");
             else
             {
@@ -495,7 +496,7 @@ private void runHandlers(
     ref BuildRequirements buildRequirements, ParseConfig cfg,
     JSONValue target, bool bGetUnusedKeys, out string[] unusedKeys, ref BuildConfiguration pending)
 {
-    import std.algorithm.searching;
+    import redub.libs.adv_diff.helpers.index_of;
     foreach(string key, JSONValue v; target)
     {
         bool mustExecuteHandler = true;
@@ -507,7 +508,7 @@ private void runHandlers(
             
             OS osToMatch = cfg.cInfo.targetOS;
             ///If the command is inside the host filters, it will use host OS instead.
-            if(commandsWithHostFilters.countUntil(filtered.command) != -1) osToMatch = std.system.os;
+            if(commandsWithHostFilters.indexOf(filtered.command) != -1) osToMatch = std.system.os;
 
             mustExecuteHandler = filtered.matchesPlatform(osToMatch, cfg.cInfo.isa, cfg.cInfo.compiler) && fn;
         }

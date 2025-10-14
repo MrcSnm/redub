@@ -4,6 +4,7 @@
 	],
 	"dependencies": {
 		"sdlite": "~>1.3.0",
+		"adv_diff": {"path": "../adv_diff"},
 		"hipjson": {"path": "../hipjson"}
 	},
 	"copyright": "Copyright © 2024, Marcelo",

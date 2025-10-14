@@ -132,8 +132,8 @@ struct DirectoriesWithFilter
 
 	pragma(inline, true) bool shouldInclude(string target)
 	{
-		import std.algorithm.searching;
-		return shouldIncludeByExt(target) && countUntil(ignoreFiles, target) == -1;
+		import redub.libs.adv_diff.helpers.index_of;
+		return shouldIncludeByExt(target) && indexOf(ignoreFiles, target) == -1;
 	}
 }
 

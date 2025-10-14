@@ -460,7 +460,7 @@ void putSourceFiles(
     import std.file;
     import std.path;
     import std.string:endsWith;
-    import std.algorithm.searching;
+    import redub.libs.adv_diff.helpers.index_of;
     import std.exception;
     import std.array;
     import std.range:choose;
@@ -515,7 +515,7 @@ void putSourceFiles(
 
     foreach(i, file; files)
     {
-        if(output.countUntil(file) != -1)
+        if(output.indexOf(file) != -1)
         {
             import std.conv:to;
             throw new Exception("\n\tFile was specified twice: "~ "File '"~file~
