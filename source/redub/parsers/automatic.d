@@ -189,7 +189,7 @@ private void partiallyFinishBuildRequirements(ref BuildRequirements req, BuildCo
     req.cfg.libraries.exclusiveMergePaths(libraries);
 
     //importPaths will always contain sourcePath if it is using the default https://dub.pm/dub-reference/build_settings/#sourcepaths
-    if(req.cfg.isUsingDefaultSourcePaths)
+    if(req.cfg.isUsingDefaultSourcePaths || req.cfg.importDirectories.length == 0)
         req.cfg.importDirectories.exclusiveMergePaths(req.cfg.sourcePaths);
 
     ///Remove libraries from the sourceFiles.
