@@ -35,7 +35,7 @@ jobs:
       - uses: MrcSnm/setup-dlang@v2
         with:
           compiler: ldc-latest
-          redub: 1.25.2
+          redub: master
 
       - name: Build
         if: runner.os != 'macOS'

@@ -14,14 +14,8 @@
             "versions": ["RedubCLI", "FSWForcePoll", "RedubWatcher"],
             "dependencies": {
                 "fswatch": "~>0.6.1",
-                "arsd-official:terminal": "~>12.0"
+                "arsd-official:terminal": "~>12.1"
             }
-        },
-        {
-            "name": "cli-osx",
-            "targetType": "executable",
-            "platforms": ["osx"],
-            "versions": ["RedubCLI"]
         },
         {
             "name": "cli-dev",
@@ -29,7 +23,7 @@
             "targetType": "executable",
             "dependencies": {
                 "fswatch": "~>0.6.1",
-                "arsd-official:terminal": "~>12.0"
+                "arsd-official:terminal": "~>12.1"
             }
         },
         {

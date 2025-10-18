@@ -4,7 +4,7 @@
 		"adv_diff":  {"path": "adv_diff"},
 		"hipjson":  {"path": "hipjson"},
 		"d-segmented-hashmap": "1.0.5",
-		"arsd-official": "12.0.0",
+		"arsd-official": "12.1.0",
 		"colorize":  {"path": "colorize"},
 		"d_dependencies":  {"path": "d_dependencies"},
 		"dub_sdl_to_json":  {"path": "dub_sdl_to_json"},

@@ -247,12 +247,13 @@ struct SemVer
 
 
 private alias cr = ComparisonResult;
-enum ComparisonTypes : ComparisonResult[3] 
+enum ComparisonTypes : ComparisonResult[3]
 {
     /// Implementation when directly specified version, or `=` is used.
     mustBeEqual = [cr.equal, cr.equal, cr.equal],
     /// Implementation when using `~`
     greaterPatchesOnly = [cr.equal, cr.equal, cr.gtEqual],
+    greaterMinors = [cr.equal, cr.gtEqual, cr.any],
     /// Implementation when using `*`
     any = [cr.any, cr.any, cr.any],
     ///Implementation when using '>='
@@ -286,9 +287,9 @@ private bool parseOperator(ref SemVer sv, string op, size_t partsLength) @nogc n
         case "^":  sv.comparison = [equal, atOnce, gtEqual];  break;
         case "~", "~>":  
             if(partsLength <= 2)
-                sv.comparison = [equal, atOnce, gtEqual];
+                sv.comparison = ComparisonTypes.greaterMinors;
             else
-                sv.comparison = [equal, equal, gtEqual]; 
+                sv.comparison = ComparisonTypes.greaterPatchesOnly;
             break;
         case ">":  sv.comparison = [atOnce, greaterThan, greaterThan]; break;
         case ">=": sv.comparison = [atOnce, gtEqual, gtEqual]; break;
@@ -364,6 +365,15 @@ unittest
     assert(!SemVer("11.5.1").satisfies(SemVer("~>11.4.1")));
 
     // assert(SemVer("~5").satisfies("5.0.0"));
+}
+
+@("Compare using ~>")
+unittest
+{
+    SemVer matchMinor = SemVer("~>12.1");
+    assert(!SemVer("12.0.0").satisfies(matchMinor));
+    assert(SemVer("12.1.0").satisfies(matchMinor));
+    assert(!SemVer("13.1.0").satisfies(matchMinor));
 }
 
 @("Compare Using Metadata")
