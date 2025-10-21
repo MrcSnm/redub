@@ -1,0 +1,18 @@
+{
+    "authors": [
+        "Marcelo"
+    ],
+    "configurations": [
+        {
+            "name": "winhttp",
+            "platforms": ["windows"],
+            "libs": ["winhttp"]
+        },
+        {
+            "name": "curl"
+        }
+    ],
+    "description": "A downloader library which avoids using libcurl so Windows do not needs to link, while use libcurls on other platforms",
+    "license": "proprietary",
+    "name": "d_downloader"
+}

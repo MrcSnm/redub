@@ -77,7 +77,7 @@ class RegistryPackageSupplier
 
 	void loadPackagesMetadata(string[] packages)
 	{
-		import std.net.curl;
+		import d_downloader;
 		static string getMetadataUrl(string registryUrl, string[] packages)
 		{
 			import std.string:join;
@@ -86,7 +86,7 @@ class RegistryPackageSupplier
 				encodeComponent(`["`~packageName~`"]`)~
 				"&include_dependencies=true&minimize=true";
 		}
-		string data = cast(string)downloadFile(getMetadataUrl(registryUrl, packages));
+		string data = cast(string)downloadToBuffer(getMetadataUrl(registryUrl, packages));
 		JSONValue parsed = parseJSON(data);
 
 		synchronized(metadataMutex.writer)

@@ -1,4 +1,5 @@
 # Redub - Dub Based Build System
+[![Update release and nightly](https://github.com/MrcSnm/redub/actions/workflows/ci.yml/badge.svg)](https://github.com/MrcSnm/redub/actions/workflows/ci.yml)
 
 
 ## Running redub without having it on path

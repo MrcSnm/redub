@@ -933,6 +933,16 @@ watch
     Description:
         Starts watching the folders which dub.json references. If anything changes, it builds its dependents.
         You may also specify --run if you wish to run the program every time you have one change.
+install
+    Usage: redub install <dmd|ldc|opend> <version?|help>
+    Description:
+        Install the specified version for dmd or ldc (opend only has a single version) in the redub workspace folder
+
+use
+    Usage: redub use <dmd|ldc|opend|reset> <version?|help>
+    Description:
+        Installs if not found and sets the specified compiler as the default one. If 'reset' is specified, the default behavior of trying to find from the
+        the PATH environment is is returned.
 `;
 
 string getHelpInfo()

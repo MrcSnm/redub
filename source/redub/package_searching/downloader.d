@@ -58,11 +58,11 @@ string getDownloadLink(string packageName, string repo, SemVer requirement, out 
  */
 ubyte[] fetchPackage(string packageName, string repo, SemVer requirement, out SemVer out_actualVersion, out string url)
 {
-    import redub.libs.package_suppliers.utils;
+    import d_downloader;
     url = getDownloadLink(packageName, repo, requirement, out_actualVersion);
     if(!url)
         return null;
-    return downloadFile(url);
+    return downloadToBuffer(url);
 }
 
 /**

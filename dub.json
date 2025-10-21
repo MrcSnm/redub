@@ -3,9 +3,7 @@
     "description": "Dub Based Build System, with parallelization per packages and easier to contribute",
     "authors": ["Hipreme"],
     "targetPath": "build",
-    "stringImportPaths": [
-        "source"
-    ],
+    "stringImportPaths": ["source"],
     "configurations": [
         {
             "name": "cli",
@@ -42,6 +40,7 @@
         "d_dependencies": {"path": "d_dependencies"},
         "dub_sdl_to_json": {"path": "dub_sdl_to_json"},
         "package_suppliers": {"path": "package_suppliers"},
+        "d_downloader": {"path": "d_downloader"},
         "xxhash3": "~>0.0.5"
     }
 }

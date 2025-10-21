@@ -4,7 +4,8 @@
 	],
 	"dependencies": {
 		"hipjson": {"path": "../hipjson"},
-		"semver": {"path": "../semver"}
+		"semver": {"path": "../semver"},
+		"d_downloader": {"path": "../d_downloader"}
 	},
 	"copyright": "Copyright © 2024, Marcelo",
 	"description": "A minimal D application.",

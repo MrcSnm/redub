@@ -27,10 +27,10 @@ void showNewerVersionMessage()
     );
 }
 
-/** 
+/**
  * Params:
  *   repo = The repository which you want to fetch from. Both user/repo
- * Returns: 
+ * Returns:
  */
 string getLatestGitRepositoryTag(string repo)
 {
@@ -42,10 +42,10 @@ string getLatestGitRepositoryTag(string repo)
 
 JSONValue getGithubRepoAPI(string repo)
 {
-    import std.net.curl;
+    import d_downloader;
     import std.conv:text;
     string api = i"https://api.github.com/repos/$(repo)/tags".text;
-    char[] tagsContent = get(api);
+    char[] tagsContent = cast(char[])downloadToBuffer(api);
     if(tagsContent.length == 0)
         return JSONValue(null);
     return parseJSON(tagsContent);

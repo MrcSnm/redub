@@ -17,20 +17,6 @@ string getFirstFileInDirectory(string inputDir)
 	return entries.front;
 }
 
-ubyte[] downloadFile(string file)
-{
-	import std.net.curl;
-	HTTP http = HTTP(file);
-	ubyte[] temp;
-	http.onReceive = (ubyte[] data)
-	{
-		temp~= data;
-		return data.length;
-	};
-	http.perform();
-	return temp;
-}
-
 bool extractZipToFolder(ubyte[] data, string outputDirectory)
 {
 	import std.file;
