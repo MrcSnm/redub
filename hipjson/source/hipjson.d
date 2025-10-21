@@ -1,7 +1,7 @@
 module hipjson;
 import hip.util.shashmap;
 
-JSONValue parseJSON(string jsonData)
+JSONValue parseJSON(const char[] jsonData)
 {
     return JSONValue.parse(jsonData);
 }
@@ -412,7 +412,7 @@ struct JSONValue
 	}
 
 
-	private static JSONValue parse(string data)
+	private static JSONValue parse(const char[] data)
 	{
 		import core.memory;
 		import std.conv:to;
@@ -422,7 +422,7 @@ struct JSONValue
 		ptrdiff_t index = 0;
 		StringPool pool = StringPool(cast(size_t)(data.length*0.75));
 
-		bool getNextString(string data, ptrdiff_t currentIndex, out ptrdiff_t newIndex, out string theString)
+		bool getNextString(const char[] data, ptrdiff_t currentIndex, out ptrdiff_t newIndex, out string theString)
 		{
 			assert(data[currentIndex] == '"', "getNextString must start with a quotation mark");
 			ptrdiff_t i = currentIndex + 1;
@@ -460,7 +460,7 @@ struct JSONValue
 		}
 
 
-		bool getNextNumber(string data, ptrdiff_t currentIndex, out ptrdiff_t newIndex, out JSONData theData, out JSONType type)
+		bool getNextNumber(const char[] data, ptrdiff_t currentIndex, out ptrdiff_t newIndex, out JSONData theData, out JSONType type)
 		{
 			assert(data[currentIndex].isNumeric);
 			bool hasDecimal = false;
@@ -486,7 +486,7 @@ struct JSONValue
 			}
 			else
 			{
-				static long strToLong(string str)
+				static long strToLong(const char[] str)
 				{
 					long result = 0;
 					foreach(ch; str)

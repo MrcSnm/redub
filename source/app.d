@@ -67,6 +67,7 @@ int main(string[] args)
             "deps": &depsMain,
             "test": &testMain,
             "init": &initMain,
+            "install": &installMain,
             // "watch": &watchMain,
             "run": cast(int function(string[]))null
         ];
@@ -266,4 +267,57 @@ int buildMain(string[] args)
 {
     ProjectDetails d = resolveDependencies(args);
     return buildProject(d).getReturnCode;
+}
+
+int installMain(string[] args)
+{
+    import std.string;
+    import redub.cli.dub;
+    import redub.logging;
+    setLogLevel(LogLevel.info);
+    if(args.length == 1)
+    {
+        error("redub install requires 1 additional argument: ",
+        "\n\topend: installs opend",
+        "\n\tldc <version?|?>: installs ldc latest if version is unspecified.",
+        "\n\t\thelp: Lists available ldc versions",
+        );
+        return 1;
+    }
+    string compiler = args[1];
+    if(compiler.startsWith("opend"))
+    {
+        import redub.misc.opend_install;
+        return installOpend();
+    }
+    else if(compiler.startsWith("ldc"))
+    {
+        import redub.api;
+        import redub.misc.ldc_install;
+        import redub.misc.github_tag_check;
+        enum ldcRepo = "ldc-developers/ldc";
+        string ldcVer = args.length > 2 ? args[2] : null;
+        if(!ldcVer)
+            ldcVer = getLatestGitRepositoryTag(ldcRepo);
+        else if(ldcVer == "help")
+        {
+            import hipjson;
+            JSONValue gitTags = getGithubRepoAPI(ldcRepo);
+            info("Listing available LDC versions:");
+            int limit = 25;
+            foreach(entry; gitTags.array)
+            {
+                info("\t", entry["name"].str);
+                if(--limit == 0)
+                    break;
+            }
+            return 0;
+        }
+        return cast(int)installLdc(ldcVer);
+    }
+    else if(compiler.startsWith("dmd"))
+    {
+        //return installDmd();
+    }
+    return 0;
 }

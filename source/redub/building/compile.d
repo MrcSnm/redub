@@ -199,18 +199,6 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
     return res;
 }
 
-bool makeFileExecutable(string filePath)
-{
-	version(Windows) return true;
-	version(Posix)
-	{
-        import std.file;
-		if(!std.file.exists(filePath)) return false;
-		import std.conv:octal;
-		std.file.setAttributes(filePath, octal!700);
-		return true;
-	}
-}
 
 CompilationResult link(ProjectNode root, string rootHash, const ThreadBuildData data, CompilingSession info, immutable string[string] env)
 {
@@ -241,6 +229,7 @@ CompilationResult link(ProjectNode root, string rootHash, const ThreadBuildData 
     string inDir = getCacheOutputDir(rootHash, cast()root.requirements, info);
     if(root.requirements.cfg.targetType == TargetType.executable && std.system.os.isPosix && info.isa != ISA.webAssembly)
     {
+        import redub.misc.make_file_executable;
         string execPath = buildNormalizedPath(inDir, getOutputName(data.cfg, os));
         if(!makeFileExecutable(execPath))
             throw new Exception("Could not make the output file as executable "~execPath);

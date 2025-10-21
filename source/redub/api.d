@@ -865,7 +865,7 @@ private string getPackageFromCli(ref string[] args)
     return null;
 }
 
-private string getVersionFromPackage(ref string pkg)
+string getVersionFromPackage(ref string pkg)
 {
     import std.algorithm.searching;
     ptrdiff_t ver = countUntil!((a => a == '@'))(pkg);

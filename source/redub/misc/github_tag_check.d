@@ -1,7 +1,7 @@
 module redub.misc.github_tag_check;
+import hipjson;
 
 private enum RedubUserRepository = "MrcSnm/redub";
-private enum GithubTagAPI = "https://api.github.com/repos/"~RedubUserRepository~"/tags";
 private enum CreateIssueURL = "https://github.com/"~RedubUserRepository~"/issues/new/choose";
 
 
@@ -9,7 +9,7 @@ void showNewerVersionMessage()
 {
     import redub.buildapi;
     import redub.logging;
-    string ver = getLatestVersion();
+    string ver = getLatestRedubVersion();
     if(ver)
     {
         if(ver != RedubVersionOnly)
@@ -27,18 +27,35 @@ void showNewerVersionMessage()
     );
 }
 
-string getLatestVersion()
+/** 
+ * Params:
+ *   repo = The repository which you want to fetch from. Both user/repo
+ * Returns: 
+ */
+string getLatestGitRepositoryTag(string repo)
+{
+    JSONValue v = getGithubRepoAPI(repo);
+    if(v.isNull)
+        return null;
+    return v.array[0]["name"].str;
+}
+
+JSONValue getGithubRepoAPI(string repo)
 {
     import std.net.curl;
-    import hipjson;
+    import std.conv:text;
+    string api = i"https://api.github.com/repos/$(repo)/tags".text;
+    char[] tagsContent = get(api);
+    if(tagsContent.length == 0)
+        return JSONValue(null);
+    return parseJSON(tagsContent);
+}
+
+string getLatestRedubVersion()
+{
     static string newestVer;
     if(!newestVer)
-    {
-        char[] tagsContent = get(GithubTagAPI);
-        if(tagsContent.length == 0)
-            return null;
-        newestVer = parseJSON(cast(string)tagsContent).array[0]["name"].str;
-    }
+        newestVer = getLatestGitRepositoryTag(RedubUserRepository);
     return newestVer;
 }
 

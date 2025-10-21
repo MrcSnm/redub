@@ -72,7 +72,7 @@ int updateMain(string[] args)
 
     if(gitCode == isNotGitRepo || gitCode == hasNoGitWindows || gitCode == hasNoGitPosix)
     {
-        latest = getLatestVersion();
+        latest = getLatestRedubVersion();
         if(SemVer(latest[1..$]) > SemVer(RedubVersionOnly[1..$]))
         {
             replaceRedub = true;
