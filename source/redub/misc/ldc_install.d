@@ -1,6 +1,14 @@
 module redub.misc.ldc_install;
 import std.system;
 
+string getLdcFolder(string ver, OS os = std.system.os, ISA isa = instructionSetArchitecture)
+{
+    import redub.api;
+    import redub.misc.path;
+    return buildNormalizedPath(getDubWorkspacePath, "redub-ldc", getLdcFolderName(ver, os, isa), "bin");
+}
+
+
 bool installLdc(string ldcVersion, OS os = std.system.os, ISA isa = instructionSetArchitecture)
 {
     import std.array;
@@ -32,7 +40,7 @@ bool installLdc(string ldcVersion, OS os = std.system.os, ISA isa = instructionS
 	return true;
 }
 
-string getLdcFolderName(string ver, OS os = std.system.os, ISA isa = instructionSetArchitecture)
+private string getLdcFolderName(string ver, OS os = std.system.os, ISA isa = instructionSetArchitecture)
 {
     import redub.command_generators.commons;
     import redub.api;

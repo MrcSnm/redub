@@ -235,6 +235,8 @@ private string getActualCompilerToUse(string preferredCompiler, ref string actua
     {
         throw new Exception(preferredCompiler~ " --version returned a non zero code. "~
         "In Addition, dmd and ldc2 were also tested and were not found. You may need to download or specify them before using redub.\n" ~
+        "If you don't have any compiler added in the PATH, you can install it by using 'redub install dmd' and then do 'redub use dmd'\n" ~
+        "it will setup the compiler to use with redub. \n"~
         "Last Shell Output: "~ compVersionRes.output);
     }
     if(actualCompiler != preferredCompiler)
@@ -407,6 +409,46 @@ private CompilerBinary inferCompiler(string compilerOrPath, string compilerAssum
     throw new Exception("Could not infer which compiler you're using from "~compilerOrPath);
 }
 
+/**
+ *
+ * Params:
+ *   compilerPath = The path where the compiler is
+ *   compilerAssumption = Assumption that will make skip --version call
+ *   compilersInfo = Used for saving metadata
+ *   isDefault = Used for metadata
+ *   isGlobal = Used for metadata
+ *   isC = Used for metadata
+ * Returns: The compiler that was inferrred from the given info
+ */
+public void saveGlobalCompiler(string compilerPath, JSONValue compilersInfo, bool isDefault, bool isC)
+{
+    import redub.misc.find_executable;
+    import std.process;
+    import std.array;
+    immutable inference = [
+        &tryInferDmd,
+        &tryInferLdc,
+        &tryInferGcc,
+        &tryInferGxx
+    ].staticArray;
+
+    CompilerBinary ret;
+    string actualCompiler;
+    auto res = executeShell(compilerPath~" --version");
+    if(res.status)
+        throw new Exception("saveGlobalCompiler was called in an inexistent compiler.");
+    foreach(inf; inference)
+    {
+        if(inf(actualCompiler, res.output, ret))
+        {
+            ret.bin = compilerPath;
+            saveCompilerInfo(compilersInfo, ret, isDefault, true, isC);
+            return;
+        }
+    }
+    throw new Exception("Could not infer which compiler you're using from "~compilerPath);
+}
+
 
 private CompilerBinary getCompilerFromCache(JSONValue allCompilersInfo, string compiler)
 {
@@ -466,7 +508,7 @@ private CompilerBinary getCompilerFromCache(JSONValue allCompilersInfo, string c
  *   isGlobal = Saves the compiler as a globalPath. For example, it will use the path whenever expected to find in global path when "dmd" is sent or "ldc2" (i.e: no real path)
  *   isC = If is a C compiler
  */
-private void saveCompilerInfo(JSONValue allCompilersInfo, ref CompilerBinary compiler, bool isDefault, bool isGlobal, bool isC)
+void saveCompilerInfo(JSONValue allCompilersInfo, ref CompilerBinary compiler, bool isDefault, bool isGlobal, bool isC)
 {
     import redub.meta;
     import std.conv:to;

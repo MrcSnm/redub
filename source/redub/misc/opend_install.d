@@ -1,6 +1,13 @@
 module redub.misc.opend_install;
 import std.system;
 
+string getOpendFolder(OS os = std.system.os, ISA isa = instructionSetArchitecture)
+{
+    import redub.api;
+    import redub.misc.path;
+    return buildNormalizedPath(getDubWorkspacePath, "redub-opend", getOpendFolderName(os, isa), "bin");
+}
+
 bool installOpend(OS os = std.system.os, ISA isa = instructionSetArchitecture)
 {
     import std.array;

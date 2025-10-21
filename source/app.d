@@ -68,6 +68,7 @@ int main(string[] args)
             "test": &testMain,
             "init": &initMain,
             "install": &installMain,
+            "use": &useMain,
             // "watch": &watchMain,
             "run": cast(int function(string[]))null
         ];
@@ -274,13 +275,15 @@ int installMain(string[] args)
     import std.string;
     import redub.cli.dub;
     import redub.logging;
+    import redub.misc.dmd_install;
     setLogLevel(LogLevel.info);
     if(args.length == 1)
     {
         error("redub install requires 1 additional argument: ",
         "\n\topend: installs opend",
-        "\n\tldc <version?|?>: installs ldc latest if version is unspecified.",
+        "\n\tldc <version?|help>: installs ldc latest if version is unspecified.",
         "\n\t\thelp: Lists available ldc versions",
+        "\n\tdmd <version?>: installs the dmd with the version "~DefaultDMDVersion~" if version is unspecified"
         );
         return 1;
     }
@@ -288,7 +291,11 @@ int installMain(string[] args)
     if(compiler.startsWith("opend"))
     {
         import redub.misc.opend_install;
-        return installOpend();
+        if(!installOpend())
+        {
+            error("Could not install OpenD");
+            return 1;
+        }
     }
     else if(compiler.startsWith("ldc"))
     {
@@ -313,11 +320,110 @@ int installMain(string[] args)
             }
             return 0;
         }
-        return cast(int)installLdc(ldcVer);
+        if(!installLdc(ldcVer))
+        {
+            error("Could not install LDC ", ldcVer);;
+            return 1;
+        }
     }
-    else if(compiler.startsWith("dmd"))
+    else if(compiler == "dmd")
     {
-        //return installDmd();
+        import redub.misc.dmd_install;
+        string dmdVer = args.length > 2 ? args[2] : DefaultDMDVersion;
+        if(!installDmd(dmdVer))
+        {
+            error("Could not install DMD ", dmdVer);;
+            return 1;
+        }
     }
+    return 0;
+}
+
+int useMain(string[] args)
+{
+    import std.string;
+    import std.file;
+    import redub.cli.dub;
+    import redub.logging;
+    import redub.meta;
+    import redub.misc.path;
+    import redub.misc.dmd_install;
+    JSONValue meta = getRedubMeta();
+    setLogLevel(LogLevel.info);
+    if(args.length == 1)
+    {
+        error("redub use requires 1 additional argument: ",
+        "\n\topend <dmd|ldc>: uses the wanted opend compiler as the default",
+        "\n\tldc <version?>: uses the latest ldc latest if version is unspecified.",
+        "\n\tdmd <version?>: uses the "~DefaultDMDVersion~" dmd if the version is unspecified.",
+        "\n\treset: removes the default compiler and redub will set it again by the first one found in the PATH environment variable",
+        );
+        return 1;
+    }
+    string compiler = args[1];
+    if(compiler.startsWith("opend"))
+    {
+        import redub.misc.opend_install;
+        import redub.compiler_identification;
+        string opendCompiler = args.length > 2 ? args[2] : null;
+        if(opendCompiler != "dmd" && opendCompiler != "ldc2")
+        {
+            error("redub uses opend: requires either dmd or ldc2 as an argument");
+            return 1;
+        }
+        string opendFolder = getOpendFolder();
+        if(!exists(opendFolder))
+            installOpend();
+        version(Windows)
+            opendCompiler~= ".exe";
+        string opendBin = buildNormalizedPath(opendFolder, opendCompiler);
+        saveGlobalCompiler(opendBin, meta, true, false);
+    }
+    else if(compiler == "ldc" || compiler == "ldc2")
+    {
+        import redub.api;
+        import redub.misc.ldc_install;
+        import redub.misc.github_tag_check;
+        enum ldcRepo = "ldc-developers/ldc";
+        string ldcVer = args.length > 2 ? args[2] : null;
+        if(!ldcVer)
+            ldcVer = getLatestGitRepositoryTag(ldcRepo);
+        string ldcFolder = getLdcFolder(ldcVer);
+        if(!exists(ldcFolder))
+            installLdc(ldcVer);
+        string ldcBin = "ldc2";
+        version(Windows)
+            ldcBin~= ".exe";
+        ldcBin = buildNormalizedPath(ldcFolder, ldcBin);
+        saveGlobalCompiler(ldcBin, meta, true, false);
+    }
+    else if(compiler == "dmd")
+    {
+        import redub.misc.dmd_install;
+        string dmdVer = args.length > 2 ? args[2] : DefaultDMDVersion;
+        string dmdFolder = getDmdFolder(dmdVer);
+        if(!exists(dmdFolder) && !installDmd(dmdVer))
+        {
+            error("Could not install DMD for using it.");
+            return 1;
+        }
+        string dmdBin = "dmd";
+        version(Windows)
+            dmdBin~= ".exe";
+        dmdBin = buildNormalizedPath(dmdFolder, dmdBin);
+        saveGlobalCompiler(dmdBin, meta, true, false);
+    }
+    else if(compiler.startsWith("reset"))
+    {
+        meta.data.object.remove("defaultCompiler");
+        meta.data.object.remove("globalPaths");
+        infos("Default redub compiler is now reset.");
+    }
+
+    if("defaultCompiler" in meta)
+    {
+        infos(meta["globalPaths"][meta["defaultCompiler"].str].str, " is now the default compiler");
+    }
+    saveRedubMeta(meta);
     return 0;
 }
