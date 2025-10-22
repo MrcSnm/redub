@@ -258,6 +258,7 @@ bool buildProjectParallelSimple(ProjectNode root, CompilingSession s, const(AdvC
     string mainPackHash = hashFrom(root.requirements, s);
     bool[ProjectNode] spawned;
     string[string] env = getCurrentEnv();
+    size_t execID = buildExecutions++;
 
     AdvCacheFormula formulaCache;
 
@@ -275,20 +276,22 @@ bool buildProjectParallelSimple(ProjectNode root, CompilingSession s, const(AdvC
                         dep.requirements.buildData(false), cast(shared)dep, 
                         s, HashPair(mainPackHash, hashFrom(dep.requirements, s)),
                         getEnvForProject(dep, env),
-                        0
+                        execID
                     );
                 }
                 else
                     dep.becomeIndependent();
             }
         }
-        auto info = receiveOnly!(ProcessInfo, CompilationResult);
-        if(info[0] != ProcessInfo.init)
+        auto info = receiveOnly!(CompilationID, ProcessInfo, CompilationResult);
+        if(info[0].id != execID)
+            continue;
+        if(info[1] != ProcessInfo.init)
         {
-            runningProcesses[info[0].pid] = true;
+            runningProcesses[info[1].pid] = true;
             continue;
         }
-        auto res = info[1];
+        auto res = info[2];
         runningProcesses[res.pid] = false;
         ProjectNode finishedPackage = cast()res.node;
         if(res.status)
