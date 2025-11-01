@@ -1,9 +1,13 @@
 module hipjson;
 import hip.util.shashmap;
 
-JSONValue parseJSON(const char[] jsonData)
+JSONValue parseJSON(const(char)[] jsonData)
 {
-    return JSONValue.parse(jsonData);
+    JSONParseState state = JSONParseState.initialize(jsonData.length);
+	JSONValue output;
+	if(JSONValue.parseStream(output, state, jsonData, true) == JSONValue.IncompleteStream)
+		return JSONValue.errorObj("Incomplete stream when trying to parse complete JSONValue.");
+	return output;
 }
 
 version(AArch64)
@@ -178,6 +182,193 @@ private union JSONData
 	JSONArray* array;
 }
 
+struct JSONParseState
+{
+	// private
+	public
+	{
+		JSONValue main;
+		JSONValue* current;
+		JSONState state = JSONState.value;
+		JSONValue lastValue;
+		StringPool pool;
+		JSONValue[] stack;
+		ptrdiff_t stackLength = 0;
+		size_t line = 0;
+		ptrdiff_t index;
+		ptrdiff_t totalParsedIndex;
+		string lastKey;
+		StringBuffer partial;
+	}
+
+
+	static JSONParseState initialize(size_t dataLength = 0) @trusted
+	{
+		import std.array;
+		JSONParseState ret = void;
+		ret.main.type = JSONType.null_;
+		ret.current = &ret.main;
+		ret.state = JSONState.value;
+		ret.lastValue = ret.main;
+		// ret.pool = StringPool(data.length == 0 ? StringBuffer.staticStorage.sizeof : cast(size_t)(data.length*0.75));
+		ret.pool = StringPool(dataLength == 0 ? StringBuffer.staticStorage.sizeof : cast(size_t)(dataLength*0.75));
+		ret.stack = uninitializedArray!(JSONValue[])(32);
+		ret.stackLength = 0;
+		ret.line = 0;
+		ret.index = 0;
+		ret.totalParsedIndex = 0;
+		ret.partial = StringBuffer.get();
+
+		return ret;
+	}
+
+	void supplyData(ref const(char)[] data, bool isFullParse)
+	{
+		if(isFullParse)
+			return;
+		if(index != 0)
+		{
+			partial.free(index);
+			totalParsedIndex+= index;
+			index = 0;
+		}
+		data = partial.getData(data);
+	}
+
+
+	private bool getNextString(const char[] data, ptrdiff_t currentIndex, out ptrdiff_t newIndex, out string theString) @trusted
+	{
+		assert(data[currentIndex] == '"', "getNextString must start with a quotation mark");
+		ptrdiff_t i = currentIndex + 1;
+		size_t returnLength = 0;
+		char[] ret = pool.getNewString(64);
+		char ch;
+
+		loop: while(i < data.length)
+		{
+			foreach(_; 0..32)
+			{
+				ch = data.ptr[i];
+				switch(ch)
+				{
+					case '"':
+						ret = pool.resizeString(ret, returnLength);
+						newIndex = i;
+						theString = cast(string)ret;
+						return true;
+					case '\\':
+						if(i + 1 >= data.length)
+							break loop;
+						ch = escapedCharacter(data[++i]);
+						break;
+					default: break;
+
+				}
+				ret[returnLength++] = ch;
+				i++;
+				if(i == data.length)
+					break loop;
+			}
+			if(returnLength >= ret.length)
+				ret = pool.resizeString(ret, ret.length*2);
+		}
+		newIndex = i;
+		pool.resizeString(ret, 0);
+
+		return false;
+	}
+
+
+	private bool getNextNumber(const char[] data, ptrdiff_t currentIndex, out ptrdiff_t newIndex, out JSONData theData, out JSONType type)
+	{
+		assert(data[currentIndex].isNumeric);
+		bool hasDecimal = false;
+		bool isNegative = false;
+		newIndex = currentIndex;
+		ptrdiff_t indexStart = currentIndex;
+		if(data[indexStart] == '-')
+		{
+			isNegative = true;
+			indexStart++;
+			newIndex++;
+		}
+
+		while(newIndex < data.length)
+		{
+			if(!hasDecimal && data[newIndex] == '.')
+			{
+				hasDecimal = true;
+				newIndex++;
+				if(newIndex == data.length) //return false
+					break;
+			}
+			if(!isNumber(data[newIndex]))
+				break;
+			newIndex++;
+		}
+		if(newIndex == data.length)
+		{
+			newIndex = currentIndex;
+			return false;
+		}
+		if(hasDecimal)
+		{
+			import std.conv:to;
+			theData._float = to!double(data[indexStart..newIndex]);
+			theData._float = isNegative ? -theData._float : theData._float;
+			type = JSONType.float_;
+		}
+		else
+		{
+			static long strToLong(const char[] str)
+			{
+				long result = 0;
+				foreach(ch; str)
+					result = result * 10 + (ch - '0');
+				return result;
+			}
+			theData._int = strToLong(data[indexStart..newIndex]);
+			theData._int = isNegative ? -theData._int : theData._int;
+			type = JSONType.int_;
+		}
+		//Stopped on a non number. Revert 1 step.
+		newIndex--;
+		return newIndex < data.length;
+	}
+	private string getErr(string err="", string f = __FILE_FULL_PATH__, size_t l = __LINE__)
+	{
+		import std.conv:to;
+		return "Error at line "~line.to!string~" "~err~" on index '"~totalParsedIndex.to!string~"' last parsed: "~lastValue.toString~" [Internal: "~f~":"~l.to!string~"]";
+	}
+
+	private bool getNextLiteral(const char[] data, ptrdiff_t currentIndex, out ptrdiff_t newIndex, out JSONValue value)
+	{
+		newIndex = currentIndex;
+		if(index + "null".length < data.length)
+		{
+			if(data[index.."true".length + index] == "true")
+			{
+				value = JSONValue(true);
+				newIndex = currentIndex + 3;
+			}
+			else if(data[index.."null".length + index] == "null")
+			{
+				value = JSONValue(null);
+				newIndex = currentIndex + 3;
+			}
+			else if(index + "false".length < data.length && data[index.."false".length + index] == "false")
+			{
+				value = JSONValue(false);
+				newIndex = currentIndex + 4;
+			}
+			else
+				return false;
+			return true;
+		}
+		return false;
+	}
+}
+
 
 struct JSONValue
 {
@@ -217,6 +408,15 @@ struct JSONValue
 	{
 		return _length & lengthMask;
 	}
+
+	static JSONValue IncompleteStream()
+	{
+		JSONValue ret;
+		ret.type = JSONType.bool_;
+		ret.data._int = 2;
+		return ret;
+	}
+
 
 
 	this(T)(T value)
@@ -411,252 +611,164 @@ struct JSONValue
 		return ret;
 	}
 
-
-	private static JSONValue parse(const char[] data)
+	static JSONValue parseStream(ref JSONValue output, ref JSONParseState parseState, const(char)[] data, bool isFullParse = false)
 	{
-		import core.memory;
 		import std.conv:to;
-
 		if(!data.length)
 			return JSONValue.errorObj("No data provided");
-		ptrdiff_t index = 0;
-		StringPool pool = StringPool(cast(size_t)(data.length*0.75));
-
-		bool getNextString(const char[] data, ptrdiff_t currentIndex, out ptrdiff_t newIndex, out string theString)
+		parseState.supplyData(data, isFullParse);
+		with(parseState)
 		{
-			assert(data[currentIndex] == '"', "getNextString must start with a quotation mark");
-			ptrdiff_t i = currentIndex + 1;
-			size_t returnLength = 0;
-			char[] ret = pool.getNewString(64);
-			char ch;
-
-			while(i < data.length)
+			do
 			{
-				foreach(_; 0..32)
-				{
-					ch = data.ptr[i];
+				char ch = data[index];
 				switch(ch)
 				{
-					case '"':
-						ret = pool.resizeString(ret, returnLength);
-						newIndex = i;
-						theString = cast(string)ret;
-						return true;
-					case '\\':
-						if(i + 1 >= data.length)
-							return false;
-						ch = escapedCharacter(data[++i]);
+					case '\n': line++; break;
+					case ' ', '\r', '\t': break;
+					case '{':
+					{
+						if(state != JSONState.value)
+							return output = JSONValue.errorObj(getErr());
+						JSONValue obj = emptyObject;
+						if(!pushNewScope(obj, current, stackLength, stack, lastKey))
+							return output = JSONValue.errorObj(getErr("Could not push new scope in JSON. Only array, object or null are valid"));
+
+						state = JSONState.key;
 						break;
-					default: break;
-
-				}
-				ret[returnLength++] = ch;
-				i++;
-				}
-				if(returnLength >= ret.length)
-					ret = pool.resizeString(ret, ret.length*2);
-			}
-			return false;
-		}
-
-
-		bool getNextNumber(const char[] data, ptrdiff_t currentIndex, out ptrdiff_t newIndex, out JSONData theData, out JSONType type)
-		{
-			assert(data[currentIndex].isNumeric);
-			bool hasDecimal = false;
-			newIndex = currentIndex;
-			if(data[currentIndex] == '-')
-				newIndex++;
-
-			while(newIndex < data.length)
-			{
-				if(!hasDecimal && data[newIndex] == '.')
-				{
-					hasDecimal = true;
-					if(newIndex+1 < data.length) newIndex++;
-				}
-				if(!isNumber(data[newIndex]))
-					break;
-				newIndex++;
-			}
-			if(hasDecimal)
-			{
-				theData._float = to!double(data[currentIndex..newIndex]);
-				type = JSONType.float_;
-			}
-			else
-			{
-				static long strToLong(const char[] str)
-				{
-					long result = 0;
-					foreach(ch; str)
-						result = result * 10 + (ch - '0');
-					return result;
-				}
-				theData._int = strToLong(data[currentIndex..newIndex]);
-				type = JSONType.int_;
-			}
-			//Stopped on a non number. Revert 1 step.
-			newIndex--;
-			return newIndex < data.length;
-		}
-		JSONValue ret;
-		ret.type = JSONType.null_;
-		JSONValue* current = &ret;
-		JSONState state = JSONState.value;
-		JSONValue lastValue = ret;
-
-		import std.array;
-		scope JSONValue[] stack = uninitializedArray!(JSONValue[])(32);
-		scope ptrdiff_t stackLength = 0;
-
-		size_t line = 0;
-		string getErr(string err="", string f = __FILE_FULL_PATH__, size_t l = __LINE__)
-		{
-			return "Error at line "~line.to!string~" "~err~" on index '"~index.to!string~"' last parsed: "~lastValue.toString~" [Internal: "~f~":"~l.to!string~"]";
-		}
-
-		string lastKey;
-		do
-		{
-			char ch = data[index];
-			switch(ch)
-			{
-				case '\n':
-					line++;
-					break;
-				case '{':
-				{
-					if(state != JSONState.value)
-						return JSONValue.errorObj(getErr());
-					JSONValue obj = emptyObject;
-					if(!pushNewScope(obj, current, stackLength, stack, lastKey))
-						return JSONValue.errorObj(getErr("Could not push new scope in JSON. Only array, object or null are valid"));
-
-					state = JSONState.key;
-					break;
-				}
-				case '}':
-					popScope(stackLength, stack, current);
-					state = JSONState.lookingForNext;
-					break;
-				case ':':
-					if(state != JSONState.lookingAssignment)
-						return JSONValue.errorObj(getErr("expected key before ':'"));
-					state = JSONState.value;
-					break;
-				case '"':
-				{
-
-					switch(state)
+					}
+					case '}':
+						// if(state != JSONState.lookingForNext)
+						// 	return JSONValue.errorObj(getErr());
+						popScope(stackLength, stack, current);
+						state = JSONState.lookingForNext;
+						break;
+					case ':':
+						if(state != JSONState.lookingAssignment)
+							return output = JSONValue.errorObj(getErr("expected key before ':'"));
+						state = JSONState.value;
+						break;
+					case '"':
 					{
-						case JSONState.lookingForNext:
-							if(current.type == JSONType.object)
-								goto case JSONState.key;
-							else if(current.type == JSONType.array)
-								goto case JSONState.value;
-							goto default;
-						case JSONState.key:
+
+						switch(state)
 						{
-							assert(current.type == JSONType.object, getErr("only object can receive a key."));
-							if(!getNextString(data, index, index, lastKey))
-								return JSONValue.errorObj(getErr("unclosed quotes."));
-							state = JSONState.lookingAssignment;
-							break;
+							case JSONState.lookingForNext:
+								if(current.type == JSONType.object)
+									goto case JSONState.key;
+								else if(current.type == JSONType.array)
+									goto case JSONState.value;
+								goto default;
+							case JSONState.key:
+							{
+								assert(current.type == JSONType.object, getErr("only object can receive a key."));
+								ptrdiff_t currIndex = index;
+								if(!getNextString(data, currIndex, index, lastKey))
+								{
+									index = currIndex;
+									return IncompleteStream;
+									//return JSONValue.errorObj(getErr("unclosed quotes."));
+								}
+								state = JSONState.lookingAssignment;
+								break;
+							}
+							case JSONState.value:
+							{
+								string val;
+								ptrdiff_t currIndex = index;
+								if(!getNextString(data, currIndex, index, val))
+								{
+									index = currIndex;
+									return IncompleteStream;
+									//return JSONValue.errorObj(getErr("unclosed quotes."));
+								}
+								pushToStack(JSONValue(val), current, lastValue, lastKey);
+								state = JSONState.lookingForNext;
+								break;
+							}
+							default:
+								return JSONValue.errorObj(getErr("comma expected before key "~lastKey));
 						}
-						case JSONState.value:
+						break;
+					}
+					case '[':
+					{
+						if(state != JSONState.lookingForNext && state != JSONState.value)
+							return output = JSONValue.errorObj(getErr(" expected to be a value. "));
+						if(!pushNewScope(JSONValue(JSONArray.createNew()), current, stackLength, stack, lastKey))
+							return output = JSONValue.errorObj(getErr("Could not push new scope in JSON. Only array, object or null are valid"));
+						state = JSONState.value;
+						break;
+					}
+					case ']':
+						if(state != JSONState.lookingForNext && state != JSONState.value)
+							return output = JSONValue.errorObj(getErr("expected to be a value. "));
+						popScope(stackLength, stack, current);
+						state = JSONState.lookingForNext;
+						break;
+					case ',':
+						if(state != JSONState.lookingForNext)
+							return output = JSONValue.errorObj(getErr("unexpected comma. "));
+						if(current.type != JSONType.object && current.type != JSONType.array)
+							return output = JSONValue.errorObj(getErr("unexpected comma. "));
+
+						switch(current.type) with(JSONType)
 						{
-							string val;
-							if(!getNextString(data, index, index, val))
-								return JSONValue.errorObj(getErr("unclosed quotes."));
-							pushToStack(JSONValue(val), current, lastValue, lastKey);
-							state = JSONState.lookingForNext;
-							break;
+							case object: state = JSONState.key; break;
+							case array: state = JSONState.value; break;
+							default: assert(false, "Error?");
 						}
-						default:
-							return JSONValue.errorObj(getErr("comma expected before key "~lastKey));
-					}
-					break;
-				}
-				case '[':
-				{
-					if(state != JSONState.lookingForNext && state != JSONState.value)
-						return JSONValue.errorObj(getErr(" expected to be a value. "));
-					if(!pushNewScope(JSONValue(JSONArray.createNew()), current, stackLength, stack, lastKey))
-						return JSONValue.errorObj(getErr("Could not push new scope in JSON. Only array, object or null are valid"));
-					state = JSONState.value;
-					break;
-				}
-				case ']':
-					if(state != JSONState.lookingForNext && state != JSONState.value)
-						return JSONValue.errorObj(getErr("expected to be a value. "));
-					popScope(stackLength, stack, current);
-					state = JSONState.lookingForNext;
-					break;
-				case ',':
-					if(state != JSONState.lookingForNext)
-						return JSONValue.errorObj(getErr("unexpected comma. "));
-					if(current.type != JSONType.object && current.type != JSONType.array)
-						return JSONValue.errorObj(getErr("unexpected comma. "));
+						break;
+					default:
+						switch(state)
+						{
+							case JSONState.value: //Any value
+							case JSONState.lookingForNext: //Array
+								if(ch.isNumeric)
+								{
+									if(state == JSONState.lookingForNext && current.type != JSONType.array)
+										return output = JSONValue.errorObj(getErr("unexpected number."));
 
-					switch(current.type) with(JSONType)
-					{
-						case object: state = JSONState.key; break;
-						case array: state = JSONState.value; break;
-						default: assert(false, "Error?");
-					}
-					break;
-				default:
-					switch(state)
-					{
-						case JSONState.value: //Any value
-						case JSONState.lookingForNext: //Array
-							if(ch.isNumeric)
-							{
-								if(state == JSONState.lookingForNext && current.type != JSONType.array)
-									return JSONValue.errorObj(getErr("unexpected number."));
-								JSONType out_type;
-								if(!getNextNumber(data, index, index, lastValue.data, out_type))
-									return JSONValue.errorObj(getErr("unexpected end of file."));
-								lastValue.type = out_type;
-								pushToStack(lastValue, current, lastValue, lastKey);
-								state = JSONState.lookingForNext;
-							}
-							else if(index + "true".length < data.length && data[index.."true".length + index] == "true")
-							{
-								if(state == JSONState.lookingForNext && current.type != JSONType.array)
-									return JSONValue.errorObj(getErr("unexpected number."));
-								pushToStack(JSONValue(true), current, lastValue, lastKey);
-								state = JSONState.lookingForNext;
-								index+= 3;
-							}
-							else if(index + "false".length < data.length && data[index.."false".length + index] == "false")
-							{
-								if(state == JSONState.lookingForNext && current.type != JSONType.array)
-									return JSONValue.errorObj(getErr("unexpected number."));
-								pushToStack(JSONValue(false), current, lastValue, lastKey);
-								state = JSONState.lookingForNext;
-								index+= 4;
-							}
-							else if(index + "null".length < data.length && data[index.."null".length + index] == "null")
-							{
-								if(state == JSONState.lookingForNext && current.type != JSONType.array)
-									return JSONValue.errorObj(getErr("unexpected number."));
-								pushToStack(JSONValue(null), current, lastValue, lastKey);
-								state = JSONState.lookingForNext;
-								index+= 3;
-							}
-							break;
-						default:break;
-					}
-					break;
+									JSONType out_type;
+									ptrdiff_t currentIndex = index;
+									if(!getNextNumber(data, currentIndex, index, lastValue.data, out_type))
+									{
+										index = currentIndex;
+										return IncompleteStream;
+									}
+									lastValue.type = out_type;
+									pushToStack(lastValue, current, lastValue, lastKey);
+									state = JSONState.lookingForNext;
+								}
+								else
+								{
+									ptrdiff_t currentIndex = index;
+									if(!getNextLiteral(data, currentIndex, index, lastValue))
+									{
+										index = currentIndex;
+										return IncompleteStream;
+									}
+									if(state == JSONState.lookingForNext && current.type != JSONType.array)
+										return output = JSONValue.errorObj(getErr(lastValue.toString));
+									pushToStack(lastValue, current, lastValue, lastKey);
+									state = JSONState.lookingForNext;
+								}
+								break;
+							default:break;
+						}
+						break;
+				}
+				index++;
 			}
-			index++;
+			while(index < data.length);
+			if(stackLength == 0)
+			{
+				output = parseState.main;
+				pool.trim();
+				return parseState.main;
+			}
 		}
-		while(index < data.length && stack.length > 0);
-
-		pool.trim();
-		return ret;
+		return JSONValue.IncompleteStream();
 	}
 
 	inout(JSONValue) opIndex(string key) inout
@@ -693,7 +805,7 @@ struct JSONValue
 		else
 			return key in *data.object;
 	}
-    
+
     int opApply(scope int delegate(string key, JSONValue v) dg)
     {
         if(type != JSONType.object)
@@ -711,7 +823,7 @@ struct JSONValue
             if (result)
                 break;
         }
-    
+
         return result;
     }
 	bool hasErrorOccurred() const { return type == JSONType.error; }
@@ -783,7 +895,8 @@ struct JSONValue
 				ret = data._float.to!string;
 				break;
 			case JSONType.bool_:
-				ret = data._bool ? "true" : "false";
+				if(data._int == 2) ret = "Incomplete Stream";
+				else ret = data._bool ? "true" : "false";
 				break;
 			case JSONType.error:
 				ret = error();
@@ -868,8 +981,77 @@ struct JSONValue
             foreach(v; data.array.value.getArray)
                 v.dispose();
         }
-        
+
     }
+}
+
+private struct StringBuffer
+{
+	char[4096] staticStorage;
+	char[] dynamicStorage;
+	size_t usedSize = 0;
+
+	static StringBuffer get()
+	{
+		StringBuffer ret = void;
+		ret.usedSize = 0;
+		ret.dynamicStorage = (char[]).init;
+		return ret;
+	}
+
+	void appendData(const(char)[] data)
+	{
+		size_t newSize = usedSize + data.length;
+		if(dynamicStorage.length || newSize > staticStorage.length)
+		{
+			size_t oldDyn = dynamicStorage.length;
+			if(newSize > dynamicStorage.length)
+				dynamicStorage.length = newSize;
+			if(oldDyn == 0)
+				dynamicStorage[0..usedSize] = staticStorage[0..usedSize];
+			dynamicStorage[usedSize..newSize] = data[];
+		}
+		else
+			staticStorage[usedSize..newSize] = data[];
+		usedSize = newSize;
+	}
+	void reset()
+	{
+		usedSize = 0;
+	}
+
+	void free(size_t freeSize)
+	{
+		import core.stdc.string;
+		if(freeSize == 0)
+			return;
+		else if(freeSize >= usedSize)
+		{
+			usedSize = 0;
+			return;
+		}
+		size_t remaining = usedSize - freeSize;
+		if(dynamicStorage.length)
+			memmove(dynamicStorage.ptr, dynamicStorage.ptr+freeSize, remaining);
+		else
+			memmove(staticStorage.ptr, staticStorage.ptr+freeSize, remaining);
+
+		usedSize = remaining;
+
+	}
+
+	scope const(char)[] getData(const(char)[] data)
+	{
+		appendData(data);
+		return getData();
+	}
+
+	scope const(char)[] getData()
+	{
+		if(dynamicStorage.length)
+			return dynamicStorage[0..usedSize];
+		return staticStorage[0..usedSize];
+	}
 }
 
 private struct StringPool
@@ -894,7 +1076,7 @@ private struct StringPool
 		return false;
 	}
 
-	char[] resizeString(char[] str, size_t newSize)
+	char[] resizeString(char[] str, size_t newSize) @trusted
 	{
 		///Inside pool
 		if(newSize == str.length) return str;
@@ -1088,33 +1270,35 @@ unittest
 }`;
 	assert(parseJSON(json)["D5F04185E96CC720"].array[1].array[0].toString == `"Second Value"`);
 }
-// unittest
-// {
+
+unittest
+{
 	// enum path = `C:\Users\Marcelo\AppData\Local\dub\.redub\E22653FD6E9559C4.json`;
 	// enum path = `C:\Users\Marcelo\Documents\D\redub\hipjson\testJson.json`;
-// 	// enum tests = 5;
-// 	enum tests = 30_000;
-// 	import core.memory;
-// 	import std.datetime.stopwatch;
-// 	import std.file;
-// 	import std.stdio;
+	enum path = `C:\Users\Marcelo\AppData\Local\dub\dump.json`;
+	enum tests = 1;
+	// enum tests = 30_000;
+	import core.memory;
+	import std.datetime.stopwatch;
+	import std.file;
+	import std.stdio;
 
-// 	string file = readText(path);
+	string file = readText(path);
 
-// 	auto res = benchmark!(()
-// 	{
-// 		parseJSON(file);
-// 	})(tests);
+	auto res = benchmark!(()
+	{
+		parseJSON(file);
+	})(tests);
 
-// 	size_t bytesRead = file.length * tests;
+	size_t bytesRead = file.length * tests;
 
 
-// 	writeln("Took: ", res[0].total!"msecs");
-// 	writeln("MB per Second: ", bytesRead / 1_000_000.0 / (res[0].total!"msecs" / 1000.0) );
+	writeln("Took: ", res[0].total!"msecs");
+	writeln("MB per Second: ", bytesRead / 1_000_000.0 / (res[0].total!"msecs" / 1000.0) );
 
-// 	writeln("Allocated: ", GC.stats.allocatedInCurrentThread / 1_000_000.0, " MB");
-// 	writeln("Free: ", GC.stats.freeSize / 1_000_000.0, " MB");
-// 	writeln("Used: ", GC.stats.usedSize / 1_000_000.0, " MB");
-// 	writeln("Collection Count: ", GC.profileStats.numCollections);
-// 	writeln("Collection Time: ", GC.profileStats.totalCollectionTime);
-// }
+	writeln("Allocated: ", GC.stats.allocatedInCurrentThread / 1_000_000.0, " MB");
+	writeln("Free: ", GC.stats.freeSize / 1_000_000.0, " MB");
+	writeln("Used: ", GC.stats.usedSize / 1_000_000.0, " MB");
+	writeln("Collection Count: ", GC.profileStats.numCollections);
+	writeln("Collection Time: ", GC.profileStats.totalCollectionTime);
+}

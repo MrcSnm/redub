@@ -2,7 +2,7 @@ module d_downloader.windows;
 version(Windows):
 import core.sys.windows.winhttp;
 
-bool download(string link, scope ubyte[] delegate(size_t incomingBytes) bufferSink, scope void delegate(ubyte[] buffer) onDataReceived = null)
+bool download(string link, scope ubyte[] delegate(size_t incomingBytes, bool isIncomingContentLength) bufferSink, scope void delegate(ubyte[] buffer) onDataReceived = null)
 {
     import std.utf:toUTF16z;
     import core.sys.windows.windef;
@@ -71,7 +71,19 @@ bool download(string link, scope ubyte[] delegate(size_t incomingBytes) bufferSi
         && WinHttpReceiveResponse(hRequest, null))
     {
         DWORD remainingDataSize = 0;
-
+        wchar[256] headerBuffer = void;
+        uint headerLength = headerBuffer.length;
+        size_t contentLength;
+        import std.stdio;
+        if(WinHttpQueryHeaders(hRequest, WINHTTP_QUERY_CONTENT_LENGTH, null, headerBuffer.ptr, &headerLength, null))
+        {
+            import std.string;
+            import std.conv:to;
+            contentLength = strip(headerBuffer[0..headerLength/wchar.sizeof]).to!size_t;
+        }
+        ubyte[] buffer;
+        if(contentLength != 0)
+            buffer = bufferSink(contentLength, true);
         do {
             if (!WinHttpQueryDataAvailable(hRequest, &remainingDataSize))
                 break;
@@ -79,7 +91,8 @@ bool download(string link, scope ubyte[] delegate(size_t incomingBytes) bufferSi
                 break;
 
             DWORD dwRead = 0;
-            ubyte[] buffer = bufferSink(remainingDataSize);
+            if(contentLength == 0)
+                buffer = bufferSink(remainingDataSize, false);
             assert(buffer.length < DWORD.max, "Buffer sink length is too big.");
             WinHttpReadData(hRequest, buffer.ptr, cast(DWORD)buffer.length, &dwRead);
             if(onDataReceived)
@@ -93,12 +106,25 @@ bool download(string link, scope ubyte[] delegate(size_t incomingBytes) bufferSi
 ubyte[] downloadToBuffer(string url)
 {
     ubyte[] buffer;
-    download(url, (size_t incomingBytes)
+    size_t processed = 0;
+    download(url, (size_t incomingBytes, bool isIncomingContentLength)
     {
-        size_t bufferTail = buffer.length;
-        buffer.length+= incomingBytes;
-        return buffer[bufferTail..$];
+        if(isIncomingContentLength)
+        {
+            buffer.length = incomingBytes;
+            processed = incomingBytes;
+            return buffer[0..incomingBytes];
+        }
+        else //Grow in 75% more than what it needs
+        {
+            if(buffer.length < processed + incomingBytes)
+                buffer.length = cast(size_t)((processed + incomingBytes) * 1.75);
+            auto ret = buffer[processed..processed+incomingBytes];
+            processed+= incomingBytes;
+            return ret;
+        }
     });
+    buffer.length = processed;
     return buffer;
 }
 
@@ -114,7 +140,7 @@ void downloadToFile(string url, string targetFile, bool lowMem = false)
     if(lowMem)
     {
         ubyte[4096] buffer;
-        download(url, (size_t incomingBytes)
+        download(url, (size_t incomingBytes, bool isIncomingContentLength)
         {
             return incomingBytes > buffer.length ? buffer[0..$] : buffer[0..incomingBytes];
         }, (ubyte[] b)
