@@ -185,13 +185,14 @@ private union JSONData
 struct JSONParseState
 {
 	// private
+	static size_t minStringPoolSize = 1024;
 	public
 	{
 		JSONValue main;
 		JSONValue* current;
 		JSONState state = JSONState.value;
 		JSONValue lastValue;
-		StringPool pool;
+		StringPoolList pool;
 		JSONValue[] stack;
 		ptrdiff_t stackLength = 0;
 		size_t line = 0;
@@ -210,8 +211,7 @@ struct JSONParseState
 		ret.current = &ret.main;
 		ret.state = JSONState.value;
 		ret.lastValue = ret.main;
-		// ret.pool = StringPool(data.length == 0 ? StringBuffer.staticStorage.sizeof : cast(size_t)(data.length*0.75));
-		ret.pool = StringPool(dataLength == 0 ? StringBuffer.staticStorage.sizeof : cast(size_t)(dataLength*0.75));
+		ret.pool = StringPoolList(dataLength <= minStringPoolSize ? minStringPoolSize : cast(size_t)(dataLength*0.5));
 		ret.stack = uninitializedArray!(JSONValue[])(32);
 		ret.stackLength = 0;
 		ret.line = 0;
@@ -1054,6 +1054,67 @@ private struct StringBuffer
 	}
 }
 
+private struct StringPoolList
+{
+	size_t defaultPoolSizes;
+	StringPool firstPool;
+	StringPool[] pools;
+	this(size_t defaultPoolSizes)
+	{
+		this.defaultPoolSizes = defaultPoolSizes;
+		firstPool = StringPool(defaultPoolSizes);
+	}
+
+	char[] getNewString(size_t strSize)
+	{
+		char[] ret = firstPool.getNewString(strSize);
+		if(ret)
+			return ret;
+
+		if(pools.length)
+			ret = pools[$-1].getNewString(strSize);
+		if(!ret)
+		{
+			pools.length++;
+			pools[$-1] = StringPool(strSize > defaultPoolSizes ? strSize : defaultPoolSizes);
+			ret = pools[$-1].getNewString(strSize);
+		}
+		return ret;
+	}
+
+
+	char[] resizeString(char[] str, size_t newSize) @trusted
+	{
+		char[] ret = firstPool.resizeString(str, newSize);
+		if(ret) return ret;
+		if(pools.length)
+		{
+			ret = pools[$-1].resizeString(str, newSize);
+			if(ret) return ret;
+			ret = pools[$-1].getNewString(newSize);
+		}
+		if(!ret)
+		{
+			pools.length++;
+			pools[$-1] = StringPool(newSize > defaultPoolSizes ? newSize : defaultPoolSizes);
+			ret = pools[$-1].getNewString(newSize);
+		}
+		if(str.length < newSize)
+			ret[0..str.length] = str[];
+		else
+			ret[0..newSize] = str[0..newSize];
+		assert(ret.length != 0 || (newSize == 0 && ret.length == 0));
+		return ret;
+	}
+
+	void trim()
+	{
+		firstPool.trim();
+		foreach(p; pools)
+			p.trim();
+	}
+}
+
 private struct StringPool
 {
 	private char[] pool;
@@ -1065,9 +1126,9 @@ private struct StringPool
 		this.pool = uninitializedArray!(char[])(size);
 	}
 
-	bool getSlice(size_t sliceSize, out char[] str)
+	private bool getSlice(size_t sliceSize, out char[] str)
 	{
-		if(used+sliceSize < pool.length)
+		if(used+sliceSize <= pool.length)
 		{
 			str = pool[used..used+sliceSize];
 			used+= sliceSize;
@@ -1087,17 +1148,13 @@ private struct StringPool
 				if(newSize - str.length + used > pool.length)
 				{
 					used-= str.length;
-					import std.array;
-					char[] ret = uninitializedArray!(char[])(newSize);
-					ret[0..str.length] = str[];
-					return ret;
+					return null;
 				}
 				else
 				{
-					ptrdiff_t offset = str.ptr - pool.ptr;
-					assert(offset >= 0, " Out of bounds?");
 					used+= newSize - str.length;
-					return pool[cast(size_t)offset..offset+newSize];
+					(cast(size_t*)&str)[0] = newSize;
+					return str;
 				}
 			}
 			else
@@ -1106,11 +1163,8 @@ private struct StringPool
 				return str[0..newSize];
 			}
 		}
-		else
-			str.length = newSize;
-		return str;
+		return null;
 	}
-
 	/**
 	*	If the pool is not enough, it will allocate randomly
 	*/
@@ -1119,7 +1173,7 @@ private struct StringPool
 		char[] ret;
 		if(getSlice(strSize, ret))
 			return ret;
-		return new char[](strSize);
+		return null;
 	}
 
 	void trim()
@@ -1276,7 +1330,7 @@ unittest
 	// enum path = `C:\Users\Marcelo\AppData\Local\dub\.redub\E22653FD6E9559C4.json`;
 	// enum path = `C:\Users\Marcelo\Documents\D\redub\hipjson\testJson.json`;
 	enum path = `C:\Users\Marcelo\AppData\Local\dub\dump.json`;
-	enum tests = 1;
+	enum tests = 10;
 	// enum tests = 30_000;
 	import core.memory;
 	import std.datetime.stopwatch;

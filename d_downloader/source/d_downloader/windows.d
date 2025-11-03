@@ -29,39 +29,7 @@ bool download(string link, scope ubyte[] delegate(size_t incomingBytes, bool isI
         WINHTTP_FLAG_SECURE);
 
     if(hRequest is null)
-    {
-        import core.sys.windows.winbase;
-        DWORD code = GetLastError();
-        string msg;
-        switch(code)
-        {
-            case ERROR_WINHTTP_INCORRECT_HANDLE_TYPE:
-                msg = `The type of handle supplied is incorrect for this operation.`; break;
-            case ERROR_WINHTTP_INTERNAL_ERROR:
-                msg = `An internal error has occurred.`; break;
-            case ERROR_WINHTTP_INVALID_URL:
-                msg = `The URL is invalid.`; break;
-            case ERROR_WINHTTP_OPERATION_CANCELLED:
-                msg = `The operation was canceled, usually because the handle on which the request was operating was closed before the operation completed.`; break;
-            case ERROR_WINHTTP_UNRECOGNIZED_SCHEME:
-                msg = `The URL specified a scheme other than "http:" or "https:".`; break;
-            case ERROR_NOT_ENOUGH_MEMORY:
-                msg = `Not enough memory was available to complete the requested operation. (Windows error code)`; break;
-            default:
-                wchar* buffer;
-                DWORD msgLength = FormatMessageW(FORMAT_MESSAGE_FROM_SYSTEM |
-                    FORMAT_MESSAGE_IGNORE_INSERTS |
-                    FORMAT_MESSAGE_ALLOCATE_BUFFER, null, code, LANG_NEUTRAL, cast(wchar*)&buffer, 0, null);
-                if(msgLength)
-                {
-                    import std.conv:to;
-                    msg = buffer[0..msgLength].to!string;
-                    LocalFree(buffer);
-                }
-                break;
-        }
-        throw new Exception(msg);
-    }
+        throwWindowsError();
 
     scope(exit)
         WinHttpCloseHandle(hRequest);
@@ -72,18 +40,16 @@ bool download(string link, scope ubyte[] delegate(size_t incomingBytes, bool isI
     {
         DWORD remainingDataSize = 0;
         wchar[256] headerBuffer = void;
-        uint headerLength = headerBuffer.length;
+        uint headerLength = headerBuffer.length * wchar.sizeof;
         size_t contentLength;
-        import std.stdio;
         if(WinHttpQueryHeaders(hRequest, WINHTTP_QUERY_CONTENT_LENGTH, null, headerBuffer.ptr, &headerLength, null))
         {
             import std.string;
             import std.conv:to;
             contentLength = strip(headerBuffer[0..headerLength/wchar.sizeof]).to!size_t;
         }
-        ubyte[] buffer;
-        if(contentLength != 0)
-            buffer = bufferSink(contentLength, true);
+        ubyte[] buffer = contentLength != 0 ? bufferSink(contentLength, true) : null;
+        uint bytesRead;
         do {
             if (!WinHttpQueryDataAvailable(hRequest, &remainingDataSize))
                 break;
@@ -91,23 +57,71 @@ bool download(string link, scope ubyte[] delegate(size_t incomingBytes, bool isI
                 break;
 
             DWORD dwRead = 0;
-            if(contentLength == 0)
-                buffer = bufferSink(remainingDataSize, false);
-            assert(buffer.length < DWORD.max, "Buffer sink length is too big.");
-            WinHttpReadData(hRequest, buffer.ptr, cast(DWORD)buffer.length, &dwRead);
+            ubyte[] tempBuffer;
+            if(buffer is null)
+                tempBuffer = bufferSink(remainingDataSize, false);
+            else
+            {
+                import std.exception;
+                enforce(bytesRead + remainingDataSize <= buffer.length, "Buffer set with Content-Length was not enough.");
+                tempBuffer = buffer[bytesRead..$];
+            }
+
+            assert(tempBuffer.length < DWORD.max, "Buffer sink length is too big.");
+            if (!WinHttpReadData(hRequest, tempBuffer.ptr, cast(DWORD)tempBuffer.length, &dwRead))
+                throwWindowsError();
+            bytesRead+= dwRead;
             if(onDataReceived)
-                onDataReceived(buffer);
+                onDataReceived(tempBuffer[0..dwRead]);
         } while (remainingDataSize > 0);
     }
 
     return true;
 }
 
+
+private void throwWindowsError()
+{
+    import core.sys.windows.windef;
+    import core.sys.windows.winbase;
+    DWORD code = GetLastError();
+    string msg;
+    switch(code)
+    {
+        case ERROR_WINHTTP_INCORRECT_HANDLE_TYPE:
+            msg = `The type of handle supplied is incorrect for this operation.`; break;
+        case ERROR_WINHTTP_INTERNAL_ERROR:
+            msg = `An internal error has occurred.`; break;
+        case ERROR_WINHTTP_INVALID_URL:
+            msg = `The URL is invalid.`; break;
+        case ERROR_WINHTTP_OPERATION_CANCELLED:
+            msg = `The operation was canceled, usually because the handle on which the request was operating was closed before the operation completed.`; break;
+        case ERROR_WINHTTP_UNRECOGNIZED_SCHEME:
+            msg = `The URL specified a scheme other than "http:" or "https:".`; break;
+        case ERROR_NOT_ENOUGH_MEMORY:
+            msg = `Not enough memory was available to complete the requested operation. (Windows error code)`; break;
+        default:
+            wchar* buffer;
+            DWORD msgLength = FormatMessageW(FORMAT_MESSAGE_FROM_SYSTEM |
+                FORMAT_MESSAGE_IGNORE_INSERTS |
+                FORMAT_MESSAGE_ALLOCATE_BUFFER, null, code, LANG_NEUTRAL, cast(wchar*)&buffer, 0, null);
+            if(msgLength)
+            {
+                import std.conv:to;
+                msg = buffer[0..msgLength].to!string;
+                LocalFree(buffer);
+            }
+            break;
+    }
+    throw new Exception(msg);
+
+}
+
 ubyte[] downloadToBuffer(string url)
 {
     ubyte[] buffer;
     size_t processed = 0;
-    download(url, (size_t incomingBytes, bool isIncomingContentLength)
+    if(!download(url, (size_t incomingBytes, bool isIncomingContentLength)
     {
         if(isIncomingContentLength)
         {
@@ -123,7 +137,8 @@ ubyte[] downloadToBuffer(string url)
             processed+= incomingBytes;
             return ret;
         }
-    });
+    }))
+        return null;
     buffer.length = processed;
     return buffer;
 }
