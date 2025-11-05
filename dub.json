@@ -36,7 +36,7 @@
         "semver": {"path": "semver"},
         "colorize": {"path": "colorize"},
         "adv_diff": {"path": "adv_diff"},
-        "hipjson": "~>1.0.6",
+        "hipjson": "~>1.0.7",
         "d_dependencies": {"path": "d_dependencies"},
         "dub_sdl_to_json": {"path": "dub_sdl_to_json"},
         "package_suppliers": {"path": "package_suppliers"},
