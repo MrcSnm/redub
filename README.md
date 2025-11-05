@@ -1,51 +1,50 @@
 # Redub - Dub Based Build System
 [![Update release and nightly](https://github.com/MrcSnm/redub/actions/workflows/ci.yml/badge.svg)](https://github.com/MrcSnm/redub/actions/workflows/ci.yml)
 
-
-## Running redub without having it on path
+## Redub for dub users
 - Change directory to the project you want to build and enter in terminal `dub run redub`
-- You may also get help by running `dub run redub -- --help`
-- If you're unsure on how to update redub to the latest version using dub, you may also do `dub run redub -- update`
+  > To fully take advantage of redub speed, you might as well use redub directly.
 
 ## Building redub
-- Enter in terminal and execute `dub`
+- Enter in terminal and execute [`dub`](https://github.com/dlang/dub)
 - Highly recommended that you build it with `dub build -b release-debug --compiler=ldc2` since this will also improve its speed on dependency resolution
-- I would also add redub/bin to the environment variables, with that, you'll be able to simply execute `redub` in the folder you're in and get your project built and running
-- After having your first redub version, you may also update redub by entering on terminal `redub update`. This will download the latest version, rebuild redub with optimizations and replace your current redub executable
 
-## Using its library API
 
-The usage of the library APIispretty straightforward. You get mainly 2 functions
-1. `resolveDependencies` which will parse the project and its dependencies, after that, you got all the project information
-2. `buildProject` which will get the project information and build in parallel
+# Redub Additions
+Those are the additions I've made over dub
+- **Self Update**: `redub update` will either sync to the latest repo (and build it) or replace it with latest release
+- [**Compiler Management**](#compiler-management) - Support to change default compiler and install on command line
+- [**Redub Plugins**](#redub-plugins) - Alternative to rdmd. Execute arbitrary D code in the build steps.
+- [**Multi Language**](#multi-language) - Compile a C project together and include it on the linking step
+- [**Library API**](#using-its-library-api) - Integrate redub directly in your application
+- **Watching Directories** - `redub watch`- Builds dependents automatically on changes. Add  `--run` to run the program after building.
+- **MacOS Universal Builds** - `redub build-universal` - Generates a single binary containing arm64 and x86_64 architectures on MacOS
 
-```d
-import redub.api;
-import redub.logging;
 
-void main()
-{
-  import std.file;
-  //Enables logging on redub
-  setLogLevel(LogLevel.verbose);
+## Redub Help
+- [Original Dub Documentation](https://dub.pm/)
+- You may also get help by running `dub run redub -- --help` or simply `redub --help`
 
-  //Gets the project information
-  ProjectDetails d = resolveDependencies(
-    invalidateCache: false,
-    std.system.os,
-    CompilationDetails("dmd", "arch not yet implemented", "dmd v[2.105.0]"),
-    ProjectToParse("configuration", getcwd(), "subPackage", "path/to/dub/recipe.json (optional)")
-  );
 
-  /** Optionally, you can change some project information by accessing the details.tree (a ProjectNode), from there, you can freely modify the BuildRequirements of the project
-  * d.tree.requirements.cfg.outputDirectory = "some/path";
-  * d.tree.requirements.cfg.dFlags~= "-gc";
-  */
 
-  //Execute the build process
-  buildProject(d);
-}
-```
+## Compiler Management
+- Installing new compilers, use `redub install`:
+  ```
+  redub install requires 1 additional argument:
+          opend: installs opend
+          ldc <version?|help>: installs ldc latest if version is unspecified.
+                  help: Lists available ldc versions
+          dmd <version?>: installs the dmd with the version 2.111.0 if version is unspecified
+  ```
+- Using the new compilers, use `redub use` - Redub use will also install if you don't already have it:
+  ```
+  redub use requires 1 additional argument:
+        opend <dmd|ldc>: uses the wanted opend compiler as the default
+        ldc <version?>: uses the latest ldc latest if version is unspecified.
+        dmd <version?>: uses the 2.111.0 dmd if the version is unspecified.
+        reset: removes the default compiler and redub will set it again by the first one found in the PATH environment variable
+  ```
+
 
 ## Redub Plugins
 
@@ -82,7 +81,7 @@ For using it on prebuild, you simply specify the module and its arguments:
 }
 ```
 
-### Useful links regarding plugins:
+**Useful links regarding plugins:**
 - [**GetModule plugin**](./plugins/getmodules/source/getmodules.d)
 - [**Example Usage**](./tests/plugin_test/dub.json)
 
@@ -95,67 +94,45 @@ Redub has also an experimental support for building and linking C/C++ code toget
 }
 ```
 
+## Using its library API
+
+The usage of the library APIispretty straightforward. You get mainly 2 functions
+1. `resolveDependencies` which will parse the project and its dependencies, after that, you got all the project information
+2. `buildProject` which will get the project information and build in parallel
+
+```d
+import redub.api;
+import redub.logging;
+
+void main()
+{
+  import std.file;
+  //Enables logging on redub
+  setLogLevel(LogLevel.verbose);
+
+  //Gets the project information
+  ProjectDetails d = resolveDependencies(
+    invalidateCache: false,
+    std.system.os,
+    CompilationDetails("dmd", "arch not yet implemented", "dmd v[2.105.0]"),
+    ProjectToParse("configuration", getcwd(), "subPackage", "path/to/dub/recipe.json (optional)")
+  );
+
+  /** Optionally, you can change some project information by accessing the details.tree (a ProjectNode), from there, you can freely modify the BuildRequirements of the project
+  * d.tree.requirements.cfg.outputDirectory = "some/path";
+  * d.tree.requirements.cfg.dFlags~= "-gc";
+  */
+
+  //Execute the build process
+  buildProject(d);
+}
+```
+
+
 With that, you'll be able to specify that your dependency is a C/C++ dependency. then, you'll be able to build it by calling `redub --cc=gcc`. You can also
 specify both D and C at the same time `redub --cc=gcc --dc=dmd`. Which will use DMD to build D and GCC to C.
 
 You can see that in the example project: [**Multi Language Redub Project**](./tests/multi_lang/dub.json)
 
 
-# Project Meta
-
-
-## Making it faster
-Have you ever wondered why [dub](https://github.com/dlang/dub) was slow? I tried solving it, but its codebase was fairly unreadable. After building this project, I've implemented features that dub don't use
-
-- Lazy build project configuration evaluation
-- Parallelization on build sorted by dependency
-- Faster JSON parsing
-- Fully parallelized build when only link is waiting for dependencies
-
-### Philosophy
-
-- Separate build system from package manager.
-- Have total backward compatibility on dub for initial versions.
-- On initial versions, develop using phobos only
-- Make it less stateful.
-- Achieve at least 90% of what dub does.
-- Isolate each process. This will make easier for adding and future contributors
-
-## Achieving it
-
-### Legend
-- api -> Can be freely be imported from any module
-- module -> Needs to be isolated as much as possible from each module. If one needs to communicate with other, a bridge/api may be created after the initial idea
-
-### How it works
-Here are described the modules which do most of the work if someone wants to contribute.
-
-- buildapi: Defines the contents of build configurations, tree of projects and commons for them
-- parsers.json: Parse dub.json into a build configuration
-- parsers.automatic: Parse using an automatic parser identification
-- cli.dub + app: Parse CLI to get the build root and an initial build configuration
-- parsers.environment: Merge environment variables into build configuration
-- tree_generators.dub: Output build dependency tree while merging their configurations
-- command_generator.automatic: Convert build configuration into compilation flags
-- buildapi + building.compile: Transform build tree into dependency order tree
-- building.compile: Spawn build processes for the dependencies until it links
-
-
-### Contributor Attracting
-- Isolate module as much as possible to attract contributors working on self contained modules which only gets input and returns an output
-
-### Starting small
-- No need to handle edge cases in the beginning. They may become even separate modules.
-
-### A week project
-- This project had a small start. I gave one week for doing it, but since it was very succesful on its
-achievements, I decided to extend a little the deadline for achieving support.
-Right now, it has been tested with
-
-### Working examples
-Those projects were fairly tested while building this one
-- dub
-- glui
-- dplug
-- arsd-official
-- Hipreme Engine
+[**Project Meta**](META.md)
