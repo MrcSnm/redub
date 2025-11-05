@@ -1,6 +1,6 @@
 module redub.compiler_identification;
 public import redub.libs.semver;
-import hipjson;
+import hip.data.json;
 import std.algorithm.setops;
 
 
@@ -127,7 +127,7 @@ struct CompilerBinary
 }
 
 
-/** 
+/**
  * Using this structure, it is possible to use any compiler with any version as long
  * they are the valid AcceptedCompiler list.
  */
@@ -161,7 +161,7 @@ bool isDCompiler(immutable CompilerBinary comp)
 }
 
 
-/** 
+/**
  * Redub will try to search compilers in that order if the D compiler on getCompiler is not found.
  */
 immutable string[] searchableCompilers = [
@@ -170,12 +170,12 @@ immutable string[] searchableCompilers = [
 ];
 
 
-/** 
+/**
  * Tries to find in the local folder for an executable file with the name of compilerOrPath.
  * They are only searched if the path is not absolute
  * Params:
  *   compilerOrPath = The base compiler name to search on the current directory.
- * Returns: 
+ * Returns:
  */
 private string tryGetCompilerOnCwd(string compilerOrPath)
 {
@@ -198,7 +198,7 @@ private string tryGetCompilerOnCwd(string compilerOrPath)
     return compilerOrPath;
 }
 
-/** 
+/**
  * Tries to find the compiler to use. If the preferred compiler is not on the user environment, it will
  * warn and use it instead.
  * Params:
@@ -251,7 +251,7 @@ string tryGetStr(JSONValue v, string key)
     return ret ? ret.str : null;
 }
 
-/** 
+/**
  * Use this function to get extensive information about the Compiler to use.
  * Params:
  *   compilerOrPath = Can be used both as a global, such as `dmd` or a complete path to a compiler. If null, defaults to DMD
@@ -288,7 +288,7 @@ Compiler getCompiler(string compilerOrPath = "dmd", string cCompilerOrPath = nul
     //         ret.usesGnuLinker = res == UsesGnuLinker.yes ? true : false;
     // }
 
-    
+
     return ret;
 }
 private CompilerBinary searchCompiler(string compilerOrPath, JSONValue compilersInfo, bool isDefault, bool isC, string compilerAssumption = null)
@@ -323,7 +323,7 @@ private CompilerBinary searchCompiler(string compilerOrPath, JSONValue compilers
     return ret;
 }
 
-/** 
+/**
  * Used for determining whether it is running on gnu ld or not
  * Params:
  *   ldcPath = Ldc path for finding the ldc.conf file
@@ -364,8 +364,8 @@ private CompilerBinary getCompilerFromGlobalPath(string compilerOrPath, JSONValu
     return CompilerBinary.init;
 }
 
-/** 
- * 
+/**
+ *
  * Params:
  *   compilerOrPath = The path where the compiler is
  *   compilerAssumption = Assumption that will make skip --version call
@@ -737,7 +737,7 @@ private string inBetweenAny(string input, string left, scope const(char)[] anyRi
 
 @"Test DMD Version" unittest
 {
-    string dmdVerString = 
+    string dmdVerString =
 `
 DMD64 D Compiler v2.106.0-dirty                                                                                                                                          Copyright (C) 1999-2023 by The D Language Foundation, All Rights Reserved written by Walter Bright
 `;
@@ -750,7 +750,7 @@ assert(SemVer("2.106.0").satisfies(comp.frontendVersion));
 
 @"Test LDC Version" unittest
 {
-string ldcVerString = 
+string ldcVerString =
 `
 LDC - the LLVM D compiler (1.36.0):                                                                                                                                        based on DMD v2.106.1 and LLVM 17.0.6                                                                                                                                    built with LDC - the LLVM D compiler (1.36.0)                                                                                                                            Default target: x86_64-pc-windows-msvc                                                                                                                                   Host CPU: znver1                                                                                                                                                         http://dlang.org - http://wiki.dlang.org/LDC
 `;

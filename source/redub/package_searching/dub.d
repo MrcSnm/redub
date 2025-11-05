@@ -2,7 +2,7 @@ module redub.package_searching.dub;
 import redub.package_searching.api;
 import redub.logging;
 import redub.api;
-import hipjson;
+import hip.data.json;
 import core.sync.mutex;
 
 
@@ -52,14 +52,14 @@ ReducedPackageInfo redubDownloadPackage(string packageName, string repo, string 
     );
 }
 
-/** 
+/**
  * Gets the best matching version on the specified folder
  * Params:
  *   folder = The folder containing the packageName versionentrie   s
  *   packageName = Used to build the path
  *   subPackage = Currently used only for warning
  *   packageVersion = The version required (SemVer)
- * Returns: 
+ * Returns:
  */
 private ReducedPackageInfo getPackageInFolder(string folder, string packageName, string subPackage, string packageVersion)
 {
@@ -101,8 +101,8 @@ private ReducedPackageInfo getPackageInFolder(string folder, string packageName,
     return ReducedPackageInfo.init;
 }
 
-/** 
- * Lookups inside 
+/**
+ * Lookups inside
  * - $HOME/.dub/packages/local-packages.json
  * - $HOME/.dub/packages/**
  *
@@ -128,7 +128,7 @@ PackageInfo getPackage(string packageName, string repo, string packageVersion, s
         pack.path = localPackage.bestVersionPath;
         return pack;
     }
-    
+
     ///If no version was downloaded yet, download before looking
     string downloadedPackagePath = redub.misc.path.buildNormalizedPath(getDefaultLookupPathForPackages(), packageName);
     ReducedPackageInfo info;
@@ -200,7 +200,7 @@ private ReducedPackageInfo getPackageInJSON(JSONValue json, string packageName, 
     return ReducedPackageInfo.init;
 }
 
-/** 
+/**
  * Use this version instead of getPackageInJSON since this one will cache the local packages instead.
  * Params:
  *   packageName = The package name to get
@@ -224,7 +224,7 @@ private ReducedPackageInfo getPackageInLocalPackages(string packageName, string 
     isCached = true;
     string locPackages = getLocalPackagesPath();
     if(std.file.exists(locPackages))
-        localCache = parseJSON(std.file.readText(locPackages));
+        localCache = parseJSON(std.file.readText(locPackages), true);
     return getPackageInLocalPackages(packageName, packageVersion);
 }
 
@@ -242,7 +242,7 @@ void prefetchPackages(string dubSelectionsPath)
     import redub.misc.path;
     if(!exists(dubSelectionsPath))
         return;
-    JSONValue v = parseJSON(readText(dubSelectionsPath));
+    JSONValue v = parseJSON(readText(dubSelectionsPath), true);
 
     string[2][] prefetchedPackages;
     string[] packagesToLoadMetadata;
@@ -289,18 +289,18 @@ private string getLocalPackagesPath()
     return localPackages;
 }
 
-/** 
+/**
  * Git style (~master)
  * Params:
  *   str = ~branchName
- * Returns: 
+ * Returns:
  */
 private bool isGitBranchStyle(string str)
 {
     import std.ascii : isAlphaNum;
     import std.algorithm.searching : canFind;
 
-    // Must start with ~ and Can't find a non alpha numeric version 
+    // Must start with ~ and Can't find a non alpha numeric version
     return str.length > 1 && str[0] == '~' &&
         !str[1 .. $].canFind!((ch) => !ch.isAlphaNum);
 }
@@ -310,7 +310,7 @@ private bool isGitHashStyle(string str)
     import std.ascii : isHexDigit;
     import std.algorithm.searching : canFind;
 
-    // Can't find a non hex digit version 
+    // Can't find a non hex digit version
     return str.length > 0 && !str.canFind!((ch) => !ch.isHexDigit);
 }
 

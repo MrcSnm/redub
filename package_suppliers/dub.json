@@ -3,7 +3,7 @@
 		"Marcelo"
 	],
 	"dependencies": {
-		"hipjson": {"path": "../hipjson"},
+		"hipjson": "*",
 		"semver": {"path": "../semver"},
 		"d_downloader": {"path": "../d_downloader"}
 	},

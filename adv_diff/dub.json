@@ -3,7 +3,7 @@
 		"Marcelo Silva Nascimento Mancini"
 	],
 	"dependencies": {
-		"hipjson": {"path": "../hipjson"}
+		"hipjson": "*"
 	},
 	"copyright": "Copyright © 2024, Marcelo Silva Nascimento Mancini",
 	"description": "An advanced diff checker. Used for files and paths.",

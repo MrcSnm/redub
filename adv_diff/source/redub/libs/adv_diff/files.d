@@ -4,7 +4,7 @@
  * Beyond that, it also provides a cache composition formula.
  */
 module redub.libs.adv_diff.files;
-public import hipjson;
+public import hip.data.json;
 import std.exception;
 import std.file;
 

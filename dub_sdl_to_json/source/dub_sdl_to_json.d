@@ -1,5 +1,5 @@
 module dub_sdl_to_json;
-public import hipjson;
+public import hip.data.json;
 import sdlite;
 import core.stdc.math;
 
@@ -308,10 +308,10 @@ string fixSDLParsingBugs(string sdlData)
         enum lb = "\r\n";
     else
         enum lb = "\n";
-    
+
     sdlData = stripComments(sdlData);
     sdlData = sdlData.replace("\\"~lb, " ");
-    
+
 
     /*
       Now replace things like:
@@ -326,12 +326,12 @@ string fixSDLParsingBugs(string sdlData)
     */
 
 
-    /** 
+    /**
      * '\\' is considered a escape for the tags
      * Params:
      *   input = A string with '`' to match, for example description `test` - match the brackets
-     *   startIndex = 
-     * Returns: 
+     *   startIndex =
+     * Returns:
      */
     static bool findMatchingEnd(string input, out ptrdiff_t start, out ptrdiff_t end, ptrdiff_t startIndex = 0)
     {
@@ -344,7 +344,7 @@ string fixSDLParsingBugs(string sdlData)
           case '\\':
             i++;
             break;
-          case '`': //The implementation is also 
+          case '`': //The implementation is also
             if(start == -1)
               start = i;
             else
@@ -409,7 +409,7 @@ buildType "unittest" {
     dflags "-preview=dip1000"
 }
 ED";
-	import hipjson;
+	import hip.data.json;
 	SDLNode[] nodes = parseSDL(null, testSdl);
 	JSONValue v = sdlToJSON(nodes);
 	assert(!parseJSON(v["description"].toString).hasErrorOccurred);

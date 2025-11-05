@@ -105,7 +105,7 @@ string downloadPackageTo(return string path, string packageName, string repo, Se
     import core.thread;
     import core.sync.mutex;
     import core.sync.condition;
-    import hipjson;
+    import hip.data.json;
     import redub.libs.package_suppliers.utils;
     import std.path;
     import std.file;
@@ -231,7 +231,7 @@ string downloadPackageTo(return string path, string packageName, string repo, Se
     {
         if(!std.file.exists(jsonPath))
             throw new NetworkException("Downloaded a dub package which has no dub configuration?");
-        json = parseJSON(std.file.readText(jsonPath));
+        json = parseJSON(std.file.readText(jsonPath), true);
     }
     if(json.hasErrorOccurred)
         throw new Exception("Redub Json Parsing Error while reading json '"~jsonPath~"': "~json.error);

@@ -4,7 +4,7 @@
  *
  */
 module redub.meta;
-public import hipjson;
+public import hip.data.json;
 
 private string getRedubMetaFileName()
 {
@@ -42,7 +42,7 @@ JSONValue getRedubMeta()
     {
         if(exists(metaFile))
         {
-            meta = parseJSON(cast(string)std.file.read(getRedubMetaFileName));
+            meta = parseJSON(cast(string)std.file.read(getRedubMetaFileName), true);
             if(meta.hasErrorOccurred)
                 return JSONValue.emptyObject;
             JSONValue* ver = "version" in meta;

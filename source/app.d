@@ -29,9 +29,9 @@ string formatError(string err)
 }
 /**
 * Redub work with input -> output on each step. It must be almost stateless.
-* ** CLI will be optionally implemented later. 
+* ** CLI will be optionally implemented later.
 * ** Cache will be optionally implemented later
-* 
+*
 * FindProject -> ParseProject -> MergeWithEnvironment -> ConvertToBuildFlags ->
 * Build
 */
@@ -140,7 +140,7 @@ int runMain(string[] args, string[] runArgs)
         return d.getReturnCode;
     if(d.tree.requirements.cfg.targetType != TargetType.executable)
         return 1;
-    
+
     if(d.tree.name == "redub")
         return 0;
     return executeProgram(d.tree, runArgs);
@@ -150,7 +150,7 @@ int describeMain(string[] args)
 {
     import std.getopt;
     DubDescribeArguments desc;
-    try 
+    try
     {
         GetoptResult res = betterGetopt(args, desc);
         if(res.helpWanted)
@@ -163,7 +163,7 @@ int describeMain(string[] args)
     ProjectDetails d = resolveDependencies(args, true);
     if(!d.tree)
         return 1;
-    
+
     alias OutputData = string[];
 
     static immutable outputs =[
@@ -308,7 +308,7 @@ int installMain(string[] args)
             ldcVer = getLatestGitRepositoryTag(ldcRepo);
         else if(ldcVer == "help")
         {
-            import hipjson;
+            import hip.data.json;
             JSONValue gitTags = getGithubRepoAPI(ldcRepo);
             info("Listing available LDC versions:");
             int limit = 25;

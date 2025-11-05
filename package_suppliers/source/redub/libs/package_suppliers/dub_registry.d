@@ -2,7 +2,7 @@ module redub.libs.package_suppliers.dub_registry;
 import redub.libs.package_suppliers.utils;
 import redub.libs.semver;
 import core.sync.rwmutex;
-import hipjson;
+import hip.data.json;
 package enum PackagesPath = "packages";
 
 
@@ -87,7 +87,7 @@ class RegistryPackageSupplier
 				"&include_dependencies=true&minimize=true";
 		}
 		string data = cast(string)downloadToBuffer(getMetadataUrl(registryUrl, packages));
-		JSONValue parsed = parseJSON(data);
+		JSONValue parsed = parseJSON(data, true);
 
 		synchronized(metadataMutex.writer)
 		{
@@ -120,8 +120,49 @@ class RegistryPackageSupplier
 }
 unittest
 {
-	assert(new RegistryPackageSupplier().getPackageDownloadURL("redub", "1.16.0") == "https://code.dlang.org/packages/redub/1.16.0.zip");
-	assert(new RegistryPackageSupplier().getBestPackageDownloadUrl("redub", SemVer("1.16.0")) == "https://code.dlang.org/packages/redub/1.16.0.zip");
+	import d_downloader;
+	import std.datetime.stopwatch;
+	// assert(new RegistryPackageSupplier().getPackageDownloadURL("redub", "1.16.0") == "https://code.dlang.org/packages/redub/1.16.0.zip");
+	// assert(new RegistryPackageSupplier().getBestPackageDownloadUrl("redub", SemVer("1.16.0")) == "https://code.dlang.org/packages/redub/1.16.0.zip");
+
+	ubyte[] buffer;
+	import hip.data.json;
+	import std.stdio;
+
+	StopWatch sw = StopWatch(AutoStart.yes);
+
+	// parseJSON(cast(char[])downloadToBuffer(`https://code.dlang.org/api/packages/infos?packages=%5B%22redub%22%5D`));
+	JSONValue json;
+	JSONParseState state = JSONParseState.initialize(ushort.max);
+
+	Duration timeSpentParsing;
+	// char[] data = cast(char[])downloadToBuffer(`https://code.dlang.org/api/packages/dump`);
+	import std.file;
+	// char[] data = cast(char[])std.file.readText(`c:\Users\Marcelo\AppData\Local\dub\dump.json`);
+	writeln("Time downloading: ", sw.peek.total!"msecs");
+	sw = StopWatch(AutoStart.yes);
+	// parseJSON(data);
+
+
+	// // download(`https://code.dlang.org/api/packages/infos?packages=%5B%22redub%22%5D`, (size_t incomingBytes)
+	download(`https://code.dlang.org/api/packages/dump`, (size_t incomingBytes, bool isIncomingContentLength)
+	{
+		if(incomingBytes > buffer.length)
+			buffer.length = incomingBytes;
+		return buffer[0..incomingBytes];
+	}, (ubyte[] dataReceive)
+	{
+		StopWatch parse = StopWatch(AutoStart.yes);
+		// JSONValue.parseStream(json, state, cast(char[])dataReceive);
+		timeSpentParsing+= parse.peek;
+	});
+
+	writeln("JSON parsed in ", sw.peek, " time spent parsing: ", timeSpentParsing);
+	// import core.memory;
+	// writeln = GC.stats.usedSize;
+
+
+
 }
 
 //Speed test

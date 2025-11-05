@@ -1,5 +1,5 @@
 module redub.misc.github_tag_check;
-import hipjson;
+import hip.data.json;
 
 private enum RedubUserRepository = "MrcSnm/redub";
 private enum CreateIssueURL = "https://github.com/"~RedubUserRepository~"/issues/new/choose";
@@ -48,7 +48,7 @@ JSONValue getGithubRepoAPI(string repo)
     char[] tagsContent = cast(char[])downloadToBuffer(api);
     if(tagsContent.length == 0)
         return JSONValue(null);
-    return parseJSON(tagsContent);
+    return parseJSON(tagsContent, true);
 }
 
 string getLatestRedubVersion()

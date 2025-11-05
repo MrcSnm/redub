@@ -2,14 +2,14 @@ module redub.parsers.json;
 import redub.logging;
 import std.system;
 import redub.buildapi;
-import hipjson;
+import hip.data.json;
 import std.file;
 import redub.parsers.base;
 import redub.command_generators.commons;
 import core.runtime;
 import redub.tree_generators.dub;
 
-/** 
+/**
  * Those commands are independent of the selected target OS.
  * It will use the host OS instead of targetOS since they depend on the machine running them
  */
@@ -34,11 +34,11 @@ immutable string[] commandsWithHostFilters = [
  *   isRoot = Used as metadata
  * Returns:
  */
-BuildRequirements parse(string filePath, 
-    string projectWorkingDir, 
+BuildRequirements parse(string filePath,
+    string projectWorkingDir,
     CompilationInfo cInfo,
     string defaultPackageName,
-    string version_, 
+    string version_,
     BuildRequirements.Configuration subConfiguration,
     string subPackage,
     out BuildConfiguration pending,
@@ -119,14 +119,14 @@ private JSONValue parseJSONCached(string filePath, string fileData)
     {
         JSONValue* cached = filePath in jsonCache;
         if(cached) return *cached;
-        jsonCache[filePath] = parseJSON(fileData);
+        jsonCache[filePath] = parseJSON(fileData, true);
         if(jsonCache[filePath].hasErrorOccurred)
             throw new Exception(jsonCache[filePath].error);
         return jsonCache[filePath];
     }
 }
 
-/** 
+/**
  * This function was created since on libraries, they may be reusing multiple times and thus
  * storing the cache between runs may trigger errors.
  */
@@ -138,10 +138,10 @@ public void clearJsonRecipeCache()
 
 
 
-/** 
+/**
  * Params:
  *   json = A dub.json equivalent
- * Returns: 
+ * Returns:
  */
 BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration pending, bool isRoot = false)
 {
@@ -244,7 +244,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
                     JSONValue* platforms = "platforms" in projectConfiguration;
                     if(platforms)
                     {
-                        enforce(platforms.type == JSONType.array, 
+                        enforce(platforms.type == JSONType.array,
                             "'platforms' on configuration "~name.str~" at project "~req.name ~ " must be an array"
                         );
                         if(!platformMatches(platforms.array, os, c.cInfo.isa))
@@ -271,8 +271,8 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
                         else
                             availableConfigs~= conf["name"].str ~ " [OS-ISA Incompatible]";
                         availableConfigs~= "\n\t";
-                    } //Using array.map is causing a memory corruption on macOS somehow. 
-                    
+                    } //Using array.map is causing a memory corruption on macOS somehow.
+
                     // string availableConfigs = v.array.map!((JSONValue e)
                     // {
                     //     JSONValue* plats = "platforms" in e;
@@ -281,7 +281,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
                     //     else
                     //         return e["name"].str ~ " [OS-ISA Incompatible]";
                     // }).join("\n\t");
-                    
+
                     throw new Exception("Configuration '"~c.subConfiguration.name~"' specified for dependency '"~req.name~"' but wasn't found or its platform is incompatible. Preferred subConfiguratio was '" ~ v.array[preferredConfiguration]["name"].str~"' . Available Configurations:\n\t"~availableConfigs);
                 }
                 if(preferredConfiguration != -1)
@@ -387,7 +387,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
         "subConfigurations": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _)
         {
             enforce(v.type == JSONType.object, "subConfigurations must be an object conversible to string[string]");
-            
+
             foreach(string key, JSONValue value; v)
                 addSubConfiguration(req, c, key, value.str);
         },
@@ -475,7 +475,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
                     import redub.parsers.automatic;
                     return parseProject(subPackagePath, cfg.cInfo, cfg.subConfiguration, null, null, buildRequirements.name, false, cfg.version_);
                 }
-            } 
+            }
         }
         import std.array;
         import std.algorithm.iteration;
@@ -508,7 +508,6 @@ private void runHandlers(
         {
             CommandWithFilter filtered = CommandWithFilter.fromKey(key);
             fn = filtered.command in handler;
-            
             OS osToMatch = cfg.cInfo.targetOS;
             ///If the command is inside the host filters, it will use host OS instead.
             if(commandsWithHostFilters.indexOf(filtered.command) != -1) osToMatch = std.system.os;
@@ -581,13 +580,13 @@ private bool matchesOS(string osRep, OS os)
 {
     switch(osRep) with(OS)
     {
-        case "posix": return os == solaris || 
-                             os == dragonFlyBSD || 
-                             os == freeBSD || 
+        case "posix": return os == solaris ||
+                             os == dragonFlyBSD ||
+                             os == freeBSD ||
                              os ==  netBSD ||
-                             os == openBSD || 
-                             os == otherPosix || 
-                             "linux".matchesOS(os) || 
+                             os == openBSD ||
+                             os == otherPosix ||
+                             "linux".matchesOS(os) ||
                              "osx".matchesOS(os);
         case "freebsd": return os == freeBSD;
         case "netbsd": return os == netBSD;
@@ -625,7 +624,7 @@ struct PlatformFilter
     bool matchesPlatform(OS os, ISA isa, string compiler = null){return matchesOS(os) && matchesArch(isa) && matchesCompiler(compiler);}
 
 
-    /** 
+    /**
      * Splits command-compiler-os-arch into a struct.
      * Input examples:
      * - dflags-osx
@@ -633,7 +632,7 @@ struct PlatformFilter
      * - dependencies-windows
      * Params:
      *   key = Any key matching input style
-     * Returns: 
+     * Returns:
      */
     static PlatformFilter fromKeys(string[] keys)
     {
@@ -670,7 +669,7 @@ struct CommandWithFilter
     bool matchesPlatform(OS os, ISA isa, string compiler = null){return filter.matchesPlatform(os, isa, compiler);}
 
 
-    /** 
+    /**
      * Splits command-compiler-os-arch into a struct.
      * Input examples:
      * - dflags-osx
@@ -678,14 +677,14 @@ struct CommandWithFilter
      * - dependencies-windows
      * Params:
      *   key = Any key matching input style
-     * Returns: 
+     * Returns:
      */
     static CommandWithFilter fromKey(string key)
     {
         import std.string;
         CommandWithFilter ret;
 
-        string[] keys = key.split("-"); 
+        string[] keys = key.split("-");
         if(keys.length == 1)
             return ret;
         ret.command = keys[0];

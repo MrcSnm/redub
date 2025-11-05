@@ -1,7 +1,7 @@
 module redub.parsers.sdl;
 public import redub.buildapi;
 public import std.system;
-import hipjson;
+import hip.data.json;
 import redub.tree_generators.dub;
 
 /**
@@ -21,12 +21,12 @@ import redub.tree_generators.dub;
  * Returns: The new build requirements
  */
 BuildRequirements parse(
-    string filePath, 
-    string workingDir,  
+    string filePath,
+    string workingDir,
     CompilationInfo cInfo,
     string defaultPackageName,
-    string version_, 
-    BuildRequirements.Configuration subConfiguration, 
+    string version_,
+    BuildRequirements.Configuration subConfiguration,
     string subPackage,
     out BuildConfiguration pending,
     string parentName,
@@ -90,8 +90,8 @@ BuildRequirements parseWithData(
     return ret;
 }
 
-/** 
- * 
+/**
+ *
  * Params:
  *   filePath = The path of the recipe file
  * Returns: Only the file name. Way faster than parsing the configurations

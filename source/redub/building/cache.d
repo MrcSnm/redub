@@ -5,7 +5,7 @@ public import std.int128;
 import redub.api;
 import redub.buildapi;
 import std.path;
-import hipjson;
+import hip.data.json;
 
 // import std.json;
 import redub.command_generators.commons;
@@ -87,7 +87,7 @@ struct CompilationCache
             if(sharedFormula.isEmptyFormula)
                 sharedFormula = AdvCacheFormula.deserialize(c.array[0]);
         }
-        else 
+        else
             return CompilationCache(reqCache, rootHash, AdvCacheFormula.init, AdvCacheFormula.init, sharedFormula);
         JSONValue* targetCache = reqCache in c.array[1];
         if (!targetCache || targetCache.type != JSONType.array)
@@ -96,10 +96,10 @@ struct CompilationCache
         return CompilationCache(reqCache, rootHash, AdvCacheFormula.deserializeSimple(targetCache.array[0], sharedFormula), AdvCacheFormula.deserializeSimple(targetCache.array[1], sharedFormula), sharedFormula);
     }
 
-    /** 
-     * 
+    /**
+     *
      * Params:
-     *   req = Requirement to generate hash 
+     *   req = Requirement to generate hash
      *   compiler = Compiler to generate hash
      *   target = Target to generate hash
      *   cache = Optional argument which stores precalculated results
@@ -133,9 +133,9 @@ struct CompilationCache
     }
 }
 
-/** 
+/**
  * Params:
- *   root = 
+ *   root =
  * Returns: Current cache status from root, without modifying it
  */
 CompilationCache[] cacheStatusForProject(ProjectNode root, CompilingSession s, out AdvCacheFormula sharedFormula)
@@ -148,7 +148,7 @@ CompilationCache[] cacheStatusForProject(ProjectNode root, CompilingSession s, o
     return cache;
 }
 
-/** 
+/**
  * This function mutates the ProjectNode|s, isUpToDate property. It checks on the entire tree
  * if it is not up to date, when it is not, it invalidates itself and all their parents.
  * It requires the existing cache status for the project and then, starts comparing, with its current
@@ -270,7 +270,7 @@ DirectoryFilterType filterTypeFromCompiler(const ref BuildRequirements cfg, cons
     }
 }
 
-/** 
+/**
  * This function will generate a formula based on its inputs. Every dependency will check for its output artifact. This is the most reliable way
  * to build across multiple compilers and configurations without having a separate cache.
  * Params:
@@ -443,7 +443,7 @@ private JSONValue* getCache(string rootCache)
     if (!(rootCache in cacheJson))
     {
         try
-            cacheJson[rootCache] = parseJSON(cast(string)std.file.read(file));
+            cacheJson[rootCache] = parseJSON(cast(string)std.file.read(file), true);
         catch (Exception e)
         {
             std.file.write(file, "[[], {}]");
