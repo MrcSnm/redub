@@ -2,8 +2,9 @@
 	"fileVersion": 1,
 	"versions": {
 		"adv_diff":  {"path": "adv_diff"},
-		"hipjson": "1.0.7",
-		"d-segmented-hashmap": "1.0.7",
+		"hipjson": "1.0.8",
+		"d-segmented-hashmap": "1.0.8",
+		"murmurhash-d": "1.0.0",
 		"intel-intrinsics": "1.12.0",
 		"arsd-official": "12.1.0",
 		"colorize":  {"path": "colorize"},
