@@ -2,7 +2,7 @@
 	"fileVersion": 1,
 	"versions": {
 		"adv_diff":  {"path": "adv_diff"},
-		"hipjson": "1.0.8",
+		"hipjson": "1.0.10",
 		"d-segmented-hashmap": "1.0.8",
 		"murmurhash-d": "1.0.0",
 		"intel-intrinsics": "1.12.0",
