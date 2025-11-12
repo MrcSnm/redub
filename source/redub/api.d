@@ -228,7 +228,7 @@ int createNewProject(string projectType, string targetDirectory)
     projectName = baseName(path);
     userName = getUserName();
     int returnCode = 0;
-    string gitIgnore = "*.exe\n*.pdb\n*.o\n*.obj\n*.lst\n*.lnk\n.history\n.dub\ndocs.json\n__dummy.html\ndocs/\n/"~projectName;
+    string gitIgnore = "*.exe\n*.pdb\n*.o\n*.obj\n*.lst\n*.lnk\n.history\n.dub\ndocs.json\n__dummy.html\ndocs/\nbuild/\n/"~projectName;
     foreach(ext; [".so", ".dylib", ".dll", ".a", ".lib", "-test-*"])
         gitIgnore~= "\n" ~ projectName ~ ext;
     
@@ -277,6 +277,7 @@ i`{
         "$(userName)"
     ],$(dependencies)
     "description": "A minimal D application.",
+    "targetPath": "build",
     "license": "proprietary",
     "name": "$(projectName)"
 }`;
