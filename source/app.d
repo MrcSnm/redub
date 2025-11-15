@@ -143,7 +143,10 @@ int runMain(string[] args, string[] runArgs)
 
     if(d.tree.name == "redub")
         return 0;
-    return executeProgram(d.tree, runArgs);
+    int ret = executeProgram(d.tree, runArgs);
+    if(ret)
+        errorTitle("Error: ", "Program exited with code ", ret);
+    return ret;
 }
 
 int describeMain(string[] args)
