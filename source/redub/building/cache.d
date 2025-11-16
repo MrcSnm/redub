@@ -266,6 +266,7 @@ DirectoryFilterType filterTypeFromCompiler(const ref BuildRequirements cfg, cons
         case dmd, ldc2: return DirectoryFilterType.d;
         case gcc: return DirectoryFilterType.c;
         case gxx: return DirectoryFilterType.cpp;
+        case clang: return DirectoryFilterType.cpp;
         case invalid: return DirectoryFilterType.none;
     }
 }

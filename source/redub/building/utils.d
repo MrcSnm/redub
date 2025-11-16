@@ -95,17 +95,19 @@ auto executeArchiver(const ThreadBuildData data, CompilingSession s, string main
     import redub.compiler_identification;
     import std.path;
     import redub.building.cache;
-    Archiver a = s.compiler.archiver;
 
-    string[] cmd = [a.bin];
-    final switch(a.type) with(AcceptedArchiver)
+    string[] cmd = [data.archiver.bin];
+    final switch(data.archiver.type) with(AcceptedArchiver)
     {
         case ar, llvmAr: cmd~= ["rcs"]; break;
+        case llvmLib: break;
         case libtool: cmd~= ["-static", "-o"]; break;
-        case none: break;
+        case none: throw new Exception("No archiver registered."); break;
     }
-
-    cmd~= buildNormalizedPath(data.cfg.outputDirectory, getOutputName(data.cfg, s.os, s.isa));
+    if(data.archiver.type == AcceptedArchiver.llvmLib)
+        cmd~= "/out:"~buildNormalizedPath(data.cfg.outputDirectory, getOutputName(data.cfg, s.os, s.isa));
+    else
+        cmd~= buildNormalizedPath(data.cfg.outputDirectory, getOutputName(data.cfg, s.os, s.isa));
 
     string cacheDir = getCacheOutputDir(mainPackHash, data.cfg, s, data.extra.isRoot);
 

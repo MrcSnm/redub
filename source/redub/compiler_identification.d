@@ -1,5 +1,7 @@
 module redub.compiler_identification;
 public import redub.libs.semver;
+public import redub.archiver_identification;
+public import redub.linker_identification;
 import hip.data.json;
 import std.algorithm.setops;
 
@@ -10,41 +12,10 @@ enum AcceptedCompiler : ubyte
     dmd,
     ldc2,
     gcc,
-    gxx
+    gxx,
+    clang
 }
 
-enum AcceptedLinker : ubyte
-{
-    unknown,
-    gnuld,
-    ld64,
-    ///I know there a plenty more, but still..
-}
-
-enum AcceptedArchiver : ubyte
-{
-    ar,
-    llvmAr,
-    libtool,
-    /**
-     * D compiler will be used for creating the library
-     */
-    none
-}
-
-enum UsesGnuLinker
-{
-    unknown,
-    yes,
-    no
-}
-
-
-struct Archiver
-{
-    AcceptedArchiver type;
-    string bin;
-}
 
 AcceptedCompiler acceptedCompilerfromString(string str)
 {
@@ -59,41 +30,8 @@ AcceptedCompiler acceptedCompilerfromString(string str)
             throw new Exception("Invalid AcceptedCompiler string received: "~str);
     }
 }
-AcceptedLinker acceptedLinkerfromString(string str)
-{
-    switch(str)
-    {
-        static foreach(mem; __traits(allMembers, AcceptedLinker))
-        {
-            case mem:
-                return __traits(getMember, AcceptedLinker, mem);
-        }
-        default:
-            return AcceptedLinker.unknown;
-    }
-}
 
-AcceptedArchiver acceptedArchiverFromString(string str)
-{
-    switch(str)
-    {
-        static foreach(mem; __traits(allMembers, AcceptedArchiver))
-        {
-            case mem:
-                return __traits(getMember, AcceptedArchiver, mem);
-        }
-        default:
-            return AcceptedArchiver.none;
-    }
-}
 
-private Archiver acceptedArchiver(JSONValue v)
-{
-    JSONValue* acc = "defaultArchiver" in v;
-    if(!acc)
-        return Archiver(AcceptedArchiver.none);
-    return Archiver(acceptedArchiverFromString(acc.object["type"].str), acc.object["bin"].str);
-}
 
 struct CompilerBinary
 {
@@ -116,6 +54,7 @@ struct CompilerBinary
             case ldc2: return "ldc";
             case gcc: return "gcc";
             case gxx: return "g++";
+            case clang: return "clang";
             case invalid: return null;
         }
     }
@@ -139,12 +78,6 @@ struct Compiler
     CompilerBinary c;
 
     /**
-     * For generating libraries, redub might use dmd/ldc2 by default since that simplifies the logic.
-     * Although it is slightly slower, this is also a compromise one takes by using integration with C
-     */
-    Archiver archiver = Archiver(AcceptedArchiver.none);
-
-    /**
      * Currently a flag that only affects Windows. Usually it is turned off since depending on the case, it might
      * make compilation slower
      */
@@ -155,9 +88,13 @@ struct Compiler
     AcceptedLinker linker = AcceptedLinker.unknown;
 }
 
-bool isDCompiler(immutable CompilerBinary comp)
+bool isDCompiler(const CompilerBinary comp)
 {
-    return comp.compiler == AcceptedCompiler.dmd || comp.compiler == AcceptedCompiler.ldc2;
+    return isDCompiler(comp.compiler);
+}
+bool isDCompiler(AcceptedCompiler c)
+{
+    return c == AcceptedCompiler.dmd || c == AcceptedCompiler.ldc2;
 }
 
 
@@ -267,17 +204,15 @@ Compiler getCompiler(string compilerOrPath = "dmd", string cCompilerOrPath = nul
     JSONValue compilersInfo = getRedubMeta();
     bool isDefault = compilerOrPath == null;
     compilerOrPath = either(compilerOrPath, tryGetStr(compilersInfo, "defaultCompiler"), "dmd");
+    cCompilerOrPath = either(cCompilerOrPath, tryGetStr(compilersInfo, "defaultCCompiler"), "clang");
 
     Compiler ret;
 
     ret.d = searchCompiler(compilerOrPath, compilersInfo, isDefault, false, compilerAssumption);
     if(cCompilerOrPath)
-    {
-        ret.c = searchCompiler(cCompilerOrPath, compilersInfo, false, true);
-    }
+        ret.c = searchCompiler(cCompilerOrPath, compilersInfo, true, true);
 
     ret.linker = acceptedLinkerfromString(compilersInfo["defaultLinker"].str);
-    ret.archiver = acceptedArchiver(compilersInfo);
 
     //Checks for ldc.conf switches to see if it is using gnu linker by default
     ///TODO: Might be reactivated if that issue shows again.
@@ -323,35 +258,6 @@ private CompilerBinary searchCompiler(string compilerOrPath, JSONValue compilers
     return ret;
 }
 
-/**
- * Used for determining whether it is running on gnu ld or not
- * Params:
- *   ldcPath = Ldc path for finding the ldc.conf file
- *   arch = Which architecture this compiler run is running with
- * Returns: -1 for can't tell. 0 if false and 1 if true
- */
-// private UsesGnuLinker isUsingGnuLinker(string ldcPath, string arch)
-// {
-//     import redub.misc.ldc_conf_parser;
-//     import std.file;
-//     import std.algorithm.searching;
-//     ConfigSection section = getLdcConfig(std.file.getcwd(), ldcPath, arch);
-//     if(section == ConfigSection.init)
-//         return UsesGnuLinker.unknown;
-//     string* switches = "switches" in section.values;
-//     if(!switches)
-//         return UsesGnuLinker.unknown;
-//     string s = *switches;
-//     ptrdiff_t linkerStart = s.countUntil("-link");
-//     if(linkerStart == -1)
-//         return UsesGnuLinker.unknown;
-//     s = s[linkerStart..$];
-
-//     if(countUntil(s, "-link-internally") != -1 || countUntil(s, "-linker=lld"))
-//         return UsesGnuLinker.no;
-
-//     return countUntil(s, "-linker=ld") != -1 ? UsesGnuLinker.yes : UsesGnuLinker.unknown;
-// }
 
 
 private CompilerBinary getCompilerFromGlobalPath(string compilerOrPath, JSONValue compilersInfo)
@@ -363,6 +269,14 @@ private CompilerBinary getCompilerFromGlobalPath(string compilerOrPath, JSONValu
     }
     return CompilerBinary.init;
 }
+
+private immutable bool function(string compilerOrPath, string vString, out CompilerBinary comp)[5] compilersInference = [
+    &tryInferDmd,
+    &tryInferLdc,
+    &tryInferGcc,
+    &tryInferGxx,
+    &tryInferClang,
+];
 
 /**
  *
@@ -378,21 +292,13 @@ private CompilerBinary getCompilerFromGlobalPath(string compilerOrPath, JSONValu
 private CompilerBinary inferCompiler(string compilerOrPath, string compilerAssumption, JSONValue compilersInfo, bool isDefault, bool isGlobal, bool isC)
 {
     import redub.misc.find_executable;
-    import std.array;
-    immutable inference = [
-        &tryInferDmd,
-        &tryInferLdc,
-        &tryInferGcc,
-        &tryInferGxx
-    ].staticArray;
-
     CompilerBinary ret;
 
     if(compilerAssumption == null)
     {
         string actualCompiler;
         string versionString = getActualCompilerToUse(compilerOrPath, actualCompiler);
-        foreach(inf; inference)
+        foreach(inf; compilersInference)
         {
             if(inf(actualCompiler, versionString, ret))
             {
@@ -424,20 +330,13 @@ public void saveGlobalCompiler(string compilerPath, JSONValue compilersInfo, boo
 {
     import redub.misc.find_executable;
     import std.process;
-    import std.array;
-    immutable inference = [
-        &tryInferDmd,
-        &tryInferLdc,
-        &tryInferGcc,
-        &tryInferGxx
-    ].staticArray;
 
     CompilerBinary ret;
     string actualCompiler;
     auto res = executeShell(compilerPath~" --version");
     if(res.status)
         throw new Exception("saveGlobalCompiler was called in an inexistent compiler.");
-    foreach(inf; inference)
+    foreach(inf; compilersInference)
     {
         if(inf(actualCompiler, res.output, ret))
         {
@@ -530,15 +429,6 @@ void saveCompilerInfo(JSONValue allCompilersInfo, ref CompilerBinary compiler, b
         allCompilersInfo["globalPaths"][compilerStr] = JSONValue(compiler.bin);
     }
 
-    if(!("defaultArchiver" in allCompilersInfo))
-    {
-        JSONValue defaultArchiver = JSONValue.emptyObject;
-        auto def = getDefaultArchiver();
-        defaultArchiver["type"] = def.type.to!string;
-        defaultArchiver["bin"] = def.bin;
-        allCompilersInfo["defaultArchiver"] = defaultArchiver;
-    }
-
     if(!("defaultLinker" in allCompilersInfo))
         allCompilersInfo["defaultLinker"] = getDefaultLinker.to!string;
 
@@ -595,44 +485,6 @@ private CompilerBinary assumeCompiler(string compilerOrPath, string compilerAssu
 }
 
 
-AcceptedLinker getDefaultLinker()
-{
-    with(AcceptedLinker)
-    {
-        version(Posix)
-        {
-            import std.process;
-            import std.string;
-            auto res = executeShell("ld -v");
-            if(res.status == 0)
-            {
-                if(res.output.startsWith("GNU ld"))
-                    return gnuld;
-                else if(res.output.startsWith("@(#)PROGRAM:ld"))
-                    return ld64;
-            }
-        }
-        return unknown;
-    }
-}
-
-
-Archiver getDefaultArchiver()
-{
-    import std.array:staticArray;
-    import std.process;
-    with(AcceptedArchiver)
-    {
-        foreach(Archiver v; [Archiver(ar, "ar"), Archiver(llvmAr, "llvm-ar"), Archiver(libtool, "libtool")].staticArray)
-        {
-            auto res = executeShell(v.bin~" --help");
-            if(res.status == 0)
-                return v;
-        }
-        return Archiver(none);
-    }
-}
-
 private bool tryInferLdc(string compilerOrPath, string vString, out CompilerBinary comp)
 {
     import std.exception;
@@ -684,7 +536,7 @@ private bool tryInferGcc(string compilerOrPath, string _vString, out CompilerBin
     {
         case "gcc", "tcc":
             comp = CompilerBinary(AcceptedCompiler.gcc, compilerOrPath, SemVer.init, SemVer.init, _vString);
-            error("GCC Compiler detected. Beware that it is still very untested.");
+            warnTitle("GCC Compiler detected. ", "Beware that it is still very untested.");
             return true;
         default: return false;
     }
@@ -696,7 +548,20 @@ private bool tryInferGxx(string compilerOrPath, string _vString, out CompilerBin
     string type = compilerOrPath.baseName.stripExtension;
     if(type != "g++") return false;
     comp = CompilerBinary(AcceptedCompiler.gxx, compilerOrPath, SemVer.init, SemVer.init, _vString);
-    error("G++ Compiler detected. Beware that it is still very untested.");
+    warnTitle("G++ Compiler detected.", " Beware that it is still very untested.");
+    return true;
+}
+
+private bool tryInferClang(string compilerOrPath, string vString, out CompilerBinary comp)
+{
+    import std.path;
+    import redub.logging;
+    string type = compilerOrPath.baseName.stripExtension;
+    if(type != "clang") return false;
+    ptrdiff_t indexRight;
+    string clangVerStr = inBetween(vString, "clang version ", "\n", indexRight);
+    comp = CompilerBinary(AcceptedCompiler.clang, compilerOrPath, SemVer(clangVerStr), SemVer(clangVerStr), vString);
+    warnTitle("Clang Compiler detected.", " Beware that it is still very untested.");
     return true;
 }
 

@@ -1,14 +1,13 @@
 module redub.buildapi;
-
 public import std.system:OS, ISA, instructionSetArchitecture;
-public import redub.compiler_identification: Compiler, CompilerBinary;
+public import redub.compiler_identification: Compiler, CompilerBinary, Archiver, AcceptedArchiver;
 public import redub.plugin.api;
 import redub.logging;
 import redub.package_searching.api;
 
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.25.14";
+enum RedubVersionOnly = "v1.26.0";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -51,6 +50,12 @@ struct CompilingSession
         this.compiler = compiler;
         this.os = osFromArch(arch);
         this.isa = isaFromArch(arch);
+    }
+
+    AcceptedArchiver getArchiverType(const ref BuildConfiguration cfg) const
+    {
+        import redub.archiver_identification;
+        return defaultArchiverFromCompiler(cfg.getCompiler(compiler).compiler, os);
     }
 }
 
@@ -731,11 +736,13 @@ struct BuildRequirements
         return output;
     }
 
-    immutable(ThreadBuildData) buildData(bool isLeaf) inout
+    immutable(ThreadBuildData) buildData(bool isLeaf, CompilingSession s) inout
     {
+        import redub.archiver_identification;
         return immutable ThreadBuildData(
             cfg.idup,
             extra.idup,
+            getArchiver(s.getArchiverType(cfg)),
             false,
             isLeaf
         );
@@ -792,6 +799,7 @@ struct ThreadBuildData
 {
     BuildConfiguration cfg;
     ExtraInformation extra;
+    Archiver archiver;
 
     bool isRoot;
     ///Used for letting it get high priority so redub may exit fast.

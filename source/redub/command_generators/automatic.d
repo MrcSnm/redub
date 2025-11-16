@@ -4,6 +4,7 @@ public import redub.buildapi;
 public import redub.compiler_identification;
 
 static import redub.command_generators.gnu_based;
+static import redub.command_generators.clang;
 static import redub.command_generators.dmd;
 static import redub.command_generators.ldc;
 
@@ -28,6 +29,8 @@ string[] getCompilationFlags(const BuildConfiguration cfg, CompilingSession s, s
     {
         case gxx:
             return redub.command_generators.gnu_based.parseBuildConfiguration(cfg, s, mainPackHash, isRoot, cppExt);
+        case clang:
+            return redub.command_generators.clang.parseBuildConfiguration(cfg, s, mainPackHash, isRoot, cppExt);
         case gcc:
             return redub.command_generators.gnu_based.parseBuildConfiguration(cfg, s, mainPackHash, isRoot, cExt);
         case dmd:
