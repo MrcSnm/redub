@@ -1,12 +1,13 @@
 module redub.command_generators.automatic;
 public import std.system;
 public import redub.buildapi;
-public import redub.compiler_identification;
+public import redub.tooling.compiler_identification;
 
-static import redub.command_generators.gnu_based;
-static import redub.command_generators.clang;
 static import redub.command_generators.dmd;
 static import redub.command_generators.ldc;
+static import redub.command_generators.gnu_based;
+static import redub.command_generators.clang;
+static import redub.command_generators.cl;
 
 string escapeCompilationCommands(string compilerBin, string[] flags)
 {
@@ -31,6 +32,8 @@ string[] getCompilationFlags(const BuildConfiguration cfg, CompilingSession s, s
             return redub.command_generators.gnu_based.parseBuildConfiguration(cfg, s, mainPackHash, isRoot, cppExt);
         case clang:
             return redub.command_generators.clang.parseBuildConfiguration(cfg, s, mainPackHash, isRoot, cppExt);
+        case cl:
+            return redub.command_generators.cl.parseBuildConfiguration(cfg, s, mainPackHash, isRoot, cppExt);
         case gcc:
             return redub.command_generators.gnu_based.parseBuildConfiguration(cfg, s, mainPackHash, isRoot, cExt);
         case dmd:
@@ -64,7 +67,7 @@ string getLinkCommands(const ThreadBuildData data, CompilingSession s, string ma
 }
 
 
-/** 
+/**
  * Executes escaleShellCommand for fixing issues such as -rpath=$ORIGIN expanding to -rpath="" which may cause some issues
  * this will guarantee that no command is expanded by the shell environment
  * Params:

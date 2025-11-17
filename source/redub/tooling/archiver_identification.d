@@ -1,6 +1,6 @@
-module redub.archiver_identification;
+module redub.tooling.archiver_identification;
 import hip.data.json;
-import redub.compiler_identification;
+import redub.tooling.compiler_identification;
 public import std.system : OS;
 import redub.command_generators.commons;
 
@@ -11,6 +11,8 @@ enum AcceptedArchiver : string
     llvmLib = "llvm-lib",
     llvmAr = "llvm-ar",
     libtool = "libtool",
+    ///lib from the msvc
+    lib = "lib",
     /**
      * D compiler will be used for creating the library
      */
@@ -32,14 +34,14 @@ AcceptedArchiver defaultArchiverFromCompiler(AcceptedCompiler compiler, OS targe
     if(compiler.isDCompiler || compiler == AcceptedCompiler.invalid)
         return AcceptedArchiver.none;
     if(target.isWindows)
-        return AcceptedArchiver.llvmLib;
+        return compiler == AcceptedCompiler.clang ? AcceptedArchiver.llvmLib : AcceptedArchiver.lib;
     if(compiler == AcceptedCompiler.clang)
         return AcceptedArchiver.llvmAr;
     return AcceptedArchiver.ar;
 }
 
 
-Archiver getArchiver(AcceptedArchiver archiver)
+Archiver getArchiver(AcceptedArchiver archiver, const string[string] env)
 {
     import std.array:staticArray;
     import redub.misc.find_executable;
@@ -57,8 +59,8 @@ Archiver getArchiver(AcceptedArchiver archiver)
             return Archiver(archiver, binPath.str);
     }
     string help = " --help";
-    if(archiver == AcceptedArchiver.llvmLib) help = " /help";
-    auto res = executeShell(archiver~help);
+    if(archiver == AcceptedArchiver.llvmLib || archiver == AcceptedArchiver.lib) help = " /help";
+    auto res = executeShell(archiver~help, env);
     if(res.status == 0)
     {
         Archiver arch = Archiver(archiver, findExecutable(archiver));

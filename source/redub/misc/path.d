@@ -1,4 +1,5 @@
 module redub.misc.path;
+public import std.path: dirSeparator, pathSeparator;
 
 string buildNormalizedPath(scope string[] paths...)
 {
@@ -65,7 +66,7 @@ string normalizePath(return ref char[] output, scope string[] paths...)
         output[totalLength..totalLength+normalized[i].length] = normalized[i];
 		totalLength+= normalized[i].length;
         if(i + 1 < length)
-            output[totalLength++] = pathSeparator;
+            output[totalLength++] = dirSeparator[0];
     }
 
     return cast(string)output[0..totalLength];
@@ -104,14 +105,4 @@ auto pathSplitterRange(string path) pure @safe nothrow @nogc
     }
 
     return PathRange(path);
-}
-version(Windows)
-{
-    enum pathSeparator = '\\';
-    enum otherSeparator = '/';
-}
-else
-{
-    enum pathSeparator = '/';
-    enum otherSeparator = '\\';
 }

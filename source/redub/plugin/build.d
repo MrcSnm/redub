@@ -1,7 +1,7 @@
 /**
 *   This module provides a way to build redub plugins.
 *   Redub plugins are meant to be a replacement for usage of rdmd
-*   Since rdmd is an external program, it's cache evaluation is not so good, and it doesn't have 
+*   Since rdmd is an external program, it's cache evaluation is not so good, and it doesn't have
 *   a real integration with build system, a build plugin is the best way for improving it
 */
 module redub.plugin.build;
@@ -65,9 +65,10 @@ void buildPlugin(string pluginName, string inputFile, CompilationInfo cInfo)
 {
     import redub.command_generators.automatic;
     import redub.command_generators.commons;
+    import redub.parsers.environment;
     import redub.building.utils;
     import redub.building.cache;
-    import redub.compiler_identification;
+    import redub.tooling.compiler_identification;
     import redub.logging;
     import std.path;
     import std.file;
@@ -98,7 +99,9 @@ void buildPlugin(string pluginName, string inputFile, CompilationInfo cInfo)
 
     string cmdFile1, cmdFile2;
 
-    errorTitle("", finishCompilerExec(b, s.compiler, inDir, b.outputDirectory, execCompiler(b, s.compiler, getCompilationFlags(b, s, pluginHash, true), buildCmds, true, cmdFile1)).output);
+    string[string] env = getRedubEnv();
+
+    errorTitle("", finishCompilerExec(b, s.compiler, inDir, b.outputDirectory, execCompiler(b, s.compiler, getCompilationFlags(b, s, pluginHash, true), buildCmds, true, cmdFile1, env)).output);
     errorTitle("Plugin Flags: ", buildCmds);
     ProcessExec2 linkProcess = linkBase(const ThreadBuildData(b, ExtraInformation()), s, pluginHash, buildCmds, cmdFile2);
     errorTitle("", waitProcessExec(linkProcess).output);

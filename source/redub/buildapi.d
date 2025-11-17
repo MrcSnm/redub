@@ -1,6 +1,6 @@
 module redub.buildapi;
 public import std.system:OS, ISA, instructionSetArchitecture;
-public import redub.compiler_identification: Compiler, CompilerBinary, Archiver, AcceptedArchiver;
+public import redub.tooling.compiler_identification: Compiler, CompilerBinary, Archiver, AcceptedArchiver;
 public import redub.plugin.api;
 import redub.logging;
 import redub.package_searching.api;
@@ -54,7 +54,7 @@ struct CompilingSession
 
     AcceptedArchiver getArchiverType(const ref BuildConfiguration cfg) const
     {
-        import redub.archiver_identification;
+        import redub.tooling.archiver_identification;
         return defaultArchiverFromCompiler(cfg.getCompiler(compiler).compiler, os);
     }
 }
@@ -121,7 +121,7 @@ TargetType targetFrom(string s)
         {
             found = true;
             ret = __traits(getMember, TargetType, mem);
-        } 
+        }
     }
     enforce(found, "Could not find targetType with value "~s);
     return ret;
@@ -257,7 +257,7 @@ struct BuildConfiguration
             }
         }
 
-        
+
         ret.language = l;
         if(initialSource)
             ret.sourcePaths = [initialSource];
@@ -321,13 +321,13 @@ struct BuildConfiguration
 
     BuildConfiguration clone() const{return cast()this;}
 
-    /** 
+    /**
      * This function is mainly used to merge a default configuration + a subConfiguration.
      * It does not execute a parent<-child merging, this step is done at the ProjectNode.
      * So, almost every property should be merged with each other here.
      * Params:
      *   other = The other configuration to merge
-     * Returns: 
+     * Returns:
      */
     BuildConfiguration merge()(const auto ref BuildConfiguration other) const
     {
@@ -428,7 +428,7 @@ struct BuildConfiguration
         ret.dFlags.exclusiveMerge(other.dFlags, filterDflags);
         return ret;
     }
-    
+
     BuildConfiguration mergeVersions(const ref BuildConfiguration other) const
     {
         BuildConfiguration ret = clone;
@@ -535,7 +535,7 @@ ref string[] exclusiveMerge(StringRange)(return scope ref string[] a, StringRang
 }
 
 
-/** 
+/**
  * Used when dealing with paths. It normalizes them for not getting the same path twice.
  * This function has been optimized for less memory allocation
  */
@@ -592,12 +592,12 @@ ref string[] inPlaceFilter(return scope ref string[] a, bool function(string obj
 }
 
 
-/** 
+/**
  * This may be more useful in the future. Also may increase compilation speed
  */
 enum Visibility
 {
-    public_,  
+    public_,
     private_,
 }
 Visibility VisibilityFrom(string vis)
@@ -691,7 +691,7 @@ struct BuildRequirements
         bool opEquals(const Configuration other) const
         {
             if(isDefault && other.isDefault) return true;
-            return name == other.name;    
+            return name == other.name;
         }
     }
 
@@ -736,15 +736,16 @@ struct BuildRequirements
         return output;
     }
 
-    immutable(ThreadBuildData) buildData(bool isLeaf, CompilingSession s) inout
+    immutable(ThreadBuildData) buildData(bool isLeaf, CompilingSession s, const string[string] env) inout
     {
-        import redub.archiver_identification;
+        import redub.tooling.archiver_identification;
         return immutable ThreadBuildData(
             cfg.idup,
             extra.idup,
-            getArchiver(s.getArchiverType(cfg)),
+            getArchiver(s.getArchiverType(cfg), env),
             false,
-            isLeaf
+            isLeaf,
+            cast(immutable)env
         );
     }
 
@@ -755,7 +756,7 @@ struct BuildRequirements
         return req;
     }
 
-    /** 
+    /**
      * Configurations and dependencies are merged.
      */
     BuildRequirements merge(BuildRequirements other) const
@@ -776,7 +777,7 @@ struct BuildRequirements
         {
             ptrdiff_t index = countUntil!((d) => d.isSameAs(dep))(ret.dependencies);
             if(index == -1) ret.dependencies~= dep;
-            else 
+            else
             {
                 if(dep.subConfiguration != ret.dependencies[index].subConfiguration)
                     enforce(ret.dependencies[index].subConfiguration.isDefault, "Can't merge 2 non default subConfigurations.");
@@ -804,6 +805,7 @@ struct ThreadBuildData
     bool isRoot;
     ///Used for letting it get high priority so redub may exit fast.
     bool isLeaf;
+    const string[string] env;
 }
 
 class ProjectNode
@@ -880,14 +882,14 @@ class ProjectNode
         return parallelizable;
     }
 
-    /** 
-     * 
+    /**
+     *
      * Returns: Values being either -1, 0 or 1
      *
      *  -1: The linker flags doesn't say anything
      *  0: Linker flags explicitly set to not use (-link-internally or other linker)
      *  1: Explicitly set to use gnu ld. (-linker=ld)
-     * 
+     *
      */
     int isUsingGnuLinker() const
     {
@@ -908,7 +910,7 @@ class ProjectNode
         return false;
     }
 
-    /** 
+    /**
      * This function will iterate recursively, from bottom to top, and it:
      * - Fixes the name if it is using subPackage name type.
      * - Adds Have_ version for the current project name.
@@ -919,7 +921,7 @@ class ProjectNode
      * >-  sourceFiles if they are libraries.
      * - Infer target type if it is on autodetect
      * - Add the dependency as a library if it is a library
-     * - Add the dependency's libraries 
+     * - Add the dependency's libraries
      * - Outputs on extra information the expected artifact
      * - Remove source libraries from projects to build
      *
@@ -947,7 +949,7 @@ class ProjectNode
         }
 
 
-        
+
         static bool hasPrivateRelationship(const ProjectNode parent, const ProjectNode child)
         {
             foreach(dep; parent.requirements.dependencies)
@@ -1005,7 +1007,7 @@ class ProjectNode
                 if(node.requirements.cfg.targetType == TargetType.none)
                     node.becomeIndependent();
             }
-            
+
         }
 
         static void finishSelfRequirements(ProjectNode node, OS targetOS, ISA isa)
@@ -1080,7 +1082,7 @@ class ProjectNode
                         target.requirements.cfg = target.requirements.cfg.mergeLibraries(other);
                         target.requirements.cfg = target.requirements.cfg.mergeLibPaths(other);
                     break;
-                case sourceLibrary: 
+                case sourceLibrary:
                     target.requirements.cfg = target.requirements.cfg.mergeFrameworks(input.requirements.cfg);
                     target.requirements.cfg = target.requirements.cfg.mergeLibraries(input.requirements.cfg);
                     target.requirements.cfg = target.requirements.cfg.mergeLibPaths(input.requirements.cfg);
@@ -1105,7 +1107,7 @@ class ProjectNode
             }
             ///Finish defining its self requirements so they can be transferred to its parents
             finishSelfRequirements(node, targetOS, isa);
-            ///If this has a private relationship, no merge occurs with parent. 
+            ///If this has a private relationship, no merge occurs with parent.
             for(int i = 0; i < node.parent.length; i++)
             {
                 ProjectNode p = node.parent[i];
@@ -1196,8 +1198,8 @@ class ProjectNode
         shouldRebuild = true;
         foreach(p; parent) p.invalidateCache();
     }
-    
-    /** 
+
+    /**
      * This function basically invalidates the entire tree, forcing a rebuild
      */
     void invalidateCacheOnTree()
@@ -1209,7 +1211,7 @@ class ProjectNode
         }
     }
 
-    /** 
+    /**
      * Can only be independent if no dependency is found.
      */
     void becomeIndependent()
@@ -1231,7 +1233,7 @@ class ProjectNode
     ///Collapses the tree in a single list.
     final auto collapse()
     {
-        if(collapsedRef is null) 
+        if(collapsedRef is null)
         {
             collapsedRef = generateCollapsed();
             foreach(node; collapsedRef) node.collapsedRef = collapsedRef;
@@ -1316,7 +1318,7 @@ class ProjectNode
         }
     }
 
-    /** 
+    /**
      * This function will try to build the entire project in a single compilation run
      */
     void combine()
@@ -1351,7 +1353,7 @@ void putLinkerFiles(const ProjectNode tree, out string[] dataContainer, OS os, I
     import redub.command_generators.commons;
     import std.range;
     import std.path;
-    
+
     if(tree.requirements.cfg.targetType.isStaticLibrary)
         dataContainer~= tree.getOutputName(os, isa);
 
@@ -1365,7 +1367,7 @@ void putLinkerFiles(const ProjectNode tree, out string[] dataContainer, OS os, I
 void putSourceFiles(const ProjectNode tree, out string[] dataContainer)
 {
     import redub.command_generators.commons;
-    redub.command_generators.commons.putSourceFiles(dataContainer, 
+    redub.command_generators.commons.putSourceFiles(dataContainer,
         tree.requirements.cfg.workingDir,
         tree.requirements.cfg.sourcePaths,
         tree.requirements.cfg.sourceFiles,
@@ -1393,7 +1395,7 @@ private TargetType inferTargetType(const ProjectNode node)
         static char[4096] normalizeBuffer;
         char[] temp = normalizeBuffer;
 
-        
+
         foreach(f; filesThatInfersExecutable)
         {
             if(std.file.exists(normalizePath(temp, p,f)))

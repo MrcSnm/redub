@@ -1,5 +1,5 @@
 module command_generators.linkers;
-public import redub.compiler_identification;
+public import redub.tooling.compiler_identification;
 public import redub.buildapi;
 public import std.system;
 import redub.command_generators.commons;
@@ -47,7 +47,7 @@ string[] parseLinkConfiguration(const ThreadBuildData data, CompilingSession s, 
         }
         if(targetType == TargetType.dynamicLibrary)
             cmds~= getTargetTypeFlag(targetType, c);
-        
+
         if (targetType.isLinkedSeparately)
         {
             //Only linux supports start/end group and no-as-needed. OSX does not
@@ -70,7 +70,7 @@ string[] parseLinkConfiguration(const ThreadBuildData data, CompilingSession s, 
             cmds = mapAppendPrefix(cmds, libraryPaths, "-L-L", true);
             cmds~= getLinkFiles(b.sourceFiles);
             cmds = mapAppend(cmds, libraries, (string l) => "-L-l"~stripLibraryExtension(l));
-            
+
         }
     }
 
@@ -111,10 +111,10 @@ string[] parseLinkConfigurationMSVC(const ThreadBuildData data, CompilingSession
         {
             cmds~= "-L/INCREMENTAL:NO";
         }
-        
+
         if(targetType == TargetType.dynamicLibrary)
             cmds~= getTargetTypeFlag(targetType, c);
-        
+
         cmds = mapAppendReverse(cmds, data.extra.librariesFullPath, (string l) => (l~getLibraryExtension(s.os)).escapePath);
 
         cmds = mapAppendPrefix(cmds, linkFlags, "-L", false);

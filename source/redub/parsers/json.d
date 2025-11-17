@@ -200,7 +200,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
             {
                 import redub.parsers.environment;
                 enforce(value.type == JSONType.string, "Environments value can only be a string.");
-                redubEnv[key] = value.str;
+                setEnvVariable(key, value.str);
             }
         },
         "workingDirectory": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){setTargetRuntimeWorkingDir(req, v.str, c);},

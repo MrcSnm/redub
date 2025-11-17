@@ -2,11 +2,12 @@ module redub.misc.find_executable;
 
 string findExecutable(string executableName)
 {
-    import std.process;
-    import std.path;
+    import redub.parsers.environment;
+    import redub.misc.path;
+    import std.path : isAbsolute, extension, buildPath;
     import std.file;
     import std.algorithm.iteration:splitter;
-    string pathEnv = environment.get("PATH", "");
+    string pathEnv = getEnvVariable("PATH");
 
     version(Windows)
         static string[] EXTENSIONS = [".exe", ".bat", ".cmd", ".com", ""];
@@ -36,14 +37,19 @@ string findExecutable(string executableName)
     if(isAbsolute(executableName) && isExecutable(executableName))
         return executableName;
 
+
+    char[4096] buffer = void;
+    char[] bufferSink = buffer;
+
     foreach(path; splitter(pathEnv, pathSeparator))
     {
-
+        string str = redub.misc.path.normalizePath(bufferSink, path, executableName);
         foreach(ext; EXTENSIONS)
         {
-            string fullPath = buildPath(path, executableName ~ ext);
+            bufferSink[str.length..str.length+ext.length] = ext;
+            string fullPath = cast(string)buffer[0..str.length+ext.length];
             if(std.file.exists(fullPath))
-                return fullPath;
+                return fullPath.dup;
         }
 
     }

@@ -1,4 +1,4 @@
-module redub.linker_identification;
+module redub.tooling.linker_identification;
 
 
 enum AcceptedLinker : ubyte

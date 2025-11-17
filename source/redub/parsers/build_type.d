@@ -1,6 +1,6 @@
 module redub.parsers.build_type;
 public import redub.buildapi;
-public import redub.compiler_identification;
+public import redub.tooling.compiler_identification;
 import redub.command_generators.d_compilers;
 
 

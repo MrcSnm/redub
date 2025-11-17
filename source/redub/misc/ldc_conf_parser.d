@@ -32,6 +32,7 @@ ConfigSection getLdcConfig(string cwd, string ldcBinPath, string triple)
 private string getLdcConfPath(string cwd, string ldcBinPath)
 {
     import std.path;
+    import redub.parsers.environment;
     import std.array;
     import std.process;
     import std.system;
@@ -47,8 +48,8 @@ private string getLdcConfPath(string cwd, string ldcBinPath)
     auto testPaths = [
         cwd,
         dirName(ldcBinPath),
-        os.isWindows ? buildNormalizedPath(environment["APPDATA"], ".ldc") : "~/.ldc",
-        os.isWindows ? environment["APPDATA"] : null,
+        os.isWindows ? buildNormalizedPath(redubEnv["APPDATA"], ".ldc") : "~/.ldc",
+        os.isWindows ? redubEnv["APPDATA"] : null,
         buildNormalizedPath(dirName(ldcBinPath), "..", "etc"),
         //6. and 7. not implemented since I didn't understand what <install-prefix> is supposed to mean
         os.isPosix ? "/etc" : null,

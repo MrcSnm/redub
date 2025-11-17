@@ -2,9 +2,9 @@ module redub.misc.username;
 
 string getUserName()
 {
-    import std.process;
+    import redub.parsers.environment;
     foreach (envKey; ["USER", "USERNAME", "LOGNAME"]) {
-        auto val = environment.get(envKey, null);
+        auto val = getEnvVariable(envKey);
         if (val !is null && val.length > 0)
             return val;
     }

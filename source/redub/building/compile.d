@@ -4,18 +4,18 @@ import redub.building.cache;
 import redub.logging;
 import redub.buildapi;
 import std.system;
-import redub.compiler_identification;
+import redub.tooling.compiler_identification;
 import redub.command_generators.automatic;
 import std.process:Pid;
 import std.concurrency:Tid;
 
-/** 
+/**
  * When using redub as a library, one may spawn multiple times the same package, having a bug on it.
  * The problem is that although it returns to execution, the threads aren't actually killed!
  * To solve that problem, finishedPackages will only ever add to it if the buildExecutions id is the same.
  */
 size_t buildExecutions;
-/** 
+/**
  * Saves which PIDs are currently running. Used whenever some process fails and kills all of them.
  */
 bool[shared Pid] runningProcesses;
@@ -64,7 +64,7 @@ string[string] getCurrentEnv()
 /**
 *   If any command has status, it will stop executing them and return
 */
-private ExecutionResult executeCommands(const(string[])[] commands, RedubCommands list, ref CompilationResult res, string workingDir, immutable string[string] env)
+private ExecutionResult executeCommands(const(string[])[] commands, RedubCommands list, ref CompilationResult res, string workingDir, const string[string] env)
 {
     import std.process;
     const string[] commandsList = commands.length > list ? commands[list] : null;
@@ -82,19 +82,19 @@ private ExecutionResult executeCommands(const(string[])[] commands, RedubCommand
     return ExecutionResult(0, "Success");
 }
 
-void execCompilationThread(immutable ThreadBuildData data, shared ProjectNode pack, CompilingSession info, HashPair hash, immutable string[string] env, size_t id)
+void execCompilationThread(immutable ThreadBuildData data, shared ProjectNode pack, CompilingSession info, HashPair hash, size_t id)
 {
     import std.concurrency;
     Tid owner = ownerTid;
     CompilationResult res;
-    res = execCompilation(data, pack, info, hash, env, owner, id);
+    res = execCompilation(data, pack, info, hash, owner, id);
     scope(exit)
     {
         owner.send(CompilationID(id), ProcessInfo.init, res);
     }
 }
 
-CompilationResult execCompilation(immutable ThreadBuildData data, shared ProjectNode pack, CompilingSession info, HashPair hash, immutable string[string] env, Tid owner, size_t id)
+CompilationResult execCompilation(immutable ThreadBuildData data, shared ProjectNode pack, CompilingSession info, HashPair hash, Tid owner, size_t id)
 {
     import std.file;
     import std.process;
@@ -122,8 +122,8 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
         string outDir = getConfigurationOutputPath(cfg, os);
         if(exists(outDir))
             remove(outDir);
-        
-        if(executeCommands(cfg.commands, RedubCommands.preBuild, res, cfg.workingDir, env).status)
+
+        if(executeCommands(cfg.commands, RedubCommands.preBuild, res, cfg.workingDir, data.env).status)
             return res;
 
         import redub.plugin.load;
@@ -146,7 +146,7 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
             {
                 import std.concurrency;
                 string cmdFile;
-                ProcessExec2 ex = execCompiler(cfg, compiler, getCompilationFlags(cfg, info, hash.rootHash, data.extra.isRoot), res.compilationCommand, data.isLeaf, cmdFile);
+                ProcessExec2 ex = execCompiler(cfg, compiler, getCompilationFlags(cfg, info, hash.rootHash, data.extra.isRoot), res.compilationCommand, data.isLeaf, cmdFile, data.env);
                 scope(exit)
                 {
                     if(cmdFile)
@@ -173,7 +173,7 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
             ///Shared Library(mostly?)
             if(!ret.status && isDCompiler(c) && isLinkedSeparately(data.cfg.targetType) && !pack.isRoot)
             {
-                CompilationResult linkRes = link(cast()pack, hash.requirementHash, data, info, env);
+                CompilationResult linkRes = link(cast()pack, hash.requirementHash, data, info);
                 ret.status = linkRes.status;
                 ret.output~= linkRes.message;
                 res.compilationCommand~= "\n\nLinking: \n\t"~ linkRes.compilationCommand;
@@ -185,9 +185,9 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
 
         if(res.status == 0)
         {
-            if(!cfg.targetType.isLinkedSeparately && executeCommands(cfg.commands, RedubCommands.postBuild, res, cfg.workingDir, env).status)
+            if(!cfg.targetType.isLinkedSeparately && executeCommands(cfg.commands, RedubCommands.postBuild, res, cfg.workingDir, data.env).status)
                 return res;
-            if(!cfg.targetType.isLinkedSeparately && executeCommands(cfg.commands, RedubCommands.postGenerate, res, cfg.workingDir, env).status)
+            if(!cfg.targetType.isLinkedSeparately && executeCommands(cfg.commands, RedubCommands.postGenerate, res, cfg.workingDir, data.env).status)
                 return res;
         }
     }
@@ -200,7 +200,7 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
 }
 
 
-CompilationResult link(ProjectNode root, string rootHash, const ThreadBuildData data, CompilingSession info, immutable string[string] env)
+CompilationResult link(ProjectNode root, string rootHash, const ThreadBuildData data, CompilingSession info)
 {
     import std.process;
     import std.file;
@@ -240,9 +240,9 @@ CompilationResult link(ProjectNode root, string rootHash, const ThreadBuildData 
 
     if(data.cfg.targetType.isLinkedSeparately)
     {
-        if(executeCommands(data.cfg.commands, RedubCommands.postBuild, ret, data.cfg.workingDir, env).status)
+        if(executeCommands(data.cfg.commands, RedubCommands.postBuild, ret, data.cfg.workingDir, data.env).status)
             return ret;
-        if(executeCommands(data.cfg.commands, RedubCommands.postGenerate, ret, data.cfg.workingDir, env).status)
+        if(executeCommands(data.cfg.commands, RedubCommands.postGenerate, ret, data.cfg.workingDir, data.env).status)
             return ret;
     }
 
@@ -273,9 +273,8 @@ bool buildProjectParallelSimple(ProjectNode root, CompilingSession s, const(AdvC
                 {
                     spawned[dep] = true;
                     spawn(&execCompilationThread,
-                        dep.requirements.buildData(false, s), cast(shared)dep,
+                        dep.requirements.buildData(false, s, getEnvForProject(dep, env)), cast(shared)dep,
                         s, HashPair(mainPackHash, hashFrom(dep.requirements, s)),
-                        getEnvForProject(dep, env),
                         execID
                     );
                 }
@@ -367,11 +366,10 @@ bool buildProjectFullyParallelized(ProjectNode root, CompilingSession s, const(A
         {
             sentPackages++;
             spawn(&execCompilationThread,
-                pack.requirements.buildData(pack is priority, s),
-                cast(shared)pack, 
+                pack.requirements.buildData(pack is priority, s, getEnvForProject(pack, env)),
+                cast(shared)pack,
                 s,
                 HashPair(mainPackHash, hashFrom(pack.requirements, s)),
-                getEnvForProject(pack, env),
                 execID
             );
         }
@@ -437,7 +435,7 @@ bool buildProjectFullyParallelized(ProjectNode root, CompilingSession s, const(A
         killRunningProcesses();
         for(int count = 0; count < sentPackages - processedPackages; count++)
         {
-            auto _ = receiveOnly!(CompilationID, ProcessInfo, CompilationResult); 
+            auto _ = receiveOnly!(CompilationID, ProcessInfo, CompilationResult);
             if(_[0].id != execID || _[1] != ProcessInfo.init)
             {
                 count--;
@@ -451,7 +449,7 @@ bool buildProjectFullyParallelized(ProjectNode root, CompilingSession s, const(A
     return doLink(root, s, mainPackHash, &formulaCache, env, existingSharedFormula) && copyFiles(root);
 }
 
-/** 
+/**
  * When wanting to do a single thread build, this function must be called.
  * This function is also used when the project has no dependency.
  * Params:
@@ -476,9 +474,9 @@ bool buildProjectSingleThread(ProjectNode root, CompilingSession s, const(AdvCac
         {
             if(dep.shouldEnterCompilationThread)
             {
-                CompilationResult res = execCompilation(dep.requirements.buildData(true, s), cast(shared)dep,
+                CompilationResult res = execCompilation(dep.requirements.buildData(true, s, getEnvForProject(dep, env)), cast(shared)dep,
                     s,
-                    HashPair(mainPackHash, hashFrom(dep.requirements, s)), getEnvForProject(dep, env), Tid.init, 0
+                    HashPair(mainPackHash, hashFrom(dep.requirements, s)), Tid.init, 0
                 );
                 if(res.status)
                 {
@@ -656,7 +654,7 @@ private bool doLink(ProjectNode root, CompilingSession info, string mainPackHash
     {
         CompilationResult linkRes;
         auto result = timed(() {
-             linkRes = link(root, mainPackHash, root.requirements.buildData(true, info), info, getEnvForProject(root, env ? env : cast(const)getCurrentEnv()));
+             linkRes = link(root, mainPackHash, root.requirements.buildData(true, info, getEnvForProject(root, env ? env : cast(const)getCurrentEnv())), info);
              return true;
         });
         if(linkRes.status)
@@ -700,6 +698,6 @@ private bool doLink(ProjectNode root, CompilingSession info, string mainPackHash
             redub.logging.info("Wrote cache in ", result.msecs, "ms");
 
     }
-        
+
     return true;
 }

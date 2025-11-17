@@ -12,7 +12,7 @@ string getHighPriorityCmd()
     else return "";
 }
 
-ProcessExec2 execCompiler(const BuildConfiguration cfg, Compiler compiler, string[] compileFlags, out string compilationCommands, bool hasHighPriority, out string cmdFile)
+ProcessExec2 execCompiler(const BuildConfiguration cfg, Compiler compiler, string[] compileFlags, out string compilationCommands, bool hasHighPriority, out string cmdFile, const string[string] env)
 {
     import std.system;
     import std.file;
@@ -27,7 +27,7 @@ ProcessExec2 execCompiler(const BuildConfiguration cfg, Compiler compiler, strin
     {
         cmdFile = createCommandFile(cfg, compileFlags, compilationCommands);
         compilationCommands = compilerBin ~ " "~compilationCommands;
-        ProcessExec2 ret = executeShell2(compilerBin~ " @"~cmdFile, null, Config.none, size_t.max, cfg.workingDir);
+        ProcessExec2 ret = executeShell2(compilerBin~ " @"~cmdFile, env, Config.none, size_t.max, cfg.workingDir);
 
         version(Windows)
         {
@@ -41,7 +41,7 @@ ProcessExec2 execCompiler(const BuildConfiguration cfg, Compiler compiler, strin
         return ret;
     }
     compilationCommands = escapeCompilationCommands(compilerBin, compileFlags);
-    return executeShell2(getHighPriorityCmd ~ compilationCommands, null, Config.none, size_t.max, cfg.workingDir);
+    return executeShell2(getHighPriorityCmd ~ compilationCommands, env, Config.none, size_t.max, cfg.workingDir);
 }
 
 
@@ -50,7 +50,7 @@ auto finishCompilerExec(const BuildConfiguration cfg, Compiler compiler, string 
     import std.file;
     import redub.api;
     import std.path;
-    import redub.compiler_identification;
+    import redub.tooling.compiler_identification;
     import redub.command_generators.commons;
 
     auto ret = waitProcessExec(p);
@@ -76,7 +76,8 @@ ProcessExec2 linkBase(const ThreadBuildData data, CompilingSession session, stri
         getLinkFlags(data, session,  rootHash),
         compilationCommand,
         true,
-        cmdFile
+        cmdFile,
+        data.env
     );
 }
 
@@ -92,7 +93,7 @@ auto executeArchiver(const ThreadBuildData data, CompilingSession s, string main
     import std.process;
     import std.array;
     import redub.command_generators.commons;
-    import redub.compiler_identification;
+    import redub.tooling.compiler_identification;
     import std.path;
     import redub.building.cache;
 
@@ -101,10 +102,11 @@ auto executeArchiver(const ThreadBuildData data, CompilingSession s, string main
     {
         case ar, llvmAr: cmd~= ["rcs"]; break;
         case llvmLib: break;
+        case lib: break;
         case libtool: cmd~= ["-static", "-o"]; break;
         case none: throw new Exception("No archiver registered."); break;
     }
-    if(data.archiver.type == AcceptedArchiver.llvmLib)
+    if(data.archiver.type == AcceptedArchiver.llvmLib || data.archiver.type == AcceptedArchiver.lib)
         cmd~= "/out:"~buildNormalizedPath(data.cfg.outputDirectory, getOutputName(data.cfg, s.os, s.isa));
     else
         cmd~= buildNormalizedPath(data.cfg.outputDirectory, getOutputName(data.cfg, s.os, s.isa));
@@ -112,7 +114,6 @@ auto executeArchiver(const ThreadBuildData data, CompilingSession s, string main
     string cacheDir = getCacheOutputDir(mainPackHash, data.cfg, s, data.extra.isRoot);
 
     putSourceFiles(cmd, null, [cacheDir], data.cfg.sourceFiles, data.cfg.excludeSourceFiles, ".o", ".obj");
-    command = cmd.join(" ");
 
-    return executeShell(command);
+    return executeShell(escapeShellCommand(cmd), data.env);
 }

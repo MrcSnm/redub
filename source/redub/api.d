@@ -7,7 +7,7 @@ public import redub.cli.dub: ParallelType, Inference;
 public import redub.parsers.environment;
 public import std.system;
 public import redub.buildapi;
-public import redub.compiler_identification;
+public import redub.tooling.compiler_identification;
 
 struct ProjectDetails
 {
@@ -62,7 +62,7 @@ struct ProjectDetails
     }
 }
 
-/** 
+/**
  * CompilationDetails are required for making proper compilation.
  */
 struct CompilationDetails
@@ -90,7 +90,7 @@ struct CompilationDetails
     */
     bool includeEnvironmentVariables = true;
 }
-/** 
+/**
  * Project in which should be parsed.
  */
 struct ProjectToParse
@@ -165,7 +165,7 @@ class BuildException : Exception
     }
 }
 
-/** 
+/**
  * Unchanged Files can't deal with directories at that moment.
  * Params:
  *   root = The root of the project
@@ -190,7 +190,7 @@ string[] getChangedBuildFiles(ProjectNode root, CompilingSession s)
     import d_depedencies;
 
     //TODO: Improve that
-    ModuleParsing moduleParse = parseDependencies(std.file.readText(depsPath), 
+    ModuleParsing moduleParse = parseDependencies(std.file.readText(depsPath),
         buildNormalizedPath("/Library/D/dmd")
     );
 
@@ -231,14 +231,14 @@ int createNewProject(string projectType, string targetDirectory)
     string gitIgnore = "*.exe\n*.pdb\n*.o\n*.obj\n*.lst\n*.lnk\n.history\n.dub\ndocs.json\n__dummy.html\ndocs/\nbuild/\n/"~projectName;
     foreach(ext; [".so", ".dylib", ".dll", ".a", ".lib", "-test-*"])
         gitIgnore~= "\n" ~ projectName ~ ext;
-    
+
     string gitIgnorePath = buildNormalizedPath(path, ".gitignore");
-    
+
 
     if(!projectType.length)
     {
         std.file.mkdirRecurse(buildNormalizedPath(path, "source"));
-        std.file.write(buildNormalizedPath(path, "source", "app.d"), 
+        std.file.write(buildNormalizedPath(path, "source", "app.d"),
 `import std.stdio;
 
 void main()
@@ -261,7 +261,7 @@ void main()
             dependencies~= `{"path": "`~ pkg.path ~ `"}`;
 
         dependencies~= "\n\t\t},";
-            
+
         d = buildProject(d);
         if(d.error)
             return d.getReturnCode;
@@ -271,7 +271,7 @@ void main()
             return returnCode;
     }
 
-    auto jsonTemplate = 
+    auto jsonTemplate =
 i`{
     "authors": [
         "$(userName)"
@@ -289,7 +289,7 @@ i`{
     infos("Success", " created empty project in ", path);
     if(projectType)
         info("Created project using ", projectType, ":init-exec");
-    
+
     return returnCode;
 }
 
@@ -389,7 +389,7 @@ ProjectDetails buildProject(ProjectDetails d)
                 return buildProjectParallelSimple(tree, session, &sharedFormula);
             case ParallelType.no:
                 return buildProjectSingleThread(tree, session, &sharedFormula);
-            default: 
+            default:
                 throw new RedubException(`Unsupported parallel type in this step.`);
         }
     });
@@ -446,7 +446,7 @@ ProjectDetails[] buildProjectUniversal(ArgsDetails args)
         auto res = executeShell(lipoRun);
         if(res.status)
             throw new BuildException(res.output);
-        
+
         foreach(d; ret)
         {
             vvlog("Removing ", d.getOutputFile);
@@ -487,7 +487,7 @@ bool cleanProject(ProjectDetails d, bool showMessages)
                 std.file.rmdirRecurse(filePath);
         }
     }
-    
+
     auto res = timed(()
     {
         import std.typecons;
@@ -530,10 +530,10 @@ bool cleanProject(ProjectDetails d, bool showMessages)
                 removeFile(outFile, showMessages);
             }
         }
-        
+
 
         import redub.building.cache;
-        
+
         string hash = hashFrom(d.tree.requirements, CompilingSession(d.compiler, osFromArch(d.cDetails.arch), isaFromArch(d.cDetails.arch)));
         string cacheOutput = redub.misc.path.buildNormalizedPath(getCacheFolder, hash);
         string cacheFile = getCacheFilePath(hash);
@@ -592,7 +592,7 @@ ArgsDetails resolveArguments(string[] args, bool isDescribeOnly = false)
         recipe = cArgs.getRecipe(workingDir);
 
     string localPackageName = getLocalPackageName(workingDir, recipe);
-    
+
     if(shouldFetchPackage(localPackageName, targetPackage, subPackage))
     {
         import redub.package_searching.cache;
@@ -606,7 +606,7 @@ ArgsDetails resolveArguments(string[] args, bool isDescribeOnly = false)
 
 
     if(bArgs.arch && !bArgs.compiler) bArgs.compiler = "ldc2";
-    
+
 
     if(bArgs.build.breadth)
     {
@@ -651,7 +651,7 @@ ArgsDetails resolveArguments(string[] args, bool isDescribeOnly = false)
 }
 
 
-/** 
+/**
  * Use this function to get a project information.
  * Params:
  *   invalidateCache = Should invalidate cache or should auto check
@@ -772,8 +772,8 @@ ProjectDetails resolveDependencies(
     return ret;
 }
 
-/** 
- * 
+/**
+ *
  * Params:
  *   projectWorkingDir = The project working dir to get the recipe
  *   recipe = The actual recipe. May be null for finding in the folder
@@ -785,7 +785,7 @@ string getLocalPackageName(string projectWorkingDir, string recipe = null)
     return getPackageName(projectWorkingDir, recipe);
 }
 
-/** 
+/**
  * If the target package has the same name as local, do not fetch
  * If the target package is empty, but the target sub package is not, assume local
  * Params:
@@ -800,12 +800,12 @@ bool shouldFetchPackage(string localPackageName, string targetPackage, string ta
 }
 
 
-/** 
- * 
+/**
+ *
  * Params:
  *   incremental = If auto, it will disable incremental when having more than 3 compilation units
- *   tree = The tree to find compilation units 
- * Returns: 
+ *   tree = The tree to find compilation units
+ * Returns:
  */
 bool isIncremental(Inference incremental, ProjectNode tree)
 {
@@ -926,7 +926,7 @@ update
         repository. After updating the source, it will also optimally rebuild redub and replace the current one with the new build.
 build-universal
     Usage: redub build-universal
-    Description: 
+    Description:
         Builds a package in non OSX (uses the main package in the  current working directory by default)
         On OSX, generates a single binary using arm64 and x86_64 architectures
 watch

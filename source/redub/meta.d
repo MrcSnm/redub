@@ -32,6 +32,21 @@ void saveRedubMeta(JSONValue content)
     std.file.write(getRedubMetaFileName, content.toString);
 }
 
+string getCachedString(ref JSONValue v, string prop, scope lazy string valueWhenNotFound)
+{
+    JSONValue* ret = prop in v;
+    if(ret)
+    {
+        string val = ret.str;
+        if(val.length)
+            return val;
+    }
+    string res = valueWhenNotFound;
+    v[prop] = JSONValue(res);
+    saveRedubMeta(v);
+    return res;
+}
+
 JSONValue getRedubMeta()
 {
     import std.file;
@@ -43,14 +58,16 @@ JSONValue getRedubMeta()
         if(exists(metaFile))
         {
             meta = parseJSON(cast(string)std.file.read(getRedubMetaFileName), true);
-            if(meta.hasErrorOccurred)
+            if(meta == JSONValue.IncompleteStream || meta.hasErrorOccurred)
                 return JSONValue.emptyObject;
             JSONValue* ver = "version" in meta;
             if(ver == null || ver.str != RedubVersionOnly)
                 return JSONValue.emptyObject;
         }
         else
+        {
             return JSONValue.emptyObject;
+        }
     }
     return meta;
 }

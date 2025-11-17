@@ -1,5 +1,5 @@
 module redub.building.cache;
-public import redub.compiler_identification;
+public import redub.tooling.compiler_identification;
 public import redub.libs.adv_diff.files;
 public import std.int128;
 import redub.api;
@@ -266,7 +266,7 @@ DirectoryFilterType filterTypeFromCompiler(const ref BuildRequirements cfg, cons
         case dmd, ldc2: return DirectoryFilterType.d;
         case gcc: return DirectoryFilterType.c;
         case gxx: return DirectoryFilterType.cpp;
-        case clang: return DirectoryFilterType.cpp;
+        case clang, cl: return DirectoryFilterType.cpp;
         case invalid: return DirectoryFilterType.none;
     }
 }

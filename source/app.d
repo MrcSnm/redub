@@ -1,7 +1,7 @@
 import redub.api;
 
 import redub.extensions.cli;
-import redub.compiler_identification;
+import redub.tooling.compiler_identification;
 import redub.logging;
 import redub.buildapi;
 import redub.parsers.automatic;
@@ -367,7 +367,7 @@ int useMain(string[] args)
     if(compiler.startsWith("opend"))
     {
         import redub.misc.opend_install;
-        import redub.compiler_identification;
+        import redub.tooling.compiler_identification;
         string opendCompiler = args.length > 2 ? args[2] : null;
         if(opendCompiler != "dmd" && opendCompiler != "ldc2")
         {

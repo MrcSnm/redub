@@ -1,7 +1,7 @@
 module redub.command_generators.commons;
 public import redub.libs.semver;
 public import std.system;
-public import redub.compiler_identification;
+public import redub.tooling.compiler_identification;
 
 //Import the commonly shared buildapi
 import redub.buildapi;
@@ -62,7 +62,7 @@ string getObjectDir(string cacheDir)
     import std.file;
 
     string objDir = buildNormalizedPath(cacheDir, "..", "obj/");
-    if(!exists(objDir)) 
+    if(!exists(objDir))
         mkdirRecurse(objDir);
     return objDir;
 }
@@ -99,10 +99,10 @@ string getLibraryPath(string libName, string outputDir, OS os)
 
         return buildNormalizedPath(dir, getOutputName(TargetType.staticLibrary, name, os));
     }
-    
+
 }
-/** 
- * 
+/**
+ *
  * Params:
  *   conf = The configuration
  *   os = OS in which is being built for
@@ -138,8 +138,8 @@ string getDepsFilePath(string cacheDir)
     return cacheDir~".deps";
 }
 
-/** 
- * 
+/**
+ *
  * Params:
  *   conf = The configuration
  *   os = OS in which is being built for
@@ -288,11 +288,11 @@ void copyDir(string fromDir, string toDir, bool shallow = true)
     }
 }
 
-/** 
+/**
  * Params:
  *   t = The target type
  *   name = Base library name or path
- *   os = Which OS is this running on   
+ *   os = Which OS is this running on
  * Returns: For a given library path (e.g: /some/path/a), will make it /some/path/a.[lib|dll] on Windows and /some/path/liba.[a|so] on POSIX
  */
 string getOutputName(TargetType t, string name, OS os, ISA isa = std.system.instructionSetArchitecture)
@@ -310,10 +310,10 @@ string getOutputName(TargetType t, string name, OS os, ISA isa = std.system.inst
     return outputName;
 }
 
-/** 
+/**
  * Params:
  *   cfg = The configuration to read target name and type
- *   os = Which OS is this running on   
+ *   os = Which OS is this running on
  *   isa = ISA which it is being built for
  * Returns: For a given library path (e.g: /some/path/a), will make it /some/path/a.[lib|dll] on Windows and /some/path/liba.[a|so] on POSIX
  */
@@ -325,8 +325,8 @@ string getOutputName(const BuildConfiguration cfg, OS os, ISA isa = std.system.i
     return getOutputName(cfg.targetType, cfg.targetName, os, isa);
 }
 
-/** 
- * 
+/**
+ *
  * Params:
  *   cfg = The configuration to get the output path
  *   type = Which is the target type. This gives more flexibility
@@ -339,8 +339,8 @@ string getOutputPath(const BuildConfiguration cfg, TargetType type, OS os, ISA i
     import std.path;
     return buildNormalizedPath(cfg.outputDirectory, getOutputName(type, cfg.targetName, os, isa));
 }
-/** 
- * 
+/**
+ *
  * Params:
  *   cfg = The configuration to get the output path
  *   os = The OS in which it is being built for
@@ -361,7 +361,7 @@ string[] getExpectedArtifacts(const BuildRequirements req, OS targetOS, ISA isa)
     ///This library will enter on the cache formula
     if(targetOS.isWindows && req.cfg.targetType == TargetType.dynamicLibrary)
         ret ~= getOutputPath(req.cfg, TargetType.staticLibrary, targetOS, isa);
-    return ret; 
+    return ret;
 }
 
 
@@ -451,8 +451,8 @@ auto dirEntriesBreadth(string inputPath)
 void putSourceFiles(
     ref string[] output,
     const string workingDir,
-    const string[] paths, 
-    const string[] files, 
+    const string[] paths,
+    const string[] files,
     const string[] excludeFiles,
     scope const string[] extensions...
 )
@@ -548,8 +548,8 @@ void renameOrCopy(string from, string to)
 
 ///DMD only when using -op
 void moveGeneratedObjectFiles(
-    const string[] paths, 
-    const string[] files, 
+    const string[] paths,
+    const string[] files,
     const string[] excludeFiles,
     string moveDir,
     string extension
@@ -656,7 +656,7 @@ BuildConfiguration getConfigurationFromLibsWithPkgConfig(string[] libs, out stri
     {
         if(cmd.isLibrary)
             ret.libraries~= cmd.flags;
-        else if(cmd.flags.length)        
+        else if(cmd.flags.length)
         {
             modifiedFlagsFromPkgConfig~= cmd.flags;
             foreach (string f; splitter(cmd.flags))
@@ -722,8 +722,8 @@ void createOutputDirFolder(const BuildConfiguration cfg)
         mkdirRecurse(cfg.outputDirectory);
 }
 
-/** 
- * This function is a lot more efficient than map!.array, since it won't need to 
+/**
+ * This function is a lot more efficient than map!.array, since it won't need to
  * allocate intermediary memory and won't use range interface
  * Params:
  *   appendTarget = The target in which will have the mapInput appended
@@ -741,7 +741,7 @@ ref string[] mapAppend(Q, T)(return ref string[] appendTarget, const scope Q[] m
         appendTarget[length++] = mapFn(mapInput[i]);
     return appendTarget;
 }
-/** 
+/**
  * This function is a is a less generic mapAppend. It constructs the array with more efficiency
  * Params:
  *   appendTarget = The target in which will have the mapInput appended

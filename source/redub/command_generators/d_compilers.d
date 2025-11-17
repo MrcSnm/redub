@@ -1,7 +1,7 @@
 module redub.command_generators.d_compilers;
 import redub.buildapi;
 import redub.command_generators.commons;
-import redub.compiler_identification;
+import redub.tooling.compiler_identification;
 import redub.command_generators.ldc;
 import redub.building.cache;
 
@@ -10,7 +10,7 @@ string[] parseBuildConfiguration(AcceptedCompiler comp, const BuildConfiguration
     import redub.misc.path;
     string function(ValidDFlags) mapper = getFlagMapper(comp);
 
-    
+
     string[] cmds = [mapper(ValidDFlags.enableColor)];
     string preserve = mapper(ValidDFlags.preserveNames);
     if(preserve) cmds ~= preserve;
@@ -52,7 +52,7 @@ string[] parseBuildConfiguration(AcceptedCompiler comp, const BuildConfiguration
 
         if(changedBuildFiles.length)
             cmds~= changedBuildFiles;
-        else 
+        else
             putSourceFiles(cmds, workingDir, sourcePaths, sourceFiles, excludeSourceFiles, ".d");
 
         string arch = mapArch(comp, b.arch);
@@ -92,8 +92,8 @@ string getTargetTypeFlag(TargetType t, AcceptedCompiler c)
 }
 
 
-/** 
- * 
+/**
+ *
  * Params:
  *   dflags = The dFlags which should contain link flags
  * Returns: Only the link flags.

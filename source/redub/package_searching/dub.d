@@ -70,6 +70,7 @@ private ReducedPackageInfo getPackageInFolder(string folder, string packageName,
     import std.algorithm.iteration;
     import std.array;
     SemVer requirement = SemVer(packageVersion);
+
     if (requirement.isInvalid)
     {
         if (isGitStyle(requirement.toString))
@@ -87,11 +88,8 @@ private ReducedPackageInfo getPackageInFolder(string folder, string packageName,
     }
     else
     {
-        SemVer[] semVers = dirEntries(folder, SpanMode.shallow)
-            .map!((DirEntry e) => e.name.baseName)
-            .filter!((string name) => name.length && name[0] != '.') //Remove invisible files
-            .map!((string name) => SemVer(name))
-            .array;
+        import redub.misc.semver_in_folder;
+        SemVer[] semVers = semverInFolder(folder);
         foreach_reverse (SemVer v; sort(semVers)) ///Sorts version from the highest to lowest
         {
             if (v.satisfies(requirement))
