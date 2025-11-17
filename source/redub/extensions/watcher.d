@@ -192,11 +192,8 @@ int watchMain(string[] args)
                     //     break WATCHERS_LOOP;
                     // }
                     // else
-                    if(event.path.endsWith(".d") || event.path.endsWith(".di"))
-                    {
-                        d = doProjectBuild(d);
-                        break WATCHERS_LOOP;
-                    }
+                    d = doProjectBuild(d);
+                    break WATCHERS_LOOP;
                 }
             }
         }

@@ -160,7 +160,8 @@ RedubLanguages redubLanguage(string input)
 enum RedubLanguages : ubyte
 {
     D,
-    C
+    C,
+    CPP
 }
 
 enum RedubCommands : ubyte
@@ -315,6 +316,7 @@ struct BuildConfiguration
         final switch(language)
         {
             case RedubLanguages.C: return c.c;
+            case RedubLanguages.CPP: return c.c;
             case RedubLanguages.D: return c.d;
         }
     }

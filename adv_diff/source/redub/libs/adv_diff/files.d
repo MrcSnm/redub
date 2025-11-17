@@ -97,6 +97,28 @@ enum DirectoryFilterType : ubyte
 	c,
 	cpp,
 }
+
+bool shouldIncludeByExt(DirectoryFilterType filter, string target)
+{
+	import std.path;
+	string ext = target.extension;
+	final switch(filter)
+	{
+		case DirectoryFilterType.c:
+			return ext == ".c" || ext == ".i" || ext == ".h";
+		case DirectoryFilterType.cpp:
+			return ext == ".c" || ext == ".i" || ext == ".h" || ext == ".cpp" || ext == ".cc" || ext == ".cxx" || ext == ".c++" || ext == ".hpp";
+		case DirectoryFilterType.d:
+			if(ext.length == 0 || ext.length > 3) return false;
+			if(ext[1] == 'd') {
+				return ext.length == 2 ||
+					(ext.length == 3 && ext[2] == 'i');
+			}
+			return false;
+		case DirectoryFilterType.none: return true;
+	}
+}
+
 struct DirectoriesWithFilter
 {
 	const string[] dirs;
@@ -108,32 +130,10 @@ struct DirectoriesWithFilter
 	///Uses the simplified hashing whenever inside that dir. May be used on directories with bigger files
 	bool useSimplifiedHashing;
 
-	pragma(inline, true)
-	bool shouldIncludeByExt(string target)
-	{
-		import std.path;
-		string ext = target.extension;
-		final switch(filterType)
-		{
-			case DirectoryFilterType.c:
-				return ext == ".c" || ext == ".i" || ext == ".h";
-			case DirectoryFilterType.cpp:
-				return ext == ".c" || ext == ".i" || ext == ".h" || ext == ".cpp" || ext == ".cc" || ext == ".cxx" || ext == ".c++" || ext == ".hpp";
-			case DirectoryFilterType.d:
-				if(ext.length == 0 || ext.length > 3) return false;
-				if(ext[1] == 'd') {
-					return ext.length == 2 ||
-						(ext.length == 3 && ext[2] == 'i');
-				}
-				return false;
-			case DirectoryFilterType.none: return true;
-		}
-	}
-
 	pragma(inline, true) bool shouldInclude(string target)
 	{
 		import redub.libs.adv_diff.helpers.index_of;
-		return shouldIncludeByExt(target) && indexOf(ignoreFiles, target) == -1;
+		return filterType.shouldIncludeByExt(target) && indexOf(ignoreFiles, target) == -1;
 	}
 }
 

@@ -2,6 +2,7 @@ module redub.command_generators.commons;
 public import redub.libs.semver;
 public import std.system;
 public import redub.tooling.compiler_identification;
+public import redub.libs.adv_diff.files : DirectoriesWithFilter, DirectoryFilterType;
 
 //Import the commonly shared buildapi
 import redub.buildapi;
@@ -217,6 +218,20 @@ bool isApple(OS os)
     return (os == OS.osx || os == OS.iOS || os == OS.tvOS || os == OS.watchOS);
 }
 
+
+DirectoryFilterType sourceFilter(const ref BuildConfiguration cfg)
+{
+    final switch(cfg.language)
+    {
+        case RedubLanguages.C:
+            return DirectoryFilterType.c;
+        case RedubLanguages.CPP:
+            return DirectoryFilterType.cpp;
+        case RedubLanguages.D:
+            return DirectoryFilterType.d;
+    }
+}
+
 /**
  *
  * Params:
@@ -229,7 +244,7 @@ bool hasAnySource(const ref BuildConfiguration cfg, ref bool[string] sourceCache
     import redub.libs.adv_diff.files;
 
     if(cfg.sourceFiles.length) return true;
-    DirectoriesWithFilter filter = DirectoriesWithFilter(cfg.sourcePaths, cfg.language == RedubLanguages.D ? DirectoryFilterType.d : DirectoryFilterType.cpp, cfg.excludeSourceFiles);
+    DirectoriesWithFilter filter = DirectoriesWithFilter(cfg.sourcePaths, sourceFilter(cfg), cfg.excludeSourceFiles);
 
     foreach(path; cfg.sourcePaths)
     {
