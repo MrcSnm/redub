@@ -2,10 +2,10 @@
 	"fileVersion": 1,
 	"versions": {
 		"adv_diff":  {"path": "adv_diff"},
-		"hipjson": "1.0.10",
-		"d-segmented-hashmap": "1.0.8",
+		"hipjson": "1.1.0",
+		"d-segmented-hashmap": "1.1.0",
 		"murmurhash-d": "1.0.0",
-		"intel-intrinsics": "1.12.0",
+		"intel-intrinsics": "1.12.2",
 		"arsd-official": "12.1.0",
 		"colorize":  {"path": "colorize"},
 		"d_dependencies":  {"path": "d_dependencies"},

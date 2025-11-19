@@ -259,7 +259,9 @@ private bool tryInferCl(string compilerOrPath, string vString, out CompilerBinar
     import redub.logging;
     string type = compilerOrPath.baseName.stripExtension;
     if(type != "cl") return false;
-    comp = CompilerBinary(AcceptedCompiler.cl, compilerOrPath, SemVer.init, SemVer.init, vString);
+    ptrdiff_t indexRight;
+    string clVerStr = inBetween(vString, "Microsoft (R) C/C++ Optimizing Compiler Version ", " for ", indexRight);
+    comp = CompilerBinary(AcceptedCompiler.cl, compilerOrPath, SemVer(clVerStr), SemVer(clVerStr), vString);
     warnTitle("CL Compiler detected.", " Beware that it is still very untested.");
     return true;
 }
