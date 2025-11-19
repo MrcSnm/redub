@@ -415,7 +415,7 @@ void setSpanModeAsBreadth(bool breadth)
     import core.atomic;
     import redub.logging;
     warn("Using redub search file mode as breadth for dub compatibility.");
-    atomicStore(usingBreadth, true);
+    atomicStore(usingBreadth, breadth);
 }
 
 auto dirEntriesBreadth(string inputPath)

@@ -200,7 +200,7 @@ string[] getChangedBuildFiles(ProjectNode root, CompilingSession s)
     return buildFiles;
 }
 
-int createNewProject(string projectType, string targetDirectory)
+int createNewProject(string projectType, string  single, string targetDirectory)
 {
     import redub.misc.username;
     import std.conv:text;
@@ -211,6 +211,9 @@ int createNewProject(string projectType, string targetDirectory)
     string userName;
     string dependencies;
     string path;
+    string targetPath;
+    if(!single.length)
+        targetPath = "\n\t\"targetPath\": \"build\",";
     if(targetDirectory is null)
         path = getcwd;
     else if(targetDirectory.isAbsolute)
@@ -219,34 +222,45 @@ int createNewProject(string projectType, string targetDirectory)
         path = buildNormalizedPath(getcwd, targetDirectory);
     if(!exists(path))
         mkdirRecurse(path);
+
+    import std.string:endsWith;
+    if(single.length && !single.endsWith(".d"))
+        single~= ".d";
     string targetDub = buildNormalizedPath(path, "dub.json");
-    if(exists(targetDub))
+    string targetSingle;
+
+    if(!single.length && exists(targetDub))
     {
         errorTitle("Folder already has a project file: ", "'", targetDub, "' already exists.");
         return 1;
     }
-    projectName = baseName(path);
+    else if(single.length)
+    {
+        targetSingle = buildNormalizedPath(path, single);
+        if(exists(targetSingle))
+        {
+            errorTitle("Folder already has a project file: ", "'", targetSingle, "' already exists.");
+            return 1;
+        }
+    }
+    projectName = single.length ? single.stripExtension : baseName(path);
     userName = getUserName();
     int returnCode = 0;
     string gitIgnore = "*.exe\n*.pdb\n*.o\n*.obj\n*.lst\n*.lnk\n.history\n.dub\ndocs.json\n__dummy.html\ndocs/\nbuild/\n/"~projectName;
     foreach(ext; [".so", ".dylib", ".dll", ".a", ".lib", "-test-*"])
         gitIgnore~= "\n" ~ projectName ~ ext;
-
-    string gitIgnorePath = buildNormalizedPath(path, ".gitignore");
-
-
-    if(!projectType.length)
-    {
-        std.file.mkdirRecurse(buildNormalizedPath(path, "source"));
-        std.file.write(buildNormalizedPath(path, "source", "app.d"),
+    string appSource =
 `import std.stdio;
 
 void main()
 {
     writeln("Edit source/app.d to start your project.");
-}`);
-    }
-    else
+}`;
+
+    string gitIgnorePath = buildNormalizedPath(path, ".gitignore");
+
+
+    if(projectType.length)
     {
         import redub.package_searching.dub;
         import redub.package_searching.api;
@@ -270,21 +284,32 @@ void main()
         if(returnCode)
             return returnCode;
     }
-
     auto jsonTemplate =
 i`{
     "authors": [
         "$(userName)"
     ],$(dependencies)
-    "description": "A minimal D application.",
-    "targetPath": "build",
+    "description": "A minimal D application.",$(targetPath)
     "license": "proprietary",
     "name": "$(projectName)"
 }`;
+    if(!projectType.length)
+    {
+        if(!single.length)
+        {
+            std.file.mkdirRecurse(buildNormalizedPath(path, "source"));
+            std.file.write(buildNormalizedPath(path, "source", "app.d"), appSource);
+        }
+        else
+            std.file.write(targetSingle, "#!/usr/bin/env redub\n/+ dub.json:\n"~jsonTemplate.text~"+/\n"~appSource);
+    }
 
-    if(!exists(gitIgnorePath))
-        std.file.write(gitIgnorePath, gitIgnore);
-    std.file.write(targetDub, jsonTemplate.text);
+    if(!single.length)
+    {
+        if(!exists(gitIgnorePath))
+            std.file.write(gitIgnorePath, gitIgnore);
+        std.file.write(targetDub, jsonTemplate.text);
+    }
 
     infos("Success", " created empty project in ", path);
     if(projectType)
@@ -578,7 +603,8 @@ ArgsDetails resolveArguments(string[] args, bool isDescribeOnly = false)
         writeln(RedubVersion);
         exit(0);
     }
-
+    import redub.command_generators.commons;
+    setSpanModeAsBreadth(bArgs.build.breadth);
     updateVerbosity(bArgs.cArgs);
 
     DubCommonArguments cArgs = bArgs.cArgs;
@@ -591,9 +617,15 @@ ArgsDetails resolveArguments(string[] args, bool isDescribeOnly = false)
     if(cArgs.recipe)
         recipe = cArgs.getRecipe(workingDir);
 
-    string localPackageName = getLocalPackageName(workingDir, recipe);
-
-    if(shouldFetchPackage(localPackageName, targetPackage, subPackage))
+    if(bArgs.single)
+    {
+        import std.path;
+        if(!isAbsolute(bArgs.single))
+            recipe = buildNormalizedPath(workingDir, bArgs.single);
+        else
+            recipe = bArgs.single;
+    }
+    else if(shouldFetchPackage(getLocalPackageName(workingDir, recipe), targetPackage, subPackage))
     {
         import redub.package_searching.cache;
         import redub.package_searching.entry;
@@ -606,23 +638,6 @@ ArgsDetails resolveArguments(string[] args, bool isDescribeOnly = false)
 
 
     if(bArgs.arch && !bArgs.compiler) bArgs.compiler = "ldc2";
-
-
-    if(bArgs.build.breadth)
-    {
-        import redub.command_generators.commons;
-        setSpanModeAsBreadth(bArgs.build.breadth);
-    }
-
-    if(bArgs.single)
-    {
-        import std.path;
-        if(!isAbsolute(bArgs.single))
-            recipe = buildNormalizedPath(workingDir, bArgs.single);
-        else
-            recipe = bArgs.single;
-    }
-
 
     if(bArgs.prefetch)
     {

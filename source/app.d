@@ -246,16 +246,22 @@ int initMain(string[] args)
         @("Creates a project of the specified type")
         @("t")
         string type;
+
+        @("Creates a --single targetable project. Specifies the name to be used. Specification: https://dub.pm/dub-guide/single/")
+        @("s")
+        string singleName;
+
     }
     InitArgs initArgs;
     GetoptResult res = betterGetopt(args, initArgs);
     if(res.helpWanted)
     {
-        defaultGetoptPrinter(RedubVersionShort~" init information:\n ", res.options);
+        defaultGetoptPrinter(RedubVersionShort~" init usage: redub init [options] targetPath\nOptions:", res.options);
         return 0;
     }
     setLogLevel(LogLevel.info);
-    return createNewProject(initArgs.type, args.length > 1 ? args[1] : null);
+
+    return createNewProject(initArgs.type, initArgs.singleName, args.length > 1 ? args[1] : null);
 }
 
 

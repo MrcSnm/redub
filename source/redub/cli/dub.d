@@ -190,7 +190,7 @@ struct DubArguments
     @("build-mode")
     string buildMode;
 
-    @("Treats the package name as a filename. The file must contain a package recipe comment.")
+    @("Treats the package name as a filename. The file must contain a package recipe comment. Specification: https://dub.pm/dub-guide/single/")
     string single;
 
     @("Shows redub version")
