@@ -84,10 +84,13 @@ CompilerBinary inferCompiler(string compilerOrPath, string compilerAssumption, J
     import redub.misc.find_executable;
     CompilerBinary ret;
 
+    string versionString;
     if(compilerAssumption == null)
     {
         string actualCompiler;
-        string versionString = getActualCompilerToUse(compilerOrPath, actualCompiler, isC ? supportedCCompilers : supportedDCompilers);
+        bool isError;
+        versionString = getActualCompilerToUse(compilerOrPath, actualCompiler, isC ? supportedCCompilers : supportedDCompilers, isError);
+        if(!isError)
         foreach(inf; isC ? cCompilersInference : dCompilersInference)
         {
             if(inf(actualCompiler, versionString, ret))
@@ -102,7 +105,7 @@ CompilerBinary inferCompiler(string compilerOrPath, string compilerAssumption, J
     {
         return assumeCompiler(compilerOrPath, compilerAssumption);
     }
-    throw new Exception("Could not infer which compiler you're using from "~compilerOrPath);
+    return CompilerBinary(AcceptedCompiler.invalid, versionString);
 }
 
 /**
@@ -113,7 +116,7 @@ CompilerBinary inferCompiler(string compilerOrPath, string compilerAssumption, J
  *   actualCompiler = Actual compiler. If no compiler is found on the searchable list, the program will exit.
  * Returns: The output from executeShell. This will be processed for getting version information on the compiler.
  */
-private string getActualCompilerToUse(string preferredCompiler, ref string actualCompiler, const string[] searchableCompilers)
+private string getActualCompilerToUse(string preferredCompiler, ref string actualCompiler, const string[] searchableCompilers, out bool isError)
 {
     import std.exception;
     import redub.parsers.environment;
@@ -147,15 +150,23 @@ private string getActualCompilerToUse(string preferredCompiler, ref string actua
 
     if(compVersionRes.status != 0)
     {
-        throw new Exception(preferredCompiler~ " --version returned a non zero code. "~
-        "In Addition, dmd and ldc2 were also tested and were not found. You may need to download or specify them before using redub.\n" ~
-        "If you don't have any compiler added in the PATH, you can install it by using 'redub install dmd' and then do 'redub use dmd'\n" ~
-        "it will setup the compiler to use with redub. \n"~
-        "Last Shell Output: "~ compVersionRes.output);
+        isError = true;
+        import std.string:join;
+        string baseMessage;
+        string testedCompilersMessage = "The compilers ["~searchableCompilers.join(", ")~ "] were tested and not found.";
+        if(preferredCompiler.length != 0)
+            baseMessage = "The specified compiler \""~preferredCompiler~"\" --version returned a non zero code.\nIn Addition:";
+
+        return baseMessage~
+        testedCompilersMessage~ " You may need to download or specify them before using redub.\n" ~
+        "If you don't have any D compiler added in the PATH, you can install them by using 'redub install dmd' and then do 'redub use dmd'\n" ~
+        "it will setup the compiler to use with redub. \n";
+        // "Last Shell Output: "~ compVersionRes.output;
     }
     if(actualCompiler != preferredCompiler)
         warn("The compiler '"~preferredCompiler~"' that was specified in your system wasn't found. Redub found "~actualCompiler~" and it will use for this compilation.");
 
+    isError = false;
     return compVersionRes.output;
 }
 

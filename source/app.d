@@ -221,7 +221,7 @@ int testMain(string[] args)
     if(d.error)
         return d.getReturnCode();
     import redub.parsers.build_type;
-    d.tree.requirements.cfg = d.tree.requirements.cfg.merge(parse(BuildType.unittest_, d.tree.requirements.cfg.getCompiler(d.compiler).compiler));
+    d.tree.requirements.cfg = d.tree.requirements.cfg.merge(parse(BuildType.unittest_, d.tree.requirements.cfg.getCompiler(d.compiler)));
     d.tree.requirements.cfg.dFlags~= "-main";
     d.tree.requirements.cfg.targetType = TargetType.executable;
     d.tree.requirements.cfg.targetName~= "-test-";

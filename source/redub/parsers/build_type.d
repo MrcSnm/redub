@@ -9,7 +9,7 @@ __gshared BuildConfiguration[string] registeredBuildTypes;
 public void clearBuildTypesCache(){registeredBuildTypes = null; }
 
 
-BuildConfiguration parse(string buildType, AcceptedCompiler comp)
+BuildConfiguration parse(string buildType, CompilerBinary comp)
 {
     import redub.api;
     auto m = getFlagMapper(comp);

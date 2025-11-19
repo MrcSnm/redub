@@ -736,7 +736,7 @@ ProjectDetails resolveDependencies(
     if(cDetails.includeEnvironmentVariables)
         req.cfg = req.cfg.merge(redub.parsers.environment.parse());
 
-    req.cfg = req.cfg.merge(redub.parsers.build_type.parse(buildType, cBin.compiler));
+    req.cfg = req.cfg.merge(redub.parsers.build_type.parse(buildType, cBin));
 
     ProjectNode tree = getProjectTree(req, cInfo);
 

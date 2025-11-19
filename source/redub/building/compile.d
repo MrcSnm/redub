@@ -648,7 +648,7 @@ private bool doLink(ProjectNode root, CompilingSession info, string mainPackHash
 {
     Compiler compiler = info.compiler;
     bool isUpToDate = root.isUpToDate;
-    bool shouldSkipLinking = isUpToDate || (root.getCompiler(info.compiler).isDCompiler && !root.requirements.cfg.targetType.isLinkedSeparately);
+    bool shouldSkipLinking = isUpToDate || (!root.requirements.cfg.targetType.isLinkedSeparately);
 
     if(!shouldSkipLinking)
     {

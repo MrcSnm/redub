@@ -5,10 +5,11 @@ import redub.tooling.compiler_identification;
 import redub.command_generators.ldc;
 import redub.building.cache;
 
-string[] parseBuildConfiguration(AcceptedCompiler comp, const BuildConfiguration b, CompilingSession s, string mainPackhash, bool isRoot)
+string[] parseBuildConfiguration(const BuildConfiguration b, CompilingSession s, string mainPackhash, bool isRoot)
 {
     import redub.misc.path;
-    string function(ValidDFlags) mapper = getFlagMapper(comp);
+    string function(ValidDFlags) mapper = getFlagMapper(s.compiler.d);
+    AcceptedCompiler comp = s.compiler.d.compiler;
 
 
     string[] cmds = [mapper(ValidDFlags.enableColor)];
@@ -79,7 +80,7 @@ string[] parseBuildConfiguration(AcceptedCompiler comp, const BuildConfiguration
     return cmds;
 }
 
-string getTargetTypeFlag(TargetType t, AcceptedCompiler c)
+string getTargetTypeFlag(TargetType t, CompilerBinary c)
 {
     auto mapper = getFlagMapper(c);
     switch(t) with(TargetType)
@@ -137,14 +138,17 @@ bool isLinkerDFlag(string arg)
     }
 }
 
-string function(ValidDFlags) getFlagMapper(AcceptedCompiler comp)
+string function(ValidDFlags) getFlagMapper(CompilerBinary comp)
 {
-    switch(comp)
+    import redub.api;
+    final switch(comp.compiler)
     {
         case AcceptedCompiler.dmd: return &dmdFlags;
         case AcceptedCompiler.ldc2: return &ldcFlags;
         case AcceptedCompiler.gcc, AcceptedCompiler.gxx: return &gccFlags;
-        default: throw new Exception("Compiler sent is not a D compiler.");
+        case AcceptedCompiler.clang: return &clangFlags;
+        case AcceptedCompiler.cl: return &clFlags;
+        case AcceptedCompiler.invalid: throw new RedubException(comp.bin);
     }
 }
 
@@ -261,6 +265,83 @@ string gccFlags(ValidDFlags flag)
         case deps: return null;
     }
 }
+
+string clangFlags(ValidDFlags flag)
+{
+    final switch(flag) with (ValidDFlags)
+    {
+        case debugMode: return null;
+        case debugInfo: return "-g";
+        case releaseMode: return "-O3";
+        case optimize: return "-O3";
+        case optimizeSize: return "-Oz";
+        case inline: return "-finline-hint-functions";
+        case noBoundsCheck: return null;
+        case unittests: return null;
+        case syntaxOnly: return "-fsyntax-only";
+        case profile: return null;
+        case profileGC: return null;
+        case coverage: return null;
+        case coverageCTFE: return null;
+        case mixinFile: return null;
+        case verbose: return "-v";
+        case verboseCodeGen: return null;
+        case timeTrace: return "-ftime-trace";
+        case timeTraceFile: return null;
+        case enableColor: return null;
+        case stringImportPaths: return "-I";
+        case versions: return "-D";
+        case debugVersions: return "-D";
+        case importPaths: return "-I";
+        case objectDir: return null;
+        case outputFile: return "-o";
+        case buildAsLibrary: return null;
+        case buildAsShared: return null;
+        case compileOnly: return "-c";
+        case arch: return null;
+        case preserveNames: return null;
+        case deps: return null;
+    }
+}
+
+string clFlags(ValidDFlags flag)
+{
+    final switch(flag) with (ValidDFlags)
+    {
+        case debugMode: return null;
+        case debugInfo: return "/Zi";
+        case releaseMode: return null;
+        case optimize: return "/O2";
+        case optimizeSize: return "/O1";
+        case inline: return null;
+        case noBoundsCheck: return null;
+        case unittests: return null;
+        case syntaxOnly: return "/Zs";
+        case profile: return null;
+        case profileGC: return null;
+        case coverage: return null;
+        case coverageCTFE: return null;
+        case mixinFile: return null;
+        case verbose: return null;
+        case verboseCodeGen: return null;
+        case timeTrace: return null;
+        case timeTraceFile: return null;
+        case enableColor: return null;
+        case stringImportPaths: return "/I";
+        case versions: return "/D";
+        case debugVersions: return "/D";
+        case importPaths: return "/I";
+        case objectDir: return null;
+        case outputFile: return "/Fe";
+        case buildAsLibrary: return null;
+        case buildAsShared: return null;
+        case compileOnly: return "/c";
+        case arch: return null;
+        case preserveNames: return null;
+        case deps: return null;
+    }
+}
+
 
 // Determines whether the specified process is running under WOW64 or an Intel64 of x64 processor.
 version (Windows)
