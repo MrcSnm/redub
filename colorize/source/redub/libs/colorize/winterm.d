@@ -19,12 +19,17 @@ version(Windows)
 	struct WinTermEmulation
 	{
 		public:
-			@nogc void initialize() nothrow
+			bool supportVT100; // if true, that whole emulation is useless.
+
+			void initialize() nothrow
 			{
 				// saves console attributes
 				_console = GetStdHandle(STD_OUTPUT_HANDLE);
 				_savedInitialColor = (0 != GetConsoleScreenBufferInfo(_console, &consoleInfo));
 				_state = State.initial;
+				uint mode;
+				if (GetConsoleMode(_console, &mode))
+					supportVT100 = (mode & ENABLE_VIRTUAL_TERMINAL_INPUT) != 0;
 			}
 
 			@nogc ~this() nothrow

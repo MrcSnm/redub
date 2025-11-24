@@ -47,6 +47,12 @@ void cwrite(S...)(File f, S args)
 	{
 		WinTermEmulation winterm;
 		winterm.initialize();
+		if (winterm.supportVT100)
+		{
+			f.write(s);
+			return;
+		}
+
 		foreach(dchar c ; s)
 		{
 			auto charAction = winterm.feed(c);
