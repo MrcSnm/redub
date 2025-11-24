@@ -126,7 +126,7 @@ struct PackageDubVariables
 /** 
  * Reflects InitialDubVariables in the environment
  */
-void setupBuildEnvironmentVariables(InitialDubVariables dubVars)
+void setupBuildEnvironmentVariables(const ref InitialDubVariables dubVars)
 {
     import std.process;
     static foreach(member; __traits(allMembers, InitialDubVariables))
@@ -166,7 +166,7 @@ InitialDubVariables getInitialDubVariablesFromArguments(DubArguments args, DubBu
  * Params:
  *   root = The root project being parsed
  */
-void setupEnvironmentVariablesForRootPackage(immutable BuildRequirements root)
+void setupEnvironmentVariablesForRootPackage(const ref BuildRequirements root)
 {
     import std.process;
     import std.conv:to;
@@ -186,7 +186,7 @@ void setupEnvironmentVariablesForRootPackage(immutable BuildRequirements root)
  * Params:
  *   root = The root where <PKG>_PACKAGE_DIR will be started to be put on environment
  */
-void setupEnvironmentVariablesForPackageTree(ProjectNode root)
+void setupEnvironmentVariablesForPackageTree(ref ProjectNode root) //It is const
 {
     ///Path to a specific package that is part of the package's dependency graph. $ must be in uppercase letters without the semver string.
     // <PKG>_PACKAGE_DIR ;
@@ -202,7 +202,7 @@ void setupEnvironmentVariablesForPackageTree(ProjectNode root)
  * - DUB_TARGET_NAME
  * - DUB_MAIN_SOURCE_FILE
  */
-PackageDubVariables getEnvironmentVariablesForPackage(const BuildConfiguration cfg)
+PackageDubVariables getEnvironmentVariablesForPackage(const ref BuildConfiguration cfg)
 {
     import std.conv:to;
 
@@ -224,7 +224,7 @@ PackageDubVariables getEnvironmentVariablesForPackage(const BuildConfiguration c
  * - DUB_TARGET_NAME
  * - DUB_MAIN_SOURCE_FILE
  */
-void setupEnvironmentVariablesForPackage(const BuildConfiguration cfg)
+void setupEnvironmentVariablesForPackage(const ref BuildConfiguration cfg)
 {
     PackageDubVariables pack = getEnvironmentVariablesForPackage(cfg);
     static foreach(mem; __traits(allMembers, PackageDubVariables))
@@ -275,15 +275,17 @@ string parseStringWithEnvironment(string str)
         string strVar = str[v.start+1 + bracketOffset..v.end - bracketOffset];
         diffLength-= 1+strVar.length + bracketOffset*2; //$.length + (abcd).length {}.length (optionally)
 
+
         if(strVar.length == 0) //$
             continue;
-        else if(!getEnvVariable(strVar))
+        string envValue = getEnvVariable(strVar);
+        if(!envValue.length)
         {
             variables = variables[0..i] ~ variables[i+1..$];
             i--;
             continue;
         }
-        diffLength+= getEnvVariable(strVar).length;
+        diffLength+= envValue.length;
     }
 	if(variables.length == 0) return str;
 	
@@ -369,25 +371,24 @@ BuildConfiguration parseEnvironmentForPreGenerate(BuildConfiguration cfg, out st
  */
 BuildConfiguration parseEnvironment(BuildConfiguration cfg)
 {
+    import redub.command_generators.commons : attrIncludesUDA;
     redub.parsers.environment.setupEnvironmentVariablesForPackage(cfg);
     with(cfg)
     {
-        importDirectories = arrParseEnv(importDirectories);
-        sourcePaths = arrParseEnv(sourcePaths);
-        sourceFiles = arrParseEnv(sourceFiles);
-        libraries = arrParseEnv(libraries);
-        libraryPaths = arrParseEnv(libraryPaths);
-        dFlags = arrParseEnv(dFlags);
-        linkFlags = arrParseEnv(linkFlags);
-
+        static foreach(mem; __traits(allMembers, BuildConfiguration))
+        {
+            static if(
+                !attrIncludesUDA!(absolutized, __traits(getAttributes, __traits(getMember, cfg, mem)))
+                && is(typeof(__traits(getMember, cfg, mem)) == string[])
+            )
+                __traits(getMember, cfg, mem) = arrParseEnv(__traits(getMember, cfg, mem));
+        }
         if(cfg.commands.length > RedubCommands.postGenerate)
             cfg.commands[RedubCommands.postGenerate] = arrParseEnv(cfg.commands[RedubCommands.postGenerate]);
         if(cfg.commands.length > RedubCommands.preBuild)
             cfg.commands[RedubCommands.preBuild] = arrParseEnv(cfg.commands[RedubCommands.preBuild]);
         if(cfg.commands.length > RedubCommands.postBuild)
             cfg.commands[RedubCommands.postBuild] = arrParseEnv(cfg.commands[RedubCommands.postBuild]);
-        stringImportPaths = arrParseEnv(stringImportPaths);
-        filesToCopy = arrParseEnv(filesToCopy);
     }
     return cfg;
 }
@@ -522,7 +523,21 @@ else
     string getEnvVariable(string key)
     {
         string* ret = key in redubEnv;
-        if(ret) return *ret;
+        while(ret)
+        {
+            key = *ret;
+            if(key.length == 0)
+                return null;
+            else if(key[0] != '$')
+                return key;
+            else
+            {
+                key = key[1..$];
+                if(key.length > 1 && key[0] == '{' && key[$-1] == '}')
+                    key = key[1..$-1];
+            }
+            ret = key in redubEnv;
+        }
         return null;
     }
     shared static this()

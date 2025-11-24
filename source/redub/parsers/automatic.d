@@ -110,7 +110,7 @@ BuildRequirements postProcessBuildRequirements(BuildRequirements req, BuildConfi
         req.cfg.flags|= BuildConfigurationFlags.outputsDeps;
 
     partiallyFinishBuildRequirements(req, pending);    ///Merge need to happen after partial finish, since other configuration will be merged
-    req.cfg = redub.parsers.environment.parseEnvironment(req.cfg);
+    req.cfg = redub.parsers.environment.parseEnvironment(req.cfg); //First pass in env parsing
     return req;
 }
 
@@ -149,8 +149,9 @@ private void partiallyFinishBuildRequirements(ref BuildRequirements req, BuildCo
     {
         foreach(ref string dir; *arr)
         {
-            import redub.command_generators.commons : escapePath;
-            if(!isAbsolute(dir)) 
+            import redub.parsers.environment;
+            dir = parseStringWithEnvironment(dir);
+            if(!isAbsolute(dir))
                 dir = redub.misc.path.buildNormalizedPath(req.cfg.workingDir, dir);
         }
     }

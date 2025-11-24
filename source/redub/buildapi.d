@@ -7,7 +7,7 @@ import redub.package_searching.api;
 
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.26.1";
+enum RedubVersionOnly = "v1.26.2";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -127,8 +127,12 @@ TargetType targetFrom(string s)
     return ret;
 }
 
-enum excludeRoot;
+///cacheExclude means that the value does not enter in the recipe file cache generation formula. That is good to reuse the project's output
 enum cacheExclude;
+///That means the same thing from cacheExclude, except it will only be excluded for the root project.
+enum excludeRoot;
+///Absolutized means that the strings have their environment value parsed inside the redub.parsers.automatic.postProcessBuildRequirements
+enum absolutized;
 
 struct PluginExecution
 {
@@ -195,18 +199,18 @@ struct BuildConfiguration
     string name;
     string[] versions;
     string[] debugVersions;
-    string[] importDirectories;
-    string[] libraryPaths;
-    string[] stringImportPaths;
+    @absolutized string[] importDirectories;
+    @absolutized string[] libraryPaths;
+    @absolutized string[] stringImportPaths;
     string[] libraries;
     string[] frameworks;
     string[] linkFlags;
     string[] dFlags;
-    string[] sourcePaths;
-    string[] sourceFiles;
-    string[] excludeSourceFiles;
+    @absolutized string[] sourcePaths;
+    @absolutized string[] sourceFiles;
+    @absolutized string[] excludeSourceFiles;
     string[] extraDependencyFiles;
-    string[] filesToCopy;
+    @absolutized string[] filesToCopy;
     string[][] commands;
     PluginExecution[] preBuildPlugins;
     string workingDir;

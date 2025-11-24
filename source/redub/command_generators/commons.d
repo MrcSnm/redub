@@ -418,6 +418,15 @@ void setSpanModeAsBreadth(bool breadth)
     atomicStore(usingBreadth, breadth);
 }
 
+bool attrIncludesUDA(LookType, Attribs...)()
+{
+    bool hasFound = false;
+    static foreach (value; Attribs)
+        static if (is(typeof(value) == LookType) || is(LookType == value))
+            hasFound = true;
+    return hasFound;
+}
+
 auto dirEntriesBreadth(string inputPath)
 {
     import std.file;

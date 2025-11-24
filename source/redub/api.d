@@ -246,7 +246,7 @@ int createNewProject(string projectType, string  single, string targetDirectory)
     projectName = single.length ? single.stripExtension : baseName(path);
     userName = getUserName();
     int returnCode = 0;
-    string gitIgnore = "*.exe\n*.pdb\n*.o\n*.obj\n*.lst\n*.lnk\n.history\n.dub\ndocs.json\n__dummy.html\ndocs/\nbuild/\n/"~projectName;
+    string gitIgnore = "*.exe\n*.pdb\n*.o\n*.obj\n*.lst\n*.lnk\n*.ilk\n.history\n.dub\ndocs.json\n__dummy.html\ndocs/\nbuild/\n/"~projectName;
     foreach(ext; [".so", ".dylib", ".dll", ".a", ".lib", "-test-*"])
         gitIgnore~= "\n" ~ projectName ~ ext;
     string appSource =
@@ -747,7 +747,7 @@ ProjectDetails resolveDependencies(
         );
 
     CompilerBinary cBin = req.cfg.getCompiler(compiler);
-    redub.parsers.environment.setupEnvironmentVariablesForRootPackage(cast(immutable)req);
+    redub.parsers.environment.setupEnvironmentVariablesForRootPackage(req);
     if(cDetails.includeEnvironmentVariables)
         req.cfg = req.cfg.merge(redub.parsers.environment.parse());
 
@@ -762,10 +762,7 @@ ProjectDetails resolveDependencies(
     redub.parsers.environment.setupEnvironmentVariablesForPackageTree(tree);
     ///That now only happens at the last stage since some environment variables only finished the definition at that stage
     foreach(ProjectNode n; tree.collapse)
-        n.requirements.cfg = redub.parsers.environment.parseEnvironment(n.requirements.cfg);
-
-
-
+        n.requirements.cfg = redub.parsers.environment.parseEnvironment(n.requirements.cfg); //Second pass on environment, important since now we have all projects available in the env
 
     import redub.libs.colorize;
     import redub.package_searching.dub;

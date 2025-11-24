@@ -197,15 +197,6 @@ ubyte[] hashFunction(const ubyte[] input, ref ubyte[8] output)
     return output;
 }
 
-bool attrIncludesUDA(LookType, Attribs...)()
-{
-    bool hasFound = false;
-    static foreach (value; Attribs)
-        static if (is(typeof(value) == LookType) || is(LookType == value))
-            hasFound = true;
-    return hasFound;
-}
-
 /**
  *
  * Params:
