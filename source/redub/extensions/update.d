@@ -47,7 +47,7 @@ int updateMain(string[] args)
     }
     setLogLevel(update.vverbose ? LogLevel.vverbose : LogLevel.info);
 
-    int gitCode = executeShell("git --help").status;
+    int gitCode = execute(["git", "--help"]).status;
     enum isNotGitRepo = 128;
     enum hasNoGitWindows = 9009;
     enum hasNoGitPosix = 127;
@@ -56,7 +56,7 @@ int updateMain(string[] args)
 
     if(gitCode == 0 && !update.noPull)
     {
-        auto ret = executeShell("git pull", null, Config.none, size_t.max, redubPath);
+        auto ret = execute(["git", "pull"], null, Config.none, size_t.max, redubPath);
         gitCode = ret.status;
         if(gitCode != 0 && gitCode != isNotGitRepo)
         {

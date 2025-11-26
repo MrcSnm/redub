@@ -57,7 +57,7 @@ bool extractTarGzToFolder(string tarGzPath, string outputDirectory)
 	}
 	info("Extracting ", tarGzPath, " to ", outputDirectory);
 	std.file.mkdirRecurse(outputDirectory);
-    auto res = executeShell("tar -xf "~tarGzPath~" -C "~outputDirectory);
+    auto res = execute(["tar", "-xf", tarGzPath, "-C", outputDirectory]);
     if(res.status)
         error("Could not extract '",tarGzPath, "' to '", outputDirectory, "': ", res.output);
 	return res.status == 0;

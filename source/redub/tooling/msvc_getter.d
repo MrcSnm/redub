@@ -86,13 +86,12 @@ private string getMsvcPath()
     string vswhere = getVswhere();
     if(!vswhere.length)
         return null;
-    auto vsOutput = executeShell(
-        escapeShellCommand(vswhere,
+    auto vsOutput = execute([vswhere,
         "-latest",
         "-products", "*",
         "-requires", "Microsoft.VisualStudio.Component.VC.Tools.x86.x64",
-        "-property", "installationPath")
-    );
+        "-property", "installationPath"
+    ]);
     if(vsOutput.status || !vsOutput.output.length)
         return null;
     string vcDir = buildNormalizedPath(strip(vsOutput.output), "VC", "Tools", "MSVC");

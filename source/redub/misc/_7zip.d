@@ -47,7 +47,7 @@ bool extract7ZipToFolder(string zPath, string outputDirectory)
     chdir(outputDirectory);
     scope(exit)
         chdir(dir);
-    auto res = executeShell(_7z ~ " x -y "~zPath);
+    auto res = execute([_7z, "x", "-y",zPath]);
     if(res.status)
         error("Could not extract 7z '", zPath, "' to '", outputDirectory, "': ", res.output);
     return res.status == 0;

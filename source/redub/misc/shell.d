@@ -9,23 +9,21 @@ struct ProcessExec2
     Appender!string output;
 }
 
-ProcessExec2 executeShell2(scope const(char)[] command,
+ProcessExec2 executeProcess2(scope const(char)[][] command,
                   const string[string] env = null,
                   Config config = Config.none,
                   size_t maxOutput = size_t.max,
-                  scope const(char)[] workDir = null,
-                  string shellPath = nativeShell)
+                  scope const(char)[] workDir = null)
     @safe
 {
-    return executeImpl!pipeShell(command,
+    return executeImpl!pipeProcess(command,
                                  env,
                                  config,
                                  maxOutput,
-                                 workDir,
-                                 shellPath);
+                                 workDir);
 }
 
-// Does the actual work for execute() and executeShell().
+// Does the actual work for execute() and executeProcess().
 private ProcessExec2 executeImpl(alias pipeFunc, Cmd, ExtraPipeFuncArgs...)(
     Cmd commandLine,
     const string[string] env = null,

@@ -3,13 +3,17 @@ import redub.buildapi;
 public import redub.misc.shell;
 import core.sys.posix.sys.ioctl;
 
-string getHighPriorityCmd()
+string[] getHighPriorityCmd(string[] compileFlags)
 {
     version(Posix)
     {
-        return "nice -n 0 ";
+        import std.array;
+        string[] ret = new string[compileFlags.length + 3];
+        ret[0..3] = ["nice", "-n", "0"].staticArray;
+        ret[3..$] = compileFlags;
+        return ret;
     }
-    else return "";
+    return compileFlags;
 }
 
 ProcessExec2 execCompiler(const BuildConfiguration cfg, Compiler compiler, string[] compileFlags, out string compilationCommands, bool hasHighPriority, out string cmdFile, const string[string] env)
@@ -27,7 +31,7 @@ ProcessExec2 execCompiler(const BuildConfiguration cfg, Compiler compiler, strin
     {
         cmdFile = createCommandFile(cfg, compileFlags, compilationCommands);
         compilationCommands = compilerBin ~ " "~compilationCommands;
-        ProcessExec2 ret = executeShell2(compilerBin~ " @"~cmdFile, env, Config.none, size_t.max, cfg.workingDir);
+        ProcessExec2 ret = executeProcess2([compilerBin, "@"~cmdFile], env, Config.none, size_t.max, cfg.workingDir);
 
         version(Windows)
         {
@@ -37,11 +41,10 @@ ProcessExec2 execCompiler(const BuildConfiguration cfg, Compiler compiler, strin
                 SetPriorityClass(ret.pipe.pid.osHandle, REALTIME_PRIORITY_CLASS);
             }
         }
-
         return ret;
     }
     compilationCommands = escapeCompilationCommands(compilerBin, compileFlags);
-    return executeShell2(getHighPriorityCmd ~ compilationCommands, env, Config.none, size_t.max, cfg.workingDir);
+    return executeProcess2(cast(const(char)[][])getHighPriorityCmd(compileFlags), env, Config.none, size_t.max, cfg.workingDir);
 }
 
 
@@ -115,5 +118,5 @@ auto executeArchiver(const ThreadBuildData data, CompilingSession s, string main
 
     putSourceFiles(cmd, null, [cacheDir], data.cfg.sourceFiles, data.cfg.excludeSourceFiles, ".o", ".obj");
 
-    return executeShell(escapeShellCommand(cmd), data.env);
+    return execute(cmd, data.env);
 }

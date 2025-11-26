@@ -58,9 +58,9 @@ Archiver getArchiver(AcceptedArchiver archiver, const string[string] env)
         if(binPath)
             return Archiver(archiver, binPath.str);
     }
-    string help = " --help";
-    if(archiver == AcceptedArchiver.llvmLib || archiver == AcceptedArchiver.lib) help = " /help";
-    auto res = executeShell(archiver~help, env);
+    string help = "--help";
+    if(archiver == AcceptedArchiver.llvmLib || archiver == AcceptedArchiver.lib) help = "/help";
+    auto res = execute([archiver, help], env);
     if(res.status == 0)
     {
         Archiver arch = Archiver(archiver, findExecutable(archiver));

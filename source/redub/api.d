@@ -449,7 +449,7 @@ ProjectDetails[] buildProjectUniversal(ArgsDetails args)
         ProjectDetails[] ret;
         ArgsDetails other = args;
 
-        string lipoRun = "lipo -create ";
+        string[] lipoRun = ["lipo", "-create"];
         string oldTargetName;
         foreach(arch; archs)
         {
@@ -460,15 +460,15 @@ ProjectDetails[] buildProjectUniversal(ArgsDetails args)
             d.tree.requirements.cfg.targetName~= "-"~arch;
             d = buildProject(d);
             ret~= d;
-            lipoRun~= " " ~ d.getOutputFile();
+            lipoRun~= d.getOutputFile();
         }
 
         ret[0].tree.requirements.cfg.targetName = oldTargetName~"-osx-universal";
-        lipoRun~= " -output "~ret[0].getOutputFile();
+        lipoRun~= ["-output", ret[0].getOutputFile()];
         ret[0].tree.requirements.cfg.targetName = oldTargetName~"-"~archs[0];
 
         vvlog(lipoRun);
-        auto res = executeShell(lipoRun);
+        auto res = execute(lipoRun, getRedubEnv);
         if(res.status)
             throw new BuildException(res.output);
 

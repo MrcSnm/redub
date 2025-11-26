@@ -23,7 +23,7 @@ public void saveGlobalCompiler(string compilerPath, JSONValue compilersInfo, boo
 
     CompilerBinary ret;
     string actualCompiler;
-    auto res = executeShell(compilerPath~" --version", getRedubEnv());
+    auto res = execute([compilerPath, "--version"], getRedubEnv());
     if(res.status)
         throw new Exception("saveGlobalCompiler was called in an inexistent compiler.");
     foreach(inf; isC ? cCompilersInference : dCompilersInference)
@@ -114,7 +114,7 @@ CompilerBinary inferCompiler(string compilerOrPath, string compilerAssumption, J
  * Params:
  *   preferredCompiler = The compiler that the user may have specified.
  *   actualCompiler = Actual compiler. If no compiler is found on the searchable list, the program will exit.
- * Returns: The output from executeShell. This will be processed for getting version information on the compiler.
+ * Returns: The output from executeProcess. This will be processed for getting version information on the compiler.
  */
 private string getActualCompilerToUse(string preferredCompiler, ref string actualCompiler, const string[] searchableCompilers, out bool isError)
 {
@@ -136,11 +136,9 @@ private string getActualCompilerToUse(string preferredCompiler, ref string actua
         else
             preferredTested = true;
 
-        string versionCommand = searchable;
-        if(searchable.baseName.stripExtension != "cl")
-            versionCommand~= " --version";
-
-        compVersionRes = executeShell(versionCommand, getRedubEnv());
+        string[2] versionCommand = [searchable, "--version"];
+        size_t args = searchable.baseName.stripExtension != "cl" ? 2 : 1;
+        compVersionRes = execute(versionCommand[0..args], getRedubEnv());
         if(compVersionRes.status == 0)
         {
             actualCompiler = searchable;
