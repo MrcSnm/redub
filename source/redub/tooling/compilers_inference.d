@@ -123,18 +123,27 @@ private string getActualCompilerToUse(string preferredCompiler, ref string actua
     import std.typecons;
     import std.process;
     import redub.logging;
-    import std.path: baseName, stripExtension;
+    import std.path: baseName, stripExtension, isAbsolute;
+    import redub.misc.find_executable;
     Tuple!(int, "status", string, "output") compVersionRes;
+    compVersionRes.status = 1;
+    compVersionRes.output = "No compiler found.";
 
     bool preferredTested = false;
     foreach(string searchable; preferredCompiler~searchableCompilers)
     {
-        if(preferredTested && searchable == preferredCompiler)
+        if((preferredTested && searchable == preferredCompiler) || searchable.length == 0)
             continue;
         if(searchable != preferredCompiler)
             searchable = tryGetCompilerOnCwd(searchable);
         else
             preferredTested = true;
+        if(!isAbsolute(searchable))
+        {
+            searchable = findExecutable(searchable);
+            if(searchable.length == 0)
+                continue;
+        }
 
         string[2] versionCommand = [searchable, "--version"];
         size_t args = searchable.baseName.stripExtension != "cl" ? 2 : 1;

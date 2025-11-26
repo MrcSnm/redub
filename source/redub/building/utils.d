@@ -3,17 +3,11 @@ import redub.buildapi;
 public import redub.misc.shell;
 import core.sys.posix.sys.ioctl;
 
-string[] getHighPriorityCmd(string[] compileFlags)
+string[] getHighPriorityCmd(string[] compileFlags, string compilerBin)
 {
     version(Posix)
-    {
-        import std.array;
-        string[] ret = new string[compileFlags.length + 3];
-        ret[0..3] = ["nice", "-n", "0"].staticArray;
-        ret[3..$] = compileFlags;
-        return ret;
-    }
-    return compileFlags;
+        return ["nice", "-n", "0", "--", compilerBin] ~ compileFlags;
+    return [compilerBin] ~ compileFlags;
 }
 
 ProcessExec2 execCompiler(const BuildConfiguration cfg, Compiler compiler, string[] compileFlags, out string compilationCommands, bool hasHighPriority, out string cmdFile, const string[string] env)
@@ -44,7 +38,7 @@ ProcessExec2 execCompiler(const BuildConfiguration cfg, Compiler compiler, strin
         return ret;
     }
     compilationCommands = escapeCompilationCommands(compilerBin, compileFlags);
-    return executeProcess2(cast(const(char)[][])getHighPriorityCmd(compileFlags), env, Config.none, size_t.max, cfg.workingDir);
+    return executeProcess2(cast(const(char)[][])getHighPriorityCmd(compileFlags, compilerBin), env, Config.none, size_t.max, cfg.workingDir);
 }
 
 

@@ -53,5 +53,5 @@ string findExecutable(string executableName)
         }
 
     }
-    return "";
+    return null;
 }
