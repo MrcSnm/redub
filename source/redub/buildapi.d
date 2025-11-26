@@ -7,7 +7,7 @@ import redub.package_searching.api;
 
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.26.3";
+enum RedubVersionOnly = "v1.26.4";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -346,6 +346,32 @@ struct BuildConfiguration
         ret.isUsingDefaultSourcePaths = ret.isUsingDefaultSourcePaths && other.isUsingDefaultSourcePaths;
         ret = ret.mergeCommands(other);
         ret.flags = other.flags;
+        ret.extraDependencyFiles.exclusiveMergePaths(other.extraDependencyFiles);
+        ret.filesToCopy.exclusiveMergePaths(other.filesToCopy);
+        ret.stringImportPaths.exclusiveMergePaths(other.stringImportPaths);
+        ret.sourceFiles.exclusiveMerge(other.sourceFiles);
+        ret.excludeSourceFiles.exclusiveMerge(other.excludeSourceFiles);
+        ret.sourcePaths.exclusiveMergePaths(other.sourcePaths);
+        ret.importDirectories.exclusiveMergePaths(other.importDirectories);
+        ret.versions.exclusiveMerge(other.versions);
+        ret.debugVersions.exclusiveMerge(other.debugVersions);
+        ret.dFlags.exclusiveMerge(other.dFlags);
+        ret.libraries.exclusiveMerge(other.libraries);
+        ret.frameworks.exclusiveMerge(other.frameworks);
+        ret.libraryPaths.exclusiveMergePaths(other.libraryPaths);
+        ret.linkFlags.exclusiveMerge(other.linkFlags, null, linkerMergeKeep);
+        return ret;
+    }
+
+    /**
+     * This function is mainly used to merge a dependency with its parent.
+     * Params:
+     *   other = The parent configuration
+     * Returns:
+     */
+    BuildConfiguration mergeForCombine(const ref BuildConfiguration other) const
+    {
+        BuildConfiguration ret = clone;
         ret.extraDependencyFiles.exclusiveMergePaths(other.extraDependencyFiles);
         ret.filesToCopy.exclusiveMergePaths(other.filesToCopy);
         ret.stringImportPaths.exclusiveMergePaths(other.stringImportPaths);
@@ -1329,8 +1355,8 @@ class ProjectNode
      */
     void combine()
     {
+        import redub.api;
         ProjectNode[] leaves;
-
         while(true)
         {
             leaves = findLeavesNodes();
@@ -1340,10 +1366,10 @@ class ProjectNode
             {
                 foreach(ref leafParent; leaf.parent)
                 {
+                    if(leafParent.requirements.cfg.language != leaf.requirements.cfg.language)
+                        throw new RedubException("Can't combine "~leafParent.name~" with "~leaf.name~". Can only combine projects with same programming language");
                     ///Keep the old target type.
-                    TargetType oldTargetType = leafParent.requirements.cfg.targetType;
-                    leafParent.requirements.cfg = leafParent.requirements.cfg.merge(leaf.requirements.cfg);
-                    leafParent.requirements.cfg.targetType = oldTargetType;
+                    leafParent.requirements.cfg = leafParent.requirements.cfg.mergeForCombine(leaf.requirements.cfg);
                 }
                 leaf.parent[0].requirements.cfg = leaf.parent[0].requirements.cfg.mergeCommands(leaf.requirements.cfg);
                 leaf.becomeIndependent();

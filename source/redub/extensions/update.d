@@ -13,6 +13,7 @@ int updateMain(string[] args)
     import std.file;
     import std.path;
     import redub.misc.github_tag_check;
+    import redub.misc.find_executable;
     import redub.libs.package_suppliers.utils;
     string redubExePath = thisExePath;
     string currentRedubDir = dirName(redubExePath);
@@ -47,14 +48,13 @@ int updateMain(string[] args)
     }
     setLogLevel(update.vverbose ? LogLevel.vverbose : LogLevel.info);
 
-    int gitCode = execute(["git", "--help"]).status;
     enum isNotGitRepo = 128;
-    enum hasNoGitWindows = 9009;
-    enum hasNoGitPosix = 127;
+    int gitCode = isNotGitRepo;
+    bool hasGit = findExecutable("git") != null;
 
     bool replaceRedub = false || update.noPull;
 
-    if(gitCode == 0 && !update.noPull)
+    if(hasGit && !update.noPull)
     {
         auto ret = execute(["git", "pull"], null, Config.none, size_t.max, redubPath);
         gitCode = ret.status;
@@ -70,7 +70,7 @@ int updateMain(string[] args)
         }
     }
 
-    if(gitCode == isNotGitRepo || gitCode == hasNoGitWindows || gitCode == hasNoGitPosix)
+    if(gitCode == isNotGitRepo || hasGit)
     {
         import d_downloader;
         latest = getLatestRedubVersion();
@@ -97,7 +97,7 @@ int updateMain(string[] args)
         if(update.fast)
             bt = BuildType.debug_;
 
-        ProjectDetails d = redub.api.resolveDependencies(false, os, CompilationDetails(update.compiler), ProjectToParse(update.dev ? "cli-dev" : null, redubPath), InitialDubVariables.init, bt);
+        ProjectDetails d = redub.api.resolveDependencies(false, os, CompilationDetails(compilerOrPath: update.compiler, combinedBuild:true), ProjectToParse(update.dev ? "cli-dev" : null, redubPath), InitialDubVariables.init, bt);
         enforce(d.tree.name == "redub", "Redub update should only be used to update redub.");
         d.tree.requirements.cfg.outputDirectory = buildNormalizedPath(tempDir, "redub_build");
         d = buildProject(d);

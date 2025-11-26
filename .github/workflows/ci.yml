@@ -40,16 +40,16 @@ jobs:
       - name: Build
         if: runner.os != 'macOS'
         run: |
-          redub build -b release-debug --prefetch
+          redub build -b release-debug --prefetch --combined
       - name: Build (OSX Universal)
         if: runner.os == 'macOS'
         run: |
           # Build arm64 version
-          redub build -b release-debug --prefetch --arch=arm64-apple-darwin
+          redub build -b release-debug --prefetch --combined --arch=arm64-apple-darwin
           mv build/redub build/redub-arm64
 
           # Build x86_64 version
-          redub build -b release-debug --prefetch --arch=x86_64
+          redub build -b release-debug --prefetch --combined --arch=x86_64
           mv build/redub build/redub-x86_64
 
           lipo -create build/redub-arm64 build/redub-x86_64 -output build/redub
