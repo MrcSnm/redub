@@ -97,7 +97,7 @@ int updateMain(string[] args)
         if(update.fast)
             bt = BuildType.debug_;
 
-        ProjectDetails d = redub.api.resolveDependencies(false, os, CompilationDetails(compilerOrPath: update.compiler, combinedBuild:true), ProjectToParse(update.dev ? "cli-dev" : null, redubPath), InitialDubVariables.init, bt);
+        ProjectDetails d = redub.api.resolveDependencies(false, os, CompilationDetails(compilerOrPath: update.compiler, combinedBuild:!update.fast), ProjectToParse(update.dev ? "cli-dev" : null, redubPath), InitialDubVariables.init, bt);
         enforce(d.tree.name == "redub", "Redub update should only be used to update redub.");
         d.tree.requirements.cfg.outputDirectory = buildNormalizedPath(tempDir, "redub_build");
         d = buildProject(d);
