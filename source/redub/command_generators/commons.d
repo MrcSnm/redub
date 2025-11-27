@@ -18,8 +18,6 @@ immutable string[] cppExt = [".c", ".cpp", ".cc", ".i", ".cxx", ".c++"];
 
 OS osFromArch(string arch)
 {
-    import std.string;
-    static bool contains(string a, string b){return a.indexOf(b) != -1;}
 
     if(arch is null) return std.system.os;
 
@@ -36,15 +34,13 @@ OS osFromArch(string arch)
     else if(contains(arch, "openbsd")) return OS.openBSD;
     else if(contains(arch, "solaris")) return OS.solaris;
     else if(contains(arch, "posix")) return OS.otherPosix;
+    else if(contains(arch, "unknown")) return OS.unknown;
 
-    return OS.unknown;
+    return std.system.os;
 }
 
 ISA isaFromArch(string arch)
 {
-    import std.string;
-    static bool contains(string a, string b){return a.indexOf(b) != -1;}
-
     with(ISA)
     {
         if(contains(arch, "x86_64"))       return x86_64;
@@ -54,6 +50,11 @@ ISA isaFromArch(string arch)
         else if(contains(arch, "x86"))     return x86;
     }
     return std.system.instructionSetArchitecture;
+}
+private bool contains(string a, string b)
+{
+    import std.string:indexOf;
+    return a.indexOf(b) != -1;
 }
 
 
