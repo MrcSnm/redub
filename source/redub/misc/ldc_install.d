@@ -76,6 +76,8 @@ string getLdcDownloadLink(string ver, OS os = std.system.os, ISA isa = instructi
         sys = "windows-multilib.7z";
     else if(os.isApple)
         sys = "osx-universal.tar.xz";
+    else if(os == OS.freeBSD)
+        sys = "freebsd-x86_64.tar.xz";
     else if(os.isPosix)
         sys = isa == ISA.aarch64 ? "linux-aarch64.tar.xz" : "linux-x86_64.tar.xz";
     else
