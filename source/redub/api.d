@@ -427,12 +427,15 @@ ProjectDetails buildProject(ProjectDetails d)
 
     import redub.misc.file_size_format;
     import std.path;
-    string generatedBin = d.getOutputFile();
+    infos("Finished: ", d.tree.name, " - ", result.msecs, "ms - Rebuild up-to-date targets with --force");
 
-    string binShortName = relativePath(generatedBin);
-    binShortName = binShortName.length < generatedBin.length ? binShortName : generatedBin;
-
-    infos("Finished: ", d.tree.name, " - ", result.msecs, "ms - Generated ",binShortName,"(",getFileSizeFormatted(generatedBin),") - Rebuild up-to-date targets with --force");
+    if(d.tree.requirements.cfg.targetType != TargetType.none)
+    {
+        string generatedBin = d.getOutputFile();
+        string binShortName = relativePath(generatedBin);
+        binShortName = binShortName.length < generatedBin.length ? binShortName : generatedBin;
+        infos("Generated ",binShortName,"(",getFileSizeFormatted(generatedBin),")");
+    }
 
     return d;
 }

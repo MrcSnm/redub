@@ -520,7 +520,7 @@ private void printCachedBuildInfo(ProjectNode root)
                 copyEnough~= cfg;
             else if(node.isUpToDate)
                 upToDate~= cfg;
-            else
+            else if(node.shouldEnterCompilationThread)
                 willBuild~= cfg;
         }
         if(copyEnough.length)
@@ -686,7 +686,7 @@ private bool doLink(ProjectNode root, CompilingSession info, string mainPackHash
 
     if(isUpToDate)
         infos("Up-to-Date: ", root.name, ", skipping linking");
-    else if(root.requirements.cfg.targetType != TargetType.none)
+    else
     {
         auto result = timed(()
         {

@@ -1024,7 +1024,7 @@ class ProjectNode
                 transferDependenciesAndClearOptional(node.dependencies[i], removedOptionals, removedNull, anySourceCache);
             }
             ///If the node is none or sourceLibrary, transfer all of its dependencies to all of its parents
-            bool shouldTransfer = node.requirements.cfg.targetType == TargetType.none || node.requirements.cfg.targetType == TargetType.sourceLibrary;
+            bool shouldTransfer = (node.requirements.cfg.targetType == TargetType.none && !node.isRoot) || node.requirements.cfg.targetType == TargetType.sourceLibrary;
             if(shouldTransfer)
             {
                 for(int i = 0; i < node.parent.length; i++)
@@ -1149,7 +1149,7 @@ class ProjectNode
                     privatesToMerge~= [p, node];
             }
             visited[node] = true;
-            if(node.requirements.cfg.targetType == TargetType.sourceLibrary || node.requirements.cfg.targetType == TargetType.none)
+            if(node.requirements.cfg.targetType == TargetType.sourceLibrary || (node.requirements.cfg.targetType == TargetType.none && !node.isRoot))
                 dependenciesToRemove~= node;
         }
         static void finishPrivate(ProjectNode[] privatesToMerge, ProjectNode[] dependenciesToRemove, ref bool[ProjectNode] linkPropagated)
@@ -1203,7 +1203,7 @@ class ProjectNode
 
     bool shouldEnterCompilationThread() const
     {
-        return !isUpToDate || isCopyEnough;
+        return (!isUpToDate || isCopyEnough) && requirements.cfg.targetType != TargetType.none;
     }
 
 
