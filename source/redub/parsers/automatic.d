@@ -109,8 +109,8 @@ BuildRequirements postProcessBuildRequirements(BuildRequirements req, BuildConfi
     if(isRoot && useExistingObj)
         req.cfg.flags|= BuildConfigurationFlags.outputsDeps;
 
-    partiallyFinishBuildRequirements(req, pending);    ///Merge need to happen after partial finish, since other configuration will be merged
     req.cfg = redub.parsers.environment.parseEnvironment(req.cfg); //First pass in env parsing
+    partiallyFinishBuildRequirements(req, pending);    ///Merge need to happen after partial finish, since other configuration will be merged
     return req;
 }
 
