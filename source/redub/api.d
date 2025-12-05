@@ -854,14 +854,17 @@ string getDubWorkspacePath()
     if(dPath)
     {
         customHome = getEnvVariable("DUB_HOME");
-        if(!isAbsolute(customHome))
+        if(customHome.length && !isAbsolute(customHome))
             throw new RedubException("DUB_HOME must not be an absolute path '"~customHome~"' when DPATH is defined ["~dPath~"]");
-        home = buildNormalizedPath(dPath, getEnvVariable("DUB_HOME"));
+        if(!customHome)
+            home = buildNormalizedPath(dPath, "dub");
+        else
+            home = buildNormalizedPath(dPath, customHome);
     }
     else
     {
         customHome = getEnvVariable("DUB_HOME");
-        if(customHome)
+        if(customHome.length)
             home = customHome;
         else
             home = getEnvVariable(home);
