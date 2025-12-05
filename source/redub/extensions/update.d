@@ -58,6 +58,7 @@ int updateMain(string[] args)
     {
         auto ret = execute(["git", "pull"], null, Config.none, size_t.max, redubPath);
         gitCode = ret.status;
+
         if(gitCode != 0 && gitCode != isNotGitRepo)
         {
             errorTitle("Git Pull Error: \n", ret.output);
@@ -70,7 +71,7 @@ int updateMain(string[] args)
         }
     }
 
-    if(gitCode == isNotGitRepo || hasGit)
+    if(gitCode == isNotGitRepo || !hasGit)
     {
         import d_downloader;
         latest = getLatestRedubVersion();

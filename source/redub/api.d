@@ -835,13 +835,38 @@ bool isIncremental(Inference incremental, ProjectNode tree)
 string getDubWorkspacePath()
 {
     import std.process;
+    import std.path :isAbsolute;
     import redub.parsers.environment;
     import redub.misc.path;
 
-    version (Windows)
-        return buildNormalizedPath(redubEnv["LOCALAPPDATA"], "dub");
+    static string dubWorkspace;
+    if(dubWorkspace.length)
+        return dubWorkspace;
+
+    version(Windows)
+        string home = "LOCALAPPDATA";
     else
-        return buildNormalizedPath(redubEnv["HOME"], ".dub");
+        string home = "HOME";
+
+    string dPath = getEnvVariable("DPATH");
+
+    string customHome;
+    if(dPath)
+    {
+        customHome = getEnvVariable("DUB_HOME");
+        if(!isAbsolute(customHome))
+            throw new RedubException("DUB_HOME must not be an absolute path '"~customHome~"' when DPATH is defined ["~dPath~"]");
+        home = buildNormalizedPath(dPath, getEnvVariable("DUB_HOME"));
+    }
+    else
+    {
+        customHome = getEnvVariable("DUB_HOME");
+        if(customHome)
+            home = customHome;
+        else
+            home = getEnvVariable(home);
+    }
+    return dubWorkspace = buildNormalizedPath(home, ".dub");
 }
 
 

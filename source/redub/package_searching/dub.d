@@ -275,7 +275,10 @@ void prefetchPackages(string dubSelectionsPath)
 private string getDefaultLookupPathForPackages()
 {
     import redub.misc.path;
-    return buildNormalizedPath(getDubWorkspacePath, "packages");
+    static string defaultPath;
+    if(!defaultPath)
+        defaultPath = buildNormalizedPath(getDubWorkspacePath, "packages");
+    return defaultPath;
 }
 
 private string getLocalPackagesPath()
