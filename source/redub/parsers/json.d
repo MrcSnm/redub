@@ -247,7 +247,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
                         enforce(platforms.type == JSONType.array,
                             "'platforms' on configuration "~name.str~" at project "~req.name ~ " must be an array"
                         );
-                        if(!platformMatches(platforms.array, os, c.cInfo.isa))
+                        if(!platformMatches(platforms.array, c.cInfo.targetOS, c.cInfo.isa))
                             continue;
                     }
                     if(name.str == c.subConfiguration.name)
@@ -258,7 +258,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
                     if(preferredConfiguration == -1)
                         preferredConfiguration = i.to!int;
                 }
-                if(c.subConfiguration.name && v.array[preferredConfiguration]["name"].str != c.subConfiguration.name)
+                if(c.subConfiguration.name && v.array[preferredConfiguration]["name"].str != c.subConfiguration.name) //Issue an error
                 {
                     import std.algorithm:map;
                     import std.array:join;
