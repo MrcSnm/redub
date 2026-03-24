@@ -179,10 +179,26 @@ Compiler getCompiler(string compilerOrPath = "dmd", string cCompilerOrPath = nul
     //     if(res != UsesGnuLinker.unknown)
     //         ret.usesGnuLinker = res == UsesGnuLinker.yes ? true : false;
     // }
-
-
     return ret;
 }
+
+private string getCompilerVersion(ref string compiler)
+{
+    import std.string:indexOf;
+    import std.path;
+    if(!isAbsolute(compiler))
+    {
+        auto verPart = compiler.indexOf('@');
+        if(verPart != -1)
+        {
+            string ret = compiler[verPart+1..$];
+            compiler = compiler[0..verPart];
+            return ret;
+        }
+    }
+    return null;
+}
+
 private CompilerBinary searchCompiler(string compilerOrPath, JSONValue compilersInfo, bool isDefault, bool isC, string compilerAssumption = null)
 {
     import redub.misc.find_executable;
@@ -192,6 +208,8 @@ private CompilerBinary searchCompiler(string compilerOrPath, JSONValue compilers
     bool isGlobal = false;
 
     CompilerBinary ret;
+    string compilerVersion = getCompilerVersion(compilerOrPath);
+    string compilerPath = compilerOrPath;
     //Try get compiler on global cache with global cached paths
     if(!isAbsolute(compilerOrPath))
     {
@@ -200,80 +218,125 @@ private CompilerBinary searchCompiler(string compilerOrPath, JSONValue compilers
             compilerOrPath = locCompiler;
         else
         {
-            ret = getCompilerFromGlobalPath(compilerOrPath, compilersInfo);
+            ret = getCompilerFromGlobalPath(compilerOrPath, compilersInfo, compilerVersion);
             isGlobal = true;
         }
     }
+
     //Try finding the compiler globally and getting it from cache
     if(ret == CompilerBinary.init)
     {
-        compilerOrPath = findExecutable(compilerOrPath);
-        ret = getCompilerFromCache(compilersInfo, compilerOrPath);
+        compilerPath = findExecutable(compilerOrPath);
+        ret = getCompilerFromCache(compilersInfo, compilerOrPath, compilerPath, compilerVersion);
     }
     //Try inferring the compiler and saving its infos
     if(ret == CompilerBinary.init)
-        ret = inferCompiler(compilerOrPath, compilerAssumption, compilersInfo, isDefault, isGlobal, isC);
+        ret = inferCompiler(compilerOrPath, compilerPath, compilerAssumption, compilersInfo, isDefault, isGlobal, isC);
+    if(compilerVersion.length && ret.version_.toString != compilerVersion)
+    {
+        import redub.api;
+        throw new BuildException("Specified " ~ compilerPath~ " "~compilerVersion~" but could not find it in cache.");
+    }
     return ret;
 }
 
 
 
-private CompilerBinary getCompilerFromGlobalPath(string compilerOrPath, JSONValue compilersInfo)
+private CompilerBinary getCompilerFromGlobalPath(string compilerIdentifier, JSONValue compilersInfo, string compilerVersion)
 {
+    if(!compilerVersion.length)
     if(JSONValue* globalPaths = "globalPaths" in compilersInfo)
     {
-        if(JSONValue* cachedPath = compilerOrPath in *globalPaths)
-            return getCompilerFromCache(compilersInfo, cachedPath.str);
+        if(JSONValue* cachedPath = compilerIdentifier in *globalPaths)
+            return getCompilerFromCache(compilersInfo, compilerIdentifier, cachedPath.str, null);
     }
     return CompilerBinary.init;
 }
 
 
+private enum ACCEPTED_COMPILER = 0;
+private enum VERSION_ = 1;
+private enum FRONTEND_VERSION = 2;
+private enum VERSION_STRING = 3;
+private enum TIMESTAMP = 4;
 
 
-private CompilerBinary getCompilerFromCache(JSONValue allCompilersInfo, string compiler)
+/** 
+ * 
+ * Params:
+ *   allCompilersInfo = All the compilers info to check
+ *   compiler = The actual compiler (for example: ldc2 || dmd || cl || gcc)
+ *   compilerPath = The actual executable path. Only used if compilerVersion is not specified
+ *   compilerVersion = The compiler version requirement. SemVer is supported
+ * Returns: The compiler that fits the version and compiler requirement
+ */
+private CompilerBinary getCompilerFromCache(JSONValue allCompilersInfo, string compiler, string compilerPath, string compilerVersion)
 {
     import std.exception;
     import std.file;
-
-    enum ACCEPTED_COMPILER = 0;
-    enum VERSION_ = 1;
-    enum FRONTEND_VERSION = 2;
-    enum VERSION_STRING = 3;
-    enum TIMESTAMP = 4;
-
     if(!compiler.length)
     {
         JSONValue* def = "defaultCompiler" in allCompilersInfo;
         if(def != null)
             compiler = def.str;
     }
+    if(compilerVersion.length)
+        return getCompilerFromCacheByVersion(allCompilersInfo, compiler, compilerVersion);
     JSONValue* comps = "compilers" in allCompilersInfo;
     if(comps)
     {
         foreach(key, value; comps.object)
         {
             enforce(value.type == JSONType.array, "Expected that the value from object "~key~" were an array.");
-            if(key == compiler && std.file.exists(key))
-            {
-                JSONValue[] arr = value.array;
+            if(key != compilerPath || !std.file.exists(key))
+                continue;
 
-                if(arr[TIMESTAMP].get!long != timeLastModified(key).stdTime)
-                    return CompilerBinary.init;
+            JSONValue[] arr = value.array;
 
-                return CompilerBinary(
-                    acceptedCompilerfromString(arr[ACCEPTED_COMPILER].str),
-                    key,
-                    SemVer(arr[VERSION_].str),
-                    SemVer(arr[FRONTEND_VERSION].str),
-                    arr[VERSION_STRING].str,
-                );
-            }
+            if(arr[TIMESTAMP].get!long != timeLastModified(key).stdTime)
+                return CompilerBinary.init;
+
+            return CompilerBinary(
+                acceptedCompilerfromString(arr[ACCEPTED_COMPILER].str),
+                key,
+                SemVer(arr[VERSION_].str),
+                SemVer(arr[FRONTEND_VERSION].str),
+                arr[VERSION_STRING].str,
+            );
         }
     }
-
     return CompilerBinary.init;
 }
+private CompilerBinary getCompilerFromCacheByVersion(JSONValue allCompilersInfo, string compiler, string compilerVersion)
+{
+    import std.exception;
+    import std.file;
+
+    JSONValue* comps = "compilers" in allCompilersInfo;
+    SemVer requirement = SemVer(compilerVersion);
+    if(comps)
+    {        
+        foreach(key, value; comps.object)
+        {
+            enforce(value.type == JSONType.array, "Expected that the value from object "~key~" were an array.");
+            JSONValue[] arr = value.array;
+
+            if(arr[ACCEPTED_COMPILER].str != compiler || !SemVer(arr[VERSION_].str).satisfies(requirement) || !std.file.exists(key))
+                continue;
+            if(arr[TIMESTAMP].get!long != timeLastModified(key).stdTime)
+                return CompilerBinary.init;
+            return CompilerBinary(
+                acceptedCompilerfromString(arr[ACCEPTED_COMPILER].str),
+                key,
+                SemVer(arr[VERSION_].str),
+                SemVer(arr[FRONTEND_VERSION].str),
+                arr[VERSION_STRING].str,
+            );
+        }
+    }
+    return CompilerBinary.init;
+}
+
 
 /**
 * The file format is as specified:

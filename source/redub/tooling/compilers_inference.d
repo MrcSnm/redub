@@ -71,6 +71,7 @@ string tryGetCompilerOnCwd(string compilerOrPath)
 /**
  *
  * Params:
+ *   compilerIdentifier = Original specification of the compiler to find
  *   compilerOrPath = The path where the compiler is
  *   compilerAssumption = Assumption that will make skip --version call
  *   compilersInfo = Used for saving metadata
@@ -79,7 +80,7 @@ string tryGetCompilerOnCwd(string compilerOrPath)
  *   isC = Used for metadata
  * Returns: The compiler that was inferrred from the given info
  */
-CompilerBinary inferCompiler(string compilerOrPath, string compilerAssumption, JSONValue compilersInfo, bool isDefault, bool isGlobal, bool isC)
+CompilerBinary inferCompiler(string compilerIdentifier, string compilerOrPath, string compilerAssumption, JSONValue compilersInfo, bool isDefault, bool isGlobal, bool isC)
 {
     import redub.misc.find_executable;
     CompilerBinary ret;
