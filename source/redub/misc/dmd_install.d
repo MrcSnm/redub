@@ -1,7 +1,7 @@
 module redub.misc.dmd_install;
 import std.system;
 
-enum DefaultDMDVersion = "2.111.0";
+enum DefaultDMDVersion = "2.112.0";
 
 
 string getDmdFolder(string ver, OS os = std.system.os, ISA isa = instructionSetArchitecture)

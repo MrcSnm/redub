@@ -364,12 +364,35 @@ int useMain(string[] args)
     {
         error("redub use requires 1 additional argument: ",
         "\n\topend <dmd|ldc>: uses the wanted opend compiler as the default",
-        "\n\tldc <version?>: uses the latest ldc latest if version is unspecified.",
-        "\n\tdmd <version?>: uses the "~DefaultDMDVersion~" dmd if the version is unspecified.",
-        "\n\treset: removes the default compiler and redub will set it again by the first one found in the PATH environment variable",
+        "\n\tldc <version|path?>: looks in PATH if version|path is unspecified. Downloads latest if not found.",
+        "\n\tdmd <version|path?>: looks in PATH if version|path is unspecified. Downloads "~DefaultDMDVersion~" if not found.",
+        "\n\treset: removes the default compiler and redub will set it again by the first one found in the PATH environment variable.",
         );
         return 1;
     }
+
+    static string tryGetCompiler(AcceptedCompiler comp, string versionOrPath, out bool useInternalCompilers)
+    {
+        bool useDefaultBehavior = versionOrPath.length == 0;
+        string compiler = comp == AcceptedCompiler.dmd ? "dmd" : "ldc2";
+        if(useDefaultBehavior)
+        {
+            import redub.tooling.compiler_identification;
+            CompilerBinary bin = searchCompiler(compiler, false);
+            if(bin.compiler == comp)
+                return bin.bin;
+        }
+        else if(exists(versionOrPath)) //Path
+        {
+            CompilerBinary bin = searchCompiler(versionOrPath, false);
+            if(bin.compiler != comp)
+                throw new RedubException("Attempt to use path "~versionOrPath~" as a "~compiler~" compiler, but it is a "~bin.getCompilerString);
+            return bin.bin;
+        }
+        useInternalCompilers = true;
+        return null;
+    }
+
     string compiler = args[1];
     if(compiler.startsWith("opend"))
     {
@@ -392,35 +415,45 @@ int useMain(string[] args)
     else if(compiler == "ldc" || compiler == "ldc2")
     {
         import redub.api;
-        import redub.misc.ldc_install;
-        import redub.misc.github_tag_check;
-        enum ldcRepo = "ldc-developers/ldc";
         string ldcVer = args.length > 2 ? args[2] : null;
-        if(!ldcVer)
+        bool useInternal;
+        string ldcBin = tryGetCompiler(AcceptedCompiler.ldc2, ldcVer, useInternal);
+        if(useInternal)
+        {
+            import redub.misc.ldc_install;
+            import redub.misc.github_tag_check;
+            enum ldcRepo = "ldc-developers/ldc";
+
             ldcVer = getLatestGitRepositoryTag(ldcRepo);
-        string ldcFolder = getLdcFolder(ldcVer);
-        if(!exists(ldcFolder))
-            installLdc(ldcVer);
-        string ldcBin = "ldc2";
-        version(Windows)
-            ldcBin~= ".exe";
-        ldcBin = buildNormalizedPath(ldcFolder, ldcBin);
+            string ldcFolder = getLdcFolder(ldcVer);
+            if(!exists(ldcFolder))
+                installLdc(ldcVer);
+            version(Windows)
+                ldcBin = buildNormalizedPath(ldcFolder, "ldc2.exe");
+            else
+                ldcBin = buildNormalizedPath(ldcFolder, "ldc2");
+        }
         saveGlobalCompiler(ldcBin, meta, true, false);
     }
     else if(compiler == "dmd")
     {
         import redub.misc.dmd_install;
         string dmdVer = args.length > 2 ? args[2] : DefaultDMDVersion;
-        string dmdFolder = getDmdFolder(dmdVer);
-        if(!exists(dmdFolder) && !installDmd(dmdVer))
+        bool useInternal;
+        string dmdBin = tryGetCompiler(AcceptedCompiler.dmd, dmdVer, useInternal);
+        if(useInternal)
         {
-            error("Could not install DMD for using it.");
-            return 1;
+            string dmdFolder = getDmdFolder(dmdVer);
+            if(!exists(dmdFolder) && !installDmd(dmdVer))
+            {
+                error("Could not install DMD for using it.");
+                return 1;
+            }
+            version(Windows)
+                dmdBin = buildNormalizedPath(dmdFolder, "dmd.exe");
+            else
+                dmdBin = buildNormalizedPath(dmdFolder, "dmd");
         }
-        string dmdBin = "dmd";
-        version(Windows)
-            dmdBin~= ".exe";
-        dmdBin = buildNormalizedPath(dmdFolder, dmdBin);
         saveGlobalCompiler(dmdBin, meta, true, false);
     }
     else if(compiler.startsWith("reset"))

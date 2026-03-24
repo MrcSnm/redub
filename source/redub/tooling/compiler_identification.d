@@ -199,7 +199,22 @@ private string getCompilerVersion(ref string compiler)
     return null;
 }
 
-private CompilerBinary searchCompiler(string compilerOrPath, JSONValue compilersInfo, bool isDefault, bool isC, string compilerAssumption = null)
+/** 
+ * Utility to get compiler info given the arguments. Used with useMain to verify for existing compilers.
+ * Params:
+ *   compilerOrPath = The compiler identifier (such as dmd|ldc etc) to find
+ *   isC = Are you looking for C compilers?
+ * Returns: Extensive information about the compiler
+ */
+CompilerBinary searchCompiler(string compilerOrPath, bool isC)
+{
+    import redub.meta;
+    JSONValue compilersInfo = getRedubMeta();
+    bool isDefault = compilerOrPath.length == 0;
+    return searchCompiler(compilerOrPath, compilersInfo, isDefault, isC, null, false);
+}
+
+private CompilerBinary searchCompiler(string compilerOrPath, JSONValue compilersInfo, bool isDefault, bool isC, string compilerAssumption = null, bool useGlobalPath = true)
 {
     import redub.misc.find_executable;
     import redub.tooling.compilers_inference;
@@ -218,7 +233,8 @@ private CompilerBinary searchCompiler(string compilerOrPath, JSONValue compilers
             compilerOrPath = locCompiler;
         else
         {
-            ret = getCompilerFromGlobalPath(compilerOrPath, compilersInfo, compilerVersion);
+            if(useGlobalPath)
+                ret = getCompilerFromGlobalPath(compilerOrPath, compilersInfo, compilerVersion);
             isGlobal = true;
         }
     }
