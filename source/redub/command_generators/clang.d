@@ -11,9 +11,9 @@ string[] parseBuildConfiguration(const BuildConfiguration b, CompilingSession s,
     import std.algorithm.iteration:map;
     import std.file;
     import redub.misc.path;
-    
+
     string[] cmds;
-    
+
     with(b)
     {
         if(isDebug) cmds~= "-g";

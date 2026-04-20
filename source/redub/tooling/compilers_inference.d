@@ -13,7 +13,7 @@ import hip.data.json;
  *   isDefault = Used for metadata
  *   isGlobal = Used for metadata
  *   isC = Used for metadata
- * Returns: The compiler that was inferrred from the given info
+ * Returns: The compiler that was inferred from the given info
  */
 public void saveGlobalCompiler(string compilerPath, JSONValue compilersInfo, bool isDefault, bool isC)
 {
@@ -78,7 +78,7 @@ string tryGetCompilerOnCwd(string compilerOrPath)
  *   isDefault = Used for metadata
  *   isGlobal = Used for metadata
  *   isC = Used for metadata
- * Returns: The compiler that was inferrred from the given info
+ * Returns: The compiler that was inferred from the given info
  */
 CompilerBinary inferCompiler(string compilerIdentifier, string compilerOrPath, string compilerAssumption, JSONValue compilersInfo, bool isDefault, bool isGlobal, bool isC)
 {

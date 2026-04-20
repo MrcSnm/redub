@@ -78,7 +78,7 @@ struct Compiler
 {
     ///Accepted compiler is used for getting the commands
     CompilerBinary d;
-    ///C compiiler that will be used when finding C proejcts
+    ///C compiler that will be used when finding C projects
     CompilerBinary c;
 
     /**
@@ -135,7 +135,7 @@ string tryGetStr(JSONValue v, string key)
  * Use this function to get extensive information about the Compiler to use.
  * Params:
  *   compilerOrPath = Can be used both as a global, such as `dmd` or a complete path to a compiler. If null, defaults to DMD
- *   compilerAssumption = Optinal version string, such as `dmd v[2.105.0] f[2.106.0]`, v being its version, f being frontend version
+ *   compilerAssumption = Optional version string, such as `dmd v[2.105.0] f[2.106.0]`, v being its version, f being frontend version
  *   arch = Used mainly for identifying which ldc.conf to take, and by using it, it is possible to detect the default linker for the specific arch
  * Returns: The Compiler information that was found, or inferred if compilerAssumption was used.
  */
@@ -199,7 +199,7 @@ private string getCompilerVersion(ref string compiler)
     return null;
 }
 
-/** 
+/**
  * Utility to get compiler info given the arguments. Used with useMain to verify for existing compilers.
  * Params:
  *   compilerOrPath = The compiler identifier (such as dmd|ldc etc) to find
@@ -277,8 +277,8 @@ private enum VERSION_STRING = 3;
 private enum TIMESTAMP = 4;
 
 
-/** 
- * 
+/**
+ *
  * Params:
  *   allCompilersInfo = All the compilers info to check
  *   compiler = The actual compiler (for example: ldc2 || dmd || cl || gcc)
@@ -331,7 +331,7 @@ private CompilerBinary getCompilerFromCacheByVersion(JSONValue allCompilersInfo,
     JSONValue* comps = "compilers" in allCompilersInfo;
     SemVer requirement = SemVer(compilerVersion);
     if(comps)
-    {        
+    {
         foreach(key, value; comps.object)
         {
             enforce(value.type == JSONType.array, "Expected that the value from object "~key~" were an array.");

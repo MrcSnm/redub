@@ -102,11 +102,11 @@ private {
         HMODULE loadLib(const(char)* name){
             return LoadLibraryA(name);
         }
-        
+
         void unloadLib(void* lib){
             FreeLibrary(lib);
         }
-        
+
         void* loadSymbol(void* lib, const(char)* symbolName){
             return GetProcAddress(lib, symbolName);
         }

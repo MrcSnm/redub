@@ -21,7 +21,7 @@ struct ParseConfig
     ///The package name to use if recipe has no name
     string defaultPackageName;
     ParseSubConfig extra;
-    ///When first run is equals false, it won't do anything at "configurations"
+    ///When first run is false, it won't do anything at "configurations"
     bool firstRun = true;
     ///When preGenerateRun is true, it will run the preGenerateRun
     bool preGenerateRun = true;
@@ -146,10 +146,10 @@ void addDebugVersions(ref BuildRequirements req, JSONStringArray vers, ParseConf
 void addLinkFlags(ref BuildRequirements req, JSONStringArray lFlags, ParseConfig c){req.cfg.linkFlags.exclusiveMerge(lFlags, null, linkerMergeKeep);}
 void addDflags(ref BuildRequirements req, JSONStringArray dFlags, ParseConfig c){req.cfg.dFlags.exclusiveMerge(dFlags);}
 void addDependency(
-    ref BuildRequirements req, 
+    ref BuildRequirements req,
     ParseConfig c,
-    string name, string version_, 
-    BuildRequirements.Configuration subConfiguration, 
+    string name, string version_,
+    BuildRequirements.Configuration subConfiguration,
     string path,
     string visibility,
     PackageInfo* info,
@@ -159,7 +159,7 @@ void addDependency(
     import std.path;
     import redub.misc.path;
     import std.algorithm.searching:countUntil;
-    if(path.length && !isAbsolute(path)) 
+    if(path.length && !isAbsolute(path))
         path = redub.misc.path.buildNormalizedPath(c.workingDir, path);
     Dependency dep = dependency(name, path, version_, req.name, c.workingDir, subConfiguration, visibility, info, isOptional);
     vvlog("Added dependency ", dep.name, " [", dep.version_, "] ", "to ", req.name);
@@ -200,12 +200,12 @@ private Dependency dependency(
 
     Visibility visibility = Visibility.public_;
     if(visibilityStr) visibility = VisibilityFrom(visibilityStr);
-    
+
     return Dependency(name, path, version_, subConfiguration, subPackage, visibility, info, isOptional);
 }
 
 void addSubConfiguration(
-    ref BuildRequirements req, 
+    ref BuildRequirements req,
     ParseConfig c,
     string dependencyName,
     string subConfigurationName
