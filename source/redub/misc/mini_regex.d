@@ -5,7 +5,7 @@ bool matches(string input, string rlike)
 {
     if(rlike.length == 0)
         return true;
-    
+
     import std.string;
     import std.exception;
     static enum RegType
@@ -159,7 +159,7 @@ bool matches(string input, string rlike)
                 continue;
             }
 
-        } 
+        }
 
         ptrdiff_t res = a.matches(temp);
 
@@ -172,7 +172,7 @@ bool matches(string input, string rlike)
                 return true;
         }
     }
-    
+
     return regIndex == builtRegexMatch.length;
 }
 
