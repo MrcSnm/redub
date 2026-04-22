@@ -47,7 +47,7 @@ else version(Posix)
     {
         printPendingProjects();
     }
-    
+
     private void handleConsoleControl()
     {
         import core.sys.posix.signal;

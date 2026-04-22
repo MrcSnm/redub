@@ -22,7 +22,7 @@ ConfigSection getLdcConfig(string cwd, string ldcBinPath, string triple)
 }
 
 
-/** 
+/**
  * Finds the ldc2.conf file, basing itself on "Configuration File" section at https://wiki.dlang.org/Using_LDC 
  * Params:
  *   cwd = Current Working Dir

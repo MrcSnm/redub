@@ -767,7 +767,7 @@ ref string[] mapAppend(Q, T)(return ref string[] appendTarget, const scope Q[] m
     return appendTarget;
 }
 /**
- * This function is a is a less generic mapAppend. It constructs the array with more efficiency
+ * This function is a less generic mapAppend. It constructs the array more efficiently.
  * Params:
  *   appendTarget = The target in which will have the mapInput appended
  *   mapInput = Array which is going to be mapped

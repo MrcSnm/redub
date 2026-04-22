@@ -103,7 +103,7 @@ bool isDCompiler(AcceptedCompiler c)
 
 
 /**
- * Redub will try to search compilers in that order if the D compiler on getCompiler is not found.
+ * Redub will try to search compilers in that order if the D compiler in getCompiler is not found.
  */
 immutable string[] supportedDCompilers = [
     "dmd",

@@ -177,8 +177,8 @@ void addDependency(
 
 
 /**
-*   This function infers the subPackage name on the dependency.
-*/
+ * This function infers the subPackage name from the dependency.
+ */
 private Dependency dependency(
     string name,
     string path,

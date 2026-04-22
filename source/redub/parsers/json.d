@@ -28,7 +28,7 @@ immutable string[] commandsWithHostFilters = [
  *   cInfo = Compilation Info for being used as filters while parsing
  *   defaultPackageName = Package name to use if no name is found inside the recipe.
  *   version_ = Version of the current one being parsed. May be used to decide which version to use
- *   subConfiguration = The configuration that were specified in the parsing process
+ *   subConfiguration = The configuration that was specified in the parsing process
  *   subPackage = The subpackage that is actually being used
  *   parentName = Used as metadata
  *   isRoot = Used as metadata
@@ -62,12 +62,12 @@ string getPackageName(string filePath)
  *
  * Params:
  *   filePath = The JSON file path
- *   fileData = The actual data to use as JSON. This were created for --single builds
+ *   fileData = The actual data to use as JSON. This was created for --single builds
  *   projectWorkingDir = Working directory to parse with it
  *   cInfo = Compilation Info for being used as filters while parsing
  *   defaultPackageName = Package name to use if no name is found inside the recipe
  *   version_ = Version of the current one being parsed. May be used to decide which version to use
- *   subConfiguration = The configuration that were specified in the parsing process
+ *   subConfiguration = The configuration that was specified in the parsing process
  *   subPackage = The subpackage that is actually being used
  *   parentName = Used as metadata
  *   isRoot = Used as metadata
@@ -97,7 +97,6 @@ private __gshared JSONValue[string] jsonCache;
 ///Saves information about which JSONValues has already registered subPackages for.
 private __gshared bool[JSONValue] registeredSubpackages;
 /**
- *
  * Params:
  *   filePath = Uses filePath as the file data for parsing. Better API
  * Returns: Same as parseJSONCache
@@ -108,11 +107,11 @@ private JSONValue parseJSONCached(string filePath)
 }
 
 /**
-* Optimization to be used when dealing with subPackages.
-* Params:
-*   filePath = The path to use for getting it from cache, used simply as a key to the jsonCache
-*   fileData = The actual content to be used for parsing.
-*/
+ * Optimization to be used when dealing with subPackages.
+ * Params:
+ *   filePath = The path to use for getting it from cache, used simply as a key to the jsonCache
+ *   fileData = The actual content to be used for parsing
+ */
 private JSONValue parseJSONCached(string filePath, string fileData)
 {
     synchronized

@@ -44,7 +44,7 @@ string getSubPackageInfo(string packageName, out string mainPackageName)
     return packageName[ind + 1 .. $];
 }
 
-/** 
+/**
  * Gets the full package name. Used for caching
  * Params:
  *   packageName = The package name specification
@@ -60,7 +60,7 @@ string getPackageFullName(string packageName, string requiredBy)
 
 
 /**
- * Same as getSubPackageInfo, but infer mainPackageName in case of sending a subPackage only, such as :adv_diff
+ * Same as getSubPackageInfo, but infers mainPackageName in case of sending a subPackage only, such as :adv_diff
  * Params:
  *   packageName = The package dependency specification
  *   requiredBy = The requiredBy may be used in case of internal dependency specification, such as :adv_diff

@@ -149,7 +149,7 @@ CompilationCache[] cacheStatusForProject(ProjectNode root, CompilingSession s, o
 }
 
 /**
- * This function mutates the ProjectNode|s, isUpToDate property. It checks on the entire tree
+ * This function mutates the ProjectNode's isUpToDate property. It checks the entire tree
  * if it is not up to date, when it is not, it invalidates itself and all their parents.
  * It requires the existing cache status for the project and then, starts comparing, with its current
  * situation
