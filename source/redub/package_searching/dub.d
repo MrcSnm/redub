@@ -55,7 +55,7 @@ ReducedPackageInfo redubDownloadPackage(string packageName, string repo, string 
 /**
  * Gets the best matching version on the specified folder
  * Params:
- *   folder = The folder containing the packageName versionentrie   s
+ *   folder = The folder containing the packageName version entries
  *   packageName = Used to build the path
  *   subPackage = Currently used only for warning
  *   packageVersion = The version required (SemVer)
