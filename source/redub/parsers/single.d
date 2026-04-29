@@ -9,18 +9,18 @@ static import redub.parsers.environment;
 import redub.command_generators.commons;
 import redub.tree_generators.dub;
 
-/** 
+/**
  * Parses an initial directory, not recursively. Currently only .sdl and .json are parsed.
- * After the parse happens, it also partially finish the requirements by using a generalized fix
+ * After the parse happens, it also partially finishes the requirements by using a generalized fix
  * for after the parsing stage.
  * Params:
  *   projectWorkingDir = Optional working dir. What is the root being considered for the recipe file
  *   compiler = Which compiler to use
  *   subConfiguration = Sub configuration to use
  *   subPackage = Optional sub package
- *   recipe = Optional recipe to read. It's path is not used as root.
+ *   recipe = Optional recipe to read. Its path is not used as root.
  *   targetOS = Will be used to filter out some commands
- *   isa = Instruction Set Architexture to use for filtering commands
+ *   isa = Instruction Set Architecture to use for filtering commands
  *   isRoot = When the package is root, it is added to the package searching cache automatically with version 0.0.0
  *   version = The actual version of that project, may be null on root
  *   useExistingObj = Makes the project output dependencies if it is a root project. Disabled by default since compilation may be way slower

@@ -62,8 +62,8 @@ string[string] getCurrentEnv()
     return getRedubEnv;
 }
 /**
-*   If any command has status, it will stop executing them and return
-*/
+ * If any command fails, stop executing and return.
+ */
 private ExecutionResult executeCommands(const(string[])[] commands, RedubCommands list, ref CompilationResult res, string workingDir, const string[string] env)
 {
     import std.process;

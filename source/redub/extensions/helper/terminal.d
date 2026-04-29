@@ -11,7 +11,7 @@ void clearLines(ref Terminal t, ulong linesToClear, int startCursorY)
         t.moveTo(0, cast(int)(startCursorY+i), ForceOption.alwaysSend), t.clearToEndOfLine();
     t.moveTo(0, cast(int)startCursorY, ForceOption.alwaysSend);
     t.updateCursorPosition();
-    
+
 }
 
 void drawChoices(ref Terminal t, string[] choices, string next, int startCursorY)
