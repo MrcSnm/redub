@@ -19,15 +19,15 @@ struct CompilationInfo
 }
 
 
-/** 
+/**
  * This function receives an already parsed project path (BuildRequirements) and finishes parsing
- * its dependees. While it parses them, it also merge the root build flags with their dependees and
+ * its dependees. While it parses them, it also merges the root build flags with their dependees and
  * does that recursively.
- * 
+ *
  * If a project with the same name is found, it is merged with its existing counterpart
  *
  * It also clears the jsonCache so it is better suited for a library
- * 
+ *
  * Params:
  *   req = Root project to build
  * Returns: A tree out of the BuildRequirements, with all its compilation flags merged. It is the final step
@@ -86,19 +86,18 @@ void detectCycle(ProjectNode t)
     impl(t);
 }
 
-/** 
- * 
+/**
  * Params:
  *   queue = A queue for breadth first traversal
  *   info = Compiler information for parsing nodes
  *   subConfigurations = A map of subConfiguration[dependencyName] for mapping sub configuration matching
  *   visited = Cache for unique matching
- *  for saving CPU and memory instead if needing to recursively iterate all the time.
- *  this was moved here because it already implements the `visited` pattern inside the tree,
- *  so, it is an assumption that can be made to make it slightly faster. Might be removed
- *  if it makes code comprehension significantly worse.
- * 
- * Returns: 
+ *   for saving CPU and memory instead of needing to recursively iterate all the time.
+ *   This was moved here because it already implements the `visited` pattern inside the tree,
+ *   so it is an assumption that can be made to make it slightly faster. Might be removed
+ *   if it makes code comprehension significantly worse.
+ *
+ * Returns:
  */
 private void getProjectTreeImpl(
     ref ProjectNode[] queue,

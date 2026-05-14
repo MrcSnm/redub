@@ -26,9 +26,9 @@ struct Archiver
 }
 
 /**
-     * For generating libraries, redub might use dmd/ldc2 by default since that simplifies the logic.
-     * Although it is slightly slower, this is also a compromise one takes by using integration with C
-     */
+ * For generating libraries, redub might use dmd/ldc2 by default since that simplifies the logic.
+ * Although it is slightly slower, this is a compromise one takes when using integration with C
+ */
 AcceptedArchiver defaultArchiverFromCompiler(AcceptedCompiler compiler, OS target)
 {
     if(compiler.isDCompiler || compiler == AcceptedCompiler.invalid)

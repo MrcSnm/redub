@@ -8,16 +8,16 @@ static import redub.parsers.environment;
 import redub.command_generators.commons;
 import redub.tree_generators.dub;
 
-/** 
+/**
  * Parses an initial directory, not recursively. Currently only .sdl and .json are parsed.
- * After the parse happens, it also partially finish the requirements by using a generalized fix
+ * After the parse happens, it also partially finishes the requirements by using a generalized fix
  * for after the parsing stage.
  * Params:
  *   projectWorkingDir = Optional working dir. What is the root being considered for the recipe file
  *   cInfo = Important compilation info for that project
  *   subConfiguration = Sub configuration to use
  *   subPackage = Optional sub package
- *   recipe = Optional recipe to read. It's path is not used as root.
+ *   recipe = Optional recipe to read. Its path is not used as root.
  *   parentName = Used whenever parseProject is called for a sub package.
  *   isRoot = When the package is root, it is added to the package searching cache automatically with version 0.0.0
  *   version = The actual version of that project, may be null on root
@@ -26,10 +26,10 @@ import redub.tree_generators.dub;
  * Returns: The build requirements to the project. Not recursive.
  */
 BuildRequirements parseProject(
-    string projectWorkingDir, 
+    string projectWorkingDir,
     CompilationInfo cInfo,
     BuildRequirements.Configuration subConfiguration,
-    string subPackage, 
+    string subPackage,
     string recipe,
     string parentName = "",
     bool isRoot = false,
@@ -69,7 +69,7 @@ BuildRequirements parseProject(
     return postProcessBuildRequirements(req, pending, cInfo, isRoot, useExistingObj);
 }
 
-/** 
+/**
  * Used mostly to check the name of a package in the local directory and decide what to build
  * Params:
  *   projectWorkingDir = The working dir on where to get the package name
@@ -93,7 +93,7 @@ string getPackageName(string projectWorkingDir, string recipe)
 
 /**
  * Post process for the parseProject operation.
- * Required for merge pending configuration, setup environment variables, parse environment variables inside its content
+ * Required to merge pending configuration, set up environment variables, parse environment variables inside its content,
  * and define its current arch
  * Params:
  *   req = Input requirement
@@ -114,7 +114,7 @@ BuildRequirements postProcessBuildRequirements(BuildRequirements req, BuildConfi
     return req;
 }
 
-/** 
+/**
  * This function finishes some parts of the build requirement:
  * - Merge pending configuration (this guarantees the order is always correct.)
  * - Transforms relative paths into absolute paths

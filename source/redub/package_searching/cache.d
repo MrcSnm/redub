@@ -4,7 +4,7 @@ import core.attribute;
 public import redub.package_searching.api;
 
 
-/** 
+/**
  * The packages cache is a package list indexed by their name.
  * This list contains different versions of the package inside it.
  * Those different versions are used to identify the best compatible version among them.
@@ -22,7 +22,7 @@ shared static this()
  *
  * Params:
  *   packageName = The package name to find
- *   repo = Repo information that is only ever used whenever the version is invalid
+ *   repo = Repo information, only used when the version is invalid
  *   packageVersion = The version of the package, may be both a SemVer or a branch
  *   requiredBy = Metadata information
  *   path = The path on which this package may be. Used whenever not in the cache
@@ -112,8 +112,8 @@ PackageInfo* findPackage(string packageName, string repo, string packageVersion,
 }
 
 
-/** 
- * 
+/**
+ *
  * Params:
  *   packageName = What is the root package name
  *   path = Where the root package is located.
