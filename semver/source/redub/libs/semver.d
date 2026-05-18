@@ -271,11 +271,12 @@ private ptrdiff_t indexOfFirstMatching(string str, scope indexOfFirstMatchingDg 
     return -1;
 }
 
-/** 
- * Operator `-` not included since it can't be described as a a ComparisonType
+/**
+ * Operator `-` not included since it can't be described as a ComparisonType.
  * Params:
- *   sv = Semver which will be populated
- *   op = Semver which will be populated
+ *   sv = SemVer which will be populated
+ *   op = Operator string
+ *   partsLength = Amount of version parts provided (e.g. 1 for "1", 2 for "1.2")
  */
 private bool parseOperator(ref SemVer sv, string op, size_t partsLength) @nogc nothrow
 {

@@ -68,8 +68,8 @@ string getLinkCommands(const ThreadBuildData data, CompilingSession s, string ma
 
 
 /**
- * Executes escaleShellCommand for fixing issues such as -rpath=$ORIGIN expanding to -rpath="" which may cause some issues
- * this will guarantee that no command is expanded by the shell environment
+ * Executes escapeShellCommand to fix issues such as -rpath=$ORIGIN expanding to -rpath="",
+ * which may cause problems. This guarantees that no argument is expanded by the shell environment.
  * Params:
  *   flags = The compiler or linker flags
  */

@@ -66,18 +66,18 @@ ubyte[] fetchPackage(string packageName, string repo, SemVer requirement, out Se
 }
 
 /**
-* Downloads the package to a specific folder and extract it.
-* If no version actually matched existing versions, both out_actualVersionRequirement and url will be empty
-*
-* Params:
-*   path = The path expected to extract the package to
-*   repo = Required when an invalid semver is sent.
-*   packageName = Package name for assembling the link
-*   requirement = Which is the requirement that it must attend
-*   out_actualVersion = The version that matched the required
-*   url = The URL that was built for downloading the package
-* Returns: The path after the extraction
-*/
+ * Downloads the package to a specific folder and extracts it.
+ * If no version actually matched existing versions, both out_actualVersionRequirement and url will be empty.
+ *
+ * Params:
+ *   path = The path expected to extract the package to
+ *   repo = Required when an invalid SemVer is sent
+ *   packageName = Package name for assembling the link
+ *   requirement = The requirement that it must satisfy
+ *   out_actualVersion = The version that matched the requirement
+ *   url = The URL that was built for downloading the package
+ * Returns: The path after extraction
+ */
 string downloadPackageTo(return string path, string packageName, string repo,  SemVer requirement, out SemVer out_actualVersion, out string url)
 {
     import redub.libs.package_suppliers.utils;
@@ -94,12 +94,12 @@ string downloadPackageTo(return string path, string packageName, string repo,  S
 private __gshared Mutex downloaderMutex;
 
 /**
-*   Dub downloads to a path, usually packagename-version
-*   After that, it replaces it to packagename/version
-*   Then, it will load the .sdl or .json file
-*   If it uses .sdl, convert it to .json and add a version to it
-*   If it uses .json, append a "version" to it
-*/
+ * Dub downloads to a path, usually packagename-version.
+ * After that, it replaces it with packagename/version.
+ * Then, it will load the .sdl or .json file
+ * If it uses .sdl, convert it to .json and add a version to it.
+ * If it uses .json, append a "version" to it
+ */
 string downloadPackageTo(return string path, string packageName, string repo, SemVer requirement, out SemVer actualVersion)
 {
     import core.thread;

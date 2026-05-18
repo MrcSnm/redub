@@ -49,8 +49,8 @@ struct ProjectDetails
     }
 
     /**
-    *   Returns whatever this project is supposed to produce [.wasm, .exe, .dll, .lib, .so, ]
-    */
+     * Returns whatever this project is supposed to produce (.wasm, .exe, .dll, .lib, .so, ...).
+     */
     string getOutputFile()
     {
         import redub.misc.path;
@@ -84,10 +84,10 @@ struct CompilationDetails
     ///Whether the build should be fully parallel, simple, no or inferred
     ParallelType parallelType;
     /**
-    *  Whenever true, it will parse the environment and merge with the configurations with the project.
-    *  Details on that can be found on redub.parsers.environment.parse()
-    *  This flag is currently used only for plugin building.
-    */
+     * When true, it will parse the environment and merge it into the project's configuration.
+     * Details can be found in `redub.parsers.environment.parse()`.
+     * This flag is currently used only for plugin building.
+     */
     bool includeEnvironmentVariables = true;
 }
 /**
@@ -95,13 +95,13 @@ struct CompilationDetails
  */
 struct ProjectToParse
 {
-    ///Optinal configuration to build
+    ///Optional configuration to build
     string configuration;
     ///If working directory is null, std.file.getcwd() is used
     string workingDir;
     ///Optional subpackage to build
     string subPackage;
-    ///Optinal recipe to use instead of workingDir's dub.json
+    ///Optional recipe to use instead of workingDir's dub.json
     string recipe;
     ///Optional single argument. Used for parsing D files
     bool isSingle;
@@ -166,7 +166,7 @@ class BuildException : Exception
 }
 
 /**
- * Unchanged Files can't deal with directories at that moment.
+ * Unchanged files can't deal with directories at the moment.
  * Params:
  *   root = The root of the project
  */
@@ -677,7 +677,7 @@ ArgsDetails resolveArguments(string[] args, bool isDescribeOnly = false)
  *   cDetails = CompilationDetails, receives, the compiler to be inferred, architecture and assumptions
  *   proj = Detailed information in which project to parse. Most of the time, workingDir is the most important part.
  *   dubVars = InitialDubVariables to setup on the project
- * Returns: Completely resolved project, with all its necessary flags and and paths, but still, the directory will be iterated on compilation searching for source files.
+ * Returns: Completely resolved project, with all its necessary flags and paths, but still, the directory will be iterated during compilation to search for source files.
  */
 ProjectDetails resolveDependencies(
     bool invalidateCache,

@@ -28,13 +28,12 @@ string formatError(string err)
     return err~"\nRedub Failed!";
 }
 /**
-* Redub work with input -> output on each step. It must be almost stateless.
-* ** CLI will be optionally implemented later.
-* ** Cache will be optionally implemented later
-*
-* FindProject -> ParseProject -> MergeWithEnvironment -> ConvertToBuildFlags ->
-* Build
-*/
+ * Redub works with input -> output on each step. It must be almost stateless.
+ * - CLI may be implemented later.
+ * - Cache may be implemented later.
+ *
+ * FindProject -> ParseProject -> MergeWithEnvironment -> ConvertToBuildFlags -> Build
+ */
 int main(string[] args)
 {
     import std.getopt;

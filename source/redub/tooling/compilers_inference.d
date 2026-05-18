@@ -8,7 +8,7 @@ import hip.data.json;
  *
  * Params:
  *   compilerPath = The path where the compiler is
- *   compilerAssumption = Assumption that will make skip --version call
+ *   compilerAssumption = Assumption that will make it skip the --version call
  *   compilersInfo = Used for saving metadata
  *   isDefault = Used for metadata
  *   isGlobal = Used for metadata
@@ -73,7 +73,7 @@ string tryGetCompilerOnCwd(string compilerOrPath)
  * Params:
  *   compilerIdentifier = Original specification of the compiler to find
  *   compilerOrPath = The path where the compiler is
- *   compilerAssumption = Assumption that will make skip --version call
+ *   compilerAssumption = Assumption that will make it skip the --version call
  *   compilersInfo = Used for saving metadata
  *   isDefault = Used for metadata
  *   isGlobal = Used for metadata
