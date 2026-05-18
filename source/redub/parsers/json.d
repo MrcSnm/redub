@@ -254,7 +254,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
                         preferredConfiguration = i.to!int;
                         break;
                     }
-                    if(preferredConfiguration == -1)
+                    if(preferredConfiguration == -1 && name.str != "unittest")
                         preferredConfiguration = i.to!int;
                 }
                 if(c.subConfiguration.name && v.array[preferredConfiguration]["name"].str != c.subConfiguration.name) //Issue an error
