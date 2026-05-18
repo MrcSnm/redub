@@ -23,7 +23,7 @@ bool[shared Pid] runningProcesses;
 struct CompilationResult
 {
     string compilationCommand;
-    string message = "No compilation was executed";
+    string message;
     size_t msNeeded;
     int status = 1;
     shared ProjectNode node;
@@ -77,6 +77,11 @@ private ExecutionResult executeCommands(const(string[])[] commands, RedubCommand
             res.status = execRes.status;
             res.message = "Result of "~list.to!string~" command '"~cmd~"' "~execRes.output;
             return execRes;
+        }
+        else
+        {
+            if(execRes.output.length)
+                res.message~= execRes.output;
         }
     }
     return ExecutionResult(0, "Success");
@@ -179,15 +184,13 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
                 res.compilationCommand~= "\n\nLinking: \n\t"~ linkRes.compilationCommand;
             }
             res.status = ret.status;
-            res.message = ret.output;
+            res.message ~= ret.output;
         }
 
 
         if(res.status == 0)
         {
             if(!cfg.targetType.isLinkedSeparately && executeCommands(cfg.commands, RedubCommands.postBuild, res, cfg.workingDir, data.env).status)
-                return res;
-            if(!cfg.targetType.isLinkedSeparately && executeCommands(cfg.commands, RedubCommands.postGenerate, res, cfg.workingDir, data.env).status)
                 return res;
         }
     }
@@ -691,6 +694,9 @@ private bool doLink(ProjectNode root, CompilingSession info, string mainPackHash
         }
         else
         {
+            import std.string:stripRight;
+            if(linkRes.message.length)
+                redub.logging.info(linkRes.message.stripRight);
             infos("Linked: ", root.name, " - ", result.msecs, "ms");
             vlog("\n\t", linkRes.compilationCommand, " \n");
         }
