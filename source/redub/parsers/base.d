@@ -123,6 +123,18 @@ void addPostBuildCommands(ref BuildRequirements req, JSONStringArray cmds, Parse
         req.cfg.commands.length = RedubCommands.postBuild + 1;
     req.cfg.commands[RedubCommands.postBuild] = req.cfg.commands[RedubCommands.postBuild].append(cmds);
 }
+void addPreRunCommands(ref BuildRequirements req, JSONStringArray cmds, ParseConfig c)
+{
+    if(req.cfg.commands.length <= RedubCommands.preRun)
+        req.cfg.commands.length = RedubCommands.preRun + 1;
+    req.cfg.commands[RedubCommands.preRun] = req.cfg.commands[RedubCommands.preRun].append(cmds);
+}
+void addPostRunCommands(ref BuildRequirements req, JSONStringArray cmds, ParseConfig c)
+{
+    if(req.cfg.commands.length <= RedubCommands.postRun)
+        req.cfg.commands.length = RedubCommands.postRun + 1;
+    req.cfg.commands[RedubCommands.postRun] = req.cfg.commands[RedubCommands.postRun].append(cmds);
+}
 void addSourcePaths(ref BuildRequirements req, JSONStringArray paths, ParseConfig c)
 {
     import std.array;

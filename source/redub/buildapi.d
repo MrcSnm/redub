@@ -7,7 +7,7 @@ import redub.package_searching.api;
 
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.27.0";
+enum RedubVersionOnly = "v1.27.1";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -173,7 +173,9 @@ enum RedubCommands : ubyte
     preGenerate,
     postGenerate,
     preBuild,
-    postBuild
+    postBuild,
+    preRun,
+    postRun
 }
 
 enum BuildConfigurationFlags : ubyte
@@ -430,7 +432,6 @@ struct BuildConfiguration
         return ret;
     }
 
-
     BuildConfiguration mergeDFlags(const ref BuildConfiguration other) const
     {
         BuildConfiguration ret = clone;
@@ -518,6 +519,14 @@ struct BuildConfiguration
         const(string[]) postGenerateCommands() const
         {
             return commands.length > RedubCommands.postGenerate ? commands[RedubCommands.postGenerate] : null;
+        }
+        const(string[]) preRunCommands() const
+        {
+            return commands.length > RedubCommands.preRun ? commands[RedubCommands.preRun] : null;
+        }
+        const(string[]) postRunCommands() const
+        {
+            return commands.length > RedubCommands.postRun ? commands[RedubCommands.postRun] : null;
         }
     }
 }

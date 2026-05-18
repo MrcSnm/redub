@@ -17,7 +17,9 @@ immutable string[] commandsWithHostFilters = [
     "preBuildCommands",
     "postBuildCommands",
     "preGenerateCommands",
-    "postGenerateCommands"
+    "postGenerateCommands",
+    "preRunCommands",
+    "postRunCommands"
 ];
 
 /**
@@ -212,6 +214,8 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
         "postGenerateCommands": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){addPostGenerateCommands(req, v.strArr, c);},
         "preBuildCommands": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){addPreBuildCommands(req, v.strArr, c);},
         "postBuildCommands": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){addPostBuildCommands(req, v.strArr, c);},
+        "preRunCommands": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){addPreRunCommands(req, v.strArr, c);},
+        "postRunCommands": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){addPostRunCommands(req, v.strArr, c);},
         "copyFiles": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){addFilesToCopy(req, v.strArr, c);},
         "extraDependencyFiles": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){addExtraDependencyFiles(req, v.strArr, c);},
         "sourcePaths": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){addSourcePaths(req, v.strArr, c);},

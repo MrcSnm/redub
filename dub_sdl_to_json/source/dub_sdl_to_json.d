@@ -168,6 +168,8 @@ JSONValue sdlToJSON(SDLNode[] sdl)
 					"postGenerateCommands",
 					"preBuildCommands",
 					"postBuildCommands",
+					"preRunCommands",
+					"postRunCommands",
 
 					"sourceFiles",
 					"excludedSourceFiles",

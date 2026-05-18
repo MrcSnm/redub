@@ -242,8 +242,6 @@ CompilationResult link(ProjectNode root, string rootHash, const ThreadBuildData 
     {
         if(executeCommands(data.cfg.commands, RedubCommands.postBuild, ret, data.cfg.workingDir, data.env).status)
             return ret;
-        if(executeCommands(data.cfg.commands, RedubCommands.postGenerate, ret, data.cfg.workingDir, data.env).status)
-            return ret;
     }
 
     return ret;
@@ -269,6 +267,12 @@ bool buildProjectParallelSimple(ProjectNode root, CompilingSession s, const(AdvC
         {
             if(!(dep in spawned))
             {
+                CompilationResult res;
+                if(executeCommands(dep.requirements.cfg.commands, RedubCommands.postGenerate, res, dep.requirements.cfg.workingDir, env).status)
+                {
+                    errorTitle("Post Generate Error: ", res.message);
+                    return false;
+                }
                 if(dep.shouldEnterCompilationThread)
                 {
                     spawned[dep] = true;
@@ -362,6 +366,12 @@ bool buildProjectFullyParallelized(ProjectNode root, CompilingSession s, const(A
     ProjectNode priority = root.findPriorityNode();
     foreach(ProjectNode pack; root.collapse)
     {
+        CompilationResult res;
+        if(executeCommands(pack.requirements.cfg.commands, RedubCommands.postGenerate, res, pack.requirements.cfg.workingDir, env).status)
+        {
+            errorTitle("Post Generate Error: ", res.message);
+            return false;
+        }
         if(pack.shouldEnterCompilationThread)
         {
             sentPackages++;
@@ -472,6 +482,14 @@ bool buildProjectSingleThread(ProjectNode root, CompilingSession s, const(AdvCac
         ProjectNode finishedPackage;
         foreach(dep; dependencyFreePackages)
         {
+            {
+                CompilationResult res;
+                if(executeCommands(dep.requirements.cfg.commands, RedubCommands.postGenerate, res, dep.requirements.cfg.workingDir, env).status)
+                {
+                    errorTitle("Post Generate Error: ", res.message);
+                    return false;
+                }
+            }
             if(dep.shouldEnterCompilationThread)
             {
                 CompilationResult res = execCompilation(dep.requirements.buildData(true, s, getEnvForProject(dep, env)), cast(shared)dep,

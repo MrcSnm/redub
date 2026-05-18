@@ -881,15 +881,37 @@ string getDubWorkspacePath()
 int executeProgram(ProjectNode tree, string[] args)
 {
     import std.stdio;
+    import redub.parsers.environment;
     import std.path;
     import std.array:join;
     import std.process;
     import redub.command_generators.commons;
-    return wait(spawnShell(
+    import redub.building.compile;
+    int ret;
+    foreach(string cmd; tree.requirements.cfg.preRunCommands)
+    {
+        if(hasLogLevel(LogLevel.verbose))
+            vlog("Executing: ", executeShell("echo "~cmd, getRedubEnv, Config.none, size_t.max, tree.requirements.cfg.workingDir).output, " at dir ", tree.requirements.cfg.workingDir);
+        ret = wait(spawnShell(cmd));
+        if(ret != 0)
+            return ret;
+    }
+    ret = wait(spawnShell(
         escapeShellCommand(getOutputPath(tree.requirements.cfg, os)) ~ " "~ join(args, " "), stdin, stdout,
         stderr, null, Config.none, tree.requirements.cfg.runtimeWorkingDir
         )
     );
+    if(ret != 0)
+        return ret;
+    foreach(string cmd; tree.requirements.cfg.postRunCommands)
+    {
+        if(hasLogLevel(LogLevel.verbose))
+            vlog("Executing: ", executeShell("echo "~cmd, getRedubEnv, Config.none, size_t.max, tree.requirements.cfg.workingDir).output, " at dir ", tree.requirements.cfg.workingDir);
+        ret = wait(spawnShell(cmd));
+        if(ret != 0)
+            return ret;
+    }
+    return ret;
 }
 
 

@@ -389,6 +389,10 @@ BuildConfiguration parseEnvironment(BuildConfiguration cfg)
             cfg.commands[RedubCommands.preBuild] = arrParseEnv(cfg.commands[RedubCommands.preBuild]);
         if(cfg.commands.length > RedubCommands.postBuild)
             cfg.commands[RedubCommands.postBuild] = arrParseEnv(cfg.commands[RedubCommands.postBuild]);
+        if(cfg.commands.length > RedubCommands.preRun)
+            cfg.commands[RedubCommands.preRun] = arrParseEnv(cfg.commands[RedubCommands.preRun]);
+        if(cfg.commands.length > RedubCommands.postRun)
+            cfg.commands[RedubCommands.postRun] = arrParseEnv(cfg.commands[RedubCommands.postRun]);
     }
     return cfg;
 }
