@@ -240,6 +240,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
                 ///If "platform" didn't match, then it will skip it.
                 int preferredConfiguration = -1;
                 JSONValue configurationToUse;
+                int possibleConfiguration = -1;
                 foreach(i, JSONValue projectConfiguration; v.array)
                 {
                     JSONValue* name = "name" in projectConfiguration;
@@ -258,8 +259,25 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
                         preferredConfiguration = i.to!int;
                         break;
                     }
-                    if(preferredConfiguration == -1 && name.str != "unittest")
+                    if(preferredConfiguration == -1)
+                    {
+                        if(name.str == "unittest")
+                        {
+                            possibleConfiguration = i;
+                            continue;
+                        }
+
+                        if(!c.isRoot) //Skip if this is a dependency and it wasn't specifically mentioned
+                        {
+                            JSONValue* targetVar = "targetType" in projectConfiguration;
+                            if(targetVar && targetFrom(targetVar.str) == TargetType.executable)
+                            {
+                                possibleConfiguration = i;
+                                continue;
+                            }
+                        }
                         preferredConfiguration = i.to!int;
+                    }
                 }
                 if(c.subConfiguration.name && v.array[preferredConfiguration]["name"].str != c.subConfiguration.name) //Issue an error
                 {
@@ -287,6 +305,9 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
 
                     throw new Exception("Configuration '"~c.subConfiguration.name~"' specified for dependency '"~req.name~"' but wasn't found or its platform is incompatible. Preferred subConfiguratio was '" ~ v.array[preferredConfiguration]["name"].str~"' . Available Configurations:\n\t"~availableConfigs);
                 }
+                
+                if(possibleConfiguration != -1 && preferredConfiguration == -1)
+                    preferredConfiguration = possibleConfiguration;
                 if(preferredConfiguration != -1)
                 {
                     configurationToUse = v.array[preferredConfiguration];
