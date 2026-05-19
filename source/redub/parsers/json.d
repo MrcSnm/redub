@@ -263,7 +263,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
                     {
                         if(name.str == "unittest")
                         {
-                            possibleConfiguration = i;
+                            possibleConfiguration = i.to!int;
                             continue;
                         }
 
@@ -272,7 +272,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
                             JSONValue* targetVar = "targetType" in projectConfiguration;
                             if(targetVar && targetFrom(targetVar.str) == TargetType.executable)
                             {
-                                possibleConfiguration = i;
+                                possibleConfiguration = i.to!int;
                                 continue;
                             }
                         }
