@@ -65,6 +65,7 @@ void setTargetRuntimeWorkingDir(ref BuildRequirements req, string workingDir, Pa
 void setTargetName(ref BuildRequirements req, string name, ParseConfig c){req.cfg.targetName = name;}
 void setTargetPath(ref BuildRequirements req, string path, ParseConfig c){req.cfg.outputDirectory = path;}
 void setTargetType(ref BuildRequirements req, string targetType, ParseConfig c){req.cfg.targetType = targetFrom(targetType);}
+void setTargetIcon(ref BuildRequirements req, string iconPath, ParseConfig c){req.cfg.targetIcon = iconPath;}
 void addImportPaths(ref BuildRequirements req, JSONStringArray paths, ParseConfig c){req.cfg.importDirectories.exclusiveMerge(paths);}
 void addStringImportPaths(ref BuildRequirements req, JSONStringArray paths, ParseConfig c){req.cfg.stringImportPaths.exclusiveMergePaths(paths);}
 void addExtraDependencyFiles(ref BuildRequirements req, JSONStringArray files, ParseConfig c){req.cfg.extraDependencyFiles.exclusiveMerge(files);}

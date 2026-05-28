@@ -204,6 +204,12 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
                 setEnvVariable(key, value.str);
             }
         },
+        "icon": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _)
+        {
+            import std.path;
+            enforce(v.type == JSONType.string_ && v.str.extension == ".png", `"icon" must be a single string with a path to a .png file.`);
+            setTargetIcon(req, v.str, c);
+        },
         "workingDirectory": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){setTargetRuntimeWorkingDir(req, v.str, c);},
         "targetName": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){setTargetName(req, v.str, c);},
         "targetType": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){setTargetType(req, v.str, c);},

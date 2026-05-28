@@ -218,6 +218,7 @@ struct BuildConfiguration
     string workingDir;
     string arch;
     string targetName;
+    string targetIcon;
 
     ///When having those files, the build will use them instead of sourcePaths + sourceFiles
     @cacheExclude string[] changedBuildFiles;
@@ -344,6 +345,7 @@ struct BuildConfiguration
         ret.runtimeWorkingDir = either(other.runtimeWorkingDir, ret.runtimeWorkingDir);
         ret.targetType = either(other.targetType, ret.targetType);
         ret.targetName = either(other.targetName, ret.targetName);
+        ret.targetIcon = either(other.targetIcon, ret.targetIcon);
         ret.outputDirectory = either(other.outputDirectory, ret.outputDirectory);
         ret.isUsingDefaultSourcePaths = ret.isUsingDefaultSourcePaths && other.isUsingDefaultSourcePaths;
         ret = ret.mergeCommands(other);
