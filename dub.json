@@ -4,6 +4,7 @@
     "authors": ["Hipreme"],
     "targetPath": "build",
     "stringImportPaths": ["source"],
+    "icon": "logo.png",
     "configurations": [
         {
             "name": "cli",
@@ -38,6 +39,7 @@
         "adv_diff": {"path": "adv_diff"},
         "hipjson": "~>1.1.1",
         "d_dependencies": {"path": "d_dependencies"},
+        "arsd-official:png" : "~>12.1",
         "dub_sdl_to_json": {"path": "dub_sdl_to_json"},
         "package_suppliers": {"path": "package_suppliers"},
         "d_downloader": {"path": "d_downloader"},
