@@ -359,7 +359,8 @@ int useMain(string[] args)
     import redub.misc.dmd_install;
     JSONValue meta = getRedubMeta();
     setLogLevel(LogLevel.info);
-    if(args.length == 1)
+
+    static int errorMessage()
     {
         error("redub use requires 1 additional argument: ",
         "\n\topend <dmd|ldc>: uses the wanted opend compiler as the default",
@@ -369,6 +370,8 @@ int useMain(string[] args)
         );
         return 1;
     }
+    if(args.length == 1)
+        return errorMessage();
 
     static string tryGetCompiler(AcceptedCompiler comp, string versionOrPath, out bool useInternalCompilers)
     {
@@ -461,6 +464,8 @@ int useMain(string[] args)
         meta.data.object.remove("globalPaths");
         infos("Default redub compiler is now reset.");
     }
+    else
+        return errorMessage();
 
     if("defaultCompiler" in meta)
     {
