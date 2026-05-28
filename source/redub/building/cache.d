@@ -300,7 +300,8 @@ AdvCacheFormula getCompilationCacheFormula(const BuildRequirements req, string m
         // the compilation is finished. Solving this would require hash calculation after linking
         joiner([
             req.cfg.sourceFiles,
-            req.cfg.filesToCopy, req.cfg.extraDependencyFiles
+            req.cfg.filesToCopy, req.cfg.extraDependencyFiles,
+            [req.cfg.targetIcon]
         ]),
         existing,
         preprocessed
@@ -343,6 +344,12 @@ AdvCacheFormula getCopyCacheFormula(string mainPackHash, const BuildRequirements
     if (req.cfg.targetType.isLinkedSeparately)
         extraRequirements = req.extra.librariesFullPath.map!(
             (libPath) => getLibraryPath(libPath, req.cfg.outputDirectory, os)).array;
+
+    if (req.cfg.targetType == TargetType.executable && req.cfg.targetIcon.length)
+    {
+        if(s.os.isWindows)
+            extraRequirements~= req.cfg.targetIcon ~ ".res";
+    }
 
     return AdvCacheFormula.make(
         &hashFunction,//DO NOT use sourcePaths since importPaths is always custom + sourcePaths
