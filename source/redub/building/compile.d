@@ -209,8 +209,20 @@ CompilationResult link(ProjectNode root, string rootHash, const ThreadBuildData 
     import std.file;
     import redub.command_generators.commons;
     OS os = info.os;
-
     CompilationResult ret;
+
+    if(root.requirements.cfg.targetIcon && root.requirements.cfg.targetType == TargetType.executable)
+    {
+        import redub.misc.win_icon;
+        string err;
+        if(processIcon(root.requirements.cfg.targetIcon, err) == null)
+        {
+            ret.message~= err;
+            ret.status = 1;
+            return ret;
+        }
+    }
+
     if(!root.isCopyEnough)
     {
         string cmdFile;

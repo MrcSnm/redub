@@ -121,6 +121,12 @@ string[] parseLinkConfigurationMSVC(const ThreadBuildData data, CompilingSession
 
         cmds = mapAppendPrefix(cmds, libraryPaths, "-L/LIBPATH:", true);
         cmds~= getLinkFiles(b.sourceFiles);
+        if(data.cfg.targetIcon)
+        {
+            import std.path;
+            import std.array;
+            cmds~= data.cfg.targetIcon.withExtension(".res").array;
+        }
         cmds = mapAppend(cmds, libraries, (string l) => "-L"~stripLibraryExtension(l)~".lib");
 
     }
