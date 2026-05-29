@@ -335,7 +335,7 @@ void createSelectionsFile(ProjectNode tree)
     bool isFirst = true;
     bool[string] usedPackages;
 
-    foreach(ProjectNode node; tree.collapse)
+    foreach(ProjectNode node; tree.getCollapsedForSelections)
     {
         if(node is tree)
             continue;
@@ -946,7 +946,7 @@ string getVersionFromPackage(ref string pkg)
     return ret;
 }
 
-private string getSubPackage(ref string pkg)
+string getSubPackage(ref string pkg)
 {
     import std.algorithm.searching;
     ptrdiff_t subPackIndex = countUntil!((a => a == ':'))(pkg);

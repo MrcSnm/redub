@@ -851,12 +851,14 @@ struct ThreadBuildData
     const string[string] env;
 }
 
+
 class ProjectNode
 {
     BuildRequirements requirements;
     ProjectNode[] parent;
     ProjectNode[] dependencies;
     private ProjectNode[] collapsedRef;
+    private ProjectNode[] internalCollapsed;
     private bool shouldRebuild = false;
     private bool needsCopyOnly = false;
     private bool _isOptional = false;
@@ -1361,6 +1363,12 @@ class ProjectNode
         }
     }
 
+    ProjectNode[] getCollapsedForSelections()
+    {
+        if(internalCollapsed.length) return internalCollapsed;
+        return collapsedRef;
+    }
+
     /**
      * This function will try to build the entire project in a single compilation run
      */
@@ -1368,6 +1376,7 @@ class ProjectNode
     {
         import redub.api;
         ProjectNode[] leaves;
+        internalCollapsed = generateCollapsed();
         while(true)
         {
             leaves = findLeavesNodes();
