@@ -211,6 +211,23 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
             enforce(v.type == JSONType.array, `"icon" must be an array of paths to .png files, not `~v.type.to!string);
             setTargetIcon(req, v.strArr, c);
         },
+        "bundleConfiguration": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _)
+        {
+            import std.conv:to;
+            enforce(v.type == JSONType.object, `"bundleConfiguration" must be an object, not `~v.type.to!string);
+            JSONValue* categories = "categories" in v;
+            JSONValue* terminal = "terminal" in v;
+            if(categories)
+            {
+                enforce(categories.type == JSONType.array, `"categories" in "bundleConfiguration" must be an array of strings, not `~categories.type.to!string);
+                setBundleCategories(req, (*categories).strArr, c);
+            }
+            if(terminal)
+            {
+                enforce(terminal.type == JSONType.bool_, `"terminal" in "bundleConfiguration" must be a boolean, not `~terminal.type.to!string);
+                req.cfg.bundleConfig.usesTerminal = terminal.get!bool;
+            }
+        },
         "workingDirectory": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){setTargetRuntimeWorkingDir(req, v.str, c);},
         "targetName": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){setTargetName(req, v.str, c);},
         "targetType": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){setTargetType(req, v.str, c);},

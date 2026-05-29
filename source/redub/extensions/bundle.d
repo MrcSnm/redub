@@ -1,5 +1,8 @@
 module redub.extensions.bundle;
 import redub.api;
+enum defaultIconNameNoExt = "redub_program";
+enum defaultIconName = "redub_program.png";
+enum programIcon = import(defaultIconName);
 
 /** 
  * 
@@ -83,21 +86,28 @@ void generateAppImageBundle(string outputFolder, ref ProjectDetails d)
     string dotDesktopFile = buildNormalizedPath(folder, projectName~".desktop");
     string appRunFile = buildNormalizedPath(folder, "AppRun");
 
+    mkdirRecurse(folder);
+
 
 
     std.file.write(dotDesktopFile, getDotDesktopContent(d));
     std.file.write(appRunFile, 
 `#!/bin/sh
 HERE="$(dirname "$(readlink -f "$0")")"
-exec "$HERE/usr/bin/`~projectName~`" "$@"`);
+cd "$HERE"
+exec "./usr/bin/`~projectName~`" "$@"`);
     if(!makeFileExecutable(appRunFile))
         throw new Exception("Could not make file "~appRunFile~" executable.");
 
     if(d.tree.requirements.cfg.targetIcon.length)
         copy(d.tree.requirements.cfg.targetIcon[0], buildNormalizedPath(folder, d.tree.requirements.cfg.targetIcon[0].baseName));
+    else
+        std.file.write(buildNormalizedPath(folder, defaultIconName), programIcon);
 
 
-    auto appImageRes = execute([appImageExecutable, folder]);
+    string[string] env;
+    env["ARCH"] = getAppImageArch();
+    auto appImageRes = execute([appImageExecutable, folder], env, Config.none, size_t.max, outputFolder);
     if(appImageRes.status)
         throw new Exception("AppImage Error: "~appImageRes.output);
     
@@ -110,15 +120,29 @@ exec "$HERE/usr/bin/`~projectName~`" "$@"`);
 private string getDotDesktopContent(const ProjectDetails d)
 {
     import core.interpolation;
+    import std.algorithm.searching:canFind;
+    import std.path: baseName;
+    import std.string:join;
     import std.conv:text;
     string projectName = d.tree.name;
+    string categories = "Development";
+    string icon = defaultIconNameNoExt;
+
+    if(d.tree.requirements.cfg.bundleConfig.categories.length)
+        categories = (cast(string[])d.tree.requirements.cfg.bundleConfig.categories).join(";");
+
+    if(d.tree.requirements.cfg.targetIcon.length)
+        icon = d.tree.requirements.cfg.targetIcon[0].baseName;
+    bool usesTerminal = d.tree.requirements.cfg.bundleConfig.usesTerminal;
+    
 
 return i"[Desktop Entry]
 Type=Application
 Name=$(projectName)
 Exec=$(projectName)
-Icon=$(projectName)
-Categories=Application;
+Icon=$(icon)
+Terminal=$(usesTerminal)
+Categories=$(categories);
 ".text;
 }
 

@@ -7,7 +7,7 @@ import redub.package_searching.api;
 
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.28.2";
+enum RedubVersionOnly = "v1.28.3";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -56,6 +56,53 @@ struct CompilingSession
     {
         import redub.tooling.archiver_identification;
         return defaultArchiverFromCompiler(cfg.getCompiler(compiler).compiler, os);
+    }
+}
+
+enum BundleCategories : string
+{
+    audioVideo = "AudioVideo",
+    development = "Development",
+    education = "Education",
+    game = "Game",
+    graphics = "Graphics",
+    network = "Network",
+    office = "Office",
+    science = "Science",
+    settings = "Settings",
+    system = "System",
+    utility = "Utility",
+
+
+    webBrowser = "WebBrowser",
+    email = "Email",
+    chat = "Chat",
+    wordProcessor = "WordProcessor",
+    spreadsheet = "Spreadsheet",
+    presentation = "Presentation",
+    emulator = "Emulator",
+    strategyGame = "StrategyGame",
+    actionGame = "ActionGame",
+    ide = "IDE",
+    textEditor = "TextEditor",
+    debugger = "Debugger",
+    vectorGraphics = "VectorGraphics",
+    _2dGraphics = "2DGraphics",
+    _3dGraphics = "3DGraphics",
+    photography = "Photography",
+    terminalEmulator = "TerminalEmulator",
+    fileManager = "FileManager",
+    monitor = "Monitor"
+}
+
+struct BundleConfiguration
+{
+    BundleCategories[] categories;
+    bool usesTerminal = true;
+
+    immutable(BundleConfiguration) idup() const
+    {
+        return BundleConfiguration(categories.dup, usesTerminal);
     }
 }
 
@@ -224,6 +271,7 @@ struct BuildConfiguration
     @cacheExclude string[] changedBuildFiles;
     @excludeRoot string outputDirectory;
     @cacheExclude string runtimeWorkingDir;
+    BundleConfiguration bundleConfig;
 
     bool isDebug;
     @cacheExclude BuildConfigurationFlags flags = BuildConfigurationFlags.defaultInit;
@@ -308,6 +356,10 @@ struct BuildConfiguration
         {
             static if(is(typeof(ret.tupleof[i]) == string[]) || is(typeof(ret.tupleof[i]) == string[][]))
                 ret.tupleof[i] = cast(typeof(ret.tupleof[i]))this.tupleof[i].dup;
+            else static if(is(typeof(ret.tupleof[i]) == BundleConfiguration))
+            {
+                ret.tupleof[i] = cast(BundleConfiguration)this.tupleof[i].idup;
+            }
             else static if(is(typeof(ret.tupleof[i]) == PluginExecution[]))
             {
                 ret.tupleof[i] = cast(PluginExecution[])this.tupleof[i].map!((const PluginExecution p) => p.idup).array;

@@ -74,6 +74,25 @@ void setTargetIcon(ref BuildRequirements req, JSONStringArray files, ParseConfig
         enforce(f.extension == ".png", "Icon in path "~f~" must be a path to a .png file.");
     req.cfg.targetIcon.exclusiveMerge(files);
 }
+void setBundleCategories(ref BuildRequirements req, JSONStringArray categories, ParseConfig c)
+{
+    import redub.api;
+    import std.array:join;
+    JSONStringArray arr = categories.save();
+    next: foreach(string v; arr)
+    {
+        foreach(cat; __traits(allMembers, BundleCategories))
+        {
+            if(v == cat)
+                continue next;
+        }
+        throw new RedubException("Invalid bundle category "~v~". Valid categories are: \n\t"~[__traits(allMembers, BundleCategories)].join("\n\t"));
+    }
+    string[] categoriesStr = cast(string[])req.cfg.bundleConfig.categories;
+    exclusiveMerge(categoriesStr, categories);
+    req.cfg.bundleConfig.categories = cast(BundleCategories[])categoriesStr;
+    
+}
 void addImportPaths(ref BuildRequirements req, JSONStringArray paths, ParseConfig c){req.cfg.importDirectories.exclusiveMergePaths(paths);}
 void addStringImportPaths(ref BuildRequirements req, JSONStringArray paths, ParseConfig c){req.cfg.stringImportPaths.exclusiveMergePaths(paths);}
 void addExtraDependencyFiles(ref BuildRequirements req, JSONStringArray files, ParseConfig c){req.cfg.extraDependencyFiles.exclusiveMerge(files);}
