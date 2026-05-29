@@ -17,6 +17,7 @@ Those are the additions I've made over dub
 - [**Redub Plugins**](#redub-plugins) - Alternative to rdmd. Execute arbitrary D code in the build steps.
 - [**Multi Language**](#multi-language) - Compile a C project together and include it on the linking step
 - [**Executable Icons**](#redub-executable-icons) - Include an icon in your .exe by simply defining the images on your recipe. 
+- [**MacOS Bundle**](#macos-bundle) - Redub can also generate .app for your macOS builds.
 - [**Library API**](#using-its-library-api) - Integrate redub directly in your application
 - **Watching Directories** - `redub watch`- Builds dependents automatically on changes. Add  `--run` to run the program after building.
 - **MacOS Universal Builds** - `redub build-universal` - Generates a single binary containing arm64 and x86_64 architectures on MacOS
@@ -99,6 +100,11 @@ Specify one or more .png paths to your icon (only .png is supported), and it wil
 ```
 The first icon path is where redub will output the .res
 
+## MacOS Bundle
+
+- **1.28.0**: Added --bundle support
+
+This feature was first supposed to add icons to apple applications, but macOS relies on you distributing bundles. You can use the icons in the same way mentioned above. Just use `redub build --bundle` and it will generate a complete macOS bundle for you instead of the raw terminal one.
 
 ## Multi language
 
