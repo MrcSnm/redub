@@ -402,6 +402,7 @@ struct BuildConfiguration
         ret.isUsingDefaultSourcePaths = ret.isUsingDefaultSourcePaths && other.isUsingDefaultSourcePaths;
         ret = ret.mergeCommands(other);
         ret.flags = other.flags;
+        ret = ret.mergeBundleConfiguration(other);
         ret.extraDependencyFiles.exclusiveMergePaths(other.extraDependencyFiles);
         ret.filesToCopy.exclusiveMergePaths(other.filesToCopy);
         ret.stringImportPaths.exclusiveMergePaths(other.stringImportPaths);
@@ -490,6 +491,16 @@ struct BuildConfiguration
     {
         BuildConfiguration ret = clone;
         ret.dFlags.exclusiveMerge(other.dFlags);
+        return ret;
+    }
+    BuildConfiguration mergeBundleConfiguration(const ref BuildConfiguration other) const
+    {
+        BuildConfiguration ret = clone;
+        string[] categories = cast(string[])ret.bundleConfig.categories;
+        exclusiveMerge(categories, cast(string[])other.bundleConfig.categories);
+        ret.bundleConfig.categories = cast(BundleCategories[])categories;
+        if(!other.bundleConfig.usesTerminal)
+            ret.bundleConfig.usesTerminal = false;
         return ret;
     }
 
