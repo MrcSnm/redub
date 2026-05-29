@@ -163,5 +163,14 @@ string processIcon(string[] filenames, out string errors)
 string getWindowsResourceName(const string[] iconPaths)
 {
     import std.array:join;
-    return join(iconPaths, ",")~".res";
+    import std.path;
+    enum separator = ",";
+    if(iconPaths.length > 1)
+    {
+        string ret = iconPaths[0];
+        for(int i = 1; i < iconPaths.length; i++)
+            ret~= separator~iconPaths[i].baseName;
+        return ret~".res";
+    }
+    return join(iconPaths, separator)~".res";
 }

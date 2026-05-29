@@ -16,6 +16,7 @@ Those are the additions I've made over dub
 - [**Compiler Management**](#compiler-management) - Support to change default compiler and install on command line
 - [**Redub Plugins**](#redub-plugins) - Alternative to rdmd. Execute arbitrary D code in the build steps.
 - [**Multi Language**](#multi-language) - Compile a C project together and include it on the linking step
+- [**Executable Icons**](#redub-executable-icons) - Include an icon in your .exe by simply defining the images on your recipe. 
 - [**Library API**](#using-its-library-api) - Integrate redub directly in your application
 - **Watching Directories** - `redub watch`- Builds dependents automatically on changes. Add  `--run` to run the program after building.
 - **MacOS Universal Builds** - `redub build-universal` - Generates a single binary containing arm64 and x86_64 architectures on MacOS
@@ -57,16 +58,6 @@ For using it, on the JSON, you **must** specify first the plugins that are usabl
 }
 ```
 
-## Redub Executable Icons
-
-Redub started supporting Windows executable icons since **v1.27.4**
-Specify one or more .png paths to your icon (only .png is supported), and it will be the icon of your project. This feature is already in use on redub itself.
-```json
-"icon": [
-  "logo.png"
-]
-```
-
 That line will both build that project and load it inside the registered plugins (That means the same name can't be specified twice)
 
 The path may be either a .d module or a dub project
@@ -94,6 +85,20 @@ For using it on prebuild, you simply specify the module and its arguments:
 **Useful links regarding plugins:**
 - [**GetModule plugin**](./plugins/getmodules/source/getmodules.d)
 - [**Example Usage**](./tests/plugin_test/dub.json)
+
+## Redub Executable Icons
+
+- **v1.27.4**: Added Windows support
+
+Specify one or more .png paths to your icon (only .png is supported), and it will be the icon of your project. This feature is already in use on redub itself.
+```json
+"icon": [
+  "logo.png",
+  "logo16.png"
+]
+```
+The first icon path is where redub will output the .res
+
 
 ## Multi language
 
