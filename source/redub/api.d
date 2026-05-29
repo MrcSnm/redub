@@ -21,7 +21,7 @@ struct ProjectDetails
     int externalErrorCode = int.min;
     bool forceRebuild;
     bool bCreateSelections = true;
-    bool generateMacBundle = false;
+    BundleType bundle = BundleType.none;
     bool bundleGenerated = false;
 
     bool error() const {return this == ProjectDetails.init; }
@@ -125,7 +125,7 @@ struct ArgsDetails
 struct ResolveInfo
 {
     bool force;
-    bool generateBundleOnBuild;
+    BundleType bundle;
 
     static fromArgs(const ArgsDetails args)
     {
@@ -413,12 +413,23 @@ ProjectDetails buildProject(ProjectDetails d)
         createSelectionsFile(tree);
     if(d.useExistingObjFiles)
         tree.requirements.cfg.changedBuildFiles = getChangedBuildFiles(tree, session);
-    if(d.generateMacBundle)
+    if(d.bundle != BundleType.none)
     {
         import redub.extensions.bundle;
-        string folder = prepareForMacOSBundleGen(d);
-        if(!d.bundleGenerated)
-            generateMacOSBundle(folder, d);
+        switch(d.bundle)
+        {
+            case BundleType.macos: 
+                string folder = prepareForMacOSBundleGen(d);
+                if(!d.bundleGenerated)
+                    generateMacOSBundle(folder, d);
+                break;
+            case BundleType.linux: 
+                string folder = prepareForAppImageBundle(d);
+                if(!d.bundleGenerated)
+                    generateAppImageBundle(folder, d);
+                break;
+            default: throw new RedubException("Unknown bug occurred.");
+        }
     }
     ///TODO: Might be reactivated if that issue shows again.
     // int uses = tree.isUsingGnuLinker();
@@ -799,7 +810,7 @@ ProjectDetails resolveDependencies(
     import redub.package_searching.dub;
     import std.conv:to;
     ProjectDetails ret = ProjectDetails(tree, compiler, cDetails.parallelType, cDetails, cDetails.useExistingObj, false, 0, resolveInfo.force);
-    ret.generateMacBundle = resolveInfo.generateBundleOnBuild;
+    ret.bundle = resolveInfo.bundle;
 
     foreach(pkg; fetchedPackages)
     {

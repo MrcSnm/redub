@@ -48,6 +48,80 @@ void generateMacOSBundle(string outputFolder, ref ProjectDetails d)
     d.bundleGenerated = true;
 }
 
+
+/** 
+ * Params:
+ *   d = The project details.
+ * Returns: The old output path for building the path inside generateMacOSBundle.
+ */
+string prepareForAppImageBundle(ref ProjectDetails d)
+{
+    import redub.misc.path;
+    string folder = d.tree.getOutputPath();
+    d.tree.requirements.cfg.outputDirectory = buildNormalizedPath(folder, d.tree.name~".AppDir", "usr", "bin");
+    return folder;
+}
+
+void generateAppImageBundle(string outputFolder, ref ProjectDetails d)
+{
+    import redub.misc.make_file_executable;
+    import redub.misc.path;
+    import redub.misc.app_image;
+    import std.process;
+    import std.file;
+    import std.path:baseName;
+
+    string projectName = d.tree.name;
+
+    string appImageExecutable = getAppImageExecutablePath();
+    if(!exists(appImageExecutable))
+    {
+        if(!installAppImage())
+            throw new RedubException("Could not install AppImage for generating linux bundle.");
+    }
+    string folder = buildNormalizedPath(outputFolder, projectName~".AppDir");
+    string dotDesktopFile = buildNormalizedPath(folder, projectName~".desktop");
+    string appRunFile = buildNormalizedPath(folder, "AppRun");
+
+
+
+    std.file.write(dotDesktopFile, getDotDesktopContent(d));
+    std.file.write(appRunFile, 
+`#!/bin/sh
+HERE="$(dirname "$(readlink -f "$0")")"
+exec "$HERE/usr/bin/`~projectName~`" "$@"`);
+    if(!makeFileExecutable(appRunFile))
+        throw new Exception("Could not make file "~appRunFile~" executable.");
+
+    if(d.tree.requirements.cfg.targetIcon.length)
+        copy(d.tree.requirements.cfg.targetIcon[0], buildNormalizedPath(folder, d.tree.requirements.cfg.targetIcon[0].baseName));
+
+
+    auto appImageRes = execute([appImageExecutable, folder]);
+    if(appImageRes.status)
+        throw new Exception("AppImage Error: "~appImageRes.output);
+    
+
+    string appImage = buildNormalizedPath(outputFolder, projectName~"-"~getAppImageArch~".AppImage");
+    if(!makeFileExecutable(appImage))
+        throw new Exception("Could not make file "~appImage~" executable.");
+}
+
+private string getDotDesktopContent(const ProjectDetails d)
+{
+    import core.interpolation;
+    import std.conv:text;
+    string projectName = d.tree.name;
+
+return i"[Desktop Entry]
+Type=Application
+Name=$(projectName)
+Exec=$(projectName)
+Icon=$(projectName)
+Categories=Application;
+".text;
+}
+
 private string getInfoPlist(const ProjectDetails d)
 {
     import std.conv:text;

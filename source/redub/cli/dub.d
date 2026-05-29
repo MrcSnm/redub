@@ -40,6 +40,13 @@ enum Color
     never = "never"
 }
 
+enum BundleType
+{
+    none,
+    macos,
+    linux
+}
+
 struct DubCommonArguments
 {
     @("Path to operate in instead of the current working dir")
@@ -204,9 +211,9 @@ struct DubArguments
     @("[Experimental] Filter version identifiers and debug version identifiers to improve build cache efficiency.")
     string[] filterVersions;
 
-    @("Generates a bundle. Currently only macOS bundle is generated")
+    @("Generates a bundle. Supported bundle types: none|macos|linux")
     @("bundle")
-    bool bundle;
+    BundleType bundle = BundleType.none;
 
 
     @("If a dub.selections.json is present, all non-path based packages are prefetched. Best for action runners.")
