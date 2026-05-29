@@ -204,6 +204,10 @@ struct DubArguments
     @("[Experimental] Filter version identifiers and debug version identifiers to improve build cache efficiency.")
     string[] filterVersions;
 
+    @("Generates a bundle. Currently only macOS bundle is generated")
+    @("bundle")
+    bool bundle;
+
 
     @("If a dub.selections.json is present, all non-path based packages are prefetched. Best for action runners.")
     bool prefetch;

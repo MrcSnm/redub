@@ -21,6 +21,8 @@ struct ProjectDetails
     int externalErrorCode = int.min;
     bool forceRebuild;
     bool bCreateSelections = true;
+    bool generateMacBundle = false;
+    bool bundleGenerated = false;
 
     bool error() const {return this == ProjectDetails.init; }
 
@@ -116,6 +118,19 @@ struct ArgsDetails
     ProjectToParse proj;
     InitialDubVariables dubVars;
     string buildType;
+
+    ResolveInfo resolveInfo() const { return ResolveInfo.fromArgs(this); }
+}
+
+struct ResolveInfo
+{
+    bool force;
+    bool generateBundleOnBuild;
+
+    static fromArgs(const ArgsDetails args)
+    {
+        return ResolveInfo(args.args.build.force, args.args.bundle);
+    }
 }
 
 
@@ -266,7 +281,7 @@ void main()
         import redub.package_searching.api;
         import std.stdio;
         PackageInfo pkg = getPackage(projectType~":init-exec", null, null, "user's "~userName~" 'redub init -t' command");
-        ProjectDetails d = resolveDependencies(false, std.system.os, CompilationDetails.init, ProjectToParse(null, pkg.path, pkg.subPackage));
+        ProjectDetails d = resolveDependencies(ResolveInfo.init, std.system.os, CompilationDetails.init, ProjectToParse(null, pkg.path, pkg.subPackage));
         dependencies = `
     "dependencies": {`~ "\n\t\t\t\"" ~ pkg.packageName ~ `": `;
         if(!pkg.bestVersion.isMatchAll)
@@ -398,6 +413,13 @@ ProjectDetails buildProject(ProjectDetails d)
         createSelectionsFile(tree);
     if(d.useExistingObjFiles)
         tree.requirements.cfg.changedBuildFiles = getChangedBuildFiles(tree, session);
+    if(d.generateMacBundle)
+    {
+        import redub.extensions.bundle;
+        string folder = prepareForMacOSBundleGen(d);
+        if(!d.bundleGenerated)
+            generateMacOSBundle(folder, d);
+    }
     ///TODO: Might be reactivated if that issue shows again.
     // int uses = tree.isUsingGnuLinker();
     // if(uses != -1)
@@ -454,14 +476,20 @@ ProjectDetails[] buildProjectUniversal(ArgsDetails args)
 
         string[] lipoRun = ["lipo", "-create"];
         string oldTargetName;
+        bool bundleGenerated = false;
+
         foreach(arch; archs)
         {
             other.cDetails.arch = arch;
-            ProjectDetails d = resolveDependencies(other.args.build.force, os, other.cDetails, other.proj, other.dubVars, other.buildType);
+            ProjectDetails d = resolveDependencies(args.resolveInfo(), os, other.cDetails, other.proj, other.dubVars, other.buildType);
+            d.bundleGenerated = bundleGenerated;
+
             if(!oldTargetName)
                 oldTargetName = d.tree.requirements.cfg.targetName;
             d.tree.requirements.cfg.targetName~= "-"~arch;
             d = buildProject(d);
+            if(d.bundleGenerated)
+                bundleGenerated = true;
             ret~= d;
             lipoRun~= d.getOutputFile();
         }
@@ -484,7 +512,7 @@ ProjectDetails[] buildProjectUniversal(ArgsDetails args)
     }
     else
     {
-        ProjectDetails d = resolveDependencies(args.args.build.force, os, args.cDetails, args.proj, args.dubVars, args.buildType);
+        ProjectDetails d = resolveDependencies(args.resolveInfo(), os, args.cDetails, args.proj, args.dubVars, args.buildType);
         return [buildProject(d)];
     }
 }
@@ -680,7 +708,7 @@ ArgsDetails resolveArguments(string[] args, bool isDescribeOnly = false)
  * Returns: Completely resolved project, with all its necessary flags and paths, but still, the directory will be iterated during compilation to search for source files.
  */
 ProjectDetails resolveDependencies(
-    bool invalidateCache,
+    ResolveInfo resolveInfo,
     const OS os = std.system.os,
     CompilationDetails cDetails = CompilationDetails.init,
     ProjectToParse proj = ProjectToParse.init,
@@ -713,7 +741,7 @@ ProjectDetails resolveDependencies(
         DC_BASE = either(DC_BASE, compiler.d.bin);
         DUB_ARCH = either(DUB_ARCH, cDetails.arch, isaFromArch(cDetails.arch).to!string);
         DUB_PLATFORM = either(DUB_PLATFORM, redub.parsers.environment.str(os));
-        DUB_FORCE = either(DUB_FORCE, redub.parsers.environment.str(invalidateCache));
+        DUB_FORCE = either(DUB_FORCE, redub.parsers.environment.str(resolveInfo.force));
     }
     redub.parsers.environment.setupBuildEnvironmentVariables(dubVars);
     CompilationInfo cInfo = CompilationInfo(compiler.d.getCompilerString, compiler.c.getCompilerString, cDetails.arch, osFromArch(cDetails.arch), isaFromArch(cDetails.arch), compiler.d.bin);
@@ -770,7 +798,8 @@ ProjectDetails resolveDependencies(
     import redub.libs.colorize;
     import redub.package_searching.dub;
     import std.conv:to;
-    ProjectDetails ret = ProjectDetails(tree, compiler, cDetails.parallelType, cDetails, cDetails.useExistingObj, false, 0, invalidateCache);
+    ProjectDetails ret = ProjectDetails(tree, compiler, cDetails.parallelType, cDetails, cDetails.useExistingObj, false, 0, resolveInfo.force);
+    ret.generateMacBundle = resolveInfo.generateBundleOnBuild;
 
     foreach(pkg; fetchedPackages)
     {

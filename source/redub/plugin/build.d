@@ -130,7 +130,7 @@ void buildPluginProject(string pluginDir, CompilationInfo cInfo)
     else
         enum preferredCompiler = "dmd";
 
-    ProjectDetails pluginDetails = resolveDependencies(false, os, CompilationDetails(preferredCompiler, includeEnvironmentVariables: false), ProjectToParse(null, pluginDir));
+    ProjectDetails pluginDetails = resolveDependencies(ResolveInfo.init, os, CompilationDetails(preferredCompiler, includeEnvironmentVariables: false), ProjectToParse(null, pluginDir));
     if(!pluginDetails.tree)
         throw new Exception("Could not build plugin at path "~pluginDir);
 

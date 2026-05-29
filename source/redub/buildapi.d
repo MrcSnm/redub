@@ -7,7 +7,7 @@ import redub.package_searching.api;
 
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.27.4";
+enum RedubVersionOnly = "v1.28.0";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -875,6 +875,11 @@ class ProjectNode
     string getOutputName(OS targetOS, ISA isa = instructionSetArchitecture) const
     {
         return getOutputName(requirements.cfg.targetType, targetOS, isa);
+    }
+
+    string getOutputPath() const
+    {
+        return requirements.cfg.outputDirectory;
     }
 
     string getOutputName(TargetType targetType, OS targetOS, ISA isa = instructionSetArchitecture) const
