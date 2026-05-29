@@ -4,7 +4,7 @@
     "authors": ["Hipreme"],
     "targetPath": "build",
     "stringImportPaths": ["source"],
-    "icon": ["logo.png"],
+    "icon": ["logo.png", "logo16.png"],
     "configurations": [
         {
             "name": "cli",
