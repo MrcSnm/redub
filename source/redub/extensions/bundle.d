@@ -67,12 +67,28 @@ private string getInfoPlist(const ProjectDetails d)
         host = environment["COMPUTERNAME"].dup;
     }
     else version(Posix)
-    {
         user = environment["USER"].dup;
-        host = environment["HOSTNAME"].dup;
+    version(linux)
+    {
+        foreach(v; ["HOSTNAME", "HOST"])
+        {
+            if(v in environment)
+            {
+                host = environment[v].dup;
+                if(host.length) break;
+            }
+        }
     }
-    version(OSX)
-        host = environment["HOST"].dup;
+    else version(OSX)
+    {
+        import std.process:execute;
+        import std.string:chomp;
+        import std.array:join;
+        auto result = execute(["hostname", "-s"]);
+        if(result.status)
+            throw new Exception(`Could not get hostname with "hostname -s"`);
+        host = result.output.chomp.dup;
+    }
 
     toLowerInPlace(host);
     toLowerInPlace(user);

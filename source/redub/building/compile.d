@@ -211,7 +211,7 @@ CompilationResult link(ProjectNode root, string rootHash, const ThreadBuildData 
     OS os = info.os;
     CompilationResult ret;
 
-    if(root.requirements.cfg.targetIcon && root.requirements.cfg.targetType == TargetType.executable)
+    if(root.requirements.cfg.targetIcon && root.requirements.cfg.targetType == TargetType.executable && info.os.isWindows)
     {
         import redub.misc.win_icon;
         string err;
