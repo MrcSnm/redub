@@ -107,7 +107,7 @@ The first icon path is where redub will output the .res
 This feature was first supposed to add icons to apple applications, but macOS relies on you distributing bundles. You can use the icons in the same way mentioned above. Just use `redub build --bundle=macos` and it will generate a complete macOS bundle for you instead of the raw terminal one.
 
 ## Linux AppImages
-- **v1.28.3** -- Added --bundle=linux support
+- **v1.28.2** -- Added --bundle=linux support
 
 This feature provides building AppImages to Linux. This is only supported running on linux, if no icon is provided, it will use the following icon:
 

@@ -78,15 +78,24 @@ void setBundleCategories(ref BuildRequirements req, JSONStringArray categories, 
 {
     import redub.api;
     import std.array:join;
+    import std.traits:EnumMembers;
+
     JSONStringArray arr = categories.save();
     next: foreach(string v; arr)
     {
         foreach(cat; __traits(allMembers, BundleCategories))
         {
-            if(v == cat)
+            if(v == __traits(getMember, BundleCategories, cat))
                 continue next;
         }
-        throw new RedubException("Invalid bundle category "~v~". Valid categories are: \n\t"~[__traits(allMembers, BundleCategories)].join("\n\t"));
+
+        BundleCategories[] members = [EnumMembers!BundleCategories];
+        string[] membersStr = cast(string[])members;
+
+
+        throw new RedubException(
+            "Invalid bundle category "~v~". Valid categories are: \n\t"~membersStr.join("\n\t")
+        );
     }
     string[] categoriesStr = cast(string[])req.cfg.bundleConfig.categories;
     exclusiveMerge(categoriesStr, categories);
