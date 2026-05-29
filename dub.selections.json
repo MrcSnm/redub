@@ -5,7 +5,7 @@
 		"hipjson": "1.1.1",
 		"d-segmented-hashmap": "1.1.0",
 		"murmurhash-d": "1.0.0",
-		"intel-intrinsics": "1.12.2",
+		"intel-intrinsics": "1.12.3",
 		"arsd-official": "12.1.0",
 		"colorize":  {"path": "colorize"},
 		"d_dependencies":  {"path": "d_dependencies"},

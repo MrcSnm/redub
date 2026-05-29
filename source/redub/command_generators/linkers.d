@@ -123,9 +123,8 @@ string[] parseLinkConfigurationMSVC(const ThreadBuildData data, CompilingSession
         cmds~= getLinkFiles(b.sourceFiles);
         if(data.cfg.targetIcon)
         {
-            import std.path;
-            import std.array;
-            cmds~= data.cfg.targetIcon.withExtension(".res").array;
+            import redub.misc.win_icon;
+            cmds~= getWindowsResourceName(data.cfg.targetIcon);
         }
         cmds = mapAppend(cmds, libraries, (string l) => "-L"~stripLibraryExtension(l)~".lib");
 

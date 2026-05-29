@@ -143,6 +143,7 @@ private void partiallyFinishBuildRequirements(ref BuildRequirements req, BuildCo
         &req.cfg.excludeSourceFiles,
         &req.cfg.sourceFiles,
         &req.cfg.filesToCopy,
+        &req.cfg.targetIcon
     ];
 
     foreach(arr; toAbsolutize)

@@ -206,9 +206,10 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
         },
         "icon": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _)
         {
+            import std.conv:to;
             import std.path;
-            enforce(v.type == JSONType.string_ && v.str.extension == ".png", `"icon" must be a single string with a path to a .png file.`);
-            setTargetIcon(req, v.str, c);
+            enforce(v.type == JSONType.array, `"icon" must be an array of paths to .png files, not `~v.type.to!string);
+            setTargetIcon(req, v.strArr, c);
         },
         "workingDirectory": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){setTargetRuntimeWorkingDir(req, v.str, c);},
         "targetName": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){setTargetName(req, v.str, c);},

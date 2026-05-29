@@ -377,7 +377,19 @@ string[] getExpectedArtifacts(const BuildRequirements req, OS targetOS, ISA isa)
     ///This library will enter on the cache formula
     if(targetOS.isWindows && req.cfg.targetType == TargetType.dynamicLibrary)
         ret ~= getOutputPath(req.cfg, TargetType.staticLibrary, targetOS, isa);
+    
+    string resName = getResourceName(req, targetOS);
+    if(resName.length)
+        ret~= resName;
     return ret;
+}
+
+string getResourceName(const BuildRequirements req, OS targetOS)
+{
+    if(!targetOS.isWindows || req.cfg.targetIcon.length == 0)
+        return null;
+    import redub.misc.win_icon;
+    return getWindowsResourceName(req.cfg.targetIcon);
 }
 
 

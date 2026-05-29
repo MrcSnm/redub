@@ -57,6 +57,16 @@ For using it, on the JSON, you **must** specify first the plugins that are usabl
 }
 ```
 
+## Redub Executable Icons
+
+Redub started supporting Windows executable icons since **v1.27.4**
+Specify one or more .png paths to your icon (only .png is supported), and it will be the icon of your project. This feature is already in use on redub itself.
+```json
+"icon": [
+  "logo.png"
+]
+```
+
 That line will both build that project and load it inside the registered plugins (That means the same name can't be specified twice)
 
 The path may be either a .d module or a dub project

@@ -3,7 +3,7 @@ module redub.misc.win_icon;
 /**
 *   Courtesy from Adam D. Ruppe and OpenD: https://github.com/opendlang/opend/blob/master/opend/opend.d#L300
 */
-string processIcon(string filenames, out string errors)
+string processIcon(string[] filenames, out string errors)
 {
     // FIXME: error if target is not windows prolly here instead of in the compiler
     // https://devblogs.microsoft.com/oldnewthing/20120720-00/?p=7083
@@ -29,8 +29,7 @@ string processIcon(string filenames, out string errors)
     }
     Ico[] icos;
 
-    foreach(filename; filenames.split(",")) {
-        auto idx = lastIndexOf(filename, ".");
+    foreach(filename; filenames) {
         static import std.file;
         import arsd.png;
         Ico ico;
@@ -155,7 +154,14 @@ string processIcon(string filenames, out string errors)
     while(resBytes.length % 4)
         resBytes ~= 0; // pad to DWORD boundary
 
-    auto resName = filenames ~ ".res";
+    auto resName = getWindowsResourceName(filenames);
     std.file.write(resName, resBytes);
     return resName;
+}
+
+
+string getWindowsResourceName(const string[] iconPaths)
+{
+    import std.array:join;
+    return join(iconPaths, ",")~".res";
 }
