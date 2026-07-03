@@ -8,6 +8,7 @@ public import redub.parsers.environment;
 public import std.system;
 public import redub.buildapi;
 public import redub.tooling.compiler_identification;
+import d_depedencies;
 
 struct ProjectDetails
 {
@@ -15,6 +16,8 @@ struct ProjectDetails
     Compiler compiler;
     ParallelType parallelType;
     CompilationDetails cDetails;
+    ProjectToParse targetProject;
+
     bool useExistingObjFiles;
     ///Makes the return code 0 for when using print commands.
     bool printOnly;
@@ -69,6 +72,17 @@ struct ProjectDetails
  */
 struct CompilationDetails
 {
+    OS targetOS()
+    {
+        import redub.command_generators.commons;
+        return osFromArch(arch);
+    }
+    ISA isa()
+    {
+        import redub.command_generators.commons;
+        return isaFromArch(arch);
+    }
+
     ///This is the only required member of this struct. Must be a path to compiler or a compiler in the global context, i.e: `dmd`
     string compilerOrPath;
     ///Must be a path to compiler or a compiler in the global context, i.e: `gcc`
@@ -215,6 +229,26 @@ string[] getChangedBuildFiles(ProjectNode root, CompilingSession s)
     return buildFiles;
 }
 
+ModuleParsing getModulesDependencies(ProjectDetails d)
+{
+    import std.file;
+    import redub.command_generators.commons;
+    setLogLevel(LogLevel.none);
+	ProjectDetails depsOnly = resolveDependencies(
+		ResolveInfo.init,
+        d.cDetails,
+        d.targetProject,
+		InitialDubVariables.init,
+		BuildType.depsCheck
+	);
+    depsOnly = buildProject(depsOnly);
+    string depsPath = getDepsFilePath(depsOnly.tree, CompilingSession(d.compiler, d.cDetails.targetOS, d.cDetails.isa));
+    if(!exists(depsPath))
+        return null;
+
+    return parseDependencies(std.file.readText(depsPath));
+}
+
 int createNewProject(string projectType, string  single, string targetDirectory)
 {
     import redub.misc.username;
@@ -281,7 +315,7 @@ void main()
         import redub.package_searching.api;
         import std.stdio;
         PackageInfo pkg = getPackage(projectType~":init-exec", null, null, "user's "~userName~" 'redub init -t' command");
-        ProjectDetails d = resolveDependencies(ResolveInfo.init, std.system.os, CompilationDetails.init, ProjectToParse(null, pkg.path, pkg.subPackage));
+        ProjectDetails d = resolveDependencies(ResolveInfo.init, CompilationDetails.init, ProjectToParse(null, pkg.path, pkg.subPackage));
         dependencies = `
     "dependencies": {`~ "\n\t\t\t\"" ~ pkg.packageName ~ `": `;
         if(!pkg.bestVersion.isMatchAll)
@@ -492,7 +526,7 @@ ProjectDetails[] buildProjectUniversal(ArgsDetails args)
         foreach(arch; archs)
         {
             other.cDetails.arch = arch;
-            ProjectDetails d = resolveDependencies(args.resolveInfo(), os, other.cDetails, other.proj, other.dubVars, other.buildType);
+            ProjectDetails d = resolveDependencies(args.resolveInfo(), other.cDetails, other.proj, other.dubVars, other.buildType);
             d.bundleGenerated = bundleGenerated;
 
             if(!oldTargetName)
@@ -523,7 +557,7 @@ ProjectDetails[] buildProjectUniversal(ArgsDetails args)
     }
     else
     {
-        ProjectDetails d = resolveDependencies(args.resolveInfo(), os, args.cDetails, args.proj, args.dubVars, args.buildType);
+        ProjectDetails d = resolveDependencies(args.resolveInfo(), args.cDetails, args.proj, args.dubVars, args.buildType);
         return [buildProject(d)];
     }
 }
@@ -720,7 +754,6 @@ ArgsDetails resolveArguments(string[] args, bool isDescribeOnly = false)
  */
 ProjectDetails resolveDependencies(
     ResolveInfo resolveInfo,
-    const OS os = std.system.os,
     CompilationDetails cDetails = CompilationDetails.init,
     ProjectToParse proj = ProjectToParse.init,
     InitialDubVariables dubVars = InitialDubVariables.init,
@@ -751,7 +784,7 @@ ProjectDetails resolveDependencies(
         DC = either(DC, compiler.d.bin);
         DC_BASE = either(DC_BASE, compiler.d.bin);
         DUB_ARCH = either(DUB_ARCH, cDetails.arch, isaFromArch(cDetails.arch).to!string);
-        DUB_PLATFORM = either(DUB_PLATFORM, redub.parsers.environment.str(os));
+        DUB_PLATFORM = either(DUB_PLATFORM, redub.parsers.environment.str(cDetails.targetOS));
         DUB_FORCE = either(DUB_FORCE, redub.parsers.environment.str(resolveInfo.force));
     }
     redub.parsers.environment.setupBuildEnvironmentVariables(dubVars);
@@ -809,7 +842,7 @@ ProjectDetails resolveDependencies(
     import redub.libs.colorize;
     import redub.package_searching.dub;
     import std.conv:to;
-    ProjectDetails ret = ProjectDetails(tree, compiler, cDetails.parallelType, cDetails, cDetails.useExistingObj, false, 0, resolveInfo.force);
+    ProjectDetails ret = ProjectDetails(tree, compiler, cDetails.parallelType, cDetails, proj, cDetails.useExistingObj, false, 0, resolveInfo.force);
     ret.bundle = resolveInfo.bundle;
 
     foreach(pkg; fetchedPackages)

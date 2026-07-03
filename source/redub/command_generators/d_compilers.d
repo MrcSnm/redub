@@ -13,13 +13,17 @@ string[] parseBuildConfiguration(const BuildConfiguration b, CompilingSession s,
 
 
     string[] cmds = [mapper(ValidDFlags.enableColor)];
-    string preserve = mapper(ValidDFlags.preserveNames);
-    if(preserve) cmds ~= preserve;
     with(b)
     {
+        if(preservePath)
+        {
+            string preserve = mapper(ValidDFlags.preserveNames);
+            if(preserve) cmds ~= preserve;
+        }
         if(isDebug) cmds~= "-debug";
         if(compilerVerbose) cmds~= mapper(ValidDFlags.verbose);
         if(compilerVerboseCodeGen) cmds~= mapper(ValidDFlags.verboseCodeGen);
+        if(syntaxOnly) cmds~= mapper(ValidDFlags.syntaxOnly);
 
 
         string cacheDir = getCacheOutputDir(mainPackhash, b, s, isRoot);

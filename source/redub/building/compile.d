@@ -172,11 +172,11 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
                 res.compilationCommand~= "\n\nArchiving: \n\t"~cmd;
             }
 
-            if(!ret.status)
+            if(!ret.status && !data.cfg.syntaxOnly)
                 copyDir(inDir, dirName(outDir));
 
             ///Shared Library(mostly?)
-            if(!ret.status && isDCompiler(c) && isLinkedSeparately(data.cfg.targetType) && !pack.isRoot)
+            if(!ret.status && isDCompiler(c) && isLinkedSeparately(data.cfg.targetType) && !pack.isRoot && !data.cfg.syntaxOnly)
             {
                 CompilationResult linkRes = link(cast()pack, hash.requirementHash, data, info);
                 ret.status = linkRes.status;
@@ -334,6 +334,8 @@ bool buildProjectParallelSimple(ProjectNode root, CompilingSession s, const(AdvC
                 break;
         }
     }
+    if(root.requirements.cfg.syntaxOnly)
+        return true;
     return doLink(root, s, mainPackHash, &formulaCache, env, existingSharedFormula) && copyFiles(root);
 }
 
@@ -471,6 +473,8 @@ bool buildProjectFullyParallelized(ProjectNode root, CompilingSession s, const(A
         }
         return false;
     }
+    if(root.requirements.cfg.syntaxOnly)
+        return true;
     return doLink(root, s, mainPackHash, &formulaCache, env, existingSharedFormula) && copyFiles(root);
 }
 
@@ -530,6 +534,8 @@ bool buildProjectSingleThread(ProjectNode root, CompilingSession s, const(AdvCac
             break;
     }
     runningProcesses.clear();
+    if(root.requirements.cfg.syntaxOnly)
+        return true;
     return doLink(root, s, mainPackHash, null, env, existingSharedFormula) && copyFiles(root);
 }
 

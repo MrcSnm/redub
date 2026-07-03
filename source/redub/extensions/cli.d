@@ -21,7 +21,6 @@ ProjectDetails resolveDependencies(string[] args, bool isDescribeOnly = false)
 
     ProjectDetails ret =  redub.api.resolveDependencies(
         ResolveInfo(argsD.args.build.force, argsD.args.bundle),
-        os,
         argsD.cDetails,
         argsD.proj,
         argsD.dubVars,

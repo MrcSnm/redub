@@ -37,7 +37,7 @@
         "semver": {"path": "semver"},
         "colorize": {"path": "colorize"},
         "adv_diff": {"path": "adv_diff"},
-        "hipjson": "~>1.1.1",
+        "hipjson": "~>1.1.2",
         "d_dependencies": {"path": "d_dependencies"},
         "arsd-official:png" : "~>12.1",
         "dub_sdl_to_json": {"path": "dub_sdl_to_json"},

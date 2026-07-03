@@ -137,6 +137,7 @@ enum BuildType : string
     ddox = "ddox",
     cov = "cov",
     cov_ctfe = "cov-ctfe",
+    depsCheck = "_depsCheck", //Internal, used to create a deps file
     unittest_cov = "unittest-cov",
     unittest_cov_ctfe = "unittest-cov-ctfe",
     syntax = "syntax",
@@ -236,6 +237,7 @@ enum BuildConfigurationFlags : ubyte
     compilerVerboseCodeGen= 1 << 3,
     defaultSource         = 1 << 4,
     defaultStringImport   = 1 << 5,
+    syntaxOnly            = 1 << 6,
 
 
     defaultInit = preservePath
@@ -341,6 +343,7 @@ struct BuildConfiguration
 
     bool outputsDeps() const {return (flags & BuildConfigurationFlags.outputsDeps) != 0;}
     bool preservePath() const {return (flags & BuildConfigurationFlags.preservePath) != 0;}
+    bool syntaxOnly() const {return (flags & BuildConfigurationFlags.syntaxOnly) != 0;}
     bool compilerVerbose() const {return (flags & BuildConfigurationFlags.compilerVerbose) != 0;}
     bool compilerVerboseCodeGen() const {return (flags & BuildConfigurationFlags.compilerVerboseCodeGen) != 0;}
     bool defaultSource() const {return (flags & BuildConfigurationFlags.defaultSource) != 0;}

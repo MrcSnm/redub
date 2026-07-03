@@ -32,15 +32,16 @@ BuildConfiguration parse(string buildType, CompilerBinary comp)
         case BuildType.mixin_check:       b.dFlags = [m(mixinFile)]; break;
         case BuildType.release_nobounds:  b.dFlags = [m(releaseMode), m(optimize), m(inline), m(noBoundsCheck)]; break;
         case BuildType.unittest_:         b.dFlags = [m(unittests), m(debugMode), m(debugInfo)]; break;
-        case BuildType.profile:           b.dFlags = [m(profile), m(debugInfo)]; break;
-        case BuildType.profile_gc:        b.dFlags = [m(profileGC), m(debugInfo)]; break;
+        case BuildType.profile:           b.dFlags = [m(profile), m(debugInfo), m(debugMode)]; break;
+        case BuildType.profile_gc:        b.dFlags = [m(profileGC), m(debugInfo), m(debugMode)]; break;
         case BuildType.docs: throw new Exception("docs is not supported by redub");
         case BuildType.ddox: throw new Exception("ddox is not supported by redub");
         case BuildType.cov:               b.dFlags = [m(coverage), m(debugInfo)]; break;
         case BuildType.cov_ctfe:          b.dFlags = [m(coverageCTFE), m(debugInfo)]; break;
         case BuildType.unittest_cov:      b.dFlags = [m(unittests), m(coverage), m(debugMode), m(debugInfo)]; break;
         case BuildType.unittest_cov_ctfe: b.dFlags = [m(unittests), m(coverageCTFE), m(debugMode), m(debugInfo)]; break;
-        case BuildType.syntax:            b.dFlags = [m(syntaxOnly)]; break;
+        case BuildType.syntax:            b.flags|=  BuildConfigurationFlags.syntaxOnly; break;
+        case BuildType.depsCheck:         b.flags|=  BuildConfigurationFlags.syntaxOnly | BuildConfigurationFlags.outputsDeps; break;
         default:
             string validBuildTypes = "Define custom build types by specifying \"buildTypes\" on your dub.json\n";
             if(registeredBuildTypes.length)
