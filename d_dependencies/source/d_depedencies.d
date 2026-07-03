@@ -17,6 +17,7 @@ struct ModuleDef
 class ModuleParsing
 {
 	ModuleDef[string] allModules;
+	private ModuleDef*[string] modulesByModuleName;
 
 	ModuleDef* getModuleInCache(string moduleName, string modulePath)
 	{
@@ -24,9 +25,18 @@ class ModuleParsing
 		if(!ret)
 		{
 			allModules[modulePath] = ModuleDef(moduleName, modulePath);
+			modulesByModuleName[moduleName] = modulePath in allModules;
 			ret = modulePath in allModules;
 		}
 		return ret;
+	}
+
+	ModuleDef* fromModuleName(const(char)[] moduleName)
+	{
+		ModuleDef** ret = (moduleName in modulesByModuleName);
+		if(!ret)
+			return null;
+		return *ret;
 	}
 
 	ModuleDef[] findRoots()

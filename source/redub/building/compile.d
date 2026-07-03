@@ -263,9 +263,10 @@ CompilationResult link(ProjectNode root, string rootHash, const ThreadBuildData 
 }
 
 
-bool buildProjectParallelSimple(ProjectNode root, CompilingSession s, const(AdvCacheFormula)* existingSharedFormula)
+bool buildProjectParallelSimple(ProjectDetails details, CompilingSession s, const(AdvCacheFormula)* existingSharedFormula)
 {
     import std.concurrency;
+    ProjectNode root = details.tree;
     ProjectNode[] dependencyFreePackages = root.findLeavesNodes();
     ProjectNode[] finishedBuilds;
     string mainPackHash = hashFrom(root.requirements, s);
@@ -336,7 +337,7 @@ bool buildProjectParallelSimple(ProjectNode root, CompilingSession s, const(AdvC
     }
     if(root.requirements.cfg.syntaxOnly)
         return true;
-    return doLink(root, s, mainPackHash, &formulaCache, env, existingSharedFormula) && copyFiles(root);
+    return doLink(details, s, mainPackHash, &formulaCache, env, existingSharedFormula) && copyFiles(root);
 }
 
 
@@ -369,10 +370,11 @@ private void killRunningProcesses()
     }
     runningProcesses.clear();
 }
-bool buildProjectFullyParallelized(ProjectNode root, CompilingSession s, const(AdvCacheFormula)* existingSharedFormula)
+bool buildProjectFullyParallelized(ProjectDetails details, CompilingSession s, const(AdvCacheFormula)* existingSharedFormula)
 {
     import std.concurrency;
     ProjectNode[] finishedBuilds;
+    ProjectNode root = details.tree;
     string mainPackHash = hashFrom(root.requirements, s);
     string[string] env = getCurrentEnv();
 
@@ -475,7 +477,7 @@ bool buildProjectFullyParallelized(ProjectNode root, CompilingSession s, const(A
     }
     if(root.requirements.cfg.syntaxOnly)
         return true;
-    return doLink(root, s, mainPackHash, &formulaCache, env, existingSharedFormula) && copyFiles(root);
+    return doLink(details, s, mainPackHash, &formulaCache, env, existingSharedFormula) && copyFiles(root);
 }
 
 /**
@@ -487,8 +489,9 @@ bool buildProjectFullyParallelized(ProjectNode root, CompilingSession s, const(A
  *   os = Which OS
  * Returns: Has succeeded
  */
-bool buildProjectSingleThread(ProjectNode root, CompilingSession s, const(AdvCacheFormula)* existingSharedFormula)
+bool buildProjectSingleThread(ProjectDetails details, CompilingSession s, const(AdvCacheFormula)* existingSharedFormula)
 {
+    ProjectNode root = details.tree;
     ProjectNode[] dependencyFreePackages = root.findLeavesNodes();
     ProjectNode[] finishedBuilds;
     string mainPackHash = hashFrom(root.requirements, s);
@@ -536,7 +539,7 @@ bool buildProjectSingleThread(ProjectNode root, CompilingSession s, const(AdvCac
     runningProcesses.clear();
     if(root.requirements.cfg.syntaxOnly)
         return true;
-    return doLink(root, s, mainPackHash, null, env, existingSharedFormula) && copyFiles(root);
+    return doLink(details, s, mainPackHash, null, env, existingSharedFormula) && copyFiles(root);
 }
 
 private void printCachedBuildInfo(ProjectNode root)
@@ -686,8 +689,9 @@ private void saveFinishedBuilds(ProjNodeRange)(ProjNodeRange finishedProjects, s
     ///TODO: Start comparing current build time with the last one
 }
 
-private bool doLink(ProjectNode root, CompilingSession info, string mainPackHash, AdvCacheFormula* formulaCache = null, const string[string] env = null, const(AdvCacheFormula)* existingSharedFormula)
+private bool doLink(ProjectDetails details, CompilingSession info, string mainPackHash, AdvCacheFormula* formulaCache = null, const string[string] env = null, const(AdvCacheFormula)* existingSharedFormula)
 {
+    ProjectNode root = details.tree;
     Compiler compiler = info.compiler;
     bool isUpToDate = root.isUpToDate;
     bool shouldSkipLinking = isUpToDate || (!root.requirements.cfg.targetType.isLinkedSeparately);
@@ -702,11 +706,19 @@ private bool doLink(ProjectNode root, CompilingSession info, string mainPackHash
         if(linkRes.status)
         {
             import redub.misc.github_tag_check;
+            import redub.error_driver;
             import redub.libs.colorize;
             errorTitle("Linking Error ", "at \"", root.name.color(fg.light_red), "\". \n\t"~ RedubVersionShort~ "\n\t" ~ root.getCompiler(compiler).getCompilerWithVersion ~ "\n\tFailed with flags: \n\n\t",
                 linkRes.compilationCommand,"\n\t\t  :\n\t",
                 linkRes.message,
             );
+            version(Windows)
+            {
+                ModuleParsing modules = getModulesDependencies(details);
+                if(modules !is null)
+                    info("Redub Help Message: ", getUndefinedSymbolExplanationMSVC(modules, linkRes.message));
+            }
+
             showNewerVersionMessage();
             return false;
         }

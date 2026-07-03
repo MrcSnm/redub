@@ -964,6 +964,8 @@ class ProjectNode
         this._isOptional = isOptional;
     }
 
+    bool generatesOutput(){return !requirements.cfg.syntaxOnly; }
+
     bool isOptional() const { return this._isOptional; }
     void makeRequired(){this._isOptional = false;}
 

@@ -476,11 +476,11 @@ ProjectDetails buildProject(ProjectDetails d)
         switch(inferParallel(d))
         {
             case ParallelType.full:
-                return buildProjectFullyParallelized(tree, session, &sharedFormula);
+                return buildProjectFullyParallelized(d, session, &sharedFormula);
             case ParallelType.leaves:
-                return buildProjectParallelSimple(tree, session, &sharedFormula);
+                return buildProjectParallelSimple(d, session, &sharedFormula);
             case ParallelType.no:
-                return buildProjectSingleThread(tree, session, &sharedFormula);
+                return buildProjectSingleThread(d, session, &sharedFormula);
             default:
                 throw new RedubException(`Unsupported parallel type in this step.`);
         }
@@ -496,7 +496,7 @@ ProjectDetails buildProject(ProjectDetails d)
     import std.path;
     infos("Finished: ", d.tree.name, " - ", result.msecs, "ms - Rebuild up-to-date targets with --force");
 
-    if(d.tree.requirements.cfg.targetType != TargetType.none)
+    if(d.tree.requirements.cfg.targetType != TargetType.none && d.tree.generatesOutput)
     {
         string generatedBin = d.getOutputFile();
         string binShortName = relativePath(generatedBin);
