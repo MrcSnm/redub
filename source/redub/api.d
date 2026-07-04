@@ -925,9 +925,15 @@ string getDubWorkspacePath()
         return dubWorkspace;
 
     version(Windows)
+    {
         string home = "LOCALAPPDATA";
+        enum dubFolder = "dub";
+    }
     else
+    {
         string home = "HOME";
+        enum dubFolder = ".dub";
+    }
 
     string dPath = getEnvVariable("DPATH");
 
@@ -935,7 +941,7 @@ string getDubWorkspacePath()
     if(dPath)
     {
         customHome = getEnvVariable("DUB_HOME");
-        if(customHome.length && !isAbsolute(customHome))
+        if(customHome.length && isAbsolute(customHome))
             throw new RedubException("DUB_HOME must not be an absolute path '"~customHome~"' when DPATH is defined ["~dPath~"]");
         if(!customHome)
             home = buildNormalizedPath(dPath, "dub");
@@ -950,7 +956,7 @@ string getDubWorkspacePath()
         else
             home = getEnvVariable(home);
     }
-    return dubWorkspace = buildNormalizedPath(home, ".dub");
+    return dubWorkspace = buildNormalizedPath(home, dubFolder);
 }
 
 

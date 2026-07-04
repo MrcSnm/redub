@@ -101,8 +101,8 @@ private ReducedPackageInfo getPackageInFolder(string folder, string packageName,
 
 /**
  * Lookups inside
- * - $HOME/.dub/packages/local-packages.json
- * - $HOME/.dub/packages/**
+ * - $HOME/dub/packages/local-packages.json
+ * - $HOME/dub/packages/**
  *
  * Params:
  *   packageName = "name" inside dub.json
@@ -325,7 +325,7 @@ private bool isGitStyle(string str)
 
 /**
 Dub's add-local outputs to
-$HOME/.dub/packages/local-packages.json
+$HOME/dub/packages/local-packages.json
 [
     {
         "name": "dorado",
