@@ -7,6 +7,19 @@ struct ModuleDef
 	ModuleDef[string] importedBy;
 	ModuleDef[string] imports;
 
+	string getImportedByChain(int level = 1)
+	{
+		string chain = modName;
+		foreach(string path, ModuleDef parent; importedBy)
+		{
+			// foreach(_; 0..level)
+			// 	ident~= "\t";
+			// chain~= "\n"~ident~parent.modName
+			chain~= "<-"~parent.getImportedByChain();
+		}
+		return chain;
+	}
+
 	package void addImport(ref ModuleDef imported)
 	{
 		imported.importedBy[modPath] = this;

@@ -716,7 +716,7 @@ private bool doLink(ProjectDetails details, CompilingSession info, string mainPa
             {
                 ModuleParsing modules = getModulesDependencies(details);
                 if(modules !is null)
-                    info("Redub Help Message: ", getUndefinedSymbolExplanationMSVC(modules, linkRes.message));
+                    redub.logging.errorTitle("Redub Linker Error Help Message: ", getUndefinedSymbolExplanationMSVC(modules, linkRes.message));
             }
 
             showNewerVersionMessage();

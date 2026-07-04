@@ -8,7 +8,7 @@ public import redub.parsers.environment;
 public import std.system;
 public import redub.buildapi;
 public import redub.tooling.compiler_identification;
-import d_depedencies;
+public import d_depedencies;
 
 struct ProjectDetails
 {
@@ -233,6 +233,9 @@ ModuleParsing getModulesDependencies(ProjectDetails d)
 {
     import std.file;
     import redub.command_generators.commons;
+    LogLevel lvl = getLogLevel();
+    scope(exit)
+        setLogLevel(lvl);
     setLogLevel(LogLevel.none);
 	ProjectDetails depsOnly = resolveDependencies(
 		ResolveInfo.init,
@@ -243,9 +246,9 @@ ModuleParsing getModulesDependencies(ProjectDetails d)
 	);
     depsOnly = buildProject(depsOnly);
     string depsPath = getDepsFilePath(depsOnly.tree, CompilingSession(d.compiler, d.cDetails.targetOS, d.cDetails.isa));
+    
     if(!exists(depsPath))
         return null;
-
     return parseDependencies(std.file.readText(depsPath));
 }
 
