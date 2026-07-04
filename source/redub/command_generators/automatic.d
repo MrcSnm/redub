@@ -16,11 +16,12 @@ string escapeCompilationCommands(string compilerBin, string[] flags)
 }
 
 /**
- * This must be used on Windows since they need a command file
+ * Dispatches to the appropriate compiler backend to generate compilation flags
  * Params:
  *   cfg = the configuration that will be parsed
  *   s = Session for determining how to build it, compiler, os and ISA matters
  *   mainPackHash = This will be used as a directory in some of outputs
+ *   isRoot = Whether this is the root package
  * Returns: The compilation commands those arguments generates
  */
 string[] getCompilationFlags(const BuildConfiguration cfg, CompilingSession s, string mainPackHash, bool isRoot)

@@ -20,7 +20,7 @@ struct CompilationInfo
 
 
 /**
- * This function receives an already parsed project path (BuildRequirements) and finishes parsing
+ * This function receives an already parsed project (BuildRequirements) and finishes parsing
  * its dependees. While it parses them, it also merges the root build flags with their dependees and
  * does that recursively.
  *
@@ -30,6 +30,7 @@ struct CompilationInfo
  *
  * Params:
  *   req = Root project to build
+ *   info = Compilation information for parsing dependencies
  * Returns: A tree out of the BuildRequirements, with all its compilation flags merged. It is the final step
  * before being able to correctly use the compilation flags
  */

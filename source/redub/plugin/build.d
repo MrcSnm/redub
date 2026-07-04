@@ -1,9 +1,9 @@
 /**
-*   This module provides a way to build redub plugins.
-*   Redub plugins are meant to be a replacement for usage of rdmd
-*   Since rdmd is an external program, it's cache evaluation is not so good, and it doesn't have
-*   a real integration with build system, a build plugin is the best way for improving it
-*/
+ * This module provides a way to build redub plugins.
+ * Redub plugins are meant to be a replacement for using rdmd.
+ * Since rdmd is an external program, its cache evaluation is not so good, and it doesn't have
+ * real integration with the build system. A build plugin is the best way to improve it.
+ */
 module redub.plugin.build;
 import redub.buildapi;
 import core.simd;

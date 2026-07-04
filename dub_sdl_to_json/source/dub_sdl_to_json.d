@@ -221,8 +221,8 @@ JSONValue sdlToJSON(SDLNode[] sdl)
 
 
 /**
-*   Strips single and multi line comments (C style)
-*/
+ * Strips single and multi-line comments (C style).
+ */
 string stripComments(string str)
 {
     string ret;
@@ -299,8 +299,8 @@ string stripComments(string str)
 /**
  * Fixes SDL for being converted to JSON
  * Params:
- *   sdlData = Some SDL data may input extra \n. Those are currently in the process of being ignored by the JSON parsing as it may break.
- * Returns: SDL parse fixed.
+ *   sdlData = Some SDL data may contain extra \n. Those are currently ignored by the JSON parsing as they may break it.
+ * Returns: SDL parsing fixed.
  */
 string fixSDLParsingBugs(string sdlData)
 {
