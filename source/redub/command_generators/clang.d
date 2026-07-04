@@ -5,7 +5,7 @@ import redub.command_generators.commons;
 import redub.logging;
 import redub.building.cache;
 
-/// Parse G++ configuration
+/// Parse Clang configuration
 string[] parseBuildConfiguration(const BuildConfiguration b, CompilingSession s, string mainPackhash, bool isRoot, const string[] extensions...)
 {
     import std.algorithm.iteration:map;

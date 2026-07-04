@@ -33,8 +33,8 @@ void showNewerVersionMessage()
 
 /**
  * Params:
- *   repo = The repository which you want to fetch from. Both user/repo
- * Returns:
+ *   repo = The repository which you want to fetch from. In the format user/repo
+ * Returns: The latest tag name, or null if the request failed
  */
 string getLatestGitRepositoryTag(string repo)
 {

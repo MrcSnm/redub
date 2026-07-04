@@ -467,8 +467,8 @@ bool buildProjectFullyParallelized(ProjectNode root, CompilingSession s, const(A
  * This function is also used when the project has no dependency.
  * Params:
  *   root = What is the project to build
- *   compiler = Which compiler
- *   os = Which OS
+ *   s = Compiling session including compiler, OS and ISA
+ *   existingSharedFormula = Reuses the hash of existing calculations if files haven't changed
  * Returns: Has succeeded
  */
 bool buildProjectSingleThread(ProjectNode root, CompilingSession s, const(AdvCacheFormula)* existingSharedFormula)

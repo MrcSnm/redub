@@ -237,6 +237,7 @@ DirectoryFilterType sourceFilter(const ref BuildConfiguration cfg)
  *
  * Params:
  *   cfg = The target build configuration
+ *   sourceCache = Cache of previously checked source paths
  * Returns: Whether it has any source to be built.
  */
 bool hasAnySource(const ref BuildConfiguration cfg, ref bool[string] sourceCache)
@@ -309,6 +310,7 @@ void copyDir(string fromDir, string toDir, bool shallow = true)
  *   t = The target type
  *   name = Base library name or path
  *   os = Which OS is this running on
+ *   isa = The instruction set architecture
  * Returns: For a given library path (e.g: /some/path/a), will make it /some/path/a.[lib|dll] on Windows and /some/path/liba.[a|so] on POSIX
  */
 string getOutputName(TargetType t, string name, OS os, ISA isa = std.system.instructionSetArchitecture)
@@ -772,6 +774,7 @@ ref string[] mapAppend(Q, T)(return ref string[] appendTarget, const scope Q[] m
  *   appendTarget = The target in which will have the mapInput appended
  *   mapInput = Array which is going to be mapped
  *   prefix = Prefix before appending
+ *   shouldEscapeInput = Whether to escape each input path
  * Returns: appendTarget with the mapped elements from mapInput appended
  */
 ref string[] mapAppendPrefix(return ref string[] appendTarget, const scope string[] mapInput, string prefix, bool shouldEscapeInput)

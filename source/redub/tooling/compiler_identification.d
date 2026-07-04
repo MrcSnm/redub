@@ -135,6 +135,7 @@ string tryGetStr(JSONValue v, string key)
  * Use this function to get extensive information about the Compiler to use.
  * Params:
  *   compilerOrPath = Can be used both as a global, such as `dmd` or a complete path to a compiler. If null, defaults to DMD
+ *   cCompilerOrPath = Optional path to a C compiler. If null, uses the default C compiler
  *   compilerAssumption = Optional version string, such as `dmd v[2.105.0] f[2.106.0]`, v being its version, f being frontend version
  *   arch = Used mainly for identifying which ldc.conf to take, and by using it, it is possible to detect the default linker for the specific arch
  * Returns: The Compiler information that was found, or inferred if compilerAssumption was used.
@@ -363,7 +364,7 @@ private CompilerBinary getCompilerFromCacheByVersion(JSONValue allCompilersInfo,
 ```
  * Params:
  *   allCompilersInfo = The JSON value of the current redub compilers info
- *   compiler = The new compiler to add. It will also save usesGnuLinker inside compiler
+ *   compiler = The new compiler to add
  *   isDefault = saves the compiler as the default compiler
  *   isGlobal = Saves the compiler as a globalPath. For example, it will use the path whenever expected to find in global path when "dmd" is sent or "ldc2" (i.e: no real path)
  *   isC = If is a C compiler

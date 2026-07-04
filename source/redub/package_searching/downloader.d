@@ -71,8 +71,8 @@ ubyte[] fetchPackage(string packageName, string repo, SemVer requirement, out Se
  *
  * Params:
  *   path = The path expected to extract the package to
- *   repo = Required when an invalid SemVer is sent
  *   packageName = Package name for assembling the link
+ *   repo = Required when an invalid SemVer is sent
  *   requirement = The requirement that it must satisfy
  *   out_actualVersion = The version that matched the requirement
  *   url = The URL that was built for downloading the package
