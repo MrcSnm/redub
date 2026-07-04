@@ -240,7 +240,9 @@ enum BuildConfigurationFlags : ubyte
     syntaxOnly            = 1 << 6,
 
 
-    defaultInit = preservePath
+    defaultInit = preservePath,
+
+    mergeFlags = preservePath | compilerVerbose | compilerVerboseCodeGen | syntaxOnly
 }
 
 
@@ -404,7 +406,7 @@ struct BuildConfiguration
         ret.outputDirectory = either(other.outputDirectory, ret.outputDirectory);
         ret.isUsingDefaultSourcePaths = ret.isUsingDefaultSourcePaths && other.isUsingDefaultSourcePaths;
         ret = ret.mergeCommands(other);
-        ret.flags = other.flags;
+        ret.flags|= other.flags;
         ret = ret.mergeBundleConfiguration(other);
         ret.extraDependencyFiles.exclusiveMergePaths(other.extraDependencyFiles);
         ret.filesToCopy.exclusiveMergePaths(other.filesToCopy);
@@ -541,6 +543,12 @@ struct BuildConfiguration
     {
         BuildConfiguration ret = clone;
         ret.debugVersions.exclusiveMerge(other.debugVersions);
+        return ret;
+    }
+    BuildConfiguration mergeFlags(const ref BuildConfiguration other) const
+    {
+        BuildConfiguration ret = clone;
+        ret.flags |= other.flags & BuildConfigurationFlags.mergeFlags;
         return ret;
     }
     BuildConfiguration mergeSourceFiles(const ref BuildConfiguration other) const
@@ -1060,7 +1068,8 @@ class ProjectNode
             {
                 dep.requirements.cfg = dep.requirements.cfg.mergeDFlags(root.requirements.cfg)
                     .mergeVersions(root.requirements.cfg)
-                    .mergeDebugVersions(root.requirements.cfg);
+                    .mergeDebugVersions(root.requirements.cfg)
+                    .mergeFlags(root.requirements.cfg);
             }
             foreach(dep; root.dependencies)
                 mergeParentInDependencies(dep);
