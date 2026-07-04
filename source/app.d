@@ -143,7 +143,7 @@ int runMain(string[] args, string[] runArgs)
 
     if(d.tree.name == "redub")
         return 0;
-    int ret = executeProgram(d.tree, runArgs);
+    int ret = executeProgram(d, runArgs);
     if(ret)
         errorTitle("Error: ", "Program exited with code ", ret);
     return ret;
@@ -235,7 +235,7 @@ int testMain(string[] args)
     if(d.error)
         return d.getReturnCode();
 
-    return executeProgram(d.tree, args);
+    return executeProgram(d, args);
 }
 
 int initMain(string[] args)

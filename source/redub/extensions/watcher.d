@@ -203,7 +203,7 @@ int watchMain(string[] args)
             {
                 terminal.moveTo(0, cursorY + 1, ForceOption.alwaysSend);
                 terminal.updateCursorPosition();
-                executeProgram(d.tree, null);
+                executeProgram(d, null);
                 terminal.updateCursorPosition();
                 runLinesCount = (terminal.cursorY - cursorY);
                 autoRunScheduled = false;
@@ -225,7 +225,7 @@ int watchMain(string[] args)
                     final switch(choices[choice])
                     {
                         case "Run Blocking":
-                            executeProgram(d.tree, null);
+                            executeProgram(d, null);
                             terminal.writeln("Press any button to continue.");
                             input.getch();
                             terminal.updateCursorPosition();

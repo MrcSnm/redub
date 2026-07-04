@@ -550,3 +550,26 @@ else
         redubEnv = environment.toAA;
     }
 }
+
+
+private string oldPATH;
+
+///Ensures that it doesn't accumulate PATH infinitely when using as a lib.
+void clearModifiedPATH()
+{
+    if(oldPATH is null)
+        return;
+    setEnvVariable("PATH", oldPATH);
+}
+
+
+void addToEnvPATH(string path)
+{
+    import std.path:pathSeparator;
+    string PATH = getEnvVariable("PATH");
+    if(oldPATH is null)
+    {
+        oldPATH = PATH;
+    }
+    setEnvVariable("PATH", PATH~pathSeparator~path);
+}

@@ -141,8 +141,10 @@ string tryGetStr(JSONValue v, string key)
  */
 Compiler getCompiler(string compilerOrPath = "dmd", string cCompilerOrPath = null, string compilerAssumption = null, string arch = null)
 {
+    import redub.parsers.environment;
     import redub.misc.either;
     import redub.meta;
+    import redub.misc.path;
 
     JSONValue compilersInfo = getRedubMeta();
     bool isDefault = compilerOrPath.length == 0;
@@ -152,12 +154,14 @@ Compiler getCompiler(string compilerOrPath = "dmd", string cCompilerOrPath = nul
     Compiler ret;
 
     ret.d = searchCompiler(compilerOrPath, compilersInfo, isDefault, false, compilerAssumption);
+    addToEnvPATH(buildNormalizedPath(ret.d.bin, ".."));
     if(cCompilerOrPath)
     {
         import redub.tooling.msvc_getter;
         version(Windows)
             setupMsvc(compilersInfo);
         ret.c = searchCompiler(cCompilerOrPath, compilersInfo, true, true);
+        addToEnvPATH(buildNormalizedPath(ret.c.bin, ".."));
         version(Windows)
         {
             if(ret.c.compiler == AcceptedCompiler.cl)

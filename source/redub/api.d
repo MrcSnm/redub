@@ -332,7 +332,7 @@ void main()
         if(d.error)
             return d.getReturnCode;
         chdir(path);
-        returnCode = executeProgram(d.tree, null);
+        returnCode = executeProgram(d, null);
         if(returnCode)
             return returnCode;
     }
@@ -491,6 +491,7 @@ ProjectDetails buildProject(ProjectDetails d)
     clearJsonCompilationInfoCache();
     clearBuildTypesCache();
     clearPackageCache();
+    clearModifiedPATH();
     bool buildSucceeded = result.value;
     if(!buildSucceeded)
         throw new BuildException(null);
@@ -960,7 +961,7 @@ string getDubWorkspacePath()
 }
 
 
-int executeProgram(ProjectNode tree, string[] args)
+int executeProgram(ProjectDetails details, string[] args)
 {
     import std.stdio;
     import redub.parsers.environment;
@@ -970,6 +971,8 @@ int executeProgram(ProjectNode tree, string[] args)
     import redub.command_generators.commons;
     import redub.building.compile;
     int ret;
+
+    ProjectNode tree = details.tree;
     foreach(string cmd; tree.requirements.cfg.preRunCommands)
     {
         if(hasLogLevel(LogLevel.verbose))
@@ -980,7 +983,7 @@ int executeProgram(ProjectNode tree, string[] args)
     }
     ret = wait(spawnShell(
         escapeShellCommand(getOutputPath(tree.requirements.cfg, os)) ~ " "~ join(args, " "), stdin, stdout,
-        stderr, null, Config.none, tree.requirements.cfg.runtimeWorkingDir
+        stderr, getRedubEnv, Config.none, tree.requirements.cfg.runtimeWorkingDir
         )
     );
     if(ret != 0)
