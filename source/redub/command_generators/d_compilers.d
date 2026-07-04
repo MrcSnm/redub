@@ -29,7 +29,7 @@ string[] parseBuildConfiguration(const BuildConfiguration b, CompilingSession s,
         string cacheDir = getCacheOutputDir(mainPackhash, b, s, isRoot);
         ///Whenever a single output file is specified, DMD does not output obj files
         ///For LDC, it does output them anyway
-        if(b.getCompiler(s.compiler).compiler == AcceptedCompiler.ldc2 && !b.outputsDeps)
+        if(b.getCompiler(s.compiler).compiler == AcceptedCompiler.ldc2 && !b.outputsDeps && !b.syntaxOnly)
         {
             import std.file;
             string ldcObjOutDir = escapePath(cacheDir~ "_obj");
@@ -41,7 +41,7 @@ string[] parseBuildConfiguration(const BuildConfiguration b, CompilingSession s,
             cmds~= mapper(ValidDFlags.objectDir)~getObjectDir(cacheDir).escapePath;
 
         cmds~= dFlags;
-        if(comp == AcceptedCompiler.ldc2 && !s.os.isApple) //Broken on apple
+        if(comp == AcceptedCompiler.ldc2 && !s.os.isApple && !b.syntaxOnly) //Broken on apple
         {
             ///cmds~= "--cache-retrieval=hardlink"; // Doesn't work on Windows when using a multi drives projects
             cmds~= "--cache=.ldc2_cache";
@@ -64,17 +64,20 @@ string[] parseBuildConfiguration(const BuildConfiguration b, CompilingSession s,
         if(arch)
             cmds~= arch;
 
-        if(targetType.isLinkedSeparately)
-            cmds~= mapper(ValidDFlags.compileOnly);
-        if(targetType.isStaticLibrary)
-            cmds~= mapper(ValidDFlags.buildAsLibrary);
-        else if(targetType == TargetType.dynamicLibrary)
-            cmds~= mapper(ValidDFlags.buildAsShared);
+        if(!b.syntaxOnly)
+        {
+            if(targetType.isLinkedSeparately)
+                cmds~= mapper(ValidDFlags.compileOnly);
+            if(targetType.isStaticLibrary)
+                cmds~= mapper(ValidDFlags.buildAsLibrary);
+            else if(targetType == TargetType.dynamicLibrary)
+                cmds~= mapper(ValidDFlags.buildAsShared);
 
 
-        //Output path for libs must still be specified
-        if(!b.outputsDeps || targetType.isStaticLibrary)
-            cmds~= mapper(ValidDFlags.outputFile) ~ buildNormalizedPath(cacheDir, getConfigurationOutputName(b, s.os)).escapePath;
+            //Output path for libs must still be specified
+            if(!b.outputsDeps || targetType.isStaticLibrary)
+                cmds~= mapper(ValidDFlags.outputFile) ~ buildNormalizedPath(cacheDir, getConfigurationOutputName(b, s.os)).escapePath;
+        }
 
         if(b.outputsDeps)
             cmds~= mapper(ValidDFlags.deps) ~ (buildNormalizedPath(cacheDir)~".deps").escapePath;
