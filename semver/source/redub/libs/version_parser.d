@@ -30,12 +30,9 @@ nint[3] parseVersion(string verString, out ptrdiff_t currIndex)
             currIndex+= i;
             break;
         }
-        else 
-        {
-            currIndex+= i;
-            if(currIndex < verString.length) 
-                currIndex+= 1; //Advance the dot
-        }
+        currIndex+= i;
+        if(currIndex < verString.length) 
+            currIndex+= 1; //Advance the dot
     }
     return ret;
 }

@@ -165,47 +165,44 @@ string downloadPackageTo(return string path, string packageName, string repo, Se
     {
         return getOutputDirectoryForPackage(path, packageName, downloadedPackages[packageName].ver);
     }
-    else
+    synchronized(downloaderMutex)
     {
-        synchronized(downloaderMutex)
-        {
-            warnTitle("Fetching Package: ", packageName, " ", repo, " version ", requirement.toString);
-            import std.stdio;
-            stdout.flush;
-        }
-        tempPath = downloadPackageTo(tempPath, packageName, repo, requirement, actualVersion, url);
-        if(!url)
-        {
-            import redub.libs.semver;
-            string existing = "'. Existing Versions: ";
-            SemVer[] vers = supplier.getExistingVersions(packageName);
-            if(vers is null) existing = "'. This package does not exists in the registry.";
-            else
-                foreach(v; vers) existing~= "\n\t"~v.toString;
-
-
-            throw new NetworkException("No version with requirement '"~requirement.toString~"' was found when looking for package "~packageName~existing);
-        }
-        synchronized(downloaderMutex)
-        {
-            downloadedPackages[packageName].ver = actualVersion.toString;
-        }
-        path = getOutputDirectoryForPackage(path, packageName, actualVersion.toString);
-        string installPath = getFirstFileInDirectory(tempPath);
-        if(!installPath)
-            throw new Exception("No file was extracted to directory "~tempPath~" while extracting package "~packageName);
-        ///The download might have happen while downloading ourselves
-
-
-        if(std.file.exists(path))
-            return path;
-
-        string outputDir = dirName(path);
-        if(!std.file.exists(outputDir))
-            mkdirRecurse(outputDir);
-        rename(installPath, path);
-        rmdirRecurse(tempPath);
+        warnTitle("Fetching Package: ", packageName, " ", repo, " version ", requirement.toString);
+        import std.stdio;
+        stdout.flush;
     }
+    tempPath = downloadPackageTo(tempPath, packageName, repo, requirement, actualVersion, url);
+    if(!url)
+    {
+        import redub.libs.semver;
+        string existing = "'. Existing Versions: ";
+        SemVer[] vers = supplier.getExistingVersions(packageName);
+        if(vers is null) existing = "'. This package does not exists in the registry.";
+        else
+            foreach(v; vers) existing~= "\n\t"~v.toString;
+
+
+        throw new NetworkException("No version with requirement '"~requirement.toString~"' was found when looking for package "~packageName~existing);
+    }
+    synchronized(downloaderMutex)
+    {
+        downloadedPackages[packageName].ver = actualVersion.toString;
+    }
+    path = getOutputDirectoryForPackage(path, packageName, actualVersion.toString);
+    string installPath = getFirstFileInDirectory(tempPath);
+    if(!installPath)
+        throw new Exception("No file was extracted to directory "~tempPath~" while extracting package "~packageName);
+    ///The download might have happen while downloading ourselves
+
+
+    if(std.file.exists(path))
+        return path;
+
+    string outputDir = dirName(path);
+    if(!std.file.exists(outputDir))
+        mkdirRecurse(outputDir);
+    rename(installPath, path);
+    rmdirRecurse(tempPath);
 
 
 

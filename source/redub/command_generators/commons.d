@@ -91,16 +91,13 @@ string getLibraryPath(string libName, string outputDir, OS os)
         if(extension(libName)) libName = stripExtension(libName);
         return buildNormalizedPath(outputDir, getOutputName(TargetType.staticLibrary, libName, os));
     }
-    else
-    {
-        string name = baseName(libName);
-        if(extension(name)) name = stripExtension(name);
-        if(name.length > 3 && name[0..3] == "lib") name = name[3..$];
-        if(name == libName) return libName;
-        string dir = dirName(libName);
+    string name = baseName(libName);
+    if(extension(name)) name = stripExtension(name);
+    if(name.length > 3 && name[0..3] == "lib") name = name[3..$];
+    if(name == libName) return libName;
+    string dir = dirName(libName);
 
-        return buildNormalizedPath(dir, getOutputName(TargetType.staticLibrary, name, os));
-    }
+    return buildNormalizedPath(dir, getOutputName(TargetType.staticLibrary, name, os));
 
 }
 /**

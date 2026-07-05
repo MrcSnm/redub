@@ -78,11 +78,8 @@ private ExecutionResult executeCommands(const(string[])[] commands, RedubCommand
             res.message = "Result of "~list.to!string~" command '"~cmd~"' "~execRes.output;
             return execRes;
         }
-        else
-        {
-            if(execRes.output.length)
-                res.message~= execRes.output;
-        }
+        if(execRes.output.length)
+            res.message~= execRes.output;
     }
     return ExecutionResult(0, "Success");
 }
@@ -318,22 +315,19 @@ bool buildProjectParallelSimple(ProjectDetails details, CompilingSession s, cons
             buildFailed(finishedPackage, res, s, finishedBuilds, mainPackHash, &formulaCache, existingSharedFormula);
             return false;
         }
-        else
-        {
-            if(!finishedPackage.isUpToDate)
-                buildSucceeded(finishedPackage, res);
-            finishedBuilds~= finishedPackage;
-            finishedPackage.becomeIndependent();
-            dependencyFreePackages = root.findLeavesNodes();
+        if(!finishedPackage.isUpToDate)
+            buildSucceeded(finishedPackage, res);
+        finishedBuilds~= finishedPackage;
+        finishedPackage.becomeIndependent();
+        dependencyFreePackages = root.findLeavesNodes();
 
-            if(!finishedPackage.requirements.cfg.targetType.isLinkedSeparately)
-            {
-                string reqCache = hashFrom(finishedPackage.requirements, s);
-                updateCache(mainPackHash, CompilationCache.make(reqCache, mainPackHash, finishedPackage.requirements, s, existingSharedFormula, &formulaCache));
-            }
-            if(finishedPackage is root)
-                break;
+        if(!finishedPackage.requirements.cfg.targetType.isLinkedSeparately)
+        {
+            string reqCache = hashFrom(finishedPackage.requirements, s);
+            updateCache(mainPackHash, CompilationCache.make(reqCache, mainPackHash, finishedPackage.requirements, s, existingSharedFormula, &formulaCache));
         }
+        if(finishedPackage is root)
+            break;
     }
     if(root.requirements.cfg.syntaxOnly)
         return true;
@@ -523,11 +517,8 @@ bool buildProjectSingleThread(ProjectDetails details, CompilingSession s, const(
                     buildFailed(dep, res, s, finishedBuilds, mainPackHash, null, existingSharedFormula);
                     return false;
                 }
-                else
-                {
-                    finishedBuilds~= dep;
-                    buildSucceeded(dep, res);
-                }
+                finishedBuilds~= dep;
+                buildSucceeded(dep, res);
             }
             finishedPackage = dep;
             finishedPackage.becomeIndependent();
@@ -722,14 +713,11 @@ private bool doLink(ProjectDetails details, CompilingSession info, string mainPa
             showNewerVersionMessage();
             return false;
         }
-        else
-        {
-            import std.string:stripRight;
-            if(linkRes.message.length)
-                redub.logging.info(linkRes.message.stripRight);
-            infos("Linked: ", root.name, " - ", result.msecs, "ms");
-            vlog("\n\t", linkRes.compilationCommand, " \n");
-        }
+        import std.string:stripRight;
+        if(linkRes.message.length)
+            redub.logging.info(linkRes.message.stripRight);
+        infos("Linked: ", root.name, " - ", result.msecs, "ms");
+        vlog("\n\t", linkRes.compilationCommand, " \n");
     }
     ///Try copying if it already exists, this operation is fast anyway for up to date builds.
     else if(root.isCopyEnough)

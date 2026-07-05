@@ -78,13 +78,13 @@ version(Windows)
 							_parsedAttr = _parsedAttr * 10 + (d - '0');
 							return CharAction.drop;
 						}
-						else if (d == ';')
+						if (d == ';')
 						{
 							executeAttribute(_parsedAttr);
 							_parsedAttr = 0;
 							return CharAction.drop;
 						}
-						else if (d == 'm')
+						if (d == 'm')
 						{
 							executeAttribute(_parsedAttr);
 							_state = State.initial;

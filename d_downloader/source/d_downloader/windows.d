@@ -129,14 +129,12 @@ ubyte[] downloadToBuffer(string url)
             processed = incomingBytes;
             return buffer[0..incomingBytes];
         }
-        else //Grow in 75% more than what it needs
-        {
-            if(buffer.length < processed + incomingBytes)
-                buffer.length = cast(size_t)((processed + incomingBytes) * 1.75);
-            auto ret = buffer[processed..processed+incomingBytes];
-            processed+= incomingBytes;
-            return ret;
-        }
+        //Grow in 75% more than what it needs
+        if(buffer.length < processed + incomingBytes)
+            buffer.length = cast(size_t)((processed + incomingBytes) * 1.75);
+        auto ret = buffer[processed..processed+incomingBytes];
+        processed+= incomingBytes;
+        return ret;
     }))
         return null;
     buffer.length = processed;

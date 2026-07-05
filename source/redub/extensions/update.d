@@ -64,7 +64,7 @@ int updateMain(string[] args)
             errorTitle("Git Pull Error: \n", ret.output);
             return 1;
         }
-        else if(gitCode == 0)
+        if(gitCode == 0)
         {
             info("Redub will be rebuilt using git repo found at ", redubPath);
             replaceRedub = true;
