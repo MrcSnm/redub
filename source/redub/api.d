@@ -792,7 +792,7 @@ ProjectDetails resolveDependencies(
         DUB_FORCE = either(DUB_FORCE, redub.parsers.environment.str(resolveInfo.force));
     }
     redub.parsers.environment.setupBuildEnvironmentVariables(dubVars);
-    CompilationInfo cInfo = CompilationInfo(compiler.d.getCompilerString, compiler.c.getCompilerString, cDetails.arch, osFromArch(cDetails.arch), isaFromArch(cDetails.arch), compiler.d.bin);
+    CompilationInfo cInfo = CompilationInfo(compiler, cDetails.arch);
     if(proj.workingDir == null)
     {
         import std.file;
@@ -807,8 +807,6 @@ ProjectDetails resolveDependencies(
             BuildRequirements.Configuration(proj.configuration, false),
             proj.subPackage,
             proj.recipe,
-            true,
-            null,
             cDetails.useExistingObj
         );
     else
@@ -818,9 +816,6 @@ ProjectDetails resolveDependencies(
             BuildRequirements.Configuration(proj.configuration, false),
             proj.subPackage,
             proj.recipe,
-            null,
-            true,
-            null,
             cDetails.useExistingObj,
             proj.isDescribeOnly
         );

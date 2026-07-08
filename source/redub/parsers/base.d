@@ -28,6 +28,30 @@ struct ParseConfig
     bool isRoot = false;
 }
 
+/**
+*   projectWorkingDir = Working directory to parse with it
+*   cInfo = Compilation Info for being used as filters while parsing
+*   defaultPackageName = Package name to use if no name is found inside the recipe
+*   version_ = Version of the current one being parsed. May be used to decide which version to use
+*   subConfiguration = The configuration that was specified in the parsing process
+*   subPackage = The subpackage that is actually being used
+*   parentName = Used as metadata
+*   isDescribeOnly = Whether or not to do a preGenerateRun
+*/
+ParseConfig getParseConfig(
+    string projectWorkingDir,
+    CompilationInfo cInfo,
+    string defaultPackageName,
+    string version_,
+    BuildRequirements.Configuration subConfiguration,
+    string subPackage,
+    string parentName,
+    bool isDescribeOnly = false)
+{
+    return ParseConfig(projectWorkingDir, subConfiguration, subPackage, version_, cInfo, defaultPackageName, ParseSubConfig(null, parentName), preGenerateRun: !isDescribeOnly);
+}
+
+
 ///Supplemental information for ParseConfig
 struct ParseSubConfig
 {

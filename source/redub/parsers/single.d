@@ -4,7 +4,6 @@ import redub.logging;
 public import redub.buildapi;
 public import std.system;
 static import redub.parsers.json;
-static import redub.parsers.sdl;
 static import redub.parsers.environment;
 import redub.command_generators.commons;
 import redub.tree_generators.dub;
@@ -32,33 +31,47 @@ BuildRequirements parseProject(
     BuildRequirements.Configuration subConfiguration,
     string subPackage, 
     string recipe,
-    bool isRoot = false,
-    string version_ = null,
     bool useExistingObj = false
 )
 {
     import std.path;
     import std.file;
     import redub.package_searching.entry;
+    import hip.data.json;
+    import redub.parsers.base;
+    import redub.parsers.automatic;
     if(!std.file.exists(projectWorkingDir))
         throw new Exception("Directory '"~projectWorkingDir~"' does not exists.");
 
     SingleFileData singleInfo = readConfigurationFromFile(recipe);
-
     inLogLevel(LogLevel.vverbose, infos("Single Recipe", "'", singleInfo.defaultPackageName, "': ", singleInfo.recipe));
+    
     BuildRequirements req;
-    BuildConfiguration pending;
+
+    JSONValue parseData;
+    bool hasInitParseData = false;
     switch(extension(singleInfo.fileName))
     {
-        case ".sdl":   req = redub.parsers.sdl.parseWithData(recipe, singleInfo.recipe, projectWorkingDir, cInfo, singleInfo.defaultPackageName, version_, subConfiguration, subPackage, pending, "", false, isRoot); break;
-        case ".json":  req = redub.parsers.json.parseWithData(recipe, singleInfo.recipe, projectWorkingDir, cInfo, singleInfo.defaultPackageName ,version_, subConfiguration, subPackage, pending, "", false, isRoot); break;
+        case ".sdl":
+            import redub.parsers.adapter.sdl;
+            parseData = sdlToJSONCache(recipe, singleInfo.recipe);
+            hasInitParseData = true;
+            goto case ".json";
+        case ".json":  
+            if(!hasInitParseData)
+            {
+                import redub.parsers.adapter.json_cache;
+                parseData = parseJSONCached(recipe, singleInfo.recipe);
+            }
+            req = redub.parsers.automatic.parseProject(parseData, projectWorkingDir, cInfo, subConfiguration, subPackage, useExistingObj, false);
+            break;
         default: throw new Exception("Unsupported project type "~recipe~" at dir "~projectWorkingDir);
     }
     req.cfg.targetType = TargetType.executable;
     req.cfg.outputDirectory = dirName(recipe);
     req.cfg.sourceFiles.exclusiveMerge([recipe]);
 
-    return postProcessBuildRequirements(req, pending, cInfo, isRoot, useExistingObj);
+    return req;
 }
 
 

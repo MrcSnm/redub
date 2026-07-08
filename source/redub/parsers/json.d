@@ -1,10 +1,10 @@
 module redub.parsers.json;
+public import redub.parsers.base;
 import redub.logging;
 import std.system;
 import redub.buildapi;
 import hip.data.json;
 import std.file;
-import redub.parsers.base;
 import redub.command_generators.commons;
 import core.runtime;
 import redub.tree_generators.dub;
@@ -22,126 +22,51 @@ immutable string[] commandsWithHostFilters = [
     "postRunCommands"
 ];
 
-/**
- * Parses a .json file into a BuildRequirements
- * Params:
- *   filePath = The JSON file path
- *   projectWorkingDir = Working directory to parse with it
- *   cInfo = Compilation Info for being used as filters while parsing
- *   defaultPackageName = Package name to use if no name is found inside the recipe.
- *   version_ = Version of the current one being parsed. May be used to decide which version to use
- *   subConfiguration = The configuration that was specified in the parsing process
- *   subPackage = The subpackage that is actually being used
- *   parentName = Used as metadata
- *   isRoot = Used as metadata
- * Returns:
- */
-BuildRequirements parse(string filePath,
-    string projectWorkingDir,
-    CompilationInfo cInfo,
-    string defaultPackageName,
-    string version_,
-    BuildRequirements.Configuration subConfiguration,
-    string subPackage,
-    out BuildConfiguration pending,
-    string parentName,
-    bool isDescribeOnly = false,
-    bool isRoot = false
-)
+string getPackageName(JSONValue packageJSON)
 {
-    import std.path;
-    ParseConfig c = ParseConfig(projectWorkingDir, subConfiguration, subPackage, version_, cInfo, defaultPackageName, ParseSubConfig(null,parentName), preGenerateRun: !isDescribeOnly);
-    return parse(parseJSONCached(filePath), c, pending, isRoot);
-}
-
-string getPackageName(string filePath)
-{
-    JSONValue v = parseJSONCached(filePath);
-    return v["name"].str;
-}
-
-/**
- *
- * Params:
- *   filePath = The JSON file path
- *   fileData = The actual data to use as JSON. This was created for --single builds
- *   projectWorkingDir = Working directory to parse with it
- *   cInfo = Compilation Info for being used as filters while parsing
- *   defaultPackageName = Package name to use if no name is found inside the recipe
- *   version_ = Version of the current one being parsed. May be used to decide which version to use
- *   subConfiguration = The configuration that was specified in the parsing process
- *   subPackage = The subpackage that is actually being used
- *   parentName = Used as metadata
- *   isRoot = Used as metadata
- * Returns:
- */
-BuildRequirements parseWithData(string filePath,
-    string fileData,
-    string projectWorkingDir,
-    CompilationInfo cInfo,
-    string defaultPackageName,
-    string version_,
-    BuildRequirements.Configuration subConfiguration,
-    string subPackage,
-    out BuildConfiguration pending,
-    string parentName,
-    bool isDescribeOnly = false,
-    bool isRoot = false
-)
-{
-    import std.path;
-    ParseConfig c = ParseConfig(projectWorkingDir, subConfiguration, subPackage, version_, cInfo, defaultPackageName, ParseSubConfig(null, parentName), preGenerateRun: !isDescribeOnly);
-    return parse(parseJSONCached(filePath, fileData), c, pending, isRoot);
+    return packageJSON["name"].str;
 }
 
 
-private __gshared JSONValue[string] jsonCache;
-///Saves information about which JSONValues has already registered subPackages for.
-private __gshared bool[JSONValue] registeredSubpackages;
-/**
- * Params:
- *   filePath = Uses filePath as the file data for parsing. Better API
- * Returns: Same as parseJSONCache
- */
-private JSONValue parseJSONCached(string filePath)
+ParseConfig getTarget(JSONValue value, string target, ParseConfig cfg)
 {
-    return parseJSONCached(filePath, std.file.readText(filePath));
-}
+    JSONValue* targets = "targets" in value;
+    if(targets is null)
+        throw new Exception("Target '"~target~"' was specified but no \"targets\" property was present at JSON "~cfg.workingDir);
 
-/**
- * Optimization to be used when dealing with subPackages.
- * Params:
- *   filePath = The path to use for getting it from cache, used simply as a key to the jsonCache
- *   fileData = The actual content to be used for parsing
- */
-private JSONValue parseJSONCached(string filePath, string fileData)
-{
-    synchronized
+    JSONValue* actualTarget = target in *targets;
+    if(!actualTarget)
     {
-        JSONValue* cached = filePath in jsonCache;
-        if(cached) return *cached;
-        jsonCache[filePath] = parseJSON(fileData, true);
-        if(jsonCache[filePath].hasErrorOccurred)
-            throw new Exception(jsonCache[filePath].error);
-        return jsonCache[filePath];
+        string availableTargets = "Target "~target~" not found. Available Targets:";
+        foreach(string key, JSONValue targetValue; targets.object)
+            availableTargets~= "\n\t"~key;
+        throw new Exception(availableTargets);
     }
+    ParseConfig ret = cfg;
+    // ret.cInfo.
+
+
+    return cfg;
 }
 
-/**
- * This function was created since on libraries, they may be reusing multiple times and thus
- * storing the cache between runs may trigger errors.
- */
+
 public void clearJsonRecipeCache()
 {
-    jsonCache = null;
+    import redub.parsers.adapter.json_cache;
+    clearJsonCache();
     registeredSubpackages = null;
 }
 
 
-
+///Saves information about which JSONValues has already registered subPackages for.
+private __gshared bool[JSONValue] registeredSubpackages;
 /**
+ * Parses a json file into a BuildRequirements
  * Params:
- *   json = A dub.json equivalent
+ *   json = The JSON 
+ *   cfg = The parsing configuration
+ *   pending = The pending configuration to be postProcessed.
+ *   isRoot = Used as metadata
  * Returns:
  */
 BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration pending, bool isRoot = false)
@@ -520,7 +445,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
                 if(subPackageName == cfg.subPackage)
                 {
                     import redub.parsers.automatic;
-                    return parseProject(subPackagePath, cfg.cInfo, cfg.subConfiguration, null, null, buildRequirements.name, false, cfg.version_);
+                    return parseProjectCommon(subPackagePath, cfg.cInfo, cfg.subConfiguration, null, null, buildRequirements.name, false, cfg.version_);
                 }
             }
         }

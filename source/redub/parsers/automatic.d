@@ -3,10 +3,98 @@ import redub.logging;
 public import redub.buildapi;
 public import std.system;
 static import redub.parsers.json;
-static import redub.parsers.sdl;
+static import redub.parsers.adapter.sdl;
 static import redub.parsers.environment;
 import redub.command_generators.commons;
 import redub.tree_generators.dub;
+import hip.data.json;
+
+/**
+ * Parses an initial directory, not recursively. Currently only .sdl and .json are parsed.
+ * After the parse happens, it also partially finishes the requirements by using a generalized fix
+ * for after the parsing stage.
+ * Params:
+ *   projectWorkingDir = Optional working dir. What is the root being considered for the recipe file
+ *   cInfo = Important compilation info for that project
+ *   subConfiguration = Sub configuration to use
+ *   subPackage = Optional sub package
+ *   recipe = Optional recipe to read. Its path is not used as root.
+ *   version = The actual version of that project, may be null on root
+ *   useExistingObj = Makes the project output dependencies if it is a root project. Disabled by default since compilation may be way slower
+ *   isDescribeOnly = Do not execute preGenerate commands when true
+ * Returns: The build requirements to the project. Not recursive.
+ */
+BuildRequirements parseProject(
+    string projectWorkingDir,
+    ref CompilationInfo cInfo,
+    BuildRequirements.Configuration subConfiguration,
+    string subPackage,
+    string recipe,
+    bool useExistingObj = false,
+    bool isDescribeOnly = false
+)
+{
+    import redub.parsers.base;
+    import std.path;
+    import std.file;
+    import redub.package_searching.entry;
+    string projectFile = findEntryProjectFile(projectWorkingDir, recipe);
+    if(!projectFile)
+        throw new Exception("Directory '"~projectWorkingDir~"' has no recipe or does not exists.");
+
+    if(getLogLevel() >= LogLevel.verbose)
+    {
+        import std.string;
+        if(projectFile.startsWith(projectWorkingDir))
+            vlog("Parsing ", projectFile);
+        else
+            vlog("Parsing ", projectFile, " at ", projectWorkingDir);
+        if(subPackage)
+            vlog("\tSubPackage: ", subPackage);
+        if(subConfiguration.name)
+            vlog("\tConfiguration: ", subConfiguration.name);
+    }
+
+    JSONValue projectJSON = getProjectJSON(projectFile, projectWorkingDir);
+    return parseProject(projectJSON, projectWorkingDir, cInfo, subConfiguration, subPackage, useExistingObj, isDescribeOnly);
+}
+
+/**
+ * Parses an initial directory, not recursively. Currently only .sdl and .json are parsed.
+ * After the parse happens, it also partially finishes the requirements by using a generalized fix
+ * for after the parsing stage.
+ * Params:
+ *   projectWorkingDir = Optional working dir. What is the root being considered for the recipe file
+ *   cInfo = Important compilation info for that project
+ *   subConfiguration = Sub configuration to use
+ *   subPackage = Optional sub package
+ *   version = The actual version of that project, may be null on root
+ *   useExistingObj = Makes the project output dependencies if it is a root project. Disabled by default since compilation may be way slower
+ *   isDescribeOnly = Do not execute preGenerate commands when true
+ * Returns: The build requirements to the project. Not recursive.
+ */
+BuildRequirements parseProject(
+    JSONValue projectJSON,
+    string projectWorkingDir,
+    ref CompilationInfo cInfo,
+    BuildRequirements.Configuration subConfiguration,
+    string subPackage,
+    bool useExistingObj = false,
+    bool isDescribeOnly = false
+)
+{
+    import redub.parsers.base;
+
+    ParseConfig cfg = getParseConfig(projectWorkingDir, cInfo, null, null, subConfiguration, subPackage, null, isDescribeOnly);
+        //Get target
+
+    // cfg = redub.parsers.json.getTarget(projectJSON, null, cfg);
+    BuildConfiguration pending;
+    BuildRequirements req = redub.parsers.json.parse(projectJSON, cfg, pending, true);
+    return postProcessBuildRequirements(req, pending, cInfo, true, useExistingObj);
+}
+
+
 
 /**
  * Parses an initial directory, not recursively. Currently only .sdl and .json are parsed.
@@ -25,9 +113,9 @@ import redub.tree_generators.dub;
  *   isDescribeOnly = Do not execute preGenerate commands when true
  * Returns: The build requirements to the project. Not recursive.
  */
-BuildRequirements parseProject(
+BuildRequirements parseProjectCommon(
     string projectWorkingDir,
-    CompilationInfo cInfo,
+    const ref CompilationInfo cInfo,
     BuildRequirements.Configuration subConfiguration,
     string subPackage,
     string recipe,
@@ -38,7 +126,7 @@ BuildRequirements parseProject(
     bool isDescribeOnly = false
 )
 {
-    import std.path;
+    import redub.parsers.base;
     import std.file;
     import redub.package_searching.entry;
     string projectFile = findEntryProjectFile(projectWorkingDir, recipe);
@@ -60,14 +148,28 @@ BuildRequirements parseProject(
     }
 
     BuildConfiguration pending;
-    switch(extension(projectFile))
-    {
-        case ".sdl":   req = redub.parsers.sdl.parse(projectFile, projectWorkingDir, cInfo, null, version_, subConfiguration, subPackage, pending, parentName, isDescribeOnly, isRoot); break;
-        case ".json":  req = redub.parsers.json.parse(projectFile, projectWorkingDir, cInfo, null, version_, subConfiguration, subPackage, pending, parentName, isDescribeOnly, isRoot); break;
-        default: throw new Exception("Unsupported project type "~projectFile~" at dir "~projectWorkingDir);
-    }
+    ParseConfig cfg = getParseConfig(projectWorkingDir, cInfo, null, version_, subConfiguration, subPackage, parentName, isDescribeOnly);
+
+    JSONValue parseData = getProjectJSON(projectFile, projectWorkingDir);
+
+    req = redub.parsers.json.parse(parseData, cfg, pending, false);
     return postProcessBuildRequirements(req, pending, cInfo, isRoot, useExistingObj);
 }
+
+JSONValue getProjectJSON(string projectFile, string projectWorkingDir)
+{
+    import std.path;
+    switch(extension(projectFile))
+    {
+        case ".sdl":
+            return redub.parsers.adapter.sdl.sdlToJSONCache(projectFile);
+        case ".json":
+            import redub.parsers.adapter.json_cache;
+            return parseJSONCached(projectFile);
+        default: throw new Exception("Unsupported project type "~projectFile~" at dir "~projectWorkingDir);
+    }
+}
+
 
 /**
  * Used mostly to check the name of a package in the local directory and decide what to build
@@ -83,10 +185,24 @@ string getPackageName(string projectWorkingDir, string recipe)
     string projectFile = findEntryProjectFile(projectWorkingDir, recipe);
     if(!projectFile)
         throw new Exception("Directory '"~projectWorkingDir~"' has no recipe or does not exists.");
+
+    JSONValue parseData;
+    bool hasInitData;
+
     switch(extension(projectFile))
     {
-        case ".sdl":   return redub.parsers.sdl.getPackageName(projectFile); break;
-        case ".json":  return redub.parsers.json.getPackageName(projectFile); break;
+        case ".sdl":
+            import redub.parsers.adapter.sdl;
+            parseData = sdlToJSONCache(projectFile);
+            hasInitData = true;
+            goto case ".json";
+        case ".json":  
+            if(!hasInitData)
+            {
+                import redub.parsers.adapter.json_cache;
+                parseData  = parseJSONCached(projectFile);
+            }
+            return redub.parsers.json.getPackageName(parseData);
         default: throw new Exception("Unsupported project type "~projectFile);
     }
 }
@@ -214,5 +330,5 @@ private void partiallyFinishBuildRequirements(ref BuildRequirements req, BuildCo
 void clearRecipeCaches()
 {
     redub.parsers.json.clearJsonRecipeCache();
-    redub.parsers.sdl.clearSdlRecipeCache();
+    redub.parsers.adapter.sdl.clearSdlRecipeCache();
 }
