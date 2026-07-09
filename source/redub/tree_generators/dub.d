@@ -5,30 +5,6 @@ import redub.package_searching.dub;
 import redub.package_searching.entry;
 import redub.parsers.automatic;
 
-
-struct CompilationInfo
-{
-    Compiler compilers;
-    string compiler() const {return compilers.d.getCompilerString; }
-    string c_compiler() const {return compilers.c.getCompilerString; }
-    string binPath() const {return compilers.d.bin; }
-    ///Where the actual compiler is. Used for plugin building
-    string arch;
-
-    OS targetOS() const
-    {
-        import redub.command_generators.commons;
-        return osFromArch(arch); 
-    }
-    ///Target Instruction Set Architecture
-    ISA isa() const
-    {
-        import redub.command_generators.commons;
-        return isaFromArch(arch); 
-    }
-}
-
-
 /**
  * This function receives an already parsed project (BuildRequirements) and finishes parsing
  * its dependees. While it parses them, it also merges the root build flags with their dependees and
@@ -44,21 +20,21 @@ struct CompilationInfo
  * Returns: A tree out of the BuildRequirements, with all its compilation flags merged. It is the final step
  * before being able to correctly use the compilation flags
  */
-ProjectNode getProjectTree(BuildRequirements req, CompilationInfo info)
+ProjectNode getProjectTree(RootParseResult res)
 {
     import redub.parsers.json;
     import std.datetime.stopwatch;
-    ProjectNode tree = new ProjectNode(req, false);
-    string[string] subConfigs = req.getSubConfigurations;
+    ProjectNode tree = new ProjectNode(res.mainRequirement, false, res.targetRequirement);
+    string[string] subConfigs = res.mainRequirement.getSubConfigurations;
     ProjectNode[string] visited;
     ProjectNode[] queue = [tree];
-    getProjectTreeImpl(queue, info, subConfigs, visited);
+    getProjectTreeImpl(queue, res, subConfigs, visited);
     detectCycle(tree);
 
     StopWatch sw = StopWatch(AutoStart.no);
     if(hasLogLevel(LogLevel.vverbose))
         sw.start();
-    tree.finish(info.targetOS, info.isa);
+    tree.finish(res.targetCompilationInfo.targetOS, res.targetCompilationInfo.isa);
     if(hasLogLevel(LogLevel.vverbose))
         infos("Tree Merged: '", tree.name, "' merged in ", sw.peek.total!"msecs", "ms");
     clearRecipeCaches();
@@ -112,7 +88,7 @@ void detectCycle(ProjectNode t)
  */
 private void getProjectTreeImpl(
     ref ProjectNode[] queue,
-    CompilationInfo info,
+    RootParseResult res,
     string[string] subConfigurations,
     ref ProjectNode[string] visited, 
 )
@@ -140,7 +116,7 @@ private void getProjectTreeImpl(
             /// and the new is a default one.
             if(visitedDep.requirements.configuration != dep.subConfiguration && !dep.subConfiguration.isDefault)
             {
-                BuildRequirements depConfig = parseDependency(dep, node.requirements, info);
+                BuildRequirements depConfig = parseDependency(dep, node.requirements, res.targetCompilationInfo);
                 if(visitedDep.requirements.targetConfiguration != depConfig.targetConfiguration)
                 {
                     //Print merging different subConfigs?
@@ -153,14 +129,14 @@ private void getProjectTreeImpl(
             else if(visitedDep.requirements.version_ != dep.version_)
             {
                 // error("Found different versions to parse: ", visitedDep.name, " ", visitedDep.requirements.version_, "  vs ", dep.version_);
-                BuildRequirements depConfig = parseDependency(dep, node.requirements, info);
+                BuildRequirements depConfig = parseDependency(dep, node.requirements, res.targetCompilationInfo);
                 visitedDep.requirements = depConfig;
             }
 
         }
         else
         {
-            depNode = new ProjectNode(parseDependency(dep, node.requirements, info), dep.isOptional);
+            depNode = new ProjectNode(parseDependency(dep, node.requirements, res.targetCompilationInfo), dep.isOptional, res.targetRequirement);
             if(dep.name != depNode.name)
             {
                 import redub.api;
@@ -180,7 +156,7 @@ private void getProjectTreeImpl(
     }
 
     queue = queue[1..$];
-    getProjectTreeImpl(queue, info, subConfigurations, visited);
+    getProjectTreeImpl(queue, res, subConfigurations, visited);
 }
 
 
@@ -200,7 +176,7 @@ private BuildRequirements parseDependency(const ref Dependency dep, const ref Bu
 
     string subPkg = dep.pkgInfo.isInternalSubPackage ? dep.subPackage : null;
     string parentName = dep.subPackage ? dep.parentName : null;
-    BuildRequirements depReq = parseProjectCommon(dep.pkgInfo.path, info, dep.subConfiguration, subPkg, null, parentName, false, dep.version_);
+    BuildRequirements depReq = parseProjectCommon(dep.pkgInfo.path, info, dep.subConfiguration, subPkg, null, parentName, false, dep.isTarget, dep.version_);
     if(getLogLevel() >= LogLevel.vverbose)
     {
         infos(dep.name, " parsed in ", sw.peek.total!"msecs", "ms");

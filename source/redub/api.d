@@ -132,6 +132,7 @@ struct ArgsDetails
     ProjectToParse proj;
     InitialDubVariables dubVars;
     string buildType;
+    string target;
 
     ResolveInfo resolveInfo() const { return ResolveInfo.fromArgs(this); }
 }
@@ -741,7 +742,7 @@ ArgsDetails resolveArguments(string[] args, bool isDescribeOnly = false)
         CompilationDetails(bArgs.compiler, bArgs.cCompiler, bArgs.arch, bArgs.compilerAssumption, bArgs.build.incremental, bArgs.build.useExistingObj, bArgs.build.combined, bArgs.build.parallel),
         ProjectToParse(bArgs.config, workingDir, subPackage, recipe, bArgs.single.length != 0, isDescribeOnly),
         getInitialDubVariablesFromArguments(bArgs, DubBuildArguments.init, os, args),
-        bt
+        bt, bArgs.target
     );
 }
 
@@ -761,7 +762,8 @@ ProjectDetails resolveDependencies(
     CompilationDetails cDetails = CompilationDetails.init,
     ProjectToParse proj = ProjectToParse.init,
     InitialDubVariables dubVars = InitialDubVariables.init,
-    string buildType = BuildType.debug_
+    string buildType = BuildType.debug_,
+    string target = null
 )
 {
     import std.datetime.stopwatch;
@@ -799,35 +801,40 @@ ProjectDetails resolveDependencies(
         proj.workingDir = std.file.getcwd;
     }
 
-    BuildRequirements req;
+    RootParseResult res;
     if(proj.isSingle)
-        req = redub.parsers.single.parseProject(
+        res = redub.parsers.single.parseProject(
             proj.workingDir,
             cInfo,
             BuildRequirements.Configuration(proj.configuration, false),
             proj.subPackage,
             proj.recipe,
+            target,
             cDetails.useExistingObj
         );
     else
-        req = redub.parsers.automatic.parseProject(
+        res = redub.parsers.automatic.parseProject(
             proj.workingDir,
             cInfo,
             BuildRequirements.Configuration(proj.configuration, false),
             proj.subPackage,
             proj.recipe,
+            target,
             cDetails.useExistingObj,
             proj.isDescribeOnly
         );
+    
+    ///Change the compiler to use the possibly new cInfo.compiler
+    compiler = res.targetCompilationInfo.compilers;
 
-    CompilerBinary cBin = req.cfg.getCompiler(compiler);
-    redub.parsers.environment.setupEnvironmentVariablesForRootPackage(req);
+    CompilerBinary cBin = res.mainRequirement.cfg.getCompiler(compiler);
+    redub.parsers.environment.setupEnvironmentVariablesForRootPackage(res.mainRequirement);
     if(cDetails.includeEnvironmentVariables)
-        req.cfg = req.cfg.merge(redub.parsers.environment.parse());
+        res.mainRequirement.cfg = res.mainRequirement.cfg.merge(redub.parsers.environment.parse());
 
-    req.cfg = req.cfg.merge(redub.parsers.build_type.parse(buildType, cBin));
+    res.mainRequirement.cfg = res.mainRequirement.cfg.merge(redub.parsers.build_type.parse(buildType, cBin));
 
-    ProjectNode tree = getProjectTree(req, cInfo);
+    ProjectNode tree = getProjectTree(res);
 
     if(cDetails.combinedBuild)
         tree.combine();

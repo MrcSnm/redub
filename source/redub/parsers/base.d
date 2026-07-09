@@ -59,6 +59,7 @@ struct ParseSubConfig
     string requiredBy;
     ///If it has a parent, it is treated as a sub package, important for assembling the name.
     string parentName;
+    bool isTarget;
 
     bool isParsingSubpackage() const { return parentName.length != 0; }
 }

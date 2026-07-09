@@ -137,7 +137,7 @@ string tryGetStr(JSONValue v, string key)
  *   compilerOrPath = Can be used both as a global, such as `dmd` or a complete path to a compiler. If null, defaults to DMD
  *   cCompilerOrPath = Optional path to a C compiler. If null, uses the default C compiler
  *   compilerAssumption = Optional version string, such as `dmd v[2.105.0] f[2.106.0]`, v being its version, f being frontend version
- *   arch = Used mainly for identifying which ldc.conf to take, and by using it, it is possible to detect the default linker for the specific arch
+ *   arch = [UNUSED] Used mainly for identifying which ldc.conf to take, and by using it, it is possible to detect the default linker for the specific arch
  * Returns: The Compiler information that was found, or inferred if compilerAssumption was used.
  */
 Compiler getCompiler(string compilerOrPath = "dmd", string cCompilerOrPath = null, string compilerAssumption = null, string arch = null)

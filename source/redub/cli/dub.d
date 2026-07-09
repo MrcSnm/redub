@@ -218,6 +218,9 @@ struct DubArguments
 
     @("If a dub.selections.json is present, all non-path based packages are prefetched. Best for action runners.")
     bool prefetch;
+
+    @("Set which target to build. target json example definition: \"targets\": {\"windmd\": {\"compiler\": \"dmd\"}}")
+    string target;
 }
 
 

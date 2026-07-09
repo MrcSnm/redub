@@ -1,0 +1,18 @@
+{
+    "authors": [
+        "Marcelo"
+    ],
+    "targets": {
+        "windmd": {
+            "compiler": "dmd",
+            "versions": ["UsingDMD"]
+        },
+        "winldc": {
+            "compiler": "ldc2"
+        }
+    },
+    "name": "targettest",
+    "description": "A minimal D application.",
+	"targetPath": "build",
+    "license": "proprietary"
+}

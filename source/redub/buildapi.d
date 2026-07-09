@@ -7,7 +7,7 @@ import redub.package_searching.api;
 
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.29.2";
+enum RedubVersionOnly = "v1.30.0";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -58,6 +58,29 @@ struct CompilingSession
         return defaultArchiverFromCompiler(cfg.getCompiler(compiler).compiler, os);
     }
 }
+
+struct CompilationInfo
+{
+    Compiler compilers;
+    string compiler() const {return compilers.d.getCompilerString; }
+    string c_compiler() const {return compilers.c.getCompilerString; }
+    string binPath() const {return compilers.d.bin; }
+    ///Where the actual compiler is. Used for plugin building
+    string arch;
+
+    OS targetOS() const
+    {
+        import redub.command_generators.commons;
+        return osFromArch(arch); 
+    }
+    ///Target Instruction Set Architecture
+    ISA isa() const
+    {
+        import redub.command_generators.commons;
+        return isaFromArch(arch); 
+    }
+}
+
 
 enum BundleCategories : string
 {
@@ -736,6 +759,13 @@ string getVisibilityString(Visibility vis)
     }
 }
 
+struct RootParseResult
+{
+    BuildRequirements mainRequirement;
+    BuildRequirements targetRequirement;
+    CompilationInfo targetCompilationInfo;
+}
+
 struct Dependency
 {
     string name;
@@ -747,6 +777,8 @@ struct Dependency
     ///This package info is used internally for keeping all the required versions in sync, so an additional pass for changing their versions isn't needed.
     PackageInfo* pkgInfo;
     bool isOptional;
+    ///Inherits from its owner. Used as a flag to not merge global dependencies with this dependency.
+    bool isTarget;
 
     bool isSameAs(string name, string subPackage) const
     {
@@ -777,6 +809,7 @@ struct ExtraInformation
 {
     string[] librariesFullPath;
     bool isRoot;
+    bool isTarget;
     immutable(ExtraInformation) idup() inout
     {
         return immutable ExtraInformation(
@@ -880,7 +913,9 @@ struct BuildRequirements
     {
         BuildRequirements ret = cast()this;
         ret.cfg = ret.cfg.merge(other.cfg);
-        return ret.mergeDependencies(other);
+        if(!ret.extra.isTarget)
+            ret = ret.mergeDependencies(other);
+        return ret;
     }
 
     BuildRequirements mergeDependencies(BuildRequirements other) const
@@ -966,8 +1001,10 @@ class ProjectNode
         );
     }
 
-    this(BuildRequirements req, bool isOptional)
+    this(BuildRequirements req, bool isOptional, BuildRequirements targetRequirement)
     {
+        if(!req.extra.isTarget && targetRequirement != BuildRequirements.init)
+            req = req.merge(targetRequirement);
         this.requirements = req;
         this._isOptional = isOptional;
     }

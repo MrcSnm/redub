@@ -21,6 +21,9 @@ Those are the additions I've made over dub
 - [**Library API**](#using-its-library-api) - Integrate redub directly in your application
 - **Watching Directories** - `redub watch`- Builds dependents automatically on changes. Add  `--run` to run the program after building.
 - **MacOS Universal Builds** - `redub build-universal` - Generates a single binary containing arm64 and x86_64 architectures on MacOS
+- [**Redub Executable Icons**](#redub-executable-icons) - Adds inside the recipe file a way to define how your program icon will look
+- [**Linker Diagnostics**](#redub-linker-diagnostics) - Experimental support to improve linker message errors.
+- [**Cross Compilation Targets**](#redub-cross-compile) - Adds support to build targets, selecting a compiler, architecture and other configuration by just calling `redub --target=PSVita`
 
 
 ## Redub Help
@@ -122,6 +125,59 @@ You can also control the bundle configurations by using. Failing to use a valid 
   "terminal": false //Control whether the terminal should show up
 }
 ```
+
+
+## Redub Linker Diagnostics
+- **1.29.0**: Added Windows Linker Diagnostics.
+
+Sometimes people may get cryptic error messages regarding anundefined __ModuleInitZ symbol. Since Redub already had information on how each module imports each other, I've ended up adding support to improve the linker messages as that may reduce by a lot iteration time. Example:
+
+```
+hipreme_engine.obj : error LNK2001: unresolved external symbol _D3hip3api12__ModuleInfoZ
+C:\Users\Hipreme\AppData\Local\.dub\.redub\1AB9D53797DC3516\1AB9D53797DC3516\hipreme_engine.exe : fatal error LNK1120: 1 unresolved external symbol
+Error: C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\bin\HostX64\x64\link.exe failed
+with status: 1120
+```
+This gets one additional message
+
+```
+Redub Help Message: Module hip.api is imported by:
+        hip.view.load_scene (C:\Users\Hipreme\Documents\D\HipremeEngine\source\hip\view\load_scene.d)
+```
+
+## Redub Cross Compile
+- **1.30.0**: Added cross compilation definition support via the `--target` flag.
+
+Ever wanted to configure a default compiler/arch based on the configuration? Now you can (mostly). This is an example on how a `target` will look in your recipe JSON:
+
+```json
+{
+  "name": "my-project",
+  "targets": {
+    "wasm": {
+      "compiler": "ldc2",
+      "arch": "wasm32-unknown-unknown-wasm"
+    },
+    "PSVita": {
+      "compiler": "ldc2",
+      "arch": "armv7a-unknown-unknown-eabi",
+      "dflags": [
+        "--revert=dtorfields",
+        "-mcpu=cortex-a9",
+        "-mattr=+neon,+neonfp,+thumb-mode",
+        "-fvisibility=hidden",
+        "-gcc=$VITASDK/bin/arm-vita-eabi-gcc",
+        "--relocation-model=static"
+      ],
+      "versions": ["PSVita"],
+      "dependencies": {
+        "custom-rt": {"path": "my/custom/runtime"}
+      }
+    }
+  }
+}
+```
+Now you can just call `redub --target=wasm` or `redub --target=PSVita` and every dependency will inherit this configuration.
 
 ## Multi language
 

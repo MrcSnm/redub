@@ -24,7 +24,8 @@ ProjectDetails resolveDependencies(string[] args, bool isDescribeOnly = false)
         argsD.cDetails,
         argsD.proj,
         argsD.dubVars,
-        argsD.buildType
+        argsD.buildType,
+        argsD.target
     );
 
     if(argsD.args.targetPath)

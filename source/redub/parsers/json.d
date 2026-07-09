@@ -8,6 +8,7 @@ import std.file;
 import redub.command_generators.commons;
 import core.runtime;
 import redub.tree_generators.dub;
+import core.stdcpp.type_traits;
 
 /**
  * Those commands are independent of the selected target OS.
@@ -27,8 +28,22 @@ string getPackageName(JSONValue packageJSON)
     return packageJSON["name"].str;
 }
 
+struct TargetInfo
+{
+    ParseConfig parseConfig;
+    BuildConfiguration pending;
+    BuildRequirements targetRequirement;
+}
 
-ParseConfig getTarget(JSONValue value, string target, ParseConfig cfg)
+/** 
+ * Gets target information from the place setup. Used mostly for crosscompilation, auto compiler/arch setup.
+ * Params:
+ *   value = The "targets" JSONValue
+ *   target = The actual target to get
+ *   cfg = Base ParseConfig containing compiler/arch. Might be unused
+ * Returns: TargetInfo with the pending buildconfiguration, a new valid parseConfig to use instead of the `cfg` argument and the targetRequirement
+ */
+TargetInfo getTarget(JSONValue value, string target, ParseConfig cfg)
 {
     JSONValue* targets = "targets" in value;
     if(targets is null)
@@ -42,11 +57,19 @@ ParseConfig getTarget(JSONValue value, string target, ParseConfig cfg)
             availableTargets~= "\n\t"~key;
         throw new Exception(availableTargets);
     }
-    ParseConfig ret = cfg;
-    // ret.cInfo.
+    TargetInfo ret;
+    ret.parseConfig = cfg;
 
+    string compiler = tryGetStr(*actualTarget, "compiler");
+    string arch = tryGetStr(*actualTarget, "arch");
+    if(compiler) ret.parseConfig.cInfo.compilers = getCompiler(compiler);
+    if(arch) ret.parseConfig.cInfo.arch = arch;
 
-    return cfg;
+    ///This line is necessary as it errors if no requiredBy is pressent and no name is present.
+    cfg.extra.requiredBy = target;
+    cfg.extra.isTarget = true;
+    ret.targetRequirement = parse(*actualTarget, cfg, ret.pending, false);
+    return ret;
 }
 
 
@@ -430,7 +453,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
             {
                 const(JSONValue)* name = "name" in p;
                 if(name.str == cfg.subPackage)
-                    return parse(p, ParseConfig(cfg.workingDir, cfg.subConfiguration, null, cfg.version_, cfg.cInfo, null, ParseSubConfig(cfg.extra.requiredBy, buildRequirements.name), true, true), pending);
+                    return parse(p, ParseConfig(cfg.workingDir, cfg.subConfiguration, null, cfg.version_, cfg.cInfo, null, ParseSubConfig(cfg.extra.requiredBy, buildRequirements.name, cfg.extra.isTarget), true, true), pending);
             }
             else ///Subpackage is on other file
             {
@@ -445,7 +468,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
                 if(subPackageName == cfg.subPackage)
                 {
                     import redub.parsers.automatic;
-                    return parseProjectCommon(subPackagePath, cfg.cInfo, cfg.subConfiguration, null, null, buildRequirements.name, false, cfg.version_);
+                    return parseProjectCommon(subPackagePath, cfg.cInfo, cfg.subConfiguration, null, null, buildRequirements.name, false, cfg.extra.isTarget, cfg.version_);
                 }
             }
         }
@@ -457,9 +480,13 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
             subPackages.array.map!((JSONValue v) => v.type == JSONType.string_ ? v.str : v["name"].str).join("\n\t")
         );
     }
-    string[] unusedKeys;
 
+    string[] unusedKeys;
     runHandlers(requirementsRun, buildRequirements, cfg, json, false, unusedKeys, pending);
+
+    if(cfg.extra.isTarget) 
+        foreach(ref Dependency dep;  buildRequirements.dependencies)
+            dep.isTarget = true;
 
     if(cfg.firstRun && unusedKeys.length) warn("Unused Keys -> ", unusedKeys);
     runPreGenerateCommands(cfg, buildRequirements);
@@ -710,5 +737,6 @@ BuildRequirements getDefaultBuildRequirement(ParseConfig cfg, JSONValue json)
     req.version_ = cfg.version_;
     req.configuration = cfg.subConfiguration;
     req.cfg.workingDir = cfg.workingDir;
+    req.extra.isTarget = cfg.extra.isTarget;
     return req;
 }

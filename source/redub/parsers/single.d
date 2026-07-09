@@ -25,12 +25,13 @@ import redub.tree_generators.dub;
  *   useExistingObj = Makes the project output dependencies if it is a root project. Disabled by default since compilation may be way slower
  * Returns: The build requirements to the project. Not recursive.
  */
-BuildRequirements parseProject(
+RootParseResult parseProject(
     string projectWorkingDir, 
     CompilationInfo cInfo,
     BuildRequirements.Configuration subConfiguration,
     string subPackage, 
     string recipe,
+    string target,
     bool useExistingObj = false
 )
 {
@@ -46,7 +47,7 @@ BuildRequirements parseProject(
     SingleFileData singleInfo = readConfigurationFromFile(recipe);
     inLogLevel(LogLevel.vverbose, infos("Single Recipe", "'", singleInfo.defaultPackageName, "': ", singleInfo.recipe));
     
-    BuildRequirements req;
+    RootParseResult res;
 
     JSONValue parseData;
     bool hasInitParseData = false;
@@ -63,15 +64,15 @@ BuildRequirements parseProject(
                 import redub.parsers.adapter.json_cache;
                 parseData = parseJSONCached(recipe, singleInfo.recipe);
             }
-            req = redub.parsers.automatic.parseProject(parseData, projectWorkingDir, cInfo, subConfiguration, subPackage, useExistingObj, false);
+            res = redub.parsers.automatic.parseProject(parseData, projectWorkingDir, cInfo, subConfiguration, subPackage, target, useExistingObj, false);
             break;
         default: throw new Exception("Unsupported project type "~recipe~" at dir "~projectWorkingDir);
     }
-    req.cfg.targetType = TargetType.executable;
-    req.cfg.outputDirectory = dirName(recipe);
-    req.cfg.sourceFiles.exclusiveMerge([recipe]);
+    res.mainRequirement.cfg.targetType = TargetType.executable;
+    res.mainRequirement.cfg.outputDirectory = dirName(recipe);
+    res.mainRequirement.cfg.sourceFiles.exclusiveMerge([recipe]);
 
-    return req;
+    return res;
 }
 
 
