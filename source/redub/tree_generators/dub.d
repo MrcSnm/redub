@@ -24,7 +24,7 @@ ProjectNode getProjectTree(RootParseResult res)
 {
     import redub.parsers.json;
     import std.datetime.stopwatch;
-    ProjectNode tree = new ProjectNode(res.mainRequirement, false, res.targetRequirement);
+    ProjectNode tree = new ProjectNode(res.mainRequirement, false, res.targetRequirement, true);
     string[string] subConfigs = res.mainRequirement.getSubConfigurations;
     ProjectNode[string] visited;
     ProjectNode[] queue = [tree];
@@ -136,7 +136,7 @@ private void getProjectTreeImpl(
         }
         else
         {
-            depNode = new ProjectNode(parseDependency(dep, node.requirements, res.targetCompilationInfo), dep.isOptional, res.targetRequirement);
+            depNode = new ProjectNode(parseDependency(dep, node.requirements, res.targetCompilationInfo), dep.isOptional, res.targetRequirement, false);
             if(dep.name != depNode.name)
             {
                 import redub.api;

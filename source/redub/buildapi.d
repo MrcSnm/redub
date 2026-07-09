@@ -479,6 +479,37 @@ struct BuildConfiguration
         return ret;
     }
 
+    
+     /**
+     * This function is mainly used to merge a dependency with its parent.
+     * Params:
+     *   other = The parent configuration
+     * Returns:
+     */
+    BuildConfiguration mergeForTarget(const ref BuildConfiguration other, bool isRoot) const
+    {
+        BuildConfiguration ret = clone;
+        if(isRoot)
+        {
+            ret.filesToCopy.exclusiveMergePaths(other.filesToCopy);
+            ret.sourceFiles.exclusiveMerge(other.sourceFiles);
+            ret.excludeSourceFiles.exclusiveMerge(other.excludeSourceFiles);
+            ret.sourcePaths.exclusiveMergePaths(other.sourcePaths);
+            ret.extraDependencyFiles.exclusiveMergePaths(other.extraDependencyFiles);
+        }
+        ret.stringImportPaths.exclusiveMergePaths(other.stringImportPaths);
+        ret.importDirectories.exclusiveMergePaths(other.importDirectories);
+        ret.versions.exclusiveMerge(other.versions);
+        ret.debugVersions.exclusiveMerge(other.debugVersions);
+        ret.dFlags.exclusiveMerge(other.dFlags);
+        ret.libraries.exclusiveMerge(other.libraries);
+        ret.frameworks.exclusiveMerge(other.frameworks);
+        ret.libraryPaths.exclusiveMergePaths(other.libraryPaths);
+        ret.linkFlags.exclusiveMerge(other.linkFlags, null, linkerMergeKeep);
+        return ret;
+    }
+
+
     BuildConfiguration mergeCommands(const ref BuildConfiguration other) const
     {
         BuildConfiguration ret = clone;
@@ -917,6 +948,17 @@ struct BuildRequirements
             ret = ret.mergeDependencies(other);
         return ret;
     }
+    /**
+     * Configurations and dependencies are merged.
+     */
+    BuildRequirements mergeForTarget(BuildRequirements other, bool isRoot) const
+    {
+        BuildRequirements ret = cast()this;
+        ret.cfg = ret.cfg.mergeForTarget(other.cfg, isRoot);
+        if(!ret.extra.isTarget)
+            ret = ret.mergeDependencies(other);
+        return ret;
+    }
 
     BuildRequirements mergeDependencies(BuildRequirements other) const
     {
@@ -1001,10 +1043,10 @@ class ProjectNode
         );
     }
 
-    this(BuildRequirements req, bool isOptional, BuildRequirements targetRequirement)
+    this(BuildRequirements req, bool isOptional, BuildRequirements targetRequirement, bool isRoot)
     {
         if(!req.extra.isTarget && targetRequirement != BuildRequirements.init)
-            req = req.merge(targetRequirement);
+            req = req.mergeForTarget(targetRequirement, isRoot);
         this.requirements = req;
         this._isOptional = isOptional;
     }

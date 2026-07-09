@@ -143,6 +143,13 @@ int runMain(string[] args, string[] runArgs)
 
     if(d.tree.name == "redub")
         return 0;
+    import std.system;
+    if(d.cDetails.targetOS != std.system.os)
+    {
+        warnTitle("Cross Compilation Warning: ", "Built target can't be run since it was cross-compiled to '",d.cDetails.targetOS, "'");
+        return 2;
+    }
+
     int ret = executeProgram(d, runArgs);
     if(ret)
         errorTitle("Error: ", "Program exited with code ", ret);
