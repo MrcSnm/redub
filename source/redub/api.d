@@ -14,11 +14,9 @@ struct ProjectDetails
 {
     ProjectNode tree;
     Compiler compiler;
-    ParallelType parallelType;
     CompilationDetails cDetails;
     ProjectToParse targetProject;
 
-    bool useExistingObjFiles;
     ///Makes the return code 0 for when using print commands.
     bool printOnly;
     int externalErrorCode = int.min;
@@ -28,6 +26,8 @@ struct ProjectDetails
     bool bundleGenerated = false;
 
     bool error() const {return this == ProjectDetails.init; }
+    ParallelType parallelType() const { return cDetails.parallelType; }
+    bool useExistingObjects() const { return cDetails.useExistingObj; }
 
     bool usesExternalErrorCode() const { return this.printOnly && externalErrorCode != int.min; }
 
@@ -81,6 +81,13 @@ struct CompilationDetails
     {
         import redub.command_generators.commons;
         return isaFromArch(arch);
+    }
+
+    void setFromCompilationInfo(CompilationInfo info)
+    {
+        compilerOrPath = info.compiler;
+        cCompilerOrPath = info.c_compiler;
+        arch = info.arch;
     }
 
     ///This is the only required member of this struct. Must be a path to compiler or a compiler in the global context, i.e: `dmd`
@@ -449,7 +456,7 @@ ProjectDetails buildProject(ProjectDetails d)
     ProjectNode tree = d.tree;
     if(d.bCreateSelections)
         createSelectionsFile(tree);
-    if(d.useExistingObjFiles)
+    if(d.useExistingObjects)
         tree.requirements.cfg.changedBuildFiles = getChangedBuildFiles(tree, session);
     if(d.bundle != BundleType.none)
     {
@@ -794,38 +801,41 @@ ProjectDetails resolveDependencies(
         DUB_FORCE = either(DUB_FORCE, redub.parsers.environment.str(resolveInfo.force));
     }
     redub.parsers.environment.setupBuildEnvironmentVariables(dubVars);
-    CompilationInfo cInfo = CompilationInfo(compiler, cDetails.arch);
     if(proj.workingDir == null)
     {
         import std.file;
         proj.workingDir = std.file.getcwd;
     }
-
     RootParseResult res;
-    if(proj.isSingle)
-        res = redub.parsers.single.parseProject(
-            proj.workingDir,
-            cInfo,
-            BuildRequirements.Configuration(proj.configuration, false),
-            proj.subPackage,
-            proj.recipe,
-            target,
-            cDetails.useExistingObj
-        );
-    else
-        res = redub.parsers.automatic.parseProject(
-            proj.workingDir,
-            cInfo,
-            BuildRequirements.Configuration(proj.configuration, false),
-            proj.subPackage,
-            proj.recipe,
-            target,
-            cDetails.useExistingObj,
-            proj.isDescribeOnly
-        );
+    {
+        CompilationInfo cInfo = CompilationInfo(compiler, cDetails.arch);
+
+        if(proj.isSingle)
+            res = redub.parsers.single.parseProject(
+                proj.workingDir,
+                cInfo,
+                BuildRequirements.Configuration(proj.configuration, false),
+                proj.subPackage,
+                proj.recipe,
+                target,
+                cDetails.useExistingObj
+            );
+        else
+            res = redub.parsers.automatic.parseProject(
+                proj.workingDir,
+                cInfo,
+                BuildRequirements.Configuration(proj.configuration, false),
+                proj.subPackage,
+                proj.recipe,
+                target,
+                cDetails.useExistingObj,
+                proj.isDescribeOnly
+            );
+    }
     
     ///Change the compiler to use the possibly new cInfo.compiler
     compiler = res.targetCompilationInfo.compilers;
+    cDetails.setFromCompilationInfo(res.targetCompilationInfo);
 
     CompilerBinary cBin = res.mainRequirement.cfg.getCompiler(compiler);
     redub.parsers.environment.setupEnvironmentVariablesForRootPackage(res.mainRequirement);
@@ -848,7 +858,7 @@ ProjectDetails resolveDependencies(
     import redub.libs.colorize;
     import redub.package_searching.dub;
     import std.conv:to;
-    ProjectDetails ret = ProjectDetails(tree, compiler, cDetails.parallelType, cDetails, proj, cDetails.useExistingObj, false, 0, resolveInfo.force);
+    ProjectDetails ret = ProjectDetails(tree, compiler, cDetails, proj, false, 0, resolveInfo.force);
     ret.bundle = resolveInfo.bundle;
 
     foreach(pkg; fetchedPackages)
@@ -860,7 +870,7 @@ ProjectDetails resolveDependencies(
     infos(
         "Resolved:", " - ", (st.peek.total!"msecs"), " ms \"",
         color(buildType, fg.magenta),"\" using ", cBin.bin," v", cBin.version_,
-        color(" ["~ cInfo.targetOS.to!string~ "-"~cInfo.isa.to!string~ "]", fg.light_cyan),
+        color(" ["~ res.targetCompilationInfo.targetOS.to!string~ "-"~res.targetCompilationInfo.isa.to!string~ "]", fg.light_cyan),
         " - ", color(inferParallel(ret).to!string~" parallel", fg.light_green)
     );
     return ret;

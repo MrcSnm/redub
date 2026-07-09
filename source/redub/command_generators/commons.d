@@ -34,7 +34,7 @@ OS osFromArch(string arch)
     else if(contains(arch, "openbsd")) return OS.openBSD;
     else if(contains(arch, "solaris")) return OS.solaris;
     else if(contains(arch, "posix")) return OS.otherPosix;
-    else if(contains(arch, "unknown")) return OS.unknown;
+    else if(contains(arch, "unknown") || contains(arch, "elf")) return OS.unknown;
 
     return std.system.os;
 }
