@@ -558,7 +558,7 @@ private bool isArch(string archRep)
 {
     switch(archRep)
     {
-        case "x86", "x86_64", "amd64", "x86_mscoff", "arm", "aarch64": return true;
+        case "x86", "x86_64", "amd64", "x86_mscoff", "arm", "aarch64", "wasm32", "wasm64": return true;
         default: return false;
     }
 }
@@ -570,6 +570,8 @@ private bool matchesArch(string archRep, ISA isa)
         case "x86_64":  return isa == x86_64;
         case "arm":     return isa == arm;
         case "aarch64": return isa == aarch64;
+        case "wasm32":  return isa == webAssembly;
+        case "wasm64":  return cast(ISAExtension)isa == ISAExtension.wasm64;
         default:
             throw new Exception("No appropriate switch clause found for architecture '"~archRep~"'");
     }

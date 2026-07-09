@@ -45,6 +45,7 @@ ISA isaFromArch(string arch)
     {
         if(contains(arch, "x86_64"))       return x86_64;
         else if(contains(arch, "aarch64")) return aarch64;
+        else if(contains(arch, "wasm64"))  return cast(ISA)ISAExtension.wasm64;
         else if(contains(arch, "wasm"))    return webAssembly;
         else if(contains(arch, "arm"))     return arm;
         else if(contains(arch, "x86"))     return x86;

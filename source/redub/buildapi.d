@@ -27,6 +27,11 @@ enum OSExtension
     visionOS
 }
 
+enum ISAExtension
+{
+    wasm64 = ISA.unknown + 1
+}
+
 /**
  * CompilingSession is important for the hash calculation and thus is passed all around while building.
  * This guarantees that if any of its configuration changes, a build can be retriggered or recovered
