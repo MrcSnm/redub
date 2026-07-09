@@ -294,7 +294,7 @@ int createNewProject(string projectType, string  single, string targetDirectory)
         errorTitle("Folder already has a project file: ", "'", targetDub, "' already exists.");
         return 1;
     }
-    else if(single.length)
+    if(single.length)
     {
         targetSingle = buildNormalizedPath(path, single);
         if(exists(targetSingle))
