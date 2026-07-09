@@ -1,4 +1,4 @@
-module command_generators.linkers;
+module redub.command_generators.linkers;
 public import redub.tooling.compiler_identification;
 public import redub.buildapi;
 public import std.system;
@@ -69,7 +69,8 @@ string[] parseLinkConfiguration(const ThreadBuildData data, CompilingSession s, 
             cmds = mapAppendPrefix(cmds, linkFlags, "-L", false);
             cmds = mapAppendPrefix(cmds, libraryPaths, "-L-L", true);
             cmds~= getLinkFiles(b.sourceFiles);
-            cmds = mapAppend(cmds, libraries, (string l) => "-L-l"~stripLibraryExtension(l));
+            import std.path:isAbsolute;
+            cmds = mapAppend(cmds, libraries, (string l) => l.isAbsolute ? ("-L"~l) : "-L-l"~stripLibraryExtension(l));
 
         }
     }
@@ -84,8 +85,6 @@ string[] parseLinkConfigurationMSVC(const ThreadBuildData data, CompilingSession
     import std.string;
     import redub.building.cache;
 
-
-    if(!s.os.isWindows) return parseLinkConfiguration(data, s, requirementCache);
     string[] cmds;
     const BuildConfiguration b = data.cfg;
     CompilerBinary c = b.getCompiler(s.compiler);

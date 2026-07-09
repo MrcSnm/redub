@@ -47,8 +47,9 @@ string[] getCompilationFlags(const BuildConfiguration cfg, CompilingSession s, s
 
 string[] getLinkFlags(const ThreadBuildData data, CompilingSession s, string mainPackHash)
 {
-    import command_generators.linkers;
-    version(Windows)
+    import redub.command_generators.commons;
+    import redub.command_generators.linkers;
+    if(isWindows(s.os))
         return parseLinkConfigurationMSVC(data, s, mainPackHash);
     else
         return parseLinkConfiguration(data, s, mainPackHash);

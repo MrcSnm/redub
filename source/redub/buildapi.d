@@ -722,15 +722,10 @@ ref string[] exclusiveMergePaths(StringRange)(return scope ref string[] a, Strin
 ref string[] inPlaceFilter(return scope ref string[] a, bool function(string obj) shouldInclude)
 {
     size_t includeLength = 0;
-    for(int i = 0; i < a.length; i++)
+    foreach(str; a)
     {
-        if(!shouldInclude(a[i]))
-        {
-            a[i] = a[i+1];
-            i++;
-        }
-        else
-            includeLength++;
+        if(shouldInclude(str))
+            a[includeLength++] = str;
     }
     a.length = includeLength;
     return a;
