@@ -1,0 +1,15 @@
+{
+    "authors": [
+        "Marcelo"
+    ],
+    "preBuildCommands": ["echo Pre-Build"],
+    "postGenerateCommands": ["echo Post Generate"],
+    "postBuildCommands": ["echo Post Build"],
+    "preRunCommands": ["echo Pre Run"],
+    "postRunCommands": ["echo Post Run"],
+    "preGenerateCommands": ["echo Pre-Generate"],
+    "description": "A minimal D application.",
+	"targetPath": "build",
+    "license": "proprietary",
+    "name": "test-commands"
+}

@@ -131,12 +131,6 @@ void addImportPaths(ref BuildRequirements req, JSONStringArray paths, ParseConfi
 void addStringImportPaths(ref BuildRequirements req, JSONStringArray paths, ParseConfig c){req.cfg.stringImportPaths.exclusiveMergePaths(paths);}
 void addExtraDependencyFiles(ref BuildRequirements req, JSONStringArray files, ParseConfig c){req.cfg.extraDependencyFiles.exclusiveMerge(files);}
 void addFilesToCopy(ref BuildRequirements req, JSONStringArray files, ParseConfig c){req.cfg.filesToCopy = req.cfg.filesToCopy.append(files);}
-void addPreGenerateCommands(ref BuildRequirements req, JSONStringArray cmds, ParseConfig c)
-{
-    if(req.cfg.commands.length <= RedubCommands.preGenerate)
-        req.cfg.commands.length = RedubCommands.preGenerate + 1;
-    req.cfg.commands[RedubCommands.preGenerate] = req.cfg.commands[RedubCommands.preGenerate].append(cmds);
-}
 
 void runPreGenerateCommands(ParseConfig c, ref BuildRequirements req)
 {
@@ -162,41 +156,19 @@ void runPreGenerateCommands(ParseConfig c, ref BuildRequirements req)
         }
     }
 }
-void addPostGenerateCommands(ref BuildRequirements req, JSONStringArray cmds, ParseConfig c)
-{
-    if(req.cfg.commands.length <= RedubCommands.postGenerate)
-        req.cfg.commands.length = RedubCommands.postGenerate + 1;
-    req.cfg.commands[RedubCommands.postGenerate] = req.cfg.commands[RedubCommands.postGenerate].append(cmds);
-}
+
 void addPreBuildPlugins(ref BuildRequirements req, string pluginName, JSONStringArray cmds, ParseConfig c)
 {
     string[] output;
     req.cfg.preBuildPlugins~= PluginExecution(pluginName, append(output, cmds));
 }
-void addPreBuildCommands(ref BuildRequirements req, JSONStringArray cmds, ParseConfig c)
+void addCommands(ref BuildRequirements req, JSONStringArray cmds, ParseConfig c, RedubCommands redubCommand)
 {
-    if(req.cfg.commands.length <= RedubCommands.preBuild)
-        req.cfg.commands.length = RedubCommands.preBuild + 1;
-    req.cfg.commands[RedubCommands.preBuild] = req.cfg.commands[RedubCommands.preBuild].append(cmds);
+    if(req.cfg.commands.length <= redubCommand)
+        req.cfg.commands.length = redubCommand + 1;    
+    req.cfg.commands[redubCommand] = req.cfg.commands[redubCommand].append(cmds);
 }
-void addPostBuildCommands(ref BuildRequirements req, JSONStringArray cmds, ParseConfig c)
-{
-    if(req.cfg.commands.length <= RedubCommands.postBuild)
-        req.cfg.commands.length = RedubCommands.postBuild + 1;
-    req.cfg.commands[RedubCommands.postBuild] = req.cfg.commands[RedubCommands.postBuild].append(cmds);
-}
-void addPreRunCommands(ref BuildRequirements req, JSONStringArray cmds, ParseConfig c)
-{
-    if(req.cfg.commands.length <= RedubCommands.preRun)
-        req.cfg.commands.length = RedubCommands.preRun + 1;
-    req.cfg.commands[RedubCommands.preRun] = req.cfg.commands[RedubCommands.preRun].append(cmds);
-}
-void addPostRunCommands(ref BuildRequirements req, JSONStringArray cmds, ParseConfig c)
-{
-    if(req.cfg.commands.length <= RedubCommands.postRun)
-        req.cfg.commands.length = RedubCommands.postRun + 1;
-    req.cfg.commands[RedubCommands.postRun] = req.cfg.commands[RedubCommands.postRun].append(cmds);
-}
+
 void addSourcePaths(ref BuildRequirements req, JSONStringArray paths, ParseConfig c)
 {
     import std.array;

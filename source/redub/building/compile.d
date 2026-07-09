@@ -64,13 +64,14 @@ string[string] getCurrentEnv()
 /**
  * If any command fails, stop executing and return.
  */
-private ExecutionResult executeCommands(const(string[])[] commands, RedubCommands list, ref CompilationResult res, string workingDir, const string[string] env)
+private ExecutionResult executeCommands(const BuildConfiguration cfg, RedubCommands list, ref CompilationResult res, const string[string] env)
 {
     import std.process;
-    const string[] commandsList = commands.length > list ? commands[list] : null;
+    import std.string:strip;
+    const string[] commandsList = cfg.commands.length > list ? cfg.commands[list] : null;
     foreach(cmd; commandsList)
     {
-        auto execRes  = cast(ExecutionResult)executeShell(cmd, env, Config.none, size_t.max, workingDir);
+        auto execRes  = cast(ExecutionResult)executeShell(cmd, env, Config.none, size_t.max, cfg.workingDir);
         if(execRes.status)
         {
             import std.conv:to;
@@ -80,8 +81,9 @@ private ExecutionResult executeCommands(const(string[])[] commands, RedubCommand
         }
         else
         {
+            import std.conv:to;
             if(execRes.output.length)
-                res.message~= execRes.output;
+                res.message~= "\t" ~list.to!string~" Running commands for "~cfg.name~": "~execRes.output.strip;
         }
     }
     return ExecutionResult(0, "Success");
@@ -128,7 +130,7 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
         if(exists(outDir))
             remove(outDir);
 
-        if(executeCommands(cfg.commands, RedubCommands.preBuild, res, cfg.workingDir, data.env).status)
+        if(executeCommands(data.cfg, RedubCommands.preBuild, res, data.env).status)
             return res;
 
         import redub.plugin.load;
@@ -190,7 +192,7 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
 
         if(res.status == 0)
         {
-            if(!cfg.targetType.isLinkedSeparately && executeCommands(cfg.commands, RedubCommands.postBuild, res, cfg.workingDir, data.env).status)
+            if(!cfg.targetType.isLinkedSeparately && executeCommands(cfg, RedubCommands.postBuild, res, data.env).status)
                 return res;
         }
     }
@@ -251,15 +253,22 @@ CompilationResult link(ProjectNode root, string rootHash, const ThreadBuildData 
     }
     copyDir(inDir, data.cfg.outputDirectory);
 
-
-
-    if(data.cfg.targetType.isLinkedSeparately)
-    {
-        if(executeCommands(data.cfg.commands, RedubCommands.postBuild, ret, data.cfg.workingDir, data.env).status)
-            return ret;
-    }
-
     return ret;
+}
+
+
+bool executeCommandsAndPrint(BuildRequirements req, RedubCommands phase, const string[string] env)
+{
+    import std.conv:to;
+    CompilationResult res;
+    if(executeCommands(req.cfg, phase, res, env).status)
+    {
+        errorTitle(phase.to!string~" Error ", "for ",req.name,": ", res.message);
+        return false;
+    }
+    else if(res.message.length)
+        info(res.message);
+    return true;
 }
 
 
@@ -283,12 +292,8 @@ bool buildProjectParallelSimple(ProjectDetails details, CompilingSession s, cons
         {
             if(!(dep in spawned))
             {
-                CompilationResult res;
-                if(executeCommands(dep.requirements.cfg.commands, RedubCommands.postGenerate, res, dep.requirements.cfg.workingDir, env).status)
-                {
-                    errorTitle("Post Generate Error: ", res.message);
+                if(!executeCommandsAndPrint(dep.requirements, RedubCommands.postGenerate, env))
                     return false;
-                }
                 if(dep.shouldEnterCompilationThread)
                 {
                     spawned[dep] = true;
@@ -385,12 +390,8 @@ bool buildProjectFullyParallelized(ProjectDetails details, CompilingSession s, c
     ProjectNode priority = root.findPriorityNode();
     foreach(ProjectNode pack; root.collapse)
     {
-        CompilationResult res;
-        if(executeCommands(pack.requirements.cfg.commands, RedubCommands.postGenerate, res, pack.requirements.cfg.workingDir, env).status)
-        {
-            errorTitle("Post Generate Error: ", res.message);
+        if(!executeCommandsAndPrint(pack.requirements, RedubCommands.postGenerate, env))
             return false;
-        }
         if(pack.shouldEnterCompilationThread)
         {
             sentPackages++;
@@ -504,14 +505,8 @@ bool buildProjectSingleThread(ProjectDetails details, CompilingSession s, const(
         ProjectNode finishedPackage;
         foreach(dep; dependencyFreePackages)
         {
-            {
-                CompilationResult res;
-                if(executeCommands(dep.requirements.cfg.commands, RedubCommands.postGenerate, res, dep.requirements.cfg.workingDir, env).status)
-                {
-                    errorTitle("Post Generate Error: ", res.message);
-                    return false;
-                }
-            }
+            if(!executeCommandsAndPrint(dep.requirements, RedubCommands.postGenerate, env))
+                return false;
             if(dep.shouldEnterCompilationThread)
             {
                 CompilationResult res = execCompilation(dep.requirements.buildData(true, s, getEnvForProject(dep, env)), cast(shared)dep,
@@ -699,10 +694,13 @@ private bool doLink(ProjectDetails details, CompilingSession info, string mainPa
     if(!shouldSkipLinking)
     {
         CompilationResult linkRes;
+        const string[string] targetEnv = getEnvForProject(root, env ? env : cast(const)getCurrentEnv());
+
         auto result = timed(() {
-             linkRes = link(root, mainPackHash, root.requirements.buildData(true, info, getEnvForProject(root, env ? env : cast(const)getCurrentEnv())), info);
-             return true;
+            linkRes = link(root, mainPackHash, root.requirements.buildData(true, info, targetEnv), info);
+            return true;
         });
+
         if(linkRes.status)
         {
             import redub.misc.github_tag_check;
@@ -729,6 +727,12 @@ private bool doLink(ProjectDetails details, CompilingSession info, string mainPa
                 redub.logging.info(linkRes.message.stripRight);
             infos("Linked: ", root.name, " - ", result.msecs, "ms");
             vlog("\n\t", linkRes.compilationCommand, " \n");
+
+            if(root.requirements.cfg.targetType.isLinkedSeparately)
+            {
+                if(!executeCommandsAndPrint(root.requirements, RedubCommands.postBuild, targetEnv))
+                    return false;
+            }
         }
     }
     ///Try copying if it already exists, this operation is fast anyway for up to date builds.
