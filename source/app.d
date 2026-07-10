@@ -139,15 +139,23 @@ int runMain(string[] args, string[] runArgs)
     if(!d.tree || d.usesExternalErrorCode)
         return d.getReturnCode;
     if(d.tree.requirements.cfg.targetType != TargetType.executable)
+    {
+        warnTitle("Warning: Unexpected Run", "Built target is an '", d.tree.requirements.cfg.targetType, "'not an executable. Build with 'redub build' to not get this warning message.'");
         return 1;
+    }
 
     if(d.tree.name == "redub")
         return 0;
     import std.system;
     if(d.cDetails.targetOS != std.system.os)
     {
-        warnTitle("Cross Compilation Warning: ", "Built target can't be run since it was cross-compiled to '",d.cDetails.targetOS, "'");
-        return 2;
+        if(!d.tree.requirements.cfg.runCommand.length)
+        {
+            warnTitle("Cross Compilation Warning: ", "Built target can't be run since it was cross-compiled to '",d.cDetails.targetOS, 
+                "'. \n\tDefine a \"runCommand\" inside your recipe: \"runCommand\": [\"nxlink\", \"${BUILD_ARTIFACT}\", \"-s\"]"
+            );
+            return 2;
+        }
     }
 
     int ret = executeProgram(d, runArgs);

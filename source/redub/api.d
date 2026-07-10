@@ -993,11 +993,29 @@ int executeProgram(ProjectDetails details, string[] args)
         if(ret != 0)
             return ret;
     }
-    ret = wait(spawnShell(
-        escapeShellCommand(getOutputPath(tree.requirements.cfg, os)) ~ " "~ join(args, " "), stdin, stdout,
-        stderr, getRedubEnv, Config.none, tree.requirements.cfg.runtimeWorkingDir
-        )
-    );
+
+    if(tree.requirements.cfg.runCommand.length)
+    {
+        string artifact = getOutputPath(tree.requirements.cfg, os);
+        setEnvVariable("BUILD_ARTIFACT", artifact);
+        string[] cmds = arrParseEnv(tree.requirements.cfg.runCommand);
+
+        string targetRunCommand = join(cmds, " ") ~ " " ~join(args, " ");
+
+        ret = wait(spawnShell(
+            targetRunCommand, stdin, stdout,
+            stderr, getRedubEnv, Config.none, tree.requirements.cfg.runtimeWorkingDir
+            )
+        );
+    }
+    else
+    {
+        ret = wait(spawnShell(
+            escapeShellCommand(getOutputPath(tree.requirements.cfg, os)) ~ " "~ join(args, " "), stdin, stdout,
+            stderr, getRedubEnv, Config.none, tree.requirements.cfg.runtimeWorkingDir
+            )
+        );
+    }
     if(ret != 0)
         return ret;
     foreach(string cmd; tree.requirements.cfg.postRunCommands)

@@ -7,7 +7,7 @@ import redub.package_searching.api;
 
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.30.0";
+enum RedubVersionOnly = "v1.31.0";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -251,7 +251,8 @@ enum RedubCommands : ubyte
     preBuild,
     postBuild,
     preRun,
-    postRun
+    postRun,
+    run ///Addition on redub to let you launch your artifact when cross compiling with a target.
 }
 
 enum BuildConfigurationFlags : ubyte
@@ -491,6 +492,8 @@ struct BuildConfiguration
         BuildConfiguration ret = clone;
         if(isRoot)
         {
+            if(other.commands.length)
+                ret = ret.mergeCommands(other);
             ret.filesToCopy.exclusiveMergePaths(other.filesToCopy);
             ret.sourceFiles.exclusiveMerge(other.sourceFiles);
             ret.excludeSourceFiles.exclusiveMerge(other.excludeSourceFiles);
@@ -662,6 +665,10 @@ struct BuildConfiguration
         const(string[]) postRunCommands() const
         {
             return commands.length > RedubCommands.postRun ? commands[RedubCommands.postRun] : null;
+        }
+        const(string[]) runCommand() const
+        {
+            return commands.length > RedubCommands.run ? commands[RedubCommands.run] : null;
         }
     }
 }

@@ -172,7 +172,8 @@ Ever wanted to configure a default compiler/arch based on the configuration? Now
       "versions": ["PSVita"],
       "dependencies": {
         "custom-rt": {"path": "my/custom/runtime"}
-      }
+      },
+      "runCommand": ["nxlink", "${DUB_ROOT_PACKAGE}.nro"] //New addition to redub. If you're cross-compiling, you can define a specific run command that will be used instead of just launching from shell the executable.
     }
   }
 }

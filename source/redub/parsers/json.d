@@ -188,6 +188,15 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
         "postBuildCommands": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){addCommands(req, v.strArr, c, RedubCommands.postBuild);},
         "preRunCommands": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){addCommands(req, v.strArr, c, RedubCommands.preRun);},
         "postRunCommands": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){addCommands(req, v.strArr, c, RedubCommands.postRun);},
+        "runCommand": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _)
+        {
+            import redub.api:BuildException;
+            if(!c.extra.isTarget)
+                throw new BuildException("runCommand can only be set inside a \"targets\" target. It is a single command which is concatenated "~
+                    "You may reference your build artifact by using ${BUILD_ARTIFACT}"
+                );
+            addCommands(req, v.strArr, c, RedubCommands.run);
+        },
         "copyFiles": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){addFilesToCopy(req, v.strArr, c);},
         "extraDependencyFiles": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){addExtraDependencyFiles(req, v.strArr, c);},
         "sourcePaths": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){addSourcePaths(req, v.strArr, c);},
