@@ -156,6 +156,19 @@ string downloadPackageTo(return string path, string packageName, string repo, Se
 
     ///Create a temporary directory for outputting downloaded version. This will ensure a single version is found on getFirstFile
     string tempPath = buildNormalizedPath(path, "temp");
+
+    if(std.file.exists(tempPath))
+    {
+        import core.time:Duration;
+        import std.datetime;
+        Duration d = (Clock.currTime() - DirEntry(tempPath).timeLastModified);
+        if(d.total!"minutes" >= 3) //Delete if older than 3 minutes and checking from another process as one may kill the process.
+        {
+            warnTitle("Recovering from unexpected shutdown after 3 minutes in path ", tempPath);
+            std.file.rmdirRecurse(tempPath); 
+        }
+        
+    }
     size_t timeout = 10_000;
     __gshared DownloadData[string] downloadedPackages;
 
