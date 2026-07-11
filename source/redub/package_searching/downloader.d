@@ -24,9 +24,22 @@ string getGitDownloadLink(string packageName, string repo, string branch)
         downloadLink = repo~"/-/archive/"~branch~"/"~encodeComponent(packageName)~"-"~branch~".zip";
     else if(repo.canFind("bitbucket.com"))
         downloadLink = repo~"/get/"~encodeComponent(packageName)~"-"~branch~".zip";
-    else
+    else if(repo.canFind("github.com"))
     {
-        ///Github, Gitea and GitBucket all use the same style
+        //Github has changed recently to other format.
+        if(branch.length)
+        {
+            if(branch[0] == '~')
+                downloadLink = repo~"/archive/refs/heads/"~branch[1..$]~".zip";
+            else
+                downloadLink = repo~"/archive/refs/tags/"~branch~".zip";
+        }
+        else
+            throw new Exception("Unexpected Empty Branch.");
+    }
+    else 
+    {
+        ///Gitea and GitBucket all use the same style
         downloadLink = repo~"/archive/"~branch~".zip";
     }
     return downloadLink;
@@ -34,14 +47,17 @@ string getGitDownloadLink(string packageName, string repo, string branch)
 
 string getDownloadLink(string packageName, string repo, SemVer requirement, out SemVer actualVer)
 {
-    if(requirement.isInvalid)
+    if(repo.length)
     {
-        if(!repo)
-            throw new Exception("Can't have invalid requirement '"~requirement.toString~"' and have no 'repository' information.
-            \nExample of repository with branch usage: \"redub\": {\"version\": \"~master\", \"repository\": \"git+https://github.com/MrcSnm/redub.git\"}");
+        if(!requirement.isInvalid)
+            throw new Exception("Package '"~packageName~"' should specify a repository branch, not semver: ["~requirement.toString ~
+            "]\n\tExample of repository with branch usage: \"redub\": {\"version\": \"~master\", \"repository\": \"git+https://github.com/MrcSnm/redub.git\"}"~
+            "\n\tBranches should start with '~' otherwise, in github, it will be treated as a tag.");
         actualVer = requirement;
         return getGitDownloadLink(packageName, repo, requirement.toString);
     }
+    else if(requirement.isInvalid)
+        throw new Exception("version for package '"~packageName~"' is invalid ["~requirement.toString~"]. verion may only be used as a git branch if a \"repository\" is specified.");
     return supplier.getBestPackageDownloadUrl(packageName, requirement, actualVer);
 }
 
@@ -81,11 +97,29 @@ ubyte[] fetchPackage(string packageName, string repo, SemVer requirement, out Se
 string downloadPackageTo(return string path, string packageName, string repo,  SemVer requirement, out SemVer out_actualVersion, out string url)
 {
     import redub.libs.package_suppliers.utils;
+    import redub.logging;
+    import std.zip;
     ubyte[] zipContent = fetchPackage(packageName, repo, requirement, out_actualVersion, url);
     if(!zipContent)
         return null;
-    if(!extractZipToFolder(zipContent, path))
-        throw new Exception("Error while trying to extract zip to path "~path);
+    
+    if(hasLogLevel(LogLevel.verbose))
+        vlog("Extracting package ",packageName, " from repository ", repo, " with branch ", requirement.toString, " to path ", path, " [",url,"]");
+
+    bool extracted = false;
+    try
+    {
+        extracted = extractZipToFolder(zipContent, path);
+    }
+    catch(ZipException e) {}
+    finally
+    {
+        if(!extracted)
+            throw new Exception("Error while trying to extract zip to path "~path~
+            "\nPackage "~packageName~ " repository "~ repo~ " with branch "~ requirement.toString~ " download link [" ~ url~"]"
+        );
+
+    }
     return path;
 }
 

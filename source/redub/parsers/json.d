@@ -334,6 +334,11 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
                     version_ = tryStr(value, "version");
                     repo = tryStr(value, "repository");
                     visibility = value.tryStr("visibility");
+                    if(repo.length)
+                    {
+                        enforce(version_, 
+                        "Dependency named "~depName~" specified the repository "~repo~" but no branch was specified. Specify its branch at \"version\".");
+                    }
                     enforce(version_ || path,
                         "Dependency named "~ depName ~
                         " must contain at least a \"path\" or \"version\" property."
