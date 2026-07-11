@@ -388,25 +388,28 @@ int useMain(string[] args)
     if(args.length == 1)
         return errorMessage();
 
-    static string tryGetCompiler(AcceptedCompiler comp, string versionOrPath, out bool useInternalCompilers)
+    static string tryGetCompiler(AcceptedCompiler comp, string compilerPath, out bool useInternalCompilers)
     {
-        bool useDefaultBehavior = versionOrPath.length == 0;
+        bool useDefaultBehavior = compilerPath.length == 0;
         string compiler = comp == AcceptedCompiler.dmd ? "dmd" : "ldc2";
         if(useDefaultBehavior)
         {
             import redub.tooling.compiler_identification;
             CompilerBinary bin = searchCompiler(compiler, false);
             if(bin.compiler == comp)
+            {
+                useInternalCompilers = true;
                 return bin.bin;
+            }
         }
-        else if(exists(versionOrPath)) //Path
+        else if(exists(compilerPath)) //Path
         {
-            CompilerBinary bin = searchCompiler(versionOrPath, false);
+            CompilerBinary bin = searchCompiler(compilerPath, false);
             if(bin.compiler != comp)
-                throw new RedubException("Attempt to use path "~versionOrPath~" as a "~compiler~" compiler, but it is a "~bin.getCompilerString);
+                throw new RedubException("Attempt to use path "~compilerPath~" as a "~compiler~" compiler, but it is a "~bin.getCompilerString);
+            useInternalCompilers = true;
             return bin.bin;
         }
-        useInternalCompilers = true;
         return null;
     }
 
@@ -432,19 +435,21 @@ int useMain(string[] args)
     else if(compiler == "ldc" || compiler == "ldc2")
     {
         import redub.api;
-        string ldcVer = args.length > 2 ? args[2] : null;
+        string ldcVerOrPath = args.length > 2 ? args[2] : null;
         bool useInternal;
-        string ldcBin = tryGetCompiler(AcceptedCompiler.ldc2, ldcVer, useInternal);
-        if(useInternal)
+        string ldcBin = tryGetCompiler(AcceptedCompiler.ldc2, ldcVerOrPath, useInternal);
+        if(!useInternal)
         {
             import redub.misc.ldc_install;
             import redub.misc.github_tag_check;
             enum ldcRepo = "ldc-developers/ldc";
 
-            ldcVer = getLatestGitRepositoryTag(ldcRepo);
-            string ldcFolder = getLdcFolder(ldcVer);
+            if(!ldcVerOrPath)
+                ldcVerOrPath = getLatestGitRepositoryTag(ldcRepo);
+            string ldcFolder = getLdcFolder(ldcVerOrPath);
+
             if(!exists(ldcFolder))
-                installLdc(ldcVer);
+                installLdc(ldcVerOrPath);
             version(Windows)
                 ldcBin = buildNormalizedPath(ldcFolder, "ldc2.exe");
             else
@@ -455,13 +460,17 @@ int useMain(string[] args)
     else if(compiler == "dmd")
     {
         import redub.misc.dmd_install;
-        string dmdVer = args.length > 2 ? args[2] : DefaultDMDVersion;
+        string dmdVerOrPath = args.length > 2 ? args[2] : null;
         bool useInternal;
-        string dmdBin = tryGetCompiler(AcceptedCompiler.dmd, dmdVer, useInternal);
-        if(useInternal)
+        string dmdBin = tryGetCompiler(AcceptedCompiler.dmd, dmdVerOrPath, useInternal);
+        import std.stdio;
+        writeln("DMD ", dmdBin);
+        if(!useInternal)
         {
-            string dmdFolder = getDmdFolder(dmdVer);
-            if(!exists(dmdFolder) && !installDmd(dmdVer))
+            if(!dmdVerOrPath)
+                dmdVerOrPath = DefaultDMDVersion;
+            string dmdFolder = getDmdFolder(dmdVerOrPath);
+            if(!exists(dmdFolder) && !installDmd(dmdVerOrPath))
             {
                 error("Could not install DMD for using it.");
                 return 1;
