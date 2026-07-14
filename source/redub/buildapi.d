@@ -981,7 +981,7 @@ struct BuildRequirements
             else
             {
                 if(dep.subConfiguration != ret.dependencies[index].subConfiguration)
-                    enforce(ret.dependencies[index].subConfiguration.isDefault, "Can't merge 2 non default subConfigurations.");
+                    enforce(ret.dependencies[index].subConfiguration.isDefault, "Can't merge 2 non default subConfigurations. ["~dep.subConfiguration.name~"] x ["~ret.dependencies[index].subConfiguration.name~"] in dependency "~dep.name);
                 ret.dependencies[index].subConfiguration = dep.subConfiguration;
             }
         }
