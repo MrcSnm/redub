@@ -372,6 +372,7 @@ BuildConfiguration parseEnvironment(BuildConfiguration cfg)
             )
                 __traits(getMember, cfg, mem) = arrParseEnv(__traits(getMember, cfg, mem));
         }
+        if(cfg.targetName.length) cfg.targetName = parseStringWithEnvironment(cfg.targetName);
         if(cfg.commands.length > RedubCommands.postGenerate)
             cfg.commands[RedubCommands.postGenerate] = arrParseEnv(cfg.commands[RedubCommands.postGenerate]);
         if(cfg.commands.length > RedubCommands.preBuild)

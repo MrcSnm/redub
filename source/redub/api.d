@@ -838,7 +838,6 @@ ProjectDetails resolveDependencies(
     cDetails.setFromCompilationInfo(res.targetCompilationInfo);
 
     CompilerBinary cBin = res.mainRequirement.cfg.getCompiler(compiler);
-    redub.parsers.environment.setupEnvironmentVariablesForRootPackage(res.mainRequirement);
     if(cDetails.includeEnvironmentVariables)
         res.mainRequirement.cfg = res.mainRequirement.cfg.merge(redub.parsers.environment.parse());
 

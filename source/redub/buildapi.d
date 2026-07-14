@@ -7,7 +7,7 @@ import redub.package_searching.api;
 
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.31.3";
+enum RedubVersionOnly = "v1.31.4";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -492,8 +492,10 @@ struct BuildConfiguration
         BuildConfiguration ret = clone;
         if(isRoot)
         {
+            import std.algorithm.comparison;
             if(other.commands.length)
                 ret = ret.mergeCommands(other);
+            ret.targetName = either(other.targetName, ret.targetName);
             ret.filesToCopy.exclusiveMergePaths(other.filesToCopy);
             ret.sourceFiles.exclusiveMerge(other.sourceFiles);
             ret.excludeSourceFiles.exclusiveMerge(other.excludeSourceFiles);

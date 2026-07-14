@@ -86,23 +86,27 @@ RootParseResult parseProject(
 )
 {
     import redub.parsers.base;
+    import redub.parsers.json;
 
     RootParseResult result;
 
     ParseConfig cfg = getParseConfig(projectWorkingDir, cInfo, null, null, subConfiguration, subPackage, null, isDescribeOnly);
-
+    TargetInfo targetInfo;
     if(target.length)
     {
-        import redub.parsers.json;
-        TargetInfo targetInfo = redub.parsers.json.getTarget(projectJSON, target, cfg);
+        targetInfo = redub.parsers.json.getTarget(projectJSON, target, cfg);
         cfg = targetInfo.parseConfig;
         cInfo = cfg.cInfo;
-        result.targetRequirement = postProcessBuildRequirements(targetInfo.targetRequirement, targetInfo.pending, cInfo, false, useExistingObj);
     }
     result.targetCompilationInfo = cInfo;
     BuildConfiguration pending;
     result.mainRequirement = redub.parsers.json.parse(projectJSON, cfg, pending, true);
     result.mainRequirement= postProcessBuildRequirements(result.mainRequirement, pending, cInfo, true, useExistingObj);
+    redub.parsers.environment.setupEnvironmentVariablesForRootPackage(result.mainRequirement);
+    //Post process for target must be after setting up env variables for root as it may access them.
+    if(target.length)
+        result.targetRequirement = postProcessBuildRequirements(targetInfo.targetRequirement, targetInfo.pending, cInfo, false, useExistingObj);
+
 
     return result;
 }
