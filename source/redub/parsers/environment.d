@@ -238,6 +238,7 @@ string parseStringWithEnvironment(string str)
     struct VarPos
     {
         size_t start, end;
+        string envValue;
     }
     VarPos[] variables;
     ptrdiff_t diffLength;
@@ -245,49 +246,42 @@ string parseStringWithEnvironment(string str)
     {
         if(str[i] == '$')
         {
-            if(i + 1 < str.length && str[i+1] == '{')
+            ptrdiff_t end = i;
+            string envValue;
+            if(i + 1 < str.length && str[i+1] == '$')
             {
-                int end = cast(int)indexOf(str, '}', i);
-                enforce(++end != 0, "Could not find matching brackets at "~str);
-                variables~= VarPos(i, end);
-                i = end;
+                end = i+2;
+                envValue = "$";
+            }
+            else if(i + 1 < str.length && str[i+1] == '{')
+            {
+                end = cast(int)indexOf(str, '}', i);
+                enforce(++end != 0, "Could not find matching brackets at "~str); //Advance the }
+                envValue = getEnvVariable(str[i+2..end-1]);
             }
             else
             {
-                size_t start = i+1;
-                size_t end = start;
+                end = i+1;
                 while(end < str.length && (str[end].isAlphaNum || str[end] == '_')) end++;
-                variables~= VarPos(i, end);
-                i = cast(int)end;
+                if(end == i+1)
+                    continue;
+                envValue = getEnvVariable(str[i+1..end]);
             }
+            if(envValue.length)
+                variables ~= VarPos(i, end, envValue);
+            i = cast(int)end - 1;
         }
     }
     if(variables.length == 0)
         return str;
 
     char[] ret;
-    ///Count the difference length between input string and output string and remove inexisntet variables.
+    ///Count the difference length between input string and output string
     for(int i = 0; i < variables.length; i++)
     {
         VarPos v = variables[i];
-        bool useBrackets = v.end > 0 && str[v.end - 1] == '}';
-        int bracketOffset = useBrackets ? 1 : 0;
-        string strVar = str[v.start+1 + bracketOffset..v.end - bracketOffset];
-        diffLength-= 1+strVar.length + bracketOffset*2; //$.length + (abcd).length {}.length (optionally)
-
-
-        if(strVar.length == 0) //$
-            continue;
-        string envValue = getEnvVariable(strVar);
-        if(!envValue.length)
-        {
-            variables = variables[0..i] ~ variables[i+1..$];
-            i--;
-            continue;
-        }
-        diffLength+= envValue.length;
+        diffLength = diffLength - (v.end - v.start) + v.envValue.length;
     }
-	if(variables.length == 0) return str;
 	
     ret = new char[](str.length+diffLength);
 	size_t outStart;
@@ -302,17 +296,12 @@ string parseStringWithEnvironment(string str)
     ///Starts appending text or variable depending on the variable positions
 	foreach(v; variables)
 	{
-		//Remove the $ {} optionally
-        int bracketOffset = v.end > 0 && str[v.end - 1] == '}';
-		string envVar = str[v.start+1 + bracketOffset..v.end - bracketOffset];
-
         ///Copy text up to the variable 
         string leftText = str[srcStart..v.start];
         appendToRet(leftText);
 
         ///Insert the variable value
-        if(envVar.length)
-            appendToRet(getEnvVariable(envVar));
+        appendToRet(v.envValue);
 
         ///Move the start pointer past the variable
 		srcStart = v.end;
