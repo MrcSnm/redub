@@ -1,9 +1,32 @@
 # Redub - Dub Based Build System
 [![Update release and nightly](https://github.com/MrcSnm/redub/actions/workflows/ci.yml/badge.svg)](https://github.com/MrcSnm/redub/actions/workflows/ci.yml)
 
+## Install (recommended)
+
+Download a `*-portable.zip` / `*-portable.tar.gz` from [Releases](https://github.com/MrcSnm/redub/releases), extract, then put `redub` on your PATH:
+
+```powershell
+# Windows
+powershell -ExecutionPolicy Bypass -File .\install.ps1
+```
+
+```bash
+# Linux / macOS
+bash ./install.sh
+```
+
+```nu
+# Nushell (any OS)
+nu install.nu
+```
+
+After that, `redub` works in new shells. `redub update` keeps an installed binary current.
+
+Details: [`installer/README.md`](installer/README.md).
+
 ## Redub for dub users
-- Change directory to the project you want to build and enter in terminal `dub run redub`
-  > To fully take advantage of redub speed, you might as well use redub directly.
+- Or, without installing: change directory to the project you want to build and run `dub run redub`
+  > To fully take advantage of redub speed, install the release binary (above) and use `redub` directly.
 
 ## Building redub
 - Enter in terminal and execute [`dub`](https://github.com/dlang/dub)

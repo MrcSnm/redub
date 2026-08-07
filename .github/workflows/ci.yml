@@ -161,6 +161,44 @@ jobs:
         fetch-depth: 0
         fetch-tags: true
 
+    - name: Stage portable packages with PATH installers
+      run: |
+        set -euo pipefail
+        INST=repository/installer
+        cp "$INST/install.ps1" redub-install.ps1
+        cp "$INST/install.sh" redub-install.sh
+        cp "$INST/install.nu" redub-install.nu
+
+        # Windows: zip containing redub.exe + installers (Expand-Archive friendly).
+        shopt -s nullglob
+        for f in redub-*-windows-*.exe; do
+          base="${f%.exe}"
+          stage=$(mktemp -d)
+          cp "$f" "$stage/redub.exe"
+          cp "$INST"/install.ps1 "$INST"/install.sh "$INST"/install.nu "$stage/"
+          if [[ -f repository/LICENSE ]]; then cp repository/LICENSE "$stage/"; fi
+          (cd "$stage" && zip -q -r "$GITHUB_WORKSPACE/${base}-portable.zip" .)
+          rm -rf "$stage"
+        done
+
+        # Linux / macOS: tar.gz with `redub` + installers.
+        for f in redub-*-linux-* redub-*-osx-*; do
+          case "$f" in
+            *.exe|*.zip|*.tar.gz|*.ps1|*.sh|*.nu) continue ;;
+          esac
+          [[ -f "$f" ]] || continue
+          base="$f"
+          stage=$(mktemp -d)
+          cp "$f" "$stage/redub"
+          chmod +x "$stage/redub"
+          cp "$INST"/install.ps1 "$INST"/install.sh "$INST"/install.nu "$stage/"
+          if [[ -f repository/LICENSE ]]; then cp repository/LICENSE "$stage/"; fi
+          tar -C "$stage" -czf "${base}-portable.tar.gz" .
+          rm -rf "$stage"
+        done
+        shopt -u nullglob
+        ls -la redub-*
+
     - name: Get latest tag for nightly
       if: startsWith(github.ref, 'refs/heads/main')
       run: |
@@ -180,6 +218,18 @@ jobs:
         cd repository
         echo "Describe from ${{ env.latest_tag }} to HEAD"
         git log --oneline ${{ env.latest_tag }}..HEAD > ../release_notes.txt
+        {
+          echo ""
+          echo "## Install (PATH)"
+          echo ""
+          echo "Prefer a \`*-portable.zip\` / \`*-portable.tar.gz\` asset, extract, then:"
+          echo ""
+          echo "- **Windows:** \`powershell -ExecutionPolicy Bypass -File .\\install.ps1\`"
+          echo "- **Linux / macOS:** \`bash ./install.sh\`"
+          echo "- **Nushell:** \`nu install.nu\`"
+          echo ""
+          echo "Bare binaries are unchanged for existing workflows. See \`installer/README.md\`."
+        } >> ../release_notes.txt
 
     - name: Publish release
       uses: ncipollo/release-action@v1
