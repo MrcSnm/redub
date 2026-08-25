@@ -419,7 +419,9 @@ bool isFileHidden(DirEntry e)
     }
     else
     {
-        return e.name.length == 0 || e.name[0] == '.';
+        import std.path;
+        string n = e.name.baseName;
+        return n.length == 0 || n[0] == '.';
     }
 }
 
@@ -443,12 +445,14 @@ bool attrIncludesUDA(LookType, Attribs...)()
     return hasFound;
 }
 
-auto dirEntriesBreadth(string inputPath)
+auto dirEntriesBreadth(string inputPath, bool filterHidden)
 {
     import std.file;
     import std.array;
+    import std.algorithm;
     struct DirEntriesRange
     {
+        bool filterHidden;
         DirEntry[] currPathEntries;
         DirEntry[] nextDirs;
 
@@ -462,14 +466,23 @@ auto dirEntriesBreadth(string inputPath)
                 while(nextDirs.length && currPathEntries.length == 0)
                 {
                     DirEntry next = nextDirs[0];
-                    currPathEntries = dirEntries(next.name, SpanMode.shallow).array;
+                    if(filterHidden)
+                    {
+                        if(!isFileHidden(next))
+                            currPathEntries = dirEntries(next.name, SpanMode.shallow).filter!(e => !isFileHidden(e)).array;
+                    }
+                    else
+                        currPathEntries = dirEntries(next.name, SpanMode.shallow).array;
                     nextDirs = nextDirs[1..$];
                 }
             }
             else
             {
                 if(currPathEntries[0].isDir)
-                    nextDirs~= currPathEntries[0];
+                {
+                    if(!filterHidden || !isFileHidden(currPathEntries[0]))
+                        nextDirs~= currPathEntries[0];
+                }
                 currPathEntries = currPathEntries[1..$];
             }
 
@@ -484,8 +497,58 @@ auto dirEntriesBreadth(string inputPath)
         }
     }
 
+    auto entries = dirEntries(inputPath, SpanMode.shallow);
+    if(filterHidden)
+        return DirEntriesRange(filterHidden, entries.filter!(e => !isFileHidden(e)).array);
+    return DirEntriesRange(filterHidden, entries.array);
+}
 
-    return DirEntriesRange(dirEntries(inputPath, SpanMode.shallow).array);
+auto dirEntriesDepth(string inputPath, bool filterHidden)
+{
+    import std.file;
+    import std.array;
+    import std.algorithm;
+
+    struct DirEntriesRange
+    {
+        bool filterHidden;
+        bool hasNext;
+        DirIterator[] iterators;
+        DirEntry next;
+
+        void popFront()
+        {
+            bool found = false;
+            while(iterators.length && !found)
+            {
+                if(iterators[$ - 1].empty)
+                {
+                    iterators.length--;
+                    continue;
+                }
+
+                next = iterators[$ - 1].front;
+                iterators[$ - 1].popFront;
+
+                found = !filterHidden || !isFileHidden(next);
+            }
+
+            if(found && next.isDir)
+                iterators ~= dirEntries(next.name, SpanMode.shallow);
+
+            hasNext = found;
+        }
+        bool empty(){return !hasNext; }
+        DirEntry front()
+        {
+            return next;
+        }
+    }
+    DirEntriesRange r;
+    r.filterHidden = filterHidden;
+    r.iterators~= dirEntries(inputPath, SpanMode.shallow);
+    r.popFront;
+    return r;
 }
 
 void putSourceFiles(
@@ -515,12 +578,12 @@ void putSourceFiles(
     if(atomicLoad(usingBreadth))
     {
         foreach(path; paths)
-        DirEntryLoopBreadth: foreach(DirEntry e; dirEntriesBreadth(unescapePath(path)))
+        DirEntryLoopBreadth: foreach(DirEntry e; dirEntriesBreadth(unescapePath(path), true))
         {
             foreach(exclusion; excludeFiles)
                 if(e.name.globMatch(exclusion))
                     continue DirEntryLoopBreadth;
-            if(isFileHidden(e) || e.isDir)
+            if(e.isDir)
                 continue;
             foreach(ext; extensions)
             {
@@ -535,12 +598,12 @@ void putSourceFiles(
     else
     {
         foreach(path; paths)
-        DirEntryLoopDepth: foreach(DirEntry e; dirEntries(unescapePath(path),SpanMode.depth))
+        DirEntryLoopDepth: foreach(DirEntry e; dirEntriesDepth(unescapePath(path), true))
         {
             foreach(exclusion; excludeFiles)
                 if(e.name.globMatch(exclusion))
                     continue DirEntryLoopDepth;
-            if(isFileHidden(e) || e.isDir)
+            if(e.isDir)
                 continue;
             foreach(ext; extensions)
             {
