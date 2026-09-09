@@ -348,7 +348,7 @@ int installMain(string[] args)
         }
         if(!installLdc(ldcVer))
         {
-            error("Could not install LDC ", ldcVer);;
+            error("Could not install LDC ", ldcVer);
             return 1;
         }
     }

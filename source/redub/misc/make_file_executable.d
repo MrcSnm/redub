@@ -8,7 +8,8 @@ bool makeFileExecutable(string filePath)
 	{
 		if(!std.file.exists(filePath)) return false;
 		import std.conv:octal;
-		std.file.setAttributes(filePath, octal!700);
+		uint attr = std.file.getAttributes(filePath);
+		std.file.setAttributes(filePath, attr & octal!700);
 		return true;
 	}
 }

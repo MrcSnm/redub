@@ -56,7 +56,7 @@ bool hardLinkFile(string from, string to, bool overwrite = false)
         else
         {
             import core.sys.posix.sys.stat : S_IWUSR, S_IWGRP, S_IWOTH;
-            return (attributes & (S_IWUSR | S_IWGRP | S_IWOTH)) == 0;
+            return (attributes & (S_IWUSR | S_IWGRP | S_IWOTH)) != 0;
         }
     }
 

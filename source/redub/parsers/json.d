@@ -525,7 +525,7 @@ private void runHandlers(
             ///If the command is inside the host filters, it will use host OS instead.
             if(commandsWithHostFilters.indexOf(filtered.command) != -1) osToMatch = std.system.os;
 
-            mustExecuteHandler = filtered.matchesPlatform(osToMatch, cfg.cInfo.isa, cfg.cInfo.compiler) && fn;
+            mustExecuteHandler = fn && filtered.matchesPlatform(osToMatch, cfg.cInfo.isa, cfg.cInfo.compiler);
         }
         if(mustExecuteHandler)
             (*fn)(buildRequirements, v, cfg, pending);

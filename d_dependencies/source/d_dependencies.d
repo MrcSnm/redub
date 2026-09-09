@@ -1,4 +1,4 @@
-module d_depedencies;
+module d_dependencies;
 
 struct ModuleDef
 {

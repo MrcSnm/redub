@@ -8,7 +8,7 @@ public import redub.parsers.environment;
 public import std.system;
 public import redub.buildapi;
 public import redub.tooling.compiler_identification;
-public import d_depedencies;
+public import d_dependencies;
 
 struct ProjectDetails
 {
@@ -224,7 +224,7 @@ string[] getChangedBuildFiles(ProjectNode root, CompilingSession s)
     if(dirtyFiles.length == 0)
         return null;
 
-    import d_depedencies;
+    import d_dependencies;
 
     //TODO: Improve that
     ModuleParsing moduleParse = parseDependencies(std.file.readText(depsPath),

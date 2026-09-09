@@ -97,7 +97,7 @@ private void getProjectTreeImpl(
     ProjectNode node = queue[0];
     foreach(dep; node.requirements.dependencies)
     {
-        if(dep.isSubConfigurationOnly)
+        if(dep.isSubConfigurationOnly || dep.isOptional)
             continue;            
         ProjectNode* visitedDep = dep.name in visited;
         ProjectNode depNode;

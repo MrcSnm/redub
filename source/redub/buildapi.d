@@ -832,6 +832,8 @@ struct Dependency
     ///If the pkgInfo is an internal subpackage, there's no need to rebuild the parent name.
     string parentName() const
     {
+        if(!pkgInfo)
+            throw new Error("Unexpected dependency without packageInfo.");
         if(subPackage && !pkgInfo.isInternalSubPackage)
             return name[0..(cast(ptrdiff_t)name.length - cast(ptrdiff_t)subPackage.length) - 1];
         return null;

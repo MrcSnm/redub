@@ -1,5 +1,5 @@
 module redub.error_driver;
-import d_depedencies;
+import d_dependencies;
 
 //hip.view.load_scene.obj : error LNK2001: símbolo externo não resolvido D3hip3api12_ModuleInfoZ
 string getUndefinedSymbolExplanationMSVC(ModuleParsing modules, string errorMessage)

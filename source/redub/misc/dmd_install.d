@@ -61,7 +61,7 @@ private string getDmdFolderName(string ver, OS os = std.system.os, ISA isa = ins
         ver = ver[1..$];
 
     if(os.isWindows)
-        sys = isa == ISA.x86 ? "winndows\\bin" : "windows\\bin64";
+        sys = isa == ISA.x86 ? "windows\\bin" : "windows\\bin64";
     else if(os.isApple)
         sys = "osx/bin";
     else if(os.isPosix)

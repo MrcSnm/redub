@@ -118,7 +118,7 @@ PackageInfo getPackage(string packageName, string repo, string packageVersion, s
 
     PackageInfo pack = basePackage(packageName, packageVersion , requiredBy);
     packageName = pack.packageName;
-    vlog("Getting package ", packageName, ":", pack.subPackage, "@", packageVersion);
+    vlog("->Getting package ", packageName, ":", pack.subPackage, "@", packageVersion, " [required by ", requiredBy,"]");
     ReducedPackageInfo localPackage = getPackageInLocalPackages(packageName, packageVersion);
     if (localPackage != ReducedPackageInfo.init)
     {

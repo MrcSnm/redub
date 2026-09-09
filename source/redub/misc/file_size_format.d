@@ -29,6 +29,7 @@ string getFileSizeFormatted(string targetFile)
         if(actualResult <= 1000)
             return ByteUnit(floorDecimal(actualResult, 2), " KB");
         actualResult/= 1000;
+        if(actualResult <= 1000)
             return ByteUnit(floorDecimal(actualResult, 2), " MB");
         actualResult/= 1000;
         return ByteUnit(floorDecimal(actualResult, 2), " GB");
