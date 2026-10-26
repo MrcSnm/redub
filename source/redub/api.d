@@ -1078,6 +1078,11 @@ Manages the redub project in the current directory. If the command is omitted,
 redub will default to "run". When running an application, "--" can be used to
 separate redub options from options passed to the application.
 
+Command dispatch: only the commands listed below are accepted as the first word.
+Any other first word is currently run as a package name, with a deprecation
+warning ("use: redub run <package>"). This will be an error in redub 2.0.
+Enable the error now with --strict or REDUB_STRICT=1.
+
 Run "redub help <command>" or "redub <command> --help" to get help for a specific command.
 
 Available commands
