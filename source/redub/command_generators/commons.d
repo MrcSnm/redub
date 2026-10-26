@@ -564,15 +564,22 @@ void putSourceFiles(
     import std.path;
     import std.string:endsWith;
     import redub.libs.adv_diff.helpers.index_of;
+    import std.conv:to;
     import std.exception;
     import std.array;
     import std.range:choose;
     import core.atomic;
 
     auto app = appender!(string[]);
+    size_t excludedCount;
     scope(exit)
     {
+        size_t outputLength = output.length;
         output~= app.data;
+        if(outputLength == output.length && excludedCount > 0 && paths.length > 0)
+        {
+            throw new Exception("\n\tAll the files specified in paths "~paths.to!string~" were filtered by "~excludeFiles.to!string~". Remove the excludedSourceFiles or avoid this dependency having source files.");
+        }
     }
 
     if(atomicLoad(usingBreadth))
@@ -582,7 +589,10 @@ void putSourceFiles(
         {
             foreach(exclusion; excludeFiles)
                 if(e.name.globMatch(exclusion))
+                {
+                    excludedCount++;
                     continue DirEntryLoopBreadth;
+                }
             if(e.isDir)
                 continue;
             foreach(ext; extensions)
@@ -602,7 +612,10 @@ void putSourceFiles(
         {
             foreach(exclusion; excludeFiles)
                 if(e.name.globMatch(exclusion))
+                {
+                    excludedCount++;
                     continue DirEntryLoopDepth;
+                }
             if(e.isDir)
                 continue;
             foreach(ext; extensions)

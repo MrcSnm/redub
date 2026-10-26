@@ -52,7 +52,7 @@ string normalizePath(return ref char[] output, scope string[] paths...)
 			output[0..normalized[0].length] = normalized[0];
 		return cast(string)output[0..normalized[0].length];
 	}
-    if(start == length)
+    if(start >= length)
         return null;
 
     size_t totalLength = (length - start) - 1;
@@ -109,4 +109,9 @@ auto pathSplitterRange(string path) pure @safe nothrow @nogc
     }
 
     return PathRange(path);
+}
+
+unittest
+{
+    assert(buildNormalizedPath("", "..") == null);
 }

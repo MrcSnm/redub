@@ -7,7 +7,7 @@ import redub.package_searching.api;
 
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.32.1";
+enum RedubVersionOnly = "v1.32.2";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -1271,7 +1271,6 @@ class ProjectNode
             import redub.misc.path;
             vvlog("Merge ", input.name, " ---> ", target.name);
             target.requirements.cfg = target.requirements.cfg.mergeImport(input.requirements.cfg);
-            target.requirements.cfg = target.requirements.cfg.mergeExcludedSourceFiles(input.requirements.cfg);
             target.requirements.cfg = target.requirements.cfg.mergeStringImport(input.requirements.cfg);
             target.requirements.cfg = target.requirements.cfg.mergeVersions(input.requirements.cfg);
             target.requirements.cfg = target.requirements.cfg.mergeFilteredDflags(input.requirements.cfg);
@@ -1305,6 +1304,7 @@ class ProjectNode
                     target.requirements.cfg = target.requirements.cfg.mergeLibPaths(input.requirements.cfg);
                     target.requirements.cfg = target.requirements.cfg.mergeSourcePaths(input.requirements.cfg);
                     target.requirements.cfg = target.requirements.cfg.mergeSourceFiles(input.requirements.cfg);
+                    target.requirements.cfg = target.requirements.cfg.mergeExcludedSourceFiles(input.requirements.cfg);
                     break;
                 case executable: break;
                 case none: throw new Exception("TargetType: none as a root project: nothing to do");
