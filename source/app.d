@@ -40,7 +40,11 @@ int main(string[] args)
     try
     {
         if(args.length == 1)
+        {
+            import std.stdio : stderr;
+            stderr.writeln("redub: no command given; running default: run");
             return runMain(args, []);
+        }
 
         import std.algorithm:countUntil;
         ptrdiff_t execArgsInit = countUntil(args, "--");
@@ -78,6 +82,18 @@ int main(string[] args)
         version(RedubWatcher)
             entryPoints["watch"] = &watchMain;
 
+
+        if(args.length >= 2 && args[1] == "help")
+        {
+            import std.stdio : writeln;
+            if(args.length >= 3 && args[2] != "run")
+            {
+                if(auto fn = args[2] in entryPoints)
+                    return (*fn)([args[0], "--help"]);
+            }
+            writeln(getHelpInfo());
+            return 0;
+        }
 
         if(args.length >= 2)
         {

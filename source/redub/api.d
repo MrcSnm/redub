@@ -1078,7 +1078,7 @@ Manages the redub project in the current directory. If the command is omitted,
 redub will default to "run". When running an application, "--" can be used to
 separate redub options from options passed to the application.
 
-Run "redub <command> --help" to get help for a specific command.
+Run "redub help <command>" or "redub <command> --help" to get help for a specific command.
 
 Available commands
 ==================
@@ -1103,6 +1103,20 @@ Available commands
                         results
 
 Additions to redub commands --
+
+setup
+    Usage: redub setup [--uninstall]
+    Description: Sets up redub environment variables (REDUB_PATH, REDUB_LDC_PATH, REDUB_LDC, REDUB_DMD_PATH, REDUB_DMD).
+        Use --uninstall to remove them.
+deps
+    Usage: redub deps [<package>[@<version-spec>]]
+    Description: Prints the dependency tree of the package.
+configure
+    Usage: redub configure [options]
+    Description: Changes redub settings (for example --update-check).
+help
+    Usage: redub help [<command>]
+    Description: Prints this help, or the help for <command>.
 
 update
     Usage: redub update
