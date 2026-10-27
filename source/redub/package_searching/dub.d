@@ -144,15 +144,21 @@ PackageInfo getPackage(string packageName, string repo, string packageVersion, s
 
     ///If no matching version was found, try downloading it.
     info = redubDownloadPackage(packageName, repo, packageVersion, requiredBy);
-    return getPackage(packageName, repo, packageVersion, requiredBy);
 
-    throw new Exception(
-        "Could not find any package named " ~
-            packageName ~ " with version " ~ packageVersion ~
-            " required by " ~ requiredBy ~ "\nFound versions:\n\t" ~
-            info.foundVersions.map!(
-                (sv) => sv.toString).join("\n\t")
-    );
+    if (info == ReducedPackageInfo.init ||
+        info.bestVersion.length == 0 ||
+        info.bestVersionPath.length == 0)
+    {
+        throw new Exception(
+            "Could not find any package named " ~
+                packageName ~ " with version " ~ packageVersion ~
+                " required by " ~ requiredBy
+        );
+    }
+
+    pack.bestVersion = SemVer(info.bestVersion);
+    pack.path = info.bestVersionPath;
+    return pack;
 }
 
 string getPackagePath(string packageName, string repo, string packageVersion, string requiredBy)

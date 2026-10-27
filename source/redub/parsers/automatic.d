@@ -82,7 +82,8 @@ RootParseResult parseProject(
     string subPackage,
     string target,
     bool useExistingObj = false,
-    bool isDescribeOnly = false
+    bool isDescribeOnly = false,
+    string defaultPackageName = null
 )
 {
     import redub.parsers.base;
@@ -90,7 +91,7 @@ RootParseResult parseProject(
 
     RootParseResult result;
 
-    ParseConfig cfg = getParseConfig(projectWorkingDir, cInfo, null, null, subConfiguration, subPackage, null, isDescribeOnly);
+    ParseConfig cfg = getParseConfig(projectWorkingDir, cInfo, defaultPackageName, null, subConfiguration, subPackage, null, isDescribeOnly);
     TargetInfo targetInfo;
     if(target.length)
     {

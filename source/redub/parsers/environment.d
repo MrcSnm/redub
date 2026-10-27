@@ -212,7 +212,7 @@ PackageDubVariables getEnvironmentVariablesForPackage(const ref BuildConfigurati
         DUB_PACKAGE_DIR: dir,
         DUB_TARGET_TYPE: cfg.targetType.to!string,
         DUB_TARGET_PATH: cfg.outputDirectory,
-        DUB_TARGET_NAME: cfg.name
+        DUB_TARGET_NAME: cfg.targetName
     );
 }
 
@@ -477,9 +477,15 @@ version(AsLibrary) //Library version will use environment instead of redubEnv si
      */
     string getEnvVariable(string key)
     {
+        uint tries = 0;
+        enum maxTries = 254;
         while(key in environment)
         {
+            if(++tries == maxTries)
+                throw new Exception("Too many expansions for the key "~key~" and value "~environment[key]);
+            string oldKey = key;
             key = environment[key];
+
             if(key.length == 0)
                 return null;
             else if(key[0] != '$')
@@ -489,6 +495,9 @@ version(AsLibrary) //Library version will use environment instead of redubEnv si
                 key = key[1..$];
                 if(key.length > 1 && key[0] == '{' && key[$-1] == '}')
                     key = key[1..$-1];
+
+                if(key == oldKey)
+                    throw new Exception("Error: Variable expanded to itself: "~key);
             }
         }
         return null;
@@ -516,9 +525,15 @@ else
     void unlockEnv(){envMutex.unlock();}
     string getEnvVariable(string key)
     {
+        uint tries = 0;
+        enum maxTries = 254;
+
         string* ret = key in redubEnv;
         while(ret)
         {
+            if(++tries == maxTries)
+                throw new Exception("Too many expansions for the key "~key~" and value "~environment[key]);
+            string oldKey = key;
             key = *ret;
             if(key.length == 0)
                 return null;
@@ -529,6 +544,8 @@ else
                 key = key[1..$];
                 if(key.length > 1 && key[0] == '{' && key[$-1] == '}')
                     key = key[1..$-1];
+                if (key == oldKey)
+                    throw new Exception("Error: Variable expanded to itself: " ~ key);
             }
             ret = key in redubEnv;
         }

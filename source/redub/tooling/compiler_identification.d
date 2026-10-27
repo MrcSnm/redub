@@ -226,6 +226,7 @@ private CompilerBinary searchCompiler(string compilerOrPath, JSONValue compilers
     import std.path;
     import std.file;
     bool isGlobal = false;
+    bool forceAssumption = compilerAssumption !is null;
 
     CompilerBinary ret;
     string compilerVersion = getCompilerVersion(compilerOrPath);
@@ -236,7 +237,7 @@ private CompilerBinary searchCompiler(string compilerOrPath, JSONValue compilers
         string locCompiler = tryGetCompilerOnCwd(compilerOrPath);
         if(locCompiler != compilerOrPath)
             compilerOrPath = locCompiler;
-        else
+        else if(!forceAssumption)
         {
             if(useGlobalPath)
                 ret = getCompilerFromGlobalPath(compilerOrPath, compilersInfo, compilerVersion);
@@ -244,15 +245,25 @@ private CompilerBinary searchCompiler(string compilerOrPath, JSONValue compilers
         }
     }
 
-    //Try finding the compiler globally and getting it from cache
-    if(ret == CompilerBinary.init)
+    if(forceAssumption)
     {
         compilerPath = findExecutable(compilerOrPath);
-        ret = getCompilerFromCache(compilersInfo, compilerOrPath, compilerPath, compilerVersion);
-    }
-    //Try inferring the compiler and saving its infos
-    if(ret == CompilerBinary.init)
+        if(compilerPath is null)
+            compilerPath = compilerOrPath;
         ret = inferCompiler(compilerOrPath, compilerPath, compilerAssumption, compilersInfo, isDefault, isGlobal, isC);
+    }
+    else
+    {
+        //Try finding the compiler globally and getting it from cache
+        if(ret == CompilerBinary.init)
+        {
+            compilerPath = findExecutable(compilerOrPath);
+            ret = getCompilerFromCache(compilersInfo, compilerOrPath, compilerPath, compilerVersion);
+        }
+        //Try inferring the compiler and saving its infos
+        if(ret == CompilerBinary.init)
+            ret = inferCompiler(compilerOrPath, compilerPath, compilerAssumption, compilersInfo, isDefault, isGlobal, isC);
+    }
     if(compilerVersion.length && ret.version_.toString != compilerVersion)
     {
         import redub.api;

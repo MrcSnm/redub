@@ -17,6 +17,42 @@ string getFirstFileInDirectory(string inputDir)
 	return entries.front;
 }
 
+bool safeZipPath(string root, string member, out string result)
+{
+	import std.path;
+	import std.string;
+
+	if(member.length == 0 || member.indexOf('\0') != -1)
+		return false;
+	
+    // "/etc/passwd", "C:\Windows", "\\server\share", "\root"
+    if (isRooted(member) || driveName(member).length != 0)
+        return false;
+
+    // "a/../../x", "..\..\x"
+    foreach (part; member.pathSplitter)
+	{
+        if (part == "..")
+            return false;
+		version(Windows)
+		{
+            if (part.indexOf(':') != -1) // avoids ADS: "foo.txt:stream"
+                return false;
+		}
+	}
+
+    string rootNorm = buildNormalizedPath(root);
+    string candidate = buildNormalizedPath(root, member);
+    string rel = relativePath(candidate, rootNorm);
+
+    // "..\x", "../x", ou caminho absoluto de outra unidade
+    if (rel == ".." || rel.startsWith(".." ~ dirSeparator) || isAbsolute(rel))
+        return false;
+
+    result = candidate;
+    return true;
+}
+
 bool extractZipToFolder(ubyte[] data, string outputDirectory)
 {
 	import std.file;
@@ -27,7 +63,9 @@ bool extractZipToFolder(ubyte[] data, string outputDirectory)
 		std.file.mkdirRecurse(outputDirectory);
 	foreach(string fileName, ArchiveMember archiveMember; zip.directory)
 	{
-		string outputFile = buildNormalizedPath(outputDirectory, fileName);
+		string outputFile;
+		if(!safeZipPath(outputDirectory, fileName, outputFile))
+			throw new Exception("Unsafe path in archive: " ~ fileName);
 		if(!std.file.exists(outputFile))
 		{
 			if(archiveMember.expandedSize == 0)

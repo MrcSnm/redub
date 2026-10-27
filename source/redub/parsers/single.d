@@ -64,7 +64,7 @@ RootParseResult parseProject(
                 import redub.parsers.adapter.json_cache;
                 parseData = parseJSONCached(recipe, singleInfo.recipe);
             }
-            res = redub.parsers.automatic.parseProject(parseData, projectWorkingDir, cInfo, subConfiguration, subPackage, target, useExistingObj, false);
+            res = redub.parsers.automatic.parseProject(parseData, projectWorkingDir, cInfo, subConfiguration, subPackage, target, useExistingObj, false, singleInfo.defaultPackageName);
             break;
         default: throw new Exception("Unsupported project type "~recipe~" at dir "~projectWorkingDir);
     }

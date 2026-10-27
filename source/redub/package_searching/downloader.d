@@ -151,6 +151,8 @@ string downloadPackageTo(return string path, string packageName, string repo, Se
     {
         Mutex mtx;
         string ver;
+        string requirement;
+        string repo;
     }
 
 
@@ -170,26 +172,27 @@ string downloadPackageTo(return string path, string packageName, string repo, Se
         
     }
     size_t timeout = 10_000;
-    __gshared DownloadData[string] downloadedPackages;
-
-
-    bool willDownload;
+    __gshared DownloadData*[string] downloadedPackages;
+    DownloadData* entry;
 
     synchronized(downloaderMutex)
     {
-        if((packageName in downloadedPackages) is null)
+        DownloadData** slot = packageName in downloadedPackages;
+        if(slot is null)
         {
-            downloadedPackages[packageName] = DownloadData(new Mutex, null);
-            willDownload = true;
+            entry = new DownloadData(new Mutex, null, null, null);
+            downloadedPackages[packageName] = entry;
         }
+        else
+            entry = *slot;
     }
-    downloadedPackages[packageName].mtx.lock;
+    entry.mtx.lock;
 
     scope(exit)
     {
-        if(std.file.exists(tempPath))
+        if(tempPath.length && std.file.exists(tempPath))
             std.file.rmdirRecurse((tempPath));
-        downloadedPackages[packageName].mtx.unlock;
+        entry.mtx.unlock;
     }
 
 
@@ -208,9 +211,15 @@ string downloadPackageTo(return string path, string packageName, string repo, Se
 
 
 
-    if(!willDownload)
+    string repoName = repo is null ? "" : repo;
+    bool cached = entry.ver !is null &&
+        entry.requirement == requirement.toString &&
+        entry.repo == repoName;
+
+    if(cached)
     {
-        return getOutputDirectoryForPackage(path, packageName, downloadedPackages[packageName].ver);
+        actualVersion = SemVer(entry.ver);
+        return getOutputDirectoryForPackage(path, packageName, entry.ver);
     }
     else
     {
@@ -233,25 +242,21 @@ string downloadPackageTo(return string path, string packageName, string repo, Se
 
             throw new NetworkException("No version with requirement '"~requirement.toString~"' was found when looking for package "~packageName~existing);
         }
-        synchronized(downloaderMutex)
-        {
-            downloadedPackages[packageName].ver = actualVersion.toString;
-        }
         path = getOutputDirectoryForPackage(path, packageName, actualVersion.toString);
         string installPath = getFirstFileInDirectory(tempPath);
         if(!installPath)
             throw new Exception("No file was extracted to directory "~tempPath~" while extracting package "~packageName);
         ///The download might have happen while downloading ourselves
 
+        if(!std.file.exists(path))
+        {
+            string outputDir = dirName(path);
+            if(!std.file.exists(outputDir))
+                mkdirRecurse(outputDir);
+            rename(installPath, path);
+            rmdirRecurse(tempPath);
+        }
 
-        if(std.file.exists(path))
-            return path;
-
-        string outputDir = dirName(path);
-        if(!std.file.exists(outputDir))
-            mkdirRecurse(outputDir);
-        rename(installPath, path);
-        rmdirRecurse(tempPath);
     }
 
 
@@ -289,6 +294,10 @@ string downloadPackageTo(return string path, string packageName, string repo, Se
         jsonPath,
         json.toString,
     );
+
+    entry.requirement = requirement.toString;
+    entry.repo = repoName;
+    entry.ver = actualVersion.toString;
     return path;
 }
 

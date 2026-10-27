@@ -66,12 +66,12 @@ int main(string[] args)
             "clean": &cleanMain,
             "describe": &describeMain,
             "deps": &depsMain,
-            "test": &testMain,
             "init": &initMain,
             "install": &installMain,
             "configure": &configureMain,
             "use": &useMain,
             // "watch": &watchMain,
+            "test": cast(int function(string[]))null,
             "run": cast(int function(string[]))null
         ];
 
@@ -88,6 +88,8 @@ int main(string[] args)
                     args = args[0..1] ~ args[2..$];
                     if(cmd == "run")
                         return runMain(args, runArgs);
+                    else if(cmd == "test")
+                        return testMain(args, runArgs);
                     return entryPoints[cmd](args);
                 }
             }
@@ -232,7 +234,7 @@ int depsMain(string[] args)
     return 0;
 }
 
-int testMain(string[] args)
+int testMain(string[] args, string[] runArgs)
 {
     ProjectDetails d = resolveDependencies(args);
     if(d.error)
@@ -252,7 +254,7 @@ int testMain(string[] args)
     if(d.error)
         return d.getReturnCode();
 
-    return executeProgram(d, args);
+    return executeProgram(d, runArgs);
 }
 
 int initMain(string[] args)

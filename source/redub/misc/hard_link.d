@@ -80,7 +80,20 @@ bool hardLinkFile(string from, string to, bool overwrite = false)
 	// fallback to copy
     try
     {
-	    std.file.copy(from, to);      
+        if(std.file.exists(to))
+        {
+            import std.random;
+            static import std.conv;
+            Random seed = Random(unpredictableSeed);
+            uint num = uniform(0, int.max, seed);
+            string output = to~ std.conv.to!string(num);
+	        std.file.copy(from, output);
+            std.file.rename(output, to);
+        }
+        else
+        {
+	        std.file.copy(from, to);
+        }
         std.file.setAttributes(to, attr);
     }
     catch(Exception e)

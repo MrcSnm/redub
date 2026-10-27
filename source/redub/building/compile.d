@@ -610,16 +610,23 @@ private bool copyFiles(ProjectNode root)
 {
     static import std.file;
     import redub.misc.hard_link;
-    import redub.misc.glob_entries;
     import std.path;
     string outputDir = root.requirements.cfg.outputDirectory;
+    auto globDirEntries(string glob)
+    {
+        import std.file:dirEntries, SpanMode;
+        import std.path : dirName, baseName;
+        string dir = dirName(glob);
+        return dirEntries(dir.length ? dir : ".", baseName(glob), SpanMode.depth);
+    }
+
     foreach(ProjectNode proj; root.collapse)
     {
         string[] files = proj.requirements.cfg.filesToCopy;
         if(files.length)
         {
             info("\tCopying files for project ", proj.name);
-            foreach(filesSpec; files) foreach(e; globDirEntriesShallow(filesSpec))
+            foreach(filesSpec; files) foreach(e; globDirEntries(filesSpec))
             {
                 string f = e.name;
                 string inputPath;

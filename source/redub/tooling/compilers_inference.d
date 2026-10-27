@@ -300,19 +300,19 @@ private CompilerBinary assumeCompiler(string compilerOrPath, string compilerAssu
     {
         case "dmd":
             ptrdiff_t _;
-            string dmdVer = inBetween(compilerOrPath, "v[", "]", _);
-            enforce(dmdVer is null, "Can only assume compiler with versions, received "~compilerAssumption);
-            string feVer = inBetween(compilerOrPath, "f[", "]", _);
+            string dmdVer = inBetween(compilerAssumption, "v[", "]", _);
+            enforce(dmdVer !is null, "DMD assumption must contain a version, received "~compilerAssumption);
+            string feVer = inBetween(compilerAssumption, "f[", "]", _);
             ret.compiler = AcceptedCompiler.dmd;
             ret.version_ = SemVer(dmdVer);
             ret.frontendVersion = feVer is null ? ret.version_ : SemVer(feVer);
             break;
         case "ldc", "ldc2":
             ptrdiff_t _;
-            string ldcVer = inBetween(compilerOrPath, "v[", "]", _);
-            enforce(ldcVer is null, "Can only assume compiler with versions, received "~compilerAssumption);
-            string feVer = inBetween(compilerOrPath, "f[", "]", _);
-            enforce(feVer is null, "LDC2 must contain a frontend version, received "~compilerAssumption);
+            string ldcVer = inBetween(compilerAssumption, "v[", "]", _);
+            enforce(ldcVer !is null, "LDC2 assumption must contain a compiler version, received "~compilerAssumption);
+            string feVer = inBetween(compilerAssumption, "f[", "]", _);
+            enforce(feVer !is null, "LDC2 must contain a frontend version, received "~compilerAssumption);
             ret.compiler = AcceptedCompiler.ldc2;
             ret.version_ = SemVer(ldcVer);
             ret.frontendVersion = SemVer(feVer);
