@@ -304,6 +304,7 @@ private CompilerBinary getCompilerFromCache(JSONValue allCompilersInfo, string c
     if(compilerVersion.length)
         return getCompilerFromCacheByVersion(allCompilersInfo, compiler, compilerVersion);
     JSONValue* comps = "compilers" in allCompilersInfo;
+    CompilerBinary ret;
     if(comps)
     {
         foreach(key, value; comps.object)
@@ -314,19 +315,21 @@ private CompilerBinary getCompilerFromCache(JSONValue allCompilersInfo, string c
 
             JSONValue[] arr = value.array;
 
-            if(arr[TIMESTAMP].get!long != timeLastModified(key).stdTime)
-                return CompilerBinary.init;
+            if(arr[TIMESTAMP].get!long == timeLastModified(key).stdTime)
+            {
+                ret = CompilerBinary(
+                    acceptedCompilerfromString(arr[ACCEPTED_COMPILER].str),
+                    key,
+                    SemVer(arr[VERSION_].str),
+                    SemVer(arr[FRONTEND_VERSION].str),
+                    arr[VERSION_STRING].str,
+                );
+            }
 
-            return CompilerBinary(
-                acceptedCompilerfromString(arr[ACCEPTED_COMPILER].str),
-                key,
-                SemVer(arr[VERSION_].str),
-                SemVer(arr[FRONTEND_VERSION].str),
-                arr[VERSION_STRING].str,
-            );
+            break;
         }
     }
-    return CompilerBinary.init;
+    return ret;
 }
 private CompilerBinary getCompilerFromCacheByVersion(JSONValue allCompilersInfo, string compiler, string compilerVersion)
 {
@@ -335,6 +338,7 @@ private CompilerBinary getCompilerFromCacheByVersion(JSONValue allCompilersInfo,
 
     JSONValue* comps = "compilers" in allCompilersInfo;
     SemVer requirement = SemVer(compilerVersion);
+    CompilerBinary ret;
     if(comps)
     {
         foreach(key, value; comps.object)
@@ -344,18 +348,20 @@ private CompilerBinary getCompilerFromCacheByVersion(JSONValue allCompilersInfo,
 
             if(arr[ACCEPTED_COMPILER].str != compiler || !SemVer(arr[VERSION_].str).satisfies(requirement) || !std.file.exists(key))
                 continue;
-            if(arr[TIMESTAMP].get!long != timeLastModified(key).stdTime)
-                return CompilerBinary.init;
-            return CompilerBinary(
-                acceptedCompilerfromString(arr[ACCEPTED_COMPILER].str),
-                key,
-                SemVer(arr[VERSION_].str),
-                SemVer(arr[FRONTEND_VERSION].str),
-                arr[VERSION_STRING].str,
-            );
+            if(arr[TIMESTAMP].get!long == timeLastModified(key).stdTime)
+            {
+                ret = CompilerBinary(
+                    acceptedCompilerfromString(arr[ACCEPTED_COMPILER].str),
+                    key,
+                    SemVer(arr[VERSION_].str),
+                    SemVer(arr[FRONTEND_VERSION].str),
+                    arr[VERSION_STRING].str,
+                );
+            }
+            break;
         }
     }
-    return CompilerBinary.init;
+    return ret;
 }
 
 
