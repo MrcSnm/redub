@@ -90,7 +90,16 @@ PackageInfo* findPackage(string packageName, string repo, string packageVersion,
     {
         import redub.logging;
         SemVer newPkg = SemVer(packageVersion);
-        if(!pkg.bestVersion.satisfies(newPkg))
+
+        ///Git branches are invalid SemVer, so satisfies() always returns false
+        ///for them. Two parents requiring the same branch must reuse the cache.
+        if(newPkg.isInvalid || pkg.requiredVersion.isInvalid)
+        {
+            if(packageVersion != pkg.requiredVersion.toString)
+                throw new Exception("Package "~packageName~" with first requirement found '"~pkg.requiredVersion.toString~"' from the dependency '" ~
+                    getBetterPackageInfo(pkg, packageName)~"' is not compatible with the new requirement: "~packageVersion ~ " required by "~requiredBy~ " ("~getBetterPackageInfo(requiredBy in packagesCache, requiredBy)~")");
+        }
+        else if(!pkg.bestVersion.satisfies(newPkg))
         {
             if(newPkg.satisfies(pkg.requiredVersion))
             {

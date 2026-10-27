@@ -29,12 +29,12 @@ bool installDmd(string dmdVersion, OS os = std.system.os, ISA isa = instructionS
         dmdVersion = dmdVersion[1..$];
 
     string workspace = buildNormalizedPath(getDubWorkspacePath, "redub-dmd");
-    string binPath = buildNormalizedPath(workspace, getDmdFolderName(dmdVersion, os, isa), "bin");
+    string binPath = buildNormalizedPath(workspace, getDmdFolderName(dmdVersion, os, isa));
     if(!exists(workspace))
         mkdirRecurse(workspace);
     if(exists(binPath))
     {
-        infos("LDC ",dmdVersion," is already installed at path ", binPath);
+        infos("DMD ", dmdVersion, " is already installed at path ", binPath);
         return true;
     }
 
@@ -42,7 +42,7 @@ bool installDmd(string dmdVersion, OS os = std.system.os, ISA isa = instructionS
         return false;
 
     rename(buildNormalizedPath(workspace, "dmd2"), buildNormalizedPath(workspace, "dmd-"~dmdVersion));
-    foreach(executable; ["ldc2", "ldmd2", "rdmd", "dub"].staticArray)
+    foreach(executable; ["dmd", "rdmd", "dub"].staticArray)
         if(!makeFileExecutable(buildNormalizedPath(binPath, executable)))
             return false;
 	return true;

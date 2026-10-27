@@ -46,6 +46,8 @@ bool matches(string input, string rlike)
     {
         return (string input)
         {
+            if(input.length == 0)
+                return -1;
             return (input[0] >= left && input[0] <= right) ? 1 : -1;
         };
     }
@@ -93,7 +95,8 @@ bool matches(string input, string rlike)
                 ptrdiff_t n = indexOf(rlike, ']', i);
                 enforce(n != -1, "End of range ']' not found on "~rlike);
                 string[] splitted = split(rlike[i+1..n], '-');
-                enforce(splitted.length == 2, "Range is not separated by a '-' at "~rlike);
+                enforce(splitted.length == 2 && splitted[0].length && splitted[1].length,
+                    "Range is not separated by a '-' at "~rlike);
                 char left = splitted[0][0], right = splitted[1][0];
 
                 enforce(right > left, "Can't create a range where right parameter '"~right~"' is not bigger than left '"~left~"'");
@@ -125,11 +128,16 @@ bool matches(string input, string rlike)
     if(startCharIndex != -1 && startCharIndex < rlike.length)
         builtRegexMatch~=  RegAlgo(null, RegType.characters, rlike[startCharIndex..rlike.length]);
 
+    ///Patterns made only of anchors ("^$") have no token to run.
+    if(builtRegexMatch.length == 0)
+        return input.length == 0;
 
     int lastMatchStart = 0;
     for(int i = 0; i <= input.length; i++)
     {
-        import std.stdio;
+        if(regIndex >= builtRegexMatch.length)
+            return true;
+
         string temp = input[lastMatchStart..i];
         RegAlgo a = builtRegexMatch[regIndex];
         if(a.characters && temp.length > a.characters.length)
@@ -155,7 +163,9 @@ bool matches(string input, string rlike)
             if(nextRes != -1)
             {
                 // writeln("Matched:  ", next.characters, " curret  index ", i);
-                regIndex+= 2;
+                regIndex += 2;
+                if(regIndex >= builtRegexMatch.length)
+                    return true;
                 continue;
             }
 
@@ -173,7 +183,7 @@ bool matches(string input, string rlike)
         }
     }
 
-    return regIndex == builtRegexMatch.length;
+    return regIndex >= builtRegexMatch.length;
 }
 
 unittest

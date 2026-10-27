@@ -82,6 +82,7 @@ BuildConfiguration executePlugin(string pluginName, BuildConfiguration cfg, stri
     }
     catch (Exception e)
     {
+        status = RedubPluginStatus(RedubPluginExitCode.error, e.msg);
         errorTitle("Plugin '"~pluginName~"' failed with an exception: ", e.msg);
     }
     if(status.code != RedubPluginExitCode.success)

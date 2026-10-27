@@ -64,6 +64,33 @@ artifact() {
     fi
 }
 
+winpath() {
+    if command -v wslpath >/dev/null 2>&1; then
+        wslpath -w "$1"
+    elif command -v cygpath >/dev/null 2>&1; then
+        cygpath -w "$1"
+    else
+        echo "$1"
+    fi
+}
+
+redub_with_dub_home() {
+    local dir=$1 home=$2 log=$3
+    shift 3
+    if [ "$WINDOWS" -eq 1 ]; then
+        local wdir whome wredub bat
+        wdir="$(winpath "$dir")"
+        whome="$(winpath "$home")"
+        wredub="$(winpath "$REDUB")"
+        bat="$dir/run_redub.bat"
+        printf '@echo off\r\nset "DUB_HOME=%s"\r\ncd /d "%s"\r\n"%s" %s\r\n' \
+            "$whome" "$wdir" "$wredub" "$*" > "$bat"
+        cmd.exe /c "$(winpath "$bat")" >"$log" 2>&1
+    else
+        ( cd "$dir" && DUB_HOME="$home" "$REDUB" "$@" ) >"$log" 2>&1
+    fi
+}
+
 test_cache_custom_source_paths()
 {
     local name="cachetest$SUFFIX"
@@ -717,6 +744,88 @@ test_source_paths_nested()
     fi
 }
 
+test_mini_regex_matches()
+{
+    local out="$ROOT/build/mini_regex_test$EXE"
+    local src="tests/regression/unit/mini_regex.d"
+    local impl="source/redub/misc/mini_regex.d"
+    rm -f "$out"
+    if command -v dmd >/dev/null 2>&1; then
+        dmd -Isource -of="$out" "$src" "$impl" >"$WORK/mini_regex_build.log" 2>&1
+    elif command -v ldc2 >/dev/null 2>&1; then
+        ldc2 -I=source -of="$out" "$src" "$impl" >"$WORK/mini_regex_build.log" 2>&1
+    elif [ "$WINDOWS" -eq 1 ] && cmd.exe /c "where dmd >nul 2>nul" >/dev/null 2>&1; then
+        cmd.exe /c "dmd -Isource -of=build\\mini_regex_test.exe tests\\regression\\unit\\mini_regex.d source\\redub\\misc\\mini_regex.d" >"$WORK/mini_regex_build.log" 2>&1
+    else
+        skip mini_regex_matches "no D compiler found"
+        return
+    fi
+    if [ ! -f "$out" ]; then
+        fail mini_regex_matches "could not compile unit test: $(detail "$WORK/mini_regex_build.log")"
+        return
+    fi
+    chmod +x "$out" 2>/dev/null || true
+    "$out" >"$WORK/mini_regex_run.log" 2>&1
+    if [ "$?" -eq 0 ]; then
+        pass mini_regex_matches
+    else
+        fail mini_regex_matches "$(detail "$WORK/mini_regex_run.log")"
+    fi
+}
+
+test_compiler_detection_cc()
+{
+    if [ "$WINDOWS" -eq 1 ] || [ "$(uname -s 2>/dev/null)" != "Linux" ]; then
+        skip compiler_detection_cc "requires a Linux host"
+        return
+    fi
+    if ! command -v cc >/dev/null 2>&1; then
+        skip compiler_detection_cc "cc not found"
+        return
+    fi
+    local name="ccdetect$SUFFIX"
+    local d="$WORK/ccdetect"
+    local log="$WORK/ccdetect.log"
+    mkdir -p "$d/source"
+    printf '%s\n' '{"name":"'"$name"'","language":"C","targetType":"executable","targetPath":"build"}' > "$d/dub.json"
+    printf '%s\n' 'int main(void){return 0;}' > "$d/source/main.c"
+
+    redub_in "$d" 120 "$log" build --force --c-compiler=cc
+    if [ "$?" -eq 0 ]; then
+        pass compiler_detection_cc
+    else
+        fail compiler_detection_cc "a valid 'cc' compiler was rejected ($(detail "$log"))"
+    fi
+}
+
+test_target_with_subpackage()
+{
+    local name="subpkg$SUFFIX"
+    local d="$WORK/subpkg"
+    local log="$WORK/subpkg.log"
+    mkdir -p "$d/home/dub/packages" "$d/pkg/subsrc" "$d/run"
+    printf '%s\n' '{"name":"'"$name"'","version":"1.0.0","subPackages":[{"name":"sub","sourcePaths":["subsrc"]}],"targets":{"t":{"targetType":"executable"}}}' > "$d/pkg/dub.json"
+    printf '%s\n' 'void main(){}' > "$d/pkg/subsrc/app.d"
+
+    local pkgpath
+    if [ "$WINDOWS" -eq 1 ]; then
+        pkgpath="$(winpath "$d/pkg" | sed 's/\\/\\\\/g')"
+    else
+        pkgpath="$d/pkg"
+    fi
+    printf '%s\n' '[{"name":"'"$name"'","version":"1.0.0","path":"'"$pkgpath"'"}]' > "$d/home/dub/packages/local-packages.json"
+
+    redub_with_dub_home "$d/run" "$d/home" "$log" build "$name:sub" --target=t --force
+    local status=$?
+    if grep -q "must contain a subPackages property since it has a subPackage" "$log"; then
+        fail target_with_subpackage "target object was parsed with the subpackage still active ($(detail "$log"))"
+    elif [ "$status" -eq 0 ]; then
+        pass target_with_subpackage
+    else
+        fail target_with_subpackage "exit $status: $(detail "$log")"
+    fi
+}
+
 test_cache_custom_source_paths
 test_test_command_forwards_args
 test_config_platform_crash
@@ -744,6 +853,9 @@ test_amd64_platform_filter
 test_project_without_name
 test_posix_c_dynamic_library
 test_path_with_spaces
+test_mini_regex_matches
+test_compiler_detection_cc
+test_target_with_subpackage
 
 printf '\n%d passed, %d failed, %d skipped\n' "$PASSED" "$FAILED" "$SKIPPED"
 if [ "$FAILED" -ne 0 ]; then

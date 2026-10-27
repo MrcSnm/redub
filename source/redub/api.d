@@ -700,7 +700,7 @@ ArgsDetails resolveArguments(string[] args, bool isDescribeOnly = false)
     DubCommonArguments cArgs = bArgs.cArgs;
     if(cArgs.root)
         workingDir = cArgs.getRoot(workingDir);
-    if(recipe && (cArgs.recipe || cArgs.root))
+    if(targetPackage.length && (cArgs.recipe || cArgs.root))
         throw new Error(`Can't specify a target package to build if you specify either --root or --recipe`);
     if(bArgs.single && cArgs.recipe)
         throw new RedubException("Can't set both --single and --recipe");

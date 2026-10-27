@@ -2,6 +2,7 @@ module redub.tooling.compilers_inference;
 import redub.libs.semver;
 import redub.tooling.compiler_identification;
 import hip.data.json;
+import std.string : startsWith, endsWith;
 
 
 /**
@@ -106,7 +107,7 @@ CompilerBinary inferCompiler(string compilerIdentifier, string compilerOrPath, s
     {
         return assumeCompiler(compilerOrPath, compilerAssumption);
     }
-    return CompilerBinary(AcceptedCompiler.invalid, versionString);
+    return CompilerBinary(AcceptedCompiler.invalid, compilerOrPath, SemVer.init, SemVer.init, versionString);
 }
 
 /**
@@ -239,21 +240,22 @@ private bool tryInferGcc(string compilerOrPath, string _vString, out CompilerBin
     import std.path;
     import redub.logging;
     string type = compilerOrPath.baseName.stripExtension;
-    switch(type)
+    if(type == "gcc" || type == "cc" || type == "tcc" ||
+        type.startsWith("gcc-") || type.endsWith("-gcc"))
     {
-        case "gcc", "tcc":
-            comp = CompilerBinary(AcceptedCompiler.gcc, compilerOrPath, SemVer.init, SemVer.init, _vString);
-            warnTitle("GCC Compiler detected. ", "Beware that it is still very untested.");
-            return true;
-        default: return false;
+        comp = CompilerBinary(AcceptedCompiler.gcc, compilerOrPath, SemVer.init, SemVer.init, _vString);
+        warnTitle("GCC Compiler detected. ", "Beware that it is still very untested.");
+        return true;
     }
+    return false;
 }
 private bool tryInferGxx(string compilerOrPath, string _vString, out CompilerBinary comp)
 {
     import std.path;
     import redub.logging;
     string type = compilerOrPath.baseName.stripExtension;
-    if(type != "g++") return false;
+    if(type != "g++" && type != "c++" &&
+        !type.startsWith("g++-") && !type.endsWith("-g++")) return false;
     comp = CompilerBinary(AcceptedCompiler.gxx, compilerOrPath, SemVer.init, SemVer.init, _vString);
     warnTitle("G++ Compiler detected.", " Beware that it is still very untested.");
     return true;
@@ -264,7 +266,7 @@ private bool tryInferClang(string compilerOrPath, string vString, out CompilerBi
     import std.path;
     import redub.logging;
     string type = compilerOrPath.baseName.stripExtension;
-    if(type != "clang") return false;
+    if(type != "clang" && !type.startsWith("clang-") && !type.endsWith("-clang")) return false;
     ptrdiff_t indexRight;
     string clangVerStr = inBetween(vString, "clang version ", "\n", indexRight);
     comp = CompilerBinary(AcceptedCompiler.clang, compilerOrPath, SemVer(clangVerStr), SemVer(clangVerStr), vString);

@@ -39,9 +39,12 @@ void showNewerVersionMessage()
 string getLatestGitRepositoryTag(string repo)
 {
     JSONValue v = getGithubRepoAPI(repo);
-    if(v.isNull)
+    if(v.isNull || v.type != JSONType.array || v.array.length == 0)
         return null;
-    return v.array[0]["name"].str;
+    JSONValue* name = "name" in v.array[0];
+    if(name is null || name.type != JSONType.string_)
+        return null;
+    return name.str;
 }
 
 JSONValue getGithubRepoAPI(string repo)

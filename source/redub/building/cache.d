@@ -76,7 +76,8 @@ struct CompilationCache
         import std.exception;
         JSONValue c = *getCache(rootHash);
         string reqCache = req.extra.isRoot ? rootHash : hashFrom(req.cfg, s, false);
-        if (c.type != JSONType.array || c.hasErrorOccurred || c.array.length != 2)
+        if (c.type != JSONType.array || c.hasErrorOccurred || c.array.length != 2 ||
+            c.array[0].type != JSONType.array || c.array[1].type != JSONType.object)
         {
             import redub.logging;
             error("Cache is corrupted, regenerating...");
@@ -90,7 +91,7 @@ struct CompilationCache
         else
             return CompilationCache(reqCache, rootHash, AdvCacheFormula.init, AdvCacheFormula.init, sharedFormula);
         JSONValue* targetCache = reqCache in c.array[1];
-        if (!targetCache || targetCache.type != JSONType.array)
+        if (!targetCache || targetCache.type != JSONType.array || targetCache.array.length < 2)
             return CompilationCache(reqCache, rootHash, AdvCacheFormula.init, AdvCacheFormula.init, sharedFormula);
 
         return CompilationCache(reqCache, rootHash, AdvCacheFormula.deserializeSimple(targetCache.array[0], sharedFormula), AdvCacheFormula.deserializeSimple(targetCache.array[1], sharedFormula), sharedFormula);
@@ -214,7 +215,14 @@ string hashFrom(const BuildConfiguration cfg, CompilingSession session, bool isR
 
     XXH_64 xxh;
     xxh.start();
-    xxh.put(cast(ubyte[])cfg.getCompiler(session.compiler).versionString);
+
+    void putString(string value)
+    {
+        xxh.put(cast(ubyte[]) (value.length.to!string));
+        xxh.put(cast(ubyte[]) value);
+    }
+
+    putString(cfg.getCompiler(session.compiler).versionString);
     xxh.put(cast(ubyte)session.os);
     xxh.put(cast(ubyte)session.isa);
     // xxh.put(cast(ubyte[])req.targetConfiguration);
@@ -228,14 +236,14 @@ string hashFrom(const BuildConfiguration cfg, CompilingSession session, bool isR
             if (!(isExcluded || (isRoot && isExcludedFromRoot)))
             {
                 static if (is(typeof(v) == string))
-                    xxh.put(cast(ubyte[]) cfg.tupleof[i]);
+                    putString(cfg.tupleof[i]);
                 else static if (is(typeof(v) == string[]))
                 {
-                    foreach (v; cfg.tupleof[i])
-                        xxh.put(cast(ubyte[]) v);
+                    foreach (element; cfg.tupleof[i])
+                        putString(element);
                 }
                 else
-                    xxh.put(cast(ubyte[]) cfg.tupleof[i].to!string);
+                    putString(cfg.tupleof[i].to!string);
             }
         }
     }
@@ -358,7 +366,7 @@ AdvCacheFormula getCopyCacheFormula(string mainPackHash, const BuildRequirements
     string[] extraRequirements = [];
     if (req.cfg.targetType.isLinkedSeparately)
         extraRequirements = req.extra.librariesFullPath.map!(
-            (libPath) => getLibraryPath(libPath, req.cfg.outputDirectory, os)).array;
+            (libPath) => getLibraryPath(libPath, req.cfg.outputDirectory, s.os)).array;
 
     return AdvCacheFormula.make(
         &hashFunction,//DO NOT use sourcePaths since importPaths is always custom + sourcePaths

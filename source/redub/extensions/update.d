@@ -75,7 +75,13 @@ int updateMain(string[] args)
     {
         import d_downloader;
         latest = getLatestRedubVersion();
-        if(SemVer(latest[1..$]) > SemVer(RedubVersionOnly[1..$]))
+        if(!latest)
+        {
+            errorTitle("Could not fetch the latest Redub version. Check your network connection.");
+            return 1;
+        }
+        string latestVersion = latest[0] == 'v' ? latest[1..$] : latest;
+        if(SemVer(latestVersion) > SemVer(RedubVersionOnly[1..$]))
         {
             replaceRedub = true;
             string redubLink = getRedubDownloadLink(latest);
@@ -84,7 +90,7 @@ int updateMain(string[] args)
             redubPath = tempDir;
             mkdirRecurse(redubPath);
             extractZipToFolder(redubZip, redubPath);
-            redubPath = buildNormalizedPath(redubPath, "redub-"~latest[1..$]);
+            redubPath = buildNormalizedPath(redubPath, "redub-"~latestVersion);
         }
     }
 
@@ -118,16 +124,21 @@ int updateMain(string[] args)
             return 1;
         }
 
+        import std.process : escapeShellCommand;
         version(Windows)
         {
-            spawnShell(`start cmd /c "`~redubScriptPath~" "~d.getOutputFile~" "~redubExePath~'"');
+            spawnShell("start \"\" cmd /c " ~ escapeShellCommand(redubScriptPath) ~ " " ~
+                escapeShellCommand(d.getOutputFile) ~ " " ~ escapeShellCommand(redubExePath));
         }
         else version(Posix)
         {
             import core.sys.posix.unistd;
             import std.conv:to;
             string pid = getpid().to!string;
-            string exec = `chmod +x `~redubScriptPath~` && nohup bash `~redubScriptPath~" "~pid~" "~d.getOutputFile~" "~redubExePath~" > /dev/null 2>&1";
+            string exec = "chmod +x " ~ escapeShellCommand(redubScriptPath) ~
+                " && nohup bash " ~ escapeShellCommand(redubScriptPath) ~ " " ~
+                escapeShellCommand(pid) ~ " " ~ escapeShellCommand(d.getOutputFile) ~ " " ~
+                escapeShellCommand(redubExePath) ~ " > /dev/null 2>&1";
             spawnShell(exec);
         }
         else assert(false, "Your system does not have any command right now for auto copying the new content.");
