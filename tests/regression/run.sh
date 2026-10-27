@@ -492,6 +492,231 @@ test_root_target_name_environment()
     fi
 }
 
+test_parallel_leaves_up_to_date()
+{
+    local name="leaves$SUFFIX"
+    local d="$WORK/leaves"
+    local log="$WORK/leaves.log"
+    mkdir -p "$d/source"
+    printf '%s\n' '{"name":"'"$name"'","targetPath":"build"}' > "$d/dub.json"
+    printf '%s\n' 'void main(){}' > "$d/source/app.d"
+
+    if ! redub_in "$d" 120 "$log" build --force; then
+        fail parallel_leaves_up_to_date "setup build failed: $(detail "$log")"
+        return
+    fi
+
+    redub_in "$d" 20 "$WORK/leaves2.log" build --parallel=leaves
+    local status=$?
+    if [ "$status" -eq 124 ]; then
+        fail parallel_leaves_up_to_date "build hung on an up-to-date project with --parallel=leaves"
+    elif [ "$status" -eq 0 ]; then
+        pass parallel_leaves_up_to_date
+    else
+        fail parallel_leaves_up_to_date "exit $status with no useful output ($(detail "$WORK/leaves2.log"))"
+    fi
+}
+
+test_meta_package_with_dependencies()
+{
+    local rootname="metaroot$SUFFIX"
+    local metaname="meta$SUFFIX"
+    local realname="real$SUFFIX"
+    local d="$WORK/meta"
+    local log="$WORK/meta.log"
+    mkdir -p "$d/source" "$d/meta" "$d/real/source"
+    printf '%s\n' '{"name":"'"$rootname"'","targetPath":"build","dependencies":{"'"$metaname"'":{"path":"meta"}}}' > "$d/dub.json"
+    printf '%s\n' 'void main(){}' > "$d/source/app.d"
+    printf '%s\n' '{"name":"'"$metaname"'","targetType":"none","dependencies":{"'"$realname"'":{"path":"../real"}}}' > "$d/meta/dub.json"
+    printf '%s\n' '{"name":"'"$realname"'","targetPath":"build"}' > "$d/real/dub.json"
+    printf '%s\n' 'module '"$realname"'; void foo(){}' > "$d/real/source/$realname.d"
+
+    redub_in "$d" 120 "$log" build --force
+    local status=$?
+    if grep -q "can't be independent when having dependencies" "$log"; then
+        fail meta_package_with_dependencies "meta package with dependencies crashed the build ($(detail "$log"))"
+    elif [ "$status" -eq 0 ]; then
+        pass meta_package_with_dependencies
+    else
+        fail meta_package_with_dependencies "exit $status: $(detail "$log")"
+    fi
+}
+
+test_missing_source_path()
+{
+    local rootname="missroot$SUFFIX"
+    local depname="missdep$SUFFIX"
+    local d="$WORK/missing"
+    local log="$WORK/missing.log"
+    mkdir -p "$d/source" "$d/dep"
+    printf '%s\n' '{"name":"'"$rootname"'","targetPath":"build","dependencies":{"'"$depname"'":{"path":"dep"}}}' > "$d/dub.json"
+    printf '%s\n' 'void main(){}' > "$d/source/app.d"
+    printf '%s\n' '{"name":"'"$depname"'","targetPath":"build","sourcePaths":["generated"]}' > "$d/dep/dub.json"
+
+    redub_in "$d" 120 "$log" build --force
+    local status=$?
+    if grep -q "Internal Error" "$log"; then
+        fail missing_source_path "missing sourcePaths produced an internal error ($(detail "$log"))"
+    elif [ "$status" -eq 0 ]; then
+        pass missing_source_path
+    else
+        fail missing_source_path "exit $status: $(detail "$log")"
+    fi
+}
+
+test_breadth_empty_directory()
+{
+    local name="breadth$SUFFIX"
+    local d="$WORK/breadth"
+    local log="$WORK/breadth.log"
+    mkdir -p "$d/source/empty"
+    printf '%s\n' '{"name":"'"$name"'","targetPath":"build"}' > "$d/dub.json"
+    printf '%s\n' 'void main(){}' > "$d/source/app.d"
+
+    redub_in "$d" 120 "$log" build --force --breadth
+    local status=$?
+    if [ "$status" -eq 0 ]; then
+        pass breadth_empty_directory
+    else
+        fail breadth_empty_directory "exit $status on a source tree with an empty subdirectory ($(detail "$log"))"
+    fi
+}
+
+test_source_paths_prefix_collision()
+{
+    local name="prefix$SUFFIX"
+    local d="$WORK/prefix"
+    local log="$WORK/prefix.log"
+    mkdir -p "$d/source" "$d/source_extra"
+    printf '%s\n' '{"name":"'"$name"'","targetPath":"build","sourcePaths":["source","source_extra"]}' > "$d/dub.json"
+    printf '%s\n' 'void main(){}' > "$d/source/app.d"
+    printf '%s\n' 'module extra; void extra(){}' > "$d/source_extra/extra.d"
+
+    redub_in "$d" 120 "$log" build --force
+    local exe
+    exe="$(artifact "$d" "$name")"
+    if [ -n "$exe" ]; then
+        pass source_paths_prefix_collision
+    else
+        fail source_paths_prefix_collision "the valid 'source' directory was pruned by 'source_extra' ($(detail "$log"))"
+    fi
+}
+
+test_amd64_platform_filter()
+{
+    local name="amd$SUFFIX"
+    local d="$WORK/amd"
+    local log="$WORK/amd.log"
+    local arch
+    arch="$(uname -m 2>/dev/null || true)"
+    if [ "$arch" != "x86_64" ] && [ "$arch" != "amd64" ]; then
+        skip amd64_platform_filter "host is not x86_64 ($arch)"
+        return
+    fi
+    mkdir -p "$d/source"
+    printf '%s\n' '{"name":"'"$name"'","targetPath":"build","configurations":[{"name":"amd","platforms":["amd64"],"sourcePaths":["source"]}]}' > "$d/dub.json"
+    printf '%s\n' 'void main(){}' > "$d/source/app.d"
+
+    redub_in "$d" 120 "$log" build --force --config amd
+    local status=$?
+    if grep -q "No appropriate switch clause found for architecture" "$log"; then
+        fail amd64_platform_filter "valid amd64 filter threw ($(detail "$log"))"
+    elif [ "$status" -eq 0 ]; then
+        pass amd64_platform_filter
+    else
+        fail amd64_platform_filter "exit $status: $(detail "$log")"
+    fi
+}
+
+test_project_without_name()
+{
+    local d="$WORK/noname"
+    local log="$WORK/noname.log"
+    mkdir -p "$d/source"
+    printf '%s\n' '{"targetPath":"build"}' > "$d/dub.json"
+    printf '%s\n' 'void main(){}' > "$d/source/app.d"
+
+    redub_in "$d" 120 "$log" build --force
+    if grep -qi "must contain a 'name'" "$log"; then
+        pass project_without_name
+    else
+        fail project_without_name "missing 'name' did not produce a clear error ($(detail "$log"))"
+    fi
+}
+
+test_posix_c_dynamic_library()
+{
+    if [ "$WINDOWS" -eq 1 ] || [ "$(uname -s 2>/dev/null)" != "Linux" ]; then
+        skip posix_c_dynamic_library "requires a Linux host"
+        return
+    fi
+    if ! command -v gcc >/dev/null 2>&1; then
+        skip posix_c_dynamic_library "gcc not found"
+        return
+    fi
+    local name="cdyn$SUFFIX"
+    local d="$WORK/cdyn"
+    local log="$WORK/cdyn.log"
+    mkdir -p "$d/source"
+    printf '%s\n' '{"name":"'"$name"'","language":"C","targetType":"dynamicLibrary","targetPath":"build"}' > "$d/dub.json"
+    printf '%s\n' 'int f(void){return 1;}' > "$d/source/f.c"
+
+    redub_in "$d" 120 "$log" build --force --c-compiler=gcc
+    local status=$?
+    if [ "$status" -ne 0 ]; then
+        fail posix_c_dynamic_library "gcc dynamic library build failed ($(detail "$log"))"
+    elif [ -z "$(find "$d/build" -maxdepth 1 -name '*.so' -print -quit 2>/dev/null)" ]; then
+        fail posix_c_dynamic_library "build succeeded but produced no .so"
+    else
+        pass posix_c_dynamic_library
+    fi
+}
+
+test_path_with_spaces()
+{
+    if [ "$WINDOWS" -eq 1 ] || [ "$(uname -s 2>/dev/null)" != "Linux" ]; then
+        skip path_with_spaces "requires a Linux host"
+        return
+    fi
+    if ! command -v gcc >/dev/null 2>&1; then
+        skip path_with_spaces "gcc not found"
+        return
+    fi
+    local name="spaces$SUFFIX"
+    local d="$WORK/path with space"
+    local log="$WORK/spaces.log"
+    mkdir -p "$d/source"
+    printf '%s\n' '{"name":"'"$name"'","language":"C","targetType":"executable","targetPath":"build"}' > "$d/dub.json"
+    printf '%s\n' 'int main(void){return 0;}' > "$d/source/main.c"
+
+    redub_in "$d" 120 "$log" build --force --c-compiler=gcc
+    if [ "$?" -eq 0 ]; then
+        pass path_with_spaces
+    else
+        fail path_with_spaces "a project path containing spaces failed ($(detail "$log"))"
+    fi
+}
+
+test_source_paths_nested()
+{
+    local name="nested$SUFFIX"
+    local d="$WORK/nested"
+    local log="$WORK/nested.log"
+    mkdir -p "$d/source/sub"
+    printf '%s\n' '{"name":"'"$name"'","targetPath":"build","sourcePaths":["source","source/sub"]}' > "$d/dub.json"
+    printf '%s\n' 'void main(){}' > "$d/source/app.d"
+    printf '%s\n' 'module sub; void sub(){}' > "$d/source/sub/sub.d"
+
+    redub_in "$d" 120 "$log" build --force
+    local exe
+    exe="$(artifact "$d" "$name")"
+    if [ -n "$exe" ] && ! grep -q "Path .*source was removed" "$log"; then
+        pass source_paths_nested
+    else
+        fail source_paths_nested "the parent 'source' was removed instead of the nested 'source/sub' ($(detail "$log"))"
+    fi
+}
+
 test_cache_custom_source_paths
 test_test_command_forwards_args
 test_config_platform_crash
@@ -509,6 +734,16 @@ test_single_file_without_name
 test_target_name_environment
 test_root_target_name_environment
 test_environment_cycle
+test_parallel_leaves_up_to_date
+test_meta_package_with_dependencies
+test_missing_source_path
+test_breadth_empty_directory
+test_source_paths_prefix_collision
+test_source_paths_nested
+test_amd64_platform_filter
+test_project_without_name
+test_posix_c_dynamic_library
+test_path_with_spaces
 
 printf '\n%d passed, %d failed, %d skipped\n' "$PASSED" "$FAILED" "$SKIPPED"
 if [ "$FAILED" -ne 0 ]; then

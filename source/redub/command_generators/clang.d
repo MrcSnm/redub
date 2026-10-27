@@ -26,7 +26,8 @@ string[] parseBuildConfiguration(const BuildConfiguration b, CompilingSession s,
         putSourceFiles(cmds, workingDir, sourcePaths, sourceFiles, excludeSourceFiles, extensions);
 
 
-        string outFlag = getTargetTypeFlag(targetType);
+        ///Dynamic libraries are linked in the link step, not in the compile step.
+        string outFlag = targetType == TargetType.dynamicLibrary ? null : getTargetTypeFlag(targetType);
         string cacheDir = getCacheOutputDir(mainPackhash, b, s, isRoot);
 
         mkdirRecurse(cacheDir);

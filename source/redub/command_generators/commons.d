@@ -258,6 +258,19 @@ bool hasAnySource(const ref BuildConfiguration cfg, ref bool[string] sourceCache
                 continue;
             return true;
         }
+        try
+        {
+            if(!exists(path) || !isDir(path))
+            {
+                sourceCache[path] = false;
+                continue;
+            }
+        }
+        catch(Exception)
+        {
+            sourceCache[path] = false;
+            continue;
+        }
         foreach(DirEntry e; dirEntries(path, SpanMode.depth))
         {
             if(filter.shouldInclude(e.name))
@@ -456,43 +469,40 @@ auto dirEntriesBreadth(string inputPath, bool filterHidden)
         DirEntry[] currPathEntries;
         DirEntry[] nextDirs;
 
+        void loadNextDirectories()
+        {
+            while(nextDirs.length && currPathEntries.length == 0)
+            {
+                DirEntry next = nextDirs[0];
+                if(filterHidden)
+                {
+                    if(!isFileHidden(next))
+                        currPathEntries = dirEntries(next.name, SpanMode.shallow).filter!(e => !isFileHidden(e)).array;
+                }
+                else
+                    currPathEntries = dirEntries(next.name, SpanMode.shallow).array;
+                nextDirs = nextDirs[1..$];
+            }
+        }
         void popFront()
         {
+            loadNextDirectories();
             if(currPathEntries.length == 0)
+                return;
+            if(currPathEntries[0].isDir)
             {
-                if(nextDirs.length == 0)
-                    return;
-
-                while(nextDirs.length && currPathEntries.length == 0)
-                {
-                    DirEntry next = nextDirs[0];
-                    if(filterHidden)
-                    {
-                        if(!isFileHidden(next))
-                            currPathEntries = dirEntries(next.name, SpanMode.shallow).filter!(e => !isFileHidden(e)).array;
-                    }
-                    else
-                        currPathEntries = dirEntries(next.name, SpanMode.shallow).array;
-                    nextDirs = nextDirs[1..$];
-                }
+                if(!filterHidden || !isFileHidden(currPathEntries[0]))
+                    nextDirs~= currPathEntries[0];
             }
-            else
-            {
-                if(currPathEntries[0].isDir)
-                {
-                    if(!filterHidden || !isFileHidden(currPathEntries[0]))
-                        nextDirs~= currPathEntries[0];
-                }
-                currPathEntries = currPathEntries[1..$];
-            }
-
-
+            currPathEntries = currPathEntries[1..$];
         }
-        bool empty(){return currPathEntries.length == 0 && nextDirs.length == 0;}
+        bool empty()
+        {
+            loadNextDirectories();
+            return currPathEntries.length == 0;
+        }
         DirEntry front()
         {
-            if(currPathEntries.length == 0)
-                popFront();
             return currPathEntries[0];
         }
     }

@@ -21,6 +21,17 @@ ProcessExec2 execCompiler(const BuildConfiguration cfg, Compiler compiler, strin
     CompilerBinary cBin = cfg.getCompiler(compiler);
     string compilerBin = cBin.bin;
 
+    ///Command generators quote paths for shell/command-file syntax. When the
+    ///flags are passed directly as argv, those quote characters become part
+    ///of the path and break anything with spaces.
+    if(!(std.system.os.isWindows && cBin.isDCompiler))
+    {
+        import std.algorithm.iteration : map;
+        import std.array : array;
+        import std.string : replace;
+        compileFlags = compileFlags.map!(flag => flag.replace("\"", "")).array;
+    }
+
     if(std.system.os.isWindows && cBin.isDCompiler)
     {
         cmdFile = createCommandFile(cfg, compileFlags, compilationCommands);

@@ -300,33 +300,47 @@ private void partiallyFinishBuildRequirements(ref BuildRequirements req, BuildCo
         }
     }
 
-    for(int i = 1; i < req.cfg.sourcePaths.length; i++)
+    static bool isSubPath(string child, string parent)
     {
-        //[src, src/folder]
-        //[src/folder, src]
-        string pathRemoved;
-        string specificPath;
-        if(req.cfg.sourcePaths[i].length > req.cfg.sourcePaths[i-1].length &&
-            req.cfg.sourcePaths[i].startsWith(req.cfg.sourcePaths[i-1]))
-        {
-            specificPath = req.cfg.sourcePaths[i];
-            pathRemoved = req.cfg.sourcePaths[i-1];
-            req.cfg.sourcePaths[i-1] = req.cfg.sourcePaths[$-1];
-        }
-        else if(req.cfg.sourcePaths[i-1].length > req.cfg.sourcePaths[i].length &&
-                req.cfg.sourcePaths[i-1].startsWith(req.cfg.sourcePaths[i]))
-        {
-            specificPath = req.cfg.sourcePaths[i-1];
-            pathRemoved = req.cfg.sourcePaths[i];
-            req.cfg.sourcePaths[i] = req.cfg.sourcePaths[$-1];
-        }
-        if(pathRemoved !is null)
-        {
-            warn("Path ",pathRemoved," was removed from sourcePaths since a more specific path was specified [", specificPath,"] . Please use \"sourcePaths\": [] instead for removing that warn and be clear about your intention");
-            req.cfg.sourcePaths.length--;
-            i--;
-        }
+        import std.path : isDirSeparator;
+        if(child.length <= parent.length || !child.startsWith(parent))
+            return false;
+        if(parent.length && isDirSeparator(parent[$-1]))
+            return true;
+        return isDirSeparator(child[parent.length]);
     }
+
+    ///Keep the broader directories and drop the ones already covered by them.
+    ///[src, src/sub] -> [src]
+    ///[src/sub, src] -> [src]
+    string[] keptPaths;
+    foreach(path; req.cfg.sourcePaths)
+    {
+        bool covered;
+        foreach(parent; keptPaths)
+        {
+            if(path == parent || isSubPath(path, parent))
+            {
+                warn("Path ", path, " was removed from sourcePaths because ", parent, " already includes it.");
+                covered = true;
+                break;
+            }
+        }
+        if(covered)
+            continue;
+
+        size_t writeIndex;
+        foreach(child; keptPaths)
+        {
+            if(isSubPath(child, path))
+                warn("Path ", child, " was removed from sourcePaths because ", path, " already includes it.");
+            else
+                keptPaths[writeIndex++] = child;
+        }
+        keptPaths.length = writeIndex;
+        keptPaths ~= path;
+    }
+    req.cfg.sourcePaths = keptPaths;
 
 
     import std.algorithm.iteration;

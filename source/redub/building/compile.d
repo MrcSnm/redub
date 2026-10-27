@@ -288,6 +288,7 @@ bool buildProjectParallelSimple(ProjectDetails details, CompilingSession s, cons
     printCachedBuildInfo(root);
     while(true)
     {
+        bool spawnedThisIteration;
         foreach(dep; dependencyFreePackages)
         {
             if(!(dep in spawned))
@@ -297,6 +298,7 @@ bool buildProjectParallelSimple(ProjectDetails details, CompilingSession s, cons
                 if(dep.shouldEnterCompilationThread)
                 {
                     spawned[dep] = true;
+                    spawnedThisIteration = true;
                     spawn(&execCompilationThread,
                         dep.requirements.buildData(false, s, getEnvForProject(dep, env)), cast(shared)dep,
                         s, HashPair(mainPackHash, hashFrom(dep.requirements, s)),
@@ -307,6 +309,17 @@ bool buildProjectParallelSimple(ProjectDetails details, CompilingSession s, cons
                     dep.becomeIndependent();
             }
         }
+
+        ///Everything was already up to date: no worker will send a message, so just
+        ///continue walking the tree instead of blocking in receiveOnly.
+        if(!spawnedThisIteration)
+        {
+            dependencyFreePackages = root.findLeavesNodes();
+            if(root.dependencies.length == 0 || dependencyFreePackages.length == 0)
+                break;
+            continue;
+        }
+
         auto info = receiveOnly!(CompilationID, ProcessInfo, CompilationResult);
         if(info[0].id != execID)
             continue;

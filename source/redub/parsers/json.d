@@ -25,7 +25,10 @@ immutable string[] commandsWithHostFilters = [
 
 string getPackageName(JSONValue packageJSON)
 {
-    return packageJSON["name"].str;
+    JSONValue* name = "name" in packageJSON;
+    if(name is null)
+        throw new Exception("Every package must contain a 'name'");
+    return name.str;
 }
 
 struct TargetInfo
@@ -647,7 +650,7 @@ private bool matchesArch(string archRep, ISA isa)
     switch(archRep) with(ISA)
     {
         case "x86", "x86_mscoff":     return isa == x86;
-        case "x86_64":  return isa == x86_64;
+        case "x86_64", "amd64": return isa == x86_64;
         case "arm":     return isa == arm;
         case "aarch64": return isa == aarch64;
         case "wasm32":  return isa == webAssembly;

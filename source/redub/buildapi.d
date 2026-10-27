@@ -1195,8 +1195,13 @@ class ProjectNode
             for(int i = 0; i < node.dependencies.length; i++)
             {
                 bool noSource = !hasAnySource(node.dependencies[i].requirements.cfg, anySourceCache);
+                bool transfersDependencies =
+                    node.dependencies[i].requirements.cfg.targetType == TargetType.none ||
+                    node.dependencies[i].requirements.cfg.targetType == TargetType.sourceLibrary;
                 ///init-exec is a special case that redub will filter.
-                if(node.dependencies[i].isOptional || node.dependencies[i].name.endsWith("init-exec") || noSource)
+                if(node.dependencies[i].isOptional ||
+                    node.dependencies[i].name.endsWith("init-exec") ||
+                    (noSource && !transfersDependencies))
                 {
                     if(node.dependencies[i].isOptional && hasLogLevel(LogLevel.warn))
                         removedOptionals~= node.dependencies[i].name;

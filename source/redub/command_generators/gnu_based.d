@@ -26,7 +26,9 @@ string[] parseBuildConfiguration(const BuildConfiguration b, CompilingSession s,
         putSourceFiles(cmds, workingDir, sourcePaths, sourceFiles, excludeSourceFiles, extensions);
 
 
-        string outFlag = getTargetTypeFlag(targetType);
+        ///Dynamic libraries are linked in the link step. The compile step must only
+        ///produce an object/relocatable file, otherwise gcc gets "-r -shared".
+        string outFlag = targetType == TargetType.dynamicLibrary ? null : getTargetTypeFlag(targetType);
         string cacheDir = getCacheOutputDir(mainPackhash, b, s, isRoot);
 
         mkdirRecurse(cacheDir);
