@@ -92,6 +92,8 @@ int main(string[] args)
             {
                 if(auto fn = args[2] in entryPoints)
                     return (*fn)([args[0], "--help"]);
+                if(args[2] != "help")
+                    return unknownHelpTopic(args[2], entryPoints.keys ~ "help");
             }
             writeln(getHelpInfo());
             return 0;
@@ -604,4 +606,27 @@ int configureMain(string[] args)
     meta["updateCheck"] = JSONValue(config.updateCheck);
     saveRedubMeta(meta);
     return 0;
+}
+
+/**
+ * `redub help <topic>` with a topic that is not a command (OpenShellOrg CLI Help CH-16, CLI Dispatch CD-1):
+ * name the token, suggest a close command, point at the top-level help, stderr, exit 2.
+ */
+int unknownHelpTopic(string topic, string[] commands)
+{
+    import std.stdio : stderr;
+    import std.algorithm : sort, filter, map, minElement;
+    import std.algorithm.comparison : levenshteinDistance;
+    import std.array : array, join;
+    import std.typecons : tuple;
+
+    string[] cmds = commands.dup;
+    sort(cmds);
+    stderr.writeln("error: no help topic '", topic, "'");
+    auto close = cmds.map!(c => tuple(levenshteinDistance(topic, c), c)).filter!(t => t[0] <= 2).array;
+    if(close.length)
+        stderr.writeln("  did you mean: redub help ", close.minElement!"a[0]"[1]);
+    stderr.writeln("  redub commands: ", cmds.join(", "));
+    stderr.writeln("  see: redub help");
+    return 2;
 }
