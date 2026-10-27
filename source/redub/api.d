@@ -669,15 +669,8 @@ ArgsDetails resolveArguments(string[] args, bool isDescribeOnly = false)
     import std.getopt;
     import std.file;
 
-    string workingDir = std.file.getcwd();
-    string targetPackage = getPackageFromCli(args);
-    string packageVersion = getVersionFromPackage(targetPackage);
-    string subPackage = getSubPackage(targetPackage);
-    string recipe;
-
     DubArguments bArgs;
     GetoptResult res = betterGetopt(args, bArgs);
-
     if(res.helpWanted)
     {
         import std.getopt;
@@ -691,6 +684,15 @@ ArgsDetails resolveArguments(string[] args, bool isDescribeOnly = false)
         writeln(RedubVersion);
         exit(0);
     }
+
+    string workingDir = std.file.getcwd();
+    string targetPackage = getPackageFromCli(args);
+    string packageVersion = getVersionFromPackage(targetPackage);
+    string subPackage = getSubPackage(targetPackage);
+    string recipe;
+
+
+    
     import redub.command_generators.commons;
     setSpanModeAsBreadth(bArgs.build.breadth);
     updateVerbosity(bArgs.cArgs);
@@ -1041,13 +1043,11 @@ void updateVerbosity(DubCommonArguments a)
 }
 private string getPackageFromCli(ref string[] args)
 {
-    if(args.length > 1 && args[1][0] != '-')
-    {
-        string ret = args[1];
-        args = args[0..$] ~ args[2..$];
-        return ret;
-    }
-    return null;
+    if (args.length < 2)
+        return null;
+    string ret = args[1];
+    args = args[0] ~ args[2 .. $];
+    return ret;
 }
 
 string getVersionFromPackage(ref string pkg)
