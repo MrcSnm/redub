@@ -65,24 +65,46 @@ string[] parseLinkConfiguration(const ThreadBuildData data, CompilingSession s, 
             //Only linux supports start/end group and no-as-needed. OSX does not
             if(emitStartGroup)
             {
-                cmds~= "-L--no-as-needed";
-                cmds~= "-L--start-group";
+                if(c.isDCompiler)
+                {
+                    cmds~= "-L--no-as-needed";
+                    cmds~= "-L--start-group";
+                }
+                else
+                {
+                    cmds~= "-Wl,--no-as-needed";
+                    cmds~= "-Wl,--start-group";
+                }
             }
             ///Use library full path for the base file
-            cmds = mapAppendReverse(cmds, data.extra.librariesFullPath, (string l) => "-L"~getOutputName(TargetType.staticLibrary, l, s.os));
+            cmds = mapAppendReverse(cmds, data.extra.librariesFullPath, (string l)
+            {
+                string libPath = getOutputName(TargetType.staticLibrary, l, s.os);
+                return c.isDCompiler ? "-L"~libPath : libPath;
+            });
             if(emitStartGroup)
-                cmds~= "-L--end-group";
+                cmds~= c.isDCompiler ? "-L--end-group" : "-Wl,--end-group";
 
             if(s.os.isApple)
             {
                 foreach(framework; frameworks)
-                    cmds~= ["-L-framework", "-L"~framework];
+                {
+                    if(c.isDCompiler)
+                        cmds~= ["-L-framework", "-L"~framework];
+                    else
+                        cmds~= ["-framework", framework];
+                }
             }
-            cmds = mapAppendPrefix(cmds, linkFlags, "-L", false);
-            cmds = mapAppendPrefix(cmds, libraryPaths, "-L-L", true);
+            cmds = mapAppendPrefix(cmds, linkFlags, c.isDCompiler ? "-L" : "", false);
+            cmds = mapAppendPrefix(cmds, libraryPaths, c.isDCompiler ? "-L-L" : "-L", true);
             cmds~= getLinkFiles(b.sourceFiles);
             import std.path:isAbsolute;
-            cmds = mapAppend(cmds, libraries, (string l) => l.isAbsolute ? ("-L"~l) : "-L-l"~stripLibraryExtension(l));
+            cmds = mapAppend(cmds, libraries, (string l)
+            {
+                if(l.isAbsolute)
+                    return c.isDCompiler ? "-L"~l : l;
+                return (c.isDCompiler ? "-L-l" : "-l")~stripLibraryExtension(l);
+            });
 
         }
     }
@@ -148,11 +170,13 @@ string getTargetTypeFlag(TargetType o, CompilerBinary compiler)
 {
     static import redub.command_generators.d_compilers;
     static import redub.command_generators.gnu_based;
+    static import redub.command_generators.clang;
 
     switch(compiler.compiler) with(AcceptedCompiler)
     {
         case dmd, ldc2: return redub.command_generators.d_compilers.getTargetTypeFlag(o, compiler);
         case gcc, gxx: return redub.command_generators.gnu_based.getTargetTypeFlag(o);
+        case clang: return redub.command_generators.clang.getTargetTypeFlag(o);
         default: throw new Exception("Unsupported compiler "~compiler.bin);
     }
 }

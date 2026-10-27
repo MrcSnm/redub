@@ -115,6 +115,15 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
 
     immutable static requirementsRun = [
         "name": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){},
+        "version": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){},
+        "targets": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){},
+        "language": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){},
+        "description": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){},
+        "authors": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){},
+        "copyright": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){},
+        "license": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){},
+        "homepage": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){},
+        "mainSourceFile": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){},
         "plugins": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _)
         {
             enforce(v.type == JSONType.object, "\"plugins\" in json must be an object.");
@@ -496,15 +505,65 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
     }
 
     string[] unusedKeys;
-    runHandlers(requirementsRun, buildRequirements, cfg, json, false, unusedKeys, pending);
+    runHandlers(requirementsRun, buildRequirements, cfg, json, true, unusedKeys, pending);
 
     if(cfg.extra.isTarget) 
         foreach(ref Dependency dep;  buildRequirements.dependencies)
             dep.isTarget = true;
 
-    if(cfg.firstRun && unusedKeys.length) warn("Unused Keys -> ", unusedKeys);
+    if(cfg.firstRun && unusedKeys.length)
+        printUnusedKeySuggestions(unusedKeys, cfg.workingDir, requirementsRun);
     runPreGenerateCommands(cfg, buildRequirements);
     return buildRequirements;
+}
+
+private double keySimilarity(string a, string b)
+{
+    import std.algorithm.comparison : levenshteinDistance;
+    import std.string : toLower;
+
+    a = a.toLower;
+    b = b.toLower;
+    size_t maxLength = a.length > b.length ? a.length : b.length;
+    if(maxLength == 0)
+        return 1.0;
+    return 1.0 - cast(double)levenshteinDistance(a, b) / maxLength;
+}
+
+private void printUnusedKeySuggestions(
+    string[] unusedKeys,
+    string workingDir,
+    immutable void function(ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration pending)[string] handler)
+{
+    enum minMatch = 0.6;
+
+    foreach(key; unusedKeys)
+    {
+        string bestMatch;
+        double bestScore = 0;
+
+        void consider(string query)
+        {
+            foreach(option, _; handler)
+            {
+                double score = keySimilarity(query, option);
+                if(score > bestScore || (score == bestScore && option < bestMatch))
+                {
+                    bestScore = score;
+                    bestMatch = option;
+                }
+            }
+        }
+
+        consider(key);
+        CommandWithFilter filtered = CommandWithFilter.fromKey(key);
+        if(filtered.command.length)
+            consider(filtered.command);
+
+        if(bestMatch.length && bestScore >= minMatch)
+            warn("Unused key '", key, "' in ", workingDir,
+                ". Did you mean '", bestMatch, "'? (", cast(int)(bestScore * 100), "% match)");
+    }
 }
 
 private void runHandlers(
@@ -529,7 +588,7 @@ private void runHandlers(
         }
         if(mustExecuteHandler)
             (*fn)(buildRequirements, v, cfg, pending);
-        else if(bGetUnusedKeys)
+        else if(bGetUnusedKeys && !fn)
             unusedKeys~= key;
     }
 }
