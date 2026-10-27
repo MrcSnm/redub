@@ -26,10 +26,11 @@ JSONValue parseJSONCached(string filePath, string fileData)
     {
         JSONValue* cached = filePath in jsonCache;
         if(cached) return *cached;
-        jsonCache[filePath] = parseJSON(fileData, true);
-        if(jsonCache[filePath].hasErrorOccurred)
-            throw new Exception(jsonCache[filePath].error);
-        return jsonCache[filePath];
+        JSONValue parsed = parseJSON(fileData, true);
+        if(parsed.hasErrorOccurred)
+            throw new Exception(parsed.error);
+        jsonCache[filePath] = parsed;
+        return parsed;
     }
 }
 

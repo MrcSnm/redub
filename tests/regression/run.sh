@@ -384,6 +384,114 @@ C
     fi
 }
 
+test_parallel_environment()
+{
+    local name="parcheck$SUFFIX"
+    local d="$WORK/parenv"
+    local log="$WORK/parenv.log"
+    mkdir -p "$d/source"
+    printf '%s\n' '{"name":"'"$name"'","targetPath":"build","postBuildCommands":["echo DUB_PARALLEL_BUILD=$DUB_PARALLEL_BUILD"]}' > "$d/dub.json"
+    printf '%s\n' 'void main(){}' > "$d/source/app.d"
+
+    redub_in "$d" 120 "$log" build --force
+    if grep -q 'DUB_PARALLEL_BUILD=TRUE' "$log"; then
+        pass parallel_environment
+    else
+        fail parallel_environment "DUB_PARALLEL_BUILD was not TRUE for an enabled parallel build ($(detail "$log"))"
+    fi
+}
+
+test_platform_filter_typo()
+{
+    local name="cfgtpy$SUFFIX"
+    local d="$WORK/cfgtypo"
+    local log="$WORK/cfgtypo.log"
+    mkdir -p "$d/source"
+    printf '%s\n' '{"name":"'"$name"'","targetPath":"build","configurations":[{"name":"typo","platforms":["window"],"sourcePaths":["source"]},{"name":"unittest","sourcePaths":["source"]}]}' > "$d/dub.json"
+    printf '%s\n' 'void main(){}' > "$d/source/app.d"
+
+    redub_in "$d" 120 "$log" build --config typo
+    local status=$?
+    if grep -qE 'ArrayIndexError|out of bounds' "$log"; then
+        fail platform_filter_typo "crashed instead of reporting the incompatible configuration ($(detail "$log"))"
+    elif [ "$status" -eq 0 ]; then
+        fail platform_filter_typo "a typo in 'platforms' selected the configuration anyway"
+    elif grep -qiE "incompatible|wasn't found" "$log"; then
+        pass platform_filter_typo
+    else
+        fail platform_filter_typo "unexpected error: $(detail "$log")"
+    fi
+}
+
+test_find_executable_skips_directory()
+{
+    local name="pathtest$SUFFIX"
+    local d="$WORK/findexec"
+    local log="$WORK/findexec.log"
+    mkdir -p "$d/bin" "$d/proj/source"
+    if [ "$WINDOWS" -eq 1 ]; then
+        mkdir -p "$d/bin/dmd.exe"
+    else
+        mkdir -p "$d/bin/dmd"
+    fi
+    printf '%s\n' '{"name":"'"$name"'","targetPath":"build"}' > "$d/proj/dub.json"
+    printf '%s\n' 'void main(){}' > "$d/proj/source/app.d"
+
+    ( cd "$d/proj" && PATH="$d/bin:$PATH" run_limited 120 "$REDUB" build --force ) >"$log" 2>&1
+    if [ "$?" -eq 0 ]; then
+        pass find_executable_skips_directory
+    else
+        fail find_executable_skips_directory "a directory named like the compiler broke PATH lookup ($(detail "$log"))"
+    fi
+}
+
+test_compiler_semver_range()
+{
+    local name="compver$SUFFIX"
+    local d="$WORK/compver"
+    local log="$WORK/compver.log"
+    mkdir -p "$d/source"
+    printf '%s\n' '{"name":"'"$name"'","targetPath":"build"}' > "$d/dub.json"
+    printf '%s\n' 'void main(){}' > "$d/source/app.d"
+
+    local dc req
+    if command -v dmd >/dev/null 2>&1 || { [ "$WINDOWS" -eq 1 ] && cmd.exe /c "where dmd >nul 2>nul" >/dev/null 2>&1; }; then
+        dc=dmd
+        req='~>2.0'
+    elif command -v ldc2 >/dev/null 2>&1 || { [ "$WINDOWS" -eq 1 ] && cmd.exe /c "where ldc2 >nul 2>nul" >/dev/null 2>&1; }; then
+        dc=ldc2
+        req='~>1.0'
+    else
+        skip compiler_semver_range "no D compiler found"
+        return
+    fi
+
+    redub_in "$d" 120 "$log" build --force --compiler="$dc@$req"
+    if [ "$?" -eq 0 ]; then
+        pass compiler_semver_range
+    else
+        fail compiler_semver_range "a semver range in --compiler was rejected ($(detail "$log"))"
+    fi
+}
+
+test_root_target_name_environment()
+{
+    local name="rootname$SUFFIX"
+    local target="myroot$SUFFIX"
+    local d="$WORK/rootname"
+    local log="$WORK/rootname.log"
+    mkdir -p "$d/source"
+    printf '%s\n' '{"name":"'"$name"'","targetName":"'"$target"'","targetPath":"build","postBuildCommands":["echo DUB_ROOT_PACKAGE_TARGET_NAME=$DUB_ROOT_PACKAGE_TARGET_NAME"]}' > "$d/dub.json"
+    printf '%s\n' 'void main(){}' > "$d/source/app.d"
+
+    redub_in "$d" 120 "$log" build --force
+    if grep -q "DUB_ROOT_PACKAGE_TARGET_NAME=$target" "$log"; then
+        pass root_target_name_environment
+    else
+        fail root_target_name_environment "DUB_ROOT_PACKAGE_TARGET_NAME is not the root targetName ($(grep 'DUB_ROOT_PACKAGE_TARGET_NAME' "$log" | head -1))"
+    fi
+}
+
 test_cache_custom_source_paths
 test_test_command_forwards_args
 test_config_platform_crash
@@ -392,9 +500,14 @@ test_unused_key_warning
 test_zip_slip
 test_parallel_with_dependency_commands
 test_assume_compiler_version
+test_parallel_environment
+test_platform_filter_typo
+test_find_executable_skips_directory
+test_compiler_semver_range
 test_posix_native_link_flags
 test_single_file_without_name
 test_target_name_environment
+test_root_target_name_environment
 test_environment_cycle
 
 printf '\n%d passed, %d failed, %d skipped\n' "$PASSED" "$FAILED" "$SKIPPED"

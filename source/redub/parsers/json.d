@@ -241,7 +241,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
                         enforce(platforms.type == JSONType.array,
                             "'platforms' on configuration "~name.str~" at project "~req.name ~ " must be an array"
                         );
-                        if(!platformMatches(platforms.array, c.cInfo.targetOS, c.cInfo.isa))
+                        if(!platformMatches(platforms.array, c.cInfo.targetOS, c.cInfo.isa, c.cInfo.compiler))
                             continue;
                     }
                     if(name.str == c.subConfiguration.name)
@@ -269,7 +269,11 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
                         preferredConfiguration = i.to!int;
                     }
                 }
-                if(c.subConfiguration.name && v.array[preferredConfiguration]["name"].str != c.subConfiguration.name) //Issue an error
+                bool requestedConfigurationFound =
+                    preferredConfiguration != -1 &&
+                    v.array[preferredConfiguration]["name"].str == c.subConfiguration.name;
+
+                if(c.subConfiguration.name && !requestedConfigurationFound) //Issue an error
                 {
                     import std.algorithm:map;
                     import std.array:join;
@@ -277,7 +281,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
                     foreach(JSONValue conf; v.array)
                     {
                         JSONValue* plats = "platforms" in conf;
-                        if(!plats || platformMatches(plats.array, os, c.cInfo.isa))
+                        if(!plats || platformMatches(plats.array, os, c.cInfo.isa, c.cInfo.compiler))
                             availableConfigs~= conf["name"].str;
                         else
                             availableConfigs~= conf["name"].str ~ " [OS-ISA Incompatible]";
@@ -287,13 +291,16 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
                     // string availableConfigs = v.array.map!((JSONValue e)
                     // {
                     //     JSONValue* plats = "platforms" in e;
-                    //     if(!plats || platformMatches(plats.array, os, c.cInfo.isa))
+                    //     if(!plats || platformMatches(plats.array, os, c.cInfo.isa, c.cInfo.compiler))
                     //         return e["name"].str;
                     //     else
                     //         return e["name"].str ~ " [OS-ISA Incompatible]";
                     // }).join("\n\t");
 
-                    throw new Exception("Configuration '"~c.subConfiguration.name~"' specified for dependency '"~req.name~"' but wasn't found or its platform is incompatible. Preferred subConfiguratio was '" ~ v.array[preferredConfiguration]["name"].str~"' . Available Configurations:\n\t"~availableConfigs);
+                    string preferredName = preferredConfiguration == -1
+                        ? c.subConfiguration.name
+                        : v.array[preferredConfiguration]["name"].str;
+                    throw new Exception("Configuration '"~c.subConfiguration.name~"' specified for dependency '"~req.name~"' but wasn't found or its platform is incompatible. Preferred subConfiguration was '" ~ preferredName ~"' . Available Configurations:\n\t"~availableConfigs);
                 }
                 
                 if(possibleConfiguration != -1 && preferredConfiguration == -1)
@@ -789,14 +796,14 @@ private void swap(T)(ref T a, ref T b)
     a = temp;
 }
 
-private bool platformMatches(JSONValue[] platforms, OS os, ISA isa)
+private bool platformMatches(JSONValue[] platforms, OS os, ISA isa, string compiler)
 {
     foreach(p; platforms)
     {
         import std.string;
         PlatformFilter filter = PlatformFilter.fromKeys(p.str.split("-"));
 
-        if(filter.matchesPlatform(os, isa))
+        if(filter.matchesPlatform(os, isa, compiler))
             return true;
     }
     return false;

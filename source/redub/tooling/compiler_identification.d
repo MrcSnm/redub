@@ -264,10 +264,14 @@ private CompilerBinary searchCompiler(string compilerOrPath, JSONValue compilers
         if(ret == CompilerBinary.init)
             ret = inferCompiler(compilerOrPath, compilerPath, compilerAssumption, compilersInfo, isDefault, isGlobal, isC);
     }
-    if(compilerVersion.length && ret.version_.toString != compilerVersion)
+    if(compilerVersion.length)
     {
+        import redub.libs.semver;
         import redub.api;
-        throw new BuildException("Specified " ~ compilerPath~ " "~compilerVersion~" but could not find it in cache.");
+        SemVer requirement = SemVer(compilerVersion);
+        if(requirement.isInvalid || !ret.version_.satisfies(requirement))
+            throw new BuildException("Specified " ~ compilerPath ~ " " ~ compilerVersion ~
+                " but found compiler version " ~ ret.version_.toString);
     }
     return ret;
 }

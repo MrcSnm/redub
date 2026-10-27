@@ -74,7 +74,7 @@ struct InitialDubVariables
     string DUB_RDMD ;
     ///"TRUE" if the --temp-build flag was used, empty otherwise
     string DUB_TEMP_BUILD ;
-    ///"TRUE" if the --parallel flag was used, empty otherwise
+    ///"TRUE" when parallel builds are enabled, empty when disabled
     string DUB_PARALLEL_BUILD="TRUE";
     ///Contains the arguments passed to the built executable in shell compatible format
     string DUB_RUN_ARGS ;
@@ -150,7 +150,7 @@ InitialDubVariables getInitialDubVariablesFromArguments(DubArguments args, DubBu
     dubVars.DUB_TEMP_BUILD      = bArgs.tempBuild.str;
     dubVars.DUB_RDMD            = bArgs.rdmd.str;
     dubVars.DUB_FORCE           = bArgs.force.str;
-    dubVars.DUB_PARALLEL_BUILD  = str(bArgs.parallel == ParallelType.no);
+    dubVars.DUB_PARALLEL_BUILD  = str(bArgs.parallel != ParallelType.no);
     dubVars.DUB_RUN_ARGS        = escapeShellCommand(rawArgs[1..$]);
     dubVars.DUB_WORKING_DIRECTORY = args.cArgs.getRoot(std.file.getcwd());
     return dubVars;
@@ -174,7 +174,7 @@ void setupEnvironmentVariablesForRootPackage(const ref BuildRequirements root)
     setEnvVariable("DUB_ROOT_PACKAGE_DIR",  root.cfg.workingDir.forceTrailingDirSeparator);
     setEnvVariable("DUB_ROOT_PACKAGE_TARGET_TYPE",  root.cfg.targetType.to!string);
     setEnvVariable("DUB_ROOT_PACKAGE_TARGET_PATH",  root.cfg.outputDirectory);
-    setEnvVariable("DUB_ROOT_PACKAGE_TARGET_NAME",  root.cfg.name);
+    setEnvVariable("DUB_ROOT_PACKAGE_TARGET_NAME",  root.cfg.targetName);
 }
 
 

@@ -24,18 +24,23 @@ string findExecutable(string executableName)
 
     static bool isExecutable(string tPath)
     {
+        if(!std.file.exists(tPath))
+            return false;
+        try
+        {
+            if(std.file.isDir(tPath))
+                return false;
+        }
+        catch(Exception)
+            return false;
+
         version(Posix)
         {
             import std.string:toStringz;
-            import core.sys.posix.sys.stat;
-            stat_t stats;
-            if(stat(toStringz(tPath), &stats) != 0)
-                return false;
-
-            static immutable flags = S_IXUSR | S_IXGRP | S_IXOTH;
-            return (stats.st_mode & flags) == flags;
+            import core.sys.posix.unistd : access, X_OK;
+            return access(toStringz(tPath), X_OK) == 0;
         }
-        else return std.file.exists(tPath);
+        else return true;
     }
 
     if(isAbsolute(executableName) && isExecutable(executableName))
@@ -52,7 +57,7 @@ string findExecutable(string executableName)
         {
             bufferSink[str.length..str.length+ext.length] = ext;
             string fullPath = cast(string)buffer[0..str.length+ext.length];
-            if(std.file.exists(fullPath))
+            if(isExecutable(fullPath))
                 return fullPath.dup;
         }
 

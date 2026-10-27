@@ -1055,7 +1055,9 @@ string getVersionFromPackage(ref string pkg)
     import std.algorithm.searching;
     ptrdiff_t ver = countUntil!((a => a == '@'))(pkg);
     if(ver == -1) return null;
-    string ret = pkg[ver+2..$]; //Advance @ and v from the tag
+    string ret = pkg[ver+1..$]; //Advance @ from the tag
+    if(ret.length && ret[0] == 'v')
+        ret = ret[1..$];
     pkg = pkg[0..ver];
     return ret;
 }
