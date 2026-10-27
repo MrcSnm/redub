@@ -120,17 +120,23 @@ private void getProjectTreeImpl(
                 if(visitedDep.requirements.targetConfiguration != depConfig.targetConfiguration)
                 {
                     //Print merging different subConfigs?
+                    visitedDep.removeAllDependencies();
                     visitedDep.requirements = mergeDifferentSubConfigurations(
                         visitedDep.requirements, 
                         depConfig
                     );
+                    queue ~= depNode;
                 }
             }
             else if(visitedDep.requirements.version_ != dep.version_)
             {
                 // error("Found different versions to parse: ", visitedDep.name, " ", visitedDep.requirements.version_, "  vs ", dep.version_);
                 BuildRequirements depConfig = parseDependency(dep, node.requirements, res.targetCompilationInfo);
+                ///The new version may have a different dependency set. Drop the
+                ///old edges and let the queue parse the new recipe.
+                visitedDep.removeAllDependencies();
                 visitedDep.requirements = depConfig;
+                queue ~= depNode;
             }
 
         }

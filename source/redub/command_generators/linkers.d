@@ -8,6 +8,8 @@ import redub.command_generators.commons;
 ///Rough way to check for start-group. Might need a proper linker identification in the future.
 bool canEmitStartGroup(OS os, ISA isa, AcceptedLinker linker)
 {
+    if(os.isWindows)
+        return false;
     if(isa == ISA.webAssembly || cast(OSExtension)os == OSExtension.emscripten)
         return false;
     if(os.isApple)
@@ -109,6 +111,32 @@ string[] parseLinkConfiguration(const ThreadBuildData data, CompilingSession s, 
         }
     }
 
+    return cmds;
+}
+
+string[] parseLinkConfigurationCL(const ThreadBuildData data, CompilingSession s, string requirementCache)
+{
+    import redub.misc.path;
+    import redub.building.cache;
+
+    string[] cmds;
+    const BuildConfiguration b = data.cfg;
+    with(b)
+    {
+        string cacheDir = getCacheOutputDir(requirementCache, b, s, data.extra.isRoot);
+        cmds~= "/OUT:"~buildNormalizedPath(cacheDir, getOutputName(b, s.os)).escapePath;
+        if(!s.compiler.usesIncremental)
+            cmds~= "/INCREMENTAL:NO";
+        if(targetType == TargetType.dynamicLibrary)
+            cmds~= "/DLL";
+
+        cmds = mapAppendReverse(cmds, data.extra.librariesFullPath,
+            (string l) => (l~getLibraryExtension(s.os)).escapePath);
+        cmds = mapAppendPrefix(cmds, libraryPaths, "/LIBPATH:", true);
+        cmds~= getLinkFiles(b.sourceFiles);
+        cmds = mapAppend(cmds, libraries, (string l) => stripLibraryExtension(l)~".lib");
+        cmds~= linkFlags;
+    }
     return cmds;
 }
 

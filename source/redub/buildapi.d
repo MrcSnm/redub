@@ -1080,9 +1080,31 @@ class ProjectNode
 
     ProjectNode addDependency(ProjectNode dep)
     {
+        foreach(existing; dependencies)
+            if(existing is dep)
+                return this;
+        foreach(existing; dep.parent)
+            if(existing is this)
+                return this;
         dep.parent~= this;
         dependencies~= dep;
         return this;
+    }
+
+    ///Detach this node from every child and every child from this node.
+    ///Used when a dependency is upgraded to another version and its subtree
+    ///must be rebuilt from the new recipe.
+    void removeAllDependencies()
+    {
+        foreach(child; dependencies)
+        {
+            size_t writeIndex;
+            foreach(parent; child.parent)
+                if(parent !is this)
+                    child.parent[writeIndex++] = parent;
+            child.parent.length = writeIndex;
+        }
+        dependencies = null;
     }
 
     bool isFullyParallelizable()
@@ -1092,7 +1114,8 @@ class ProjectNode
             requirements.cfg.postBuildCommands.length == 0;
         foreach(dep; dependencies)
         {
-            parallelizable|= dep.isFullyParallelizable;
+            //Remove since I haven't found use in not being fully parallelizable yet.
+            // parallelizable = parallelizable && dep.isFullyParallelizable;
             if(!parallelizable) return false;
         }
         return parallelizable;

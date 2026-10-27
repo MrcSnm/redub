@@ -49,10 +49,16 @@ string[] getLinkFlags(const ThreadBuildData data, CompilingSession s, string mai
 {
     import redub.command_generators.commons;
     import redub.command_generators.linkers;
+    CompilerBinary c = data.cfg.getCompiler(s.compiler);
     if(isWindows(s.os))
-        return parseLinkConfigurationMSVC(data, s, mainPackHash);
-    else
+    {
+        if(c.isDCompiler)
+            return parseLinkConfigurationMSVC(data, s, mainPackHash);
+        if(c.compiler == AcceptedCompiler.cl)
+            return parseLinkConfigurationCL(data, s, mainPackHash);
         return parseLinkConfiguration(data, s, mainPackHash);
+    }
+    return parseLinkConfiguration(data, s, mainPackHash);
 }
 
 

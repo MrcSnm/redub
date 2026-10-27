@@ -149,7 +149,10 @@ private string getActualCompilerToUse(string preferredCompiler, ref string actua
 
         string[2] versionCommand = [searchable, "--version"];
         size_t args = searchable.baseName.stripExtension != "cl" ? 2 : 1;
-        compVersionRes = execute(versionCommand[0..args], getRedubEnv());
+        try
+            compVersionRes = execute(versionCommand[0..args], getRedubEnv());
+        catch(ProcessException)
+            continue;
         if(compVersionRes.status == 0)
         {
             actualCompiler = searchable;

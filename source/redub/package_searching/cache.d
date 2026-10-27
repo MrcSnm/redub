@@ -35,7 +35,17 @@ PackageInfo* findPackage(string packageName, string repo, string packageVersion,
     {
         pkg = packageName in packagesCache;
     }
-    if(pkg) return pkg;
+    if(pkg)
+    {
+        if(path.length)
+        {
+            import std.path : filenameCmp;
+            if(pkg.path.length == 0 || filenameCmp(pkg.path, path) != 0)
+                throw new Exception("Package "~packageName~" was requested from path '"~path~
+                    "' but is already cached from '"~pkg.path~"'.");
+        }
+        return pkg;
+    }
     if(path.length == 0) return findPackage(packageName, repo, packageVersion, requiredBy);
 
     PackageInfo localPackage = basePackage(packageName, packageVersion, requiredBy);

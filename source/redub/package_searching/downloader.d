@@ -156,8 +156,11 @@ string downloadPackageTo(return string path, string packageName, string repo, Se
     }
 
 
-    ///Create a temporary directory for outputting downloaded version. This will ensure a single version is found on getFirstFile
-    string tempPath = buildNormalizedPath(path, "temp");
+    ///Create a temporary directory for outputting downloaded version. This will ensure a single version is found on getFirstFile.
+    ///Use the process id so two Redub processes don't extract into the same directory.
+    import std.process : thisProcessID;
+    import std.conv : to;
+    string tempPath = buildNormalizedPath(path, "temp-" ~ thisProcessID.to!string);
 
     if(std.file.exists(tempPath))
     {

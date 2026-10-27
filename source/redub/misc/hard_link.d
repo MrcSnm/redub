@@ -46,6 +46,8 @@ bool hardLinkFile(string from, string to, bool overwrite = false)
             return true;
 	}
     uint attr = DirEntry(from).attributes;
+    const bool destinationExists = exists(to);
+    const uint destinationAttr = destinationExists ? DirEntry(to).attributes : 0;
     static bool isWritable(uint attributes)
     {
         version(Windows)
@@ -60,7 +62,7 @@ bool hardLinkFile(string from, string to, bool overwrite = false)
         }
     }
 
-	const writeAccessChangeRequired = overwrite && !isWritable(attr);
+	const writeAccessChangeRequired = overwrite && destinationExists && !isWritable(destinationAttr);
 	if (!writeAccessChangeRequired)
 	{
 		version (Windows)
@@ -80,6 +82,19 @@ bool hardLinkFile(string from, string to, bool overwrite = false)
 	// fallback to copy
     try
     {
+        if(destinationExists && overwrite && !isWritable(destinationAttr))
+        {
+            version(Windows)
+            {
+                enum FILE_ATTRIBUTE_READONLY = 0x01;
+                std.file.setAttributes(to, destinationAttr & ~FILE_ATTRIBUTE_READONLY);
+            }
+            else
+            {
+                import core.sys.posix.sys.stat : S_IWUSR;
+                std.file.setAttributes(to, destinationAttr | S_IWUSR);
+            }
+        }
         if(std.file.exists(to))
         {
             import std.random;

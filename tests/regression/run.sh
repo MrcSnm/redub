@@ -798,31 +798,48 @@ test_compiler_detection_cc()
     fi
 }
 
-test_target_with_subpackage()
+test_dependency_upgrade_deep_diamond()
 {
-    local name="subpkg$SUFFIX"
-    local d="$WORK/subpkg"
-    local log="$WORK/subpkg.log"
-    mkdir -p "$d/home/dub/packages" "$d/pkg/subsrc" "$d/run"
-    printf '%s\n' '{"name":"'"$name"'","version":"1.0.0","subPackages":[{"name":"sub","sourcePaths":["subsrc"]}],"targets":{"t":{"targetType":"executable"}}}' > "$d/pkg/dub.json"
-    printf '%s\n' 'void main(){}' > "$d/pkg/subsrc/app.d"
+    local rootname="diamondroot$SUFFIX"
+    local d="$WORK/diamond"
+    local log="$WORK/diamond.log"
+    mkdir -p "$d/home/dub/packages" "$d/root/source" "$d/A/source" "$d/B/source" "$d/C/source" \
+        "$d/x10/source" "$d/x12/source" "$d/olddep/source" "$d/newdep/source"
 
-    local pkgpath
+    printf '%s\n' '{"name":"'"$rootname"'","targetPath":"build","dependencies":{"dia":{"path":"../A"},"dib":{"path":"../B"}}}' > "$d/root/dub.json"
+    printf '%s\n' 'void main(){}' > "$d/root/source/app.d"
+
+    printf '%s\n' '{"name":"dia","targetPath":"build","dependencies":{"diamondx":"~>1.0"}}' > "$d/A/dub.json"
+    printf '%s\n' 'module dia; void a(){}' > "$d/A/source/dia.d"
+    printf '%s\n' '{"name":"dib","targetPath":"build","dependencies":{"dic":{"path":"../C"}}}' > "$d/B/dub.json"
+    printf '%s\n' 'module dib; void b(){}' > "$d/B/source/dib.d"
+    printf '%s\n' '{"name":"dic","targetPath":"build","dependencies":{"diamondx":"~>1.2"}}' > "$d/C/dub.json"
+    printf '%s\n' 'module dic; void c(){}' > "$d/C/source/dic.d"
+
+    printf '%s\n' '{"name":"diamondx","version":"1.0.0","targetPath":"build","dependencies":{"olddep":{"path":"../olddep"}}}' > "$d/x10/dub.json"
+    printf '%s\n' 'module diamondx; void x(){}' > "$d/x10/source/diamondx.d"
+    printf '%s\n' '{"name":"diamondx","version":"1.2.0","targetPath":"build","dependencies":{"newdep":{"path":"../newdep"}}}' > "$d/x12/dub.json"
+    printf '%s\n' 'module diamondx; import newdep; void x(){ newdep.foo(); }' > "$d/x12/source/diamondx.d"
+    printf '%s\n' '{"name":"olddep","targetPath":"build"}' > "$d/olddep/dub.json"
+    printf '%s\n' 'module olddep; void foo(){}' > "$d/olddep/source/olddep.d"
+    printf '%s\n' '{"name":"newdep","targetPath":"build"}' > "$d/newdep/dub.json"
+    printf '%s\n' 'module newdep; void foo(){}' > "$d/newdep/source/newdep.d"
+
+    local x10 x12
     if [ "$WINDOWS" -eq 1 ]; then
-        pkgpath="$(winpath "$d/pkg" | sed 's/\\/\\\\/g')"
+        x10="$(winpath "$d/x10" | sed 's/\\/\\\\/g')"
+        x12="$(winpath "$d/x12" | sed 's/\\/\\\\/g')"
     else
-        pkgpath="$d/pkg"
+        x10="$d/x10"
+        x12="$d/x12"
     fi
-    printf '%s\n' '[{"name":"'"$name"'","version":"1.0.0","path":"'"$pkgpath"'"}]' > "$d/home/dub/packages/local-packages.json"
+    printf '%s\n' '[{"name":"diamondx","version":"1.0.0","path":"'"$x10"'"},{"name":"diamondx","version":"1.2.0","path":"'"$x12"'"}]' > "$d/home/dub/packages/local-packages.json"
 
-    redub_with_dub_home "$d/run" "$d/home" "$log" build "$name:sub" --target=t --force
-    local status=$?
-    if grep -q "must contain a subPackages property since it has a subPackage" "$log"; then
-        fail target_with_subpackage "target object was parsed with the subpackage still active ($(detail "$log"))"
-    elif [ "$status" -eq 0 ]; then
-        pass target_with_subpackage
+    redub_with_dub_home "$d/root" "$d/home" "$log" build --force
+    if [ "$?" -eq 0 ]; then
+        pass dependency_upgrade_deep_diamond
     else
-        fail target_with_subpackage "exit $status: $(detail "$log")"
+        fail dependency_upgrade_deep_diamond "upgraded dependency did not bring its new children ($(detail "$log"))"
     fi
 }
 
@@ -855,7 +872,7 @@ test_posix_c_dynamic_library
 test_path_with_spaces
 test_mini_regex_matches
 test_compiler_detection_cc
-test_target_with_subpackage
+test_dependency_upgrade_deep_diamond
 
 printf '\n%d passed, %d failed, %d skipped\n' "$PASSED" "$FAILED" "$SKIPPED"
 if [ "$FAILED" -ne 0 ]; then
