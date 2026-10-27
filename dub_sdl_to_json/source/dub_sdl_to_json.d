@@ -132,6 +132,9 @@ JSONValue sdlToJSON(SDLNode[] sdl)
 					requirements[a.name] = toJSONValue(a.value);
 				ret["toolchainRequirements"] = requirements;
 				break;
+			case "bundleConfiguration":
+				ret["bundleConfiguration"] = sdlToJSON(v.children);
+				break;
 			case "subConfiguration":
 				enforce(v.values.length == 2, "subConfiguration must contain a two values.");
 				enforce(v.values[0].isText, "subConfiguration value 1 must be a text.");
@@ -156,6 +159,8 @@ JSONValue sdlToJSON(SDLNode[] sdl)
 				break;
 			default:
 				bool shouldForceArray = indexOf([
+					"icon",
+					"categories",
 					"dflags",
 					"lflags",
 					"libs",
@@ -214,6 +219,7 @@ JSONValue sdlToJSON(SDLNode[] sdl)
 		ret["configurations"] = configurations;
 	if(subPackages.array.length != 0)
 		ret["subPackages"] = subPackages;
+	
 
 
 	return ret;
