@@ -923,6 +923,37 @@ test_make_file_executable()
     fi
 }
 
+test_subpackage_root_path_cache()
+{
+    local name="subpkgcache$SUFFIX"
+    local d="$WORK/subpkgcache"
+    local log="$WORK/subpkgcache.log"
+    mkdir -p "$d/source" "$d/modules/nir/source"
+    cat > "$d/dub.json" <<JSON
+{
+  "name": "$name",
+  "targetPath": "build",
+  "subPackages": ["modules/nir"],
+  "dependencies": {
+    "$name:nir": {"path": "."}
+  }
+}
+JSON
+    printf '%s\n' 'void main(){}' > "$d/source/app.d"
+    printf '%s\n' '{"name":"nir","targetPath":"build","sourcePaths":["source"]}' > "$d/modules/nir/dub.json"
+    printf '%s\n' 'module nir; void f(){}' > "$d/modules/nir/source/nir.d"
+
+    redub_in "$d" 120 "$log" build --force
+    local status=$?
+    if grep -q "was requested from path" "$log"; then
+        fail subpackage_root_path_cache "subpackage cached from its own directory was rejected when resolved from the root ($(detail "$log"))"
+    elif [ "$status" -eq 0 ]; then
+        pass subpackage_root_path_cache
+    else
+        fail subpackage_root_path_cache "exit $status: $(detail "$log")"
+    fi
+}
+
 test_cache_custom_source_paths
 test_test_command_forwards_args
 test_config_platform_crash
@@ -953,6 +984,7 @@ test_path_with_spaces
 test_mini_regex_matches
 test_compiler_detection_cc
 test_dependency_upgrade_deep_diamond
+test_subpackage_root_path_cache
 test_ldc_cache_with_space
 test_clang_multiple_sources
 test_make_file_executable

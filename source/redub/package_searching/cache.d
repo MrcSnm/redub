@@ -39,8 +39,19 @@ PackageInfo* findPackage(string packageName, string repo, string packageVersion,
     {
         if(path.length)
         {
-            import std.path : filenameCmp;
-            if(pkg.path.length == 0 || filenameCmp(pkg.path, path) != 0)
+            import std.path : filenameCmp, isDirSeparator;
+            import std.string : startsWith;
+
+            bool samePath = pkg.path.length && filenameCmp(pkg.path, path) == 0;
+            ///A subpackage may be resolved from the root package directory or
+            ///from its own subdirectory. Both are the same package.
+            bool nestedPath =
+                (pkg.path.length && path.length > pkg.path.length &&
+                    path.startsWith(pkg.path) && isDirSeparator(path[pkg.path.length])) ||
+                (pkg.path.length > path.length &&
+                    pkg.path.startsWith(path) && isDirSeparator(pkg.path[path.length]));
+
+            if(!samePath && !nestedPath)
                 throw new Exception("Package "~packageName~" was requested from path '"~path~
                     "' but is already cached from '"~pkg.path~"'.");
         }
