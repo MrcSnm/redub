@@ -6,12 +6,14 @@ bool download(string link, scope ubyte[] delegate(size_t incomingBytes, bool isI
 {
     import std.utf:toUTF16z;
     import core.sys.windows.windef;
+    import d_downloader.retry : NonRetryableException;
     HINTERNET hSession = WinHttpOpen("D-Downloader/1.0",
         WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
         WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
 
     if (!hSession)
         return false;
+    WinHttpSetTimeouts(hSession, 10_000, 10_000, 30_000, 30_000);
     scope(exit)
         WinHttpCloseHandle(hSession);
 
@@ -34,47 +36,60 @@ bool download(string link, scope ubyte[] delegate(size_t incomingBytes, bool isI
     scope(exit)
         WinHttpCloseHandle(hRequest);
 
-    if (WinHttpSendRequest(hRequest, WINHTTP_NO_ADDITIONAL_HEADERS, 0,
-                           WINHTTP_NO_REQUEST_DATA, 0, 0, 0)
-        && WinHttpReceiveResponse(hRequest, null))
+    if(!WinHttpSendRequest(hRequest, WINHTTP_NO_ADDITIONAL_HEADERS, 0,
+                           WINHTTP_NO_REQUEST_DATA, 0, 0, 0))
+        throwWindowsError();
+    if(!WinHttpReceiveResponse(hRequest, null))
+        throwWindowsError();
+
+    DWORD statusCode;
+    DWORD statusCodeLength = DWORD.sizeof;
+    if(WinHttpQueryHeaders(hRequest, cast(DWORD)(WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER),
+        WINHTTP_HEADER_NAME_BY_INDEX, &statusCode, &statusCodeLength, WINHTTP_NO_HEADER_INDEX))
     {
-        DWORD remainingDataSize = 0;
-        wchar[256] headerBuffer = void;
-        uint headerLength = headerBuffer.length * wchar.sizeof;
-        size_t contentLength;
-        if(WinHttpQueryHeaders(hRequest, WINHTTP_QUERY_CONTENT_LENGTH, null, headerBuffer.ptr, &headerLength, null))
-        {
-            import std.string;
-            import std.conv:to;
-            contentLength = strip(headerBuffer[0..headerLength/wchar.sizeof]).to!size_t;
-        }
-        ubyte[] buffer = contentLength != 0 ? bufferSink(contentLength, true) : null;
-        uint bytesRead;
-        do {
-            if (!WinHttpQueryDataAvailable(hRequest, &remainingDataSize))
-                break;
-            if (!remainingDataSize)
-                break;
-
-            DWORD dwRead = 0;
-            ubyte[] tempBuffer;
-            if(buffer is null)
-                tempBuffer = bufferSink(remainingDataSize, false);
-            else
-            {
-                import std.exception;
-                enforce(bytesRead + remainingDataSize <= buffer.length, "Buffer set with Content-Length was not enough.");
-                tempBuffer = buffer[bytesRead..$];
-            }
-
-            assert(tempBuffer.length < DWORD.max, "Buffer sink length is too big.");
-            if (!WinHttpReadData(hRequest, tempBuffer.ptr, cast(DWORD)tempBuffer.length, &dwRead))
-                throwWindowsError();
-            bytesRead+= dwRead;
-            if(onDataReceived)
-                onDataReceived(tempBuffer[0..dwRead]);
-        } while (remainingDataSize > 0);
+        import std.conv : to;
+        if(statusCode >= 500 || statusCode == 408 || statusCode == 429)
+            throw new Exception("HTTP " ~ statusCode.to!string);
+        if(statusCode >= 400)
+            throw new NonRetryableException("HTTP " ~ statusCode.to!string);
     }
+
+    DWORD remainingDataSize = 0;
+    wchar[256] headerBuffer = void;
+    uint headerLength = headerBuffer.length * wchar.sizeof;
+    size_t contentLength;
+    if(WinHttpQueryHeaders(hRequest, WINHTTP_QUERY_CONTENT_LENGTH, null, headerBuffer.ptr, &headerLength, null))
+    {
+        import std.string;
+        import std.conv:to;
+        contentLength = strip(headerBuffer[0..headerLength/wchar.sizeof]).to!size_t;
+    }
+    ubyte[] buffer = contentLength != 0 ? bufferSink(contentLength, true) : null;
+    uint bytesRead;
+    do {
+        if (!WinHttpQueryDataAvailable(hRequest, &remainingDataSize))
+            throwWindowsError();
+        if (!remainingDataSize)
+            break;
+
+        DWORD dwRead = 0;
+        ubyte[] tempBuffer;
+        if(buffer is null)
+            tempBuffer = bufferSink(remainingDataSize, false);
+        else
+        {
+            import std.exception;
+            enforce(bytesRead + remainingDataSize <= buffer.length, "Buffer set with Content-Length was not enough.");
+            tempBuffer = buffer[bytesRead..$];
+        }
+
+        assert(tempBuffer.length < DWORD.max, "Buffer sink length is too big.");
+        if (!WinHttpReadData(hRequest, tempBuffer.ptr, cast(DWORD)tempBuffer.length, &dwRead))
+            throwWindowsError();
+        bytesRead+= dwRead;
+        if(onDataReceived)
+            onDataReceived(tempBuffer[0..dwRead]);
+    } while (remainingDataSize > 0);
 
     return true;
 }
@@ -140,7 +155,7 @@ ubyte[] downloadToBuffer(string url)
                 return ret;
             }
         }))
-            return null;
+            throw new Exception("Could not initialize the WinHTTP session.");
         buffer.length = processed;
         return buffer;
     });
@@ -158,13 +173,14 @@ void downloadToFile(string url, string targetFile, bool lowMem = false)
     if(lowMem)
     {
         ubyte[4096] buffer;
-        download(url, (size_t incomingBytes, bool isIncomingContentLength)
+        if(!download(url, (size_t incomingBytes, bool isIncomingContentLength)
         {
             return incomingBytes > buffer.length ? buffer[0..$] : buffer[0..incomingBytes];
         }, (ubyte[] b)
         {
             f.rawWrite(b);
-        });
+        }))
+            throw new Exception("Could not initialize the WinHTTP session.");
     }
     else
     {

@@ -242,12 +242,12 @@ string downloadPackageTo(return string path, string packageName, string repo, Se
             import redub.libs.semver;
             string existing = "'. Existing Versions: ";
             SemVer[] vers = supplier.getExistingVersions(packageName);
-            if(vers is null) existing = "'. This package does not exists in the registry.";
+            if(vers is null) existing = "'. This package does not exist in the registry.";
             else
                 foreach(v; vers) existing~= "\n\t"~v.toString;
 
 
-            throw new NetworkException("No version with requirement '"~requirement.toString~"' was found when looking for package "~packageName~existing);
+            throw new NetworkException("No version with requirement '"~requirement.toString~"' was found when looking for package '"~packageName~existing);
         }
         path = getOutputDirectoryForPackage(path, packageName, actualVersion.toString);
         string installPath = getFirstFileInDirectory(tempPath);

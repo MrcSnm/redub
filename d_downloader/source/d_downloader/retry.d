@@ -1,5 +1,13 @@
 module d_downloader.retry;
 
+class NonRetryableException : Exception
+{
+    this(string msg, string file = __FILE__, size_t line = __LINE__, Throwable nextInChain = null)
+    {
+        super(msg, file, line, nextInChain);
+    }
+}
+
 ubyte[] downloadWithRetries(ubyte[] delegate() download)
 {
     import core.thread : Thread;
@@ -17,9 +25,13 @@ ubyte[] downloadWithRetries(ubyte[] delegate() download)
                 return content;
         }
         catch(Exception e)
+        {
+            if(cast(NonRetryableException)e !is null)
+                throw e;
             lastError = e;
+        }
     }
     if(lastError !is null)
         throw lastError;
-    return null;
+    throw new Exception("Empty response received after retries.");
 }
