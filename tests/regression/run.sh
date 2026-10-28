@@ -954,7 +954,136 @@ JSON
     fi
 }
 
+test_failed_build_keeps_cache()
+{
+    local rootname="failroot$SUFFIX"
+    local depname="faildep$SUFFIX"
+    local d="$WORK/failcache"
+    local log="$WORK/failcache.log"
+    mkdir -p "$d/source" "$d/dep/source"
+
+    local dc
+    if command -v dmd >/dev/null 2>&1; then
+        dc=dmd
+    elif command -v ldc2 >/dev/null 2>&1; then
+        dc=ldc2
+    else
+        skip failed_build_keeps_cache "no D compiler found"
+        return
+    fi
+
+    printf '%s\n' '{"name":"'"$rootname"'","targetPath":"build","dependencies":{"'"$depname"'":{"path":"dep"}}}' > "$d/dub.json"
+    {
+        printf '%s\n' 'module app;'
+        printf '%s\n' 'import '"$depname"';'
+        printf '%s\n' 'extern(C) void redub_missing_symbol();'
+        printf '%s\n' 'void main(){ foo(); redub_missing_symbol(); }'
+    } > "$d/source/app.d"
+    printf '%s\n' '{"name":"'"$depname"'","targetPath":"build"}' > "$d/dep/dub.json"
+    printf '%s\n' 'module '"$depname"'; void foo(){}' > "$d/dep/source/$depname.d"
+
+    if redub_in "$d" 120 "$log" build --compiler="$dc"; then
+        fail failed_build_keeps_cache "a link error was not reported"
+        return
+    fi
+
+    redub_in "$d" 120 "$log" build --compiler="$dc"
+    if grep -q "Will Build:.*$depname" "$log"; then
+        fail failed_build_keeps_cache "the already compiled dependency was rebuilt after a failed build ($(detail "$log"))"
+    elif grep -q "Up-to-Date:.*$depname" "$log"; then
+        pass failed_build_keeps_cache
+    else
+        fail failed_build_keeps_cache "dependency was neither up-to-date nor rebuilt ($(detail "$log"))"
+    fi
+}
+
+test_excluded_dependency_file_does_not_invalidate()
+{
+    local rootname="exclroot$SUFFIX"
+    local depname="excldep$SUFFIX"
+    local d="$WORK/excluded"
+    local log="$WORK/excluded.log"
+    mkdir -p "$d/source" "$d/dep/source"
+
+    local dc
+    if command -v dmd >/dev/null 2>&1; then
+        dc=dmd
+    elif command -v ldc2 >/dev/null 2>&1; then
+        dc=ldc2
+    else
+        skip excluded_dependency_file "no D compiler found"
+        return
+    fi
+
+    printf '%s\n' '{"name":"'"$rootname"'","targetPath":"build","dependencies":{"'"$depname"'":{"path":"dep"}}}' > "$d/dub.json"
+    printf '%s\n' 'import '"$depname"'; void main(){ foo(); }' > "$d/source/app.d"
+    printf '%s\n' '{"name":"'"$depname"'","targetPath":"build","excludedSourceFiles":["source/ignored.d"]}' > "$d/dep/dub.json"
+    printf '%s\n' 'module '"$depname"'; void foo(){}' > "$d/dep/source/$depname.d"
+    printf '%s\n' 'module ignored; void unused(){}' > "$d/dep/source/ignored.d"
+
+    if ! redub_in "$d" 120 "$log" build --force --compiler="$dc"; then
+        fail excluded_dependency_file "setup build failed: $(detail "$log")"
+        return
+    fi
+
+    sleep 1
+    printf '%s\n' 'module ignored; void unused(){ int changed = 42; }' > "$d/dep/source/ignored.d"
+
+    redub_in "$d" 120 "$log" build --compiler="$dc"
+    if grep -q "Built:" "$log"; then
+        fail excluded_dependency_file "changing an excluded dependency file triggered a rebuild ($(detail "$log"))"
+    elif grep -q "skipping linking" "$log"; then
+        pass excluded_dependency_file
+    else
+        fail excluded_dependency_file "expected an up-to-date build ($(detail "$log"))"
+    fi
+}
+
+test_shared_source_dir_with_dependency_excludes()
+{
+    local rootname="shsroot$SUFFIX"
+    local depname="shsdep$SUFFIX"
+    local d="$WORK/sharedsrc"
+    local log="$WORK/sharedsrc.log"
+    mkdir -p "$d/root/source" "$d/dep/source" "$d/shared"
+
+    local dc
+    if command -v dmd >/dev/null 2>&1; then
+        dc=dmd
+    elif command -v ldc2 >/dev/null 2>&1; then
+        dc=ldc2
+    else
+        skip shared_source_dir_with_dependency_excludes "no D compiler found"
+        return
+    fi
+
+    printf '%s\n' '{"name":"'"$rootname"'","targetType":"executable","targetPath":"build","sourcePaths":["source","../shared"],"dependencies":{"'"$depname"'":{"path":"../dep"}}}' > "$d/root/dub.json"
+    printf '%s\n' '{"name":"'"$depname"'","targetType":"library","targetPath":"build","sourcePaths":["source","../shared"],"excludedSourceFiles":["../shared/app.d"]}' > "$d/dep/dub.json"
+    printf '%s\n' 'module foo; void foo(){}' > "$d/shared/foo.d"
+    printf '%s\n' 'module depmod; void depfn(){}' > "$d/dep/source/depmod.d"
+    printf '%s\n' 'import foo;' 'import depmod;' 'void main(){ foo.foo(); depmod.depfn(); }' > "$d/shared/app.d"
+
+    if ! redub_in "$d/root" 120 "$log" build --force --compiler="$dc"; then
+        fail shared_source_dir_with_dependency_excludes "build failed: $(detail "$log")"
+        return
+    fi
+    if [ -z "$(artifact "$d/root" "$rootname")" ]; then
+        fail shared_source_dir_with_dependency_excludes "the shared main source was not compiled ($(detail "$log"))"
+        return
+    fi
+
+    redub_in "$d/root" 120 "$log" build --compiler="$dc"
+    if grep -q "skipping linking" "$log"; then
+        pass shared_source_dir_with_dependency_excludes
+    else
+        fail shared_source_dir_with_dependency_excludes "rebuild with no changes was not up-to-date ($(detail "$log"))"
+    fi
+}
+
 test_cache_custom_source_paths
+test_failed_build_keeps_cache
+test_excluded_dependency_file_does_not_invalidate
+test_shared_source_dir_with_dependency_excludes
 test_test_command_forwards_args
 test_config_platform_crash
 test_copy_files_no_match

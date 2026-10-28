@@ -782,14 +782,10 @@ private Dependency parseDependencyDeclaration(JSONValue value, string depName, s
     string version_, path, visibility, repo;
     string out_mainPackage;
     string subPackage = getSubPackageInfoRequiredBy(depName, requiredBy, out_mainPackage);
+    ///If the main package is the same as this dependency, it belongs to the same package family.
+    ///Its path still comes from the cache: sibling subpackages live in their own directories.
+    bool sameMainPackage = subPackage && out_mainPackage == requiredBy;
     bool isOptional = false;
-    bool isInSameFile = false;
-    ///If the main package is the same as this dependency, then simply use the same json file.
-    if(subPackage && out_mainPackage == requiredBy)
-    {
-        path = workingDir;
-        isInSameFile = true;
-    }
     if(value.type == JSONType.object) ///Uses path style
     {
         path = tryStr(value, "path");
@@ -815,7 +811,7 @@ private Dependency parseDependencyDeclaration(JSONValue value, string depName, s
     else if(value.type == JSONType.string) ///Version style
         version_ = value.str;
 
-    if(isInSameFile)
+    if(sameMainPackage)
     {
         ///Match all dependencies which are subpackages should have the same version as the parent project.
         if(SemVer(version_).isMatchAll())

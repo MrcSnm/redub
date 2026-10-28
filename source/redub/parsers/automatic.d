@@ -282,9 +282,14 @@ private void partiallyFinishBuildRequirements(ref BuildRequirements req, BuildCo
         ? !req.extra.isRoot
         : req.cfg.targetType != TargetType.executable;
     if(excludeEntryPoint)
+    {
+        import std.string : lastIndexOf;
+        string packageName = req.cfg.name[req.cfg.name.lastIndexOf(':') + 1 .. $];
         foreach(p; req.cfg.sourcePaths)
-            foreach(f; ["app.d", "main.d", "app.c", "main.c"])
+            foreach(f; ["app.d", "main.d", "app.c", "main.c",
+                packageName ~ "/main.d", packageName ~ "/app.d"])
                 req.cfg.excludeSourceFiles.exclusiveMerge([p ~ dirSeparator ~ f]);
+    }
 
     alias StringArrayRef = string[]*;
     scope StringArrayRef[] toAbsolutize = [

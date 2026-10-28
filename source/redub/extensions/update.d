@@ -124,21 +124,16 @@ int updateMain(string[] args)
             return 1;
         }
 
-        import std.process : escapeShellCommand;
         version(Windows)
         {
-            spawnShell("start \"\" cmd /c " ~ escapeShellCommand(redubScriptPath) ~ " " ~
-                escapeShellCommand(d.getOutputFile) ~ " " ~ escapeShellCommand(redubExePath));
+            spawnShell(`start cmd /c "`~redubScriptPath~" "~d.getOutputFile~" "~redubExePath~'"');
         }
         else version(Posix)
         {
             import core.sys.posix.unistd;
             import std.conv:to;
             string pid = getpid().to!string;
-            string exec = "chmod +x " ~ escapeShellCommand(redubScriptPath) ~
-                " && nohup bash " ~ escapeShellCommand(redubScriptPath) ~ " " ~
-                escapeShellCommand(pid) ~ " " ~ escapeShellCommand(d.getOutputFile) ~ " " ~
-                escapeShellCommand(redubExePath) ~ " > /dev/null 2>&1";
+            string exec = `chmod +x `~redubScriptPath~` && nohup bash `~redubScriptPath~" "~pid~" "~d.getOutputFile~" "~redubExePath~" > /dev/null 2>&1";
             spawnShell(exec);
         }
         else assert(false, "Your system does not have any command right now for auto copying the new content.");

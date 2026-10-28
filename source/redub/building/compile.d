@@ -294,7 +294,11 @@ bool buildProjectParallelSimple(ProjectDetails details, CompilingSession s, cons
             if(!(dep in spawned))
             {
                 if(!executeCommandsAndPrint(dep.requirements, RedubCommands.postGenerate, env))
+                {
+                    saveBuiltPackages(finishedBuilds, mainPackHash, s, &formulaCache, existingSharedFormula);
+                    killRunningProcesses();
                     return false;
+                }
                 if(dep.shouldEnterCompilationThread)
                 {
                     spawned[dep] = true;
@@ -401,10 +405,15 @@ bool buildProjectFullyParallelized(ProjectDetails details, CompilingSession s, c
     size_t processedPackages = 0;
     size_t execID = buildExecutions++;
     ProjectNode priority = root.findPriorityNode();
+    ///All packages must generate their files before any compilation starts; that way a
+    ///postGenerate failure aborts before any work is spawned and nothing needs to be killed.
     foreach(ProjectNode pack; root.collapse)
     {
         if(!executeCommandsAndPrint(pack.requirements, RedubCommands.postGenerate, env))
             return false;
+    }
+    foreach(ProjectNode pack; root.collapse)
+    {
         if(pack.shouldEnterCompilationThread)
         {
             sentPackages++;
@@ -474,19 +483,31 @@ bool buildProjectFullyParallelized(ProjectDetails details, CompilingSession s, c
     //TODO: What happens if a higher dependency finished first than a lower one? It may simply skip the lower since the parent has already finished.
     if(failedPackage)
     {
-        buildFailed(failedPackage, failedRes, s, finishedBuilds, mainPackHash, &formulaCache, existingSharedFormula);
         killRunningProcesses();
+        ///Packages that finished before the abort still have their result waiting in the mailbox.
+        ///Record them so their cache is persisted instead of being rebuilt on the next run.
         for(int count = 0; count < sentPackages - processedPackages; count++)
         {
-            auto _ = receiveOnly!(CompilationID, ProcessInfo, CompilationResult);
-            if(_[0].id != execID || _[1] != ProcessInfo.init)
+            auto info = receiveOnly!(CompilationID, ProcessInfo, CompilationResult);
+            if(info[0].id != execID || info[1] != ProcessInfo.init)
             {
                 count--;
                 continue;
             }
-            // import core.thread;
-            // thread_joinAll();// Use receiveOnly for waiting the threads to finish instead of joinAll as it breaks lib work
+            auto res = info[2];
+            runningProcesses[res.pid] = false;
+            if(res.status == 0)
+            {
+                ProjectNode done = cast()res.node;
+                finishedBuilds ~= done;
+                if(!done.requirements.cfg.targetType.isLinkedSeparately)
+                {
+                    string reqHash = hashFrom(done.requirements, s);
+                    updateCache(mainPackHash, CompilationCache.make(reqHash, mainPackHash, done.requirements, s, existingSharedFormula, &formulaCache));
+                }
+            }
         }
+        buildFailed(failedPackage, failedRes, s, finishedBuilds, mainPackHash, &formulaCache, existingSharedFormula);
         return false;
     }
     if(root.requirements.cfg.syntaxOnly)
@@ -519,7 +540,10 @@ bool buildProjectSingleThread(ProjectDetails details, CompilingSession s, const(
         foreach(dep; dependencyFreePackages)
         {
             if(!executeCommandsAndPrint(dep.requirements, RedubCommands.postGenerate, env))
+            {
+                saveBuiltPackages(finishedBuilds, mainPackHash, s, null, existingSharedFormula);
                 return false;
+            }
             if(dep.shouldEnterCompilationThread)
             {
                 CompilationResult res = execCompilation(dep.requirements.buildData(true, s, getEnvForProject(dep, env)), cast(shared)dep,
@@ -604,7 +628,6 @@ private void buildFailed(const ProjectNode node, CompilationResult res, Compilin
 )
 {
     import redub.misc.github_tag_check;
-    import std.algorithm.iteration;
     import std.conv:to;
     string msg = res.message ? " with message\n\t" ~res.message : null;
 
@@ -615,7 +638,7 @@ private void buildFailed(const ProjectNode node, CompilationResult res, Compilin
     );
     showNewerVersionMessage();
     ///It can save anything, except the root project as it would make it up to date while it actually requires the .lib files to be up to date.
-    saveFinishedBuilds(filter!((ProjectNode n) => !n.isRoot)(finishedPackages), mainPackHash, s, formulaCache, existingSharedFormula);
+    saveBuiltPackages(finishedPackages, mainPackHash, s, formulaCache, existingSharedFormula);
 }
 
 
@@ -685,6 +708,13 @@ immutable(string[string]) getEnvForProject(const ProjectNode node, const string[
 
 }
 
+///Saves what was built without ever saving the root, whose artifact can't be trusted after a failure.
+private void saveBuiltPackages(Range)(Range builtPackages, string mainPackHash, CompilingSession s, AdvCacheFormula* formulaCache, const(AdvCacheFormula)* existingSharedFormula)
+{
+    import std.algorithm.iteration : filter;
+    saveFinishedBuilds(filter!((ProjectNode n) => !n.isRoot)(builtPackages), mainPackHash, s, formulaCache, existingSharedFormula);
+}
+
 private void saveFinishedBuilds(ProjNodeRange)(ProjNodeRange finishedProjects, string mainPackHash, CompilingSession s, AdvCacheFormula* formulaCache, const(AdvCacheFormula)* existingSharedFormula)
 {
     AdvCacheFormula cache;
@@ -738,6 +768,9 @@ private bool doLink(ProjectDetails details, CompilingSession info, string mainPa
             }
 
             showNewerVersionMessage();
+            ///Keep the packages that compiled successfully, but never the root: after a
+            ///link failure its artifact is stale/missing and it must be rebuilt.
+            saveBuiltPackages(root.collapse, mainPackHash, info, formulaCache, existingSharedFormula);
             return false;
         }
         else
