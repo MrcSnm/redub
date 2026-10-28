@@ -40,7 +40,11 @@ int main(string[] args)
     try
     {
         if(args.length == 1)
+        {
+            import std.stdio : stderr;
+            stderr.writeln("redub: no command given; running default: run");
             return runMain(args, []);
+        }
 
         import std.algorithm:countUntil;
         ptrdiff_t execArgsInit = countUntil(args, "--");
@@ -78,6 +82,20 @@ int main(string[] args)
         version(RedubWatcher)
             entryPoints["watch"] = &watchMain;
 
+
+        if(args.length >= 2 && args[1] == "help")
+        {
+            import std.stdio : writeln;
+            if(args.length >= 3 && args[2] != "run")
+            {
+                if(auto fn = args[2] in entryPoints)
+                    return (*fn)([args[0], "--help"]);
+                if(args[2] != "help")
+                    return unknownHelpTopic(args[2], entryPoints.keys ~ "help");
+            }
+            writeln(getHelpInfo());
+            return 0;
+        }
 
         if(args.length >= 2)
         {
@@ -529,4 +547,27 @@ int configureMain(string[] args)
     meta["updateCheck"] = JSONValue(config.updateCheck);
     saveRedubMeta(meta);
     return 0;
+}
+
+/**
+ * `redub help <topic>` with a topic that is not a command (OpenShellOrg CLI Help CH-16, CLI Dispatch CD-1):
+ * name the token, suggest a close command, point at the top-level help, stderr, exit 2.
+ */
+int unknownHelpTopic(string topic, string[] commands)
+{
+    import std.stdio : stderr;
+    import std.algorithm : sort, filter, map, minElement;
+    import std.algorithm.comparison : levenshteinDistance;
+    import std.array : array, join;
+    import std.typecons : tuple;
+
+    string[] cmds = commands.dup;
+    sort(cmds);
+    stderr.writeln("error: no help topic '", topic, "'");
+    auto close = cmds.map!(c => tuple(levenshteinDistance(topic, c), c)).filter!(t => t[0] <= 2).array;
+    if(close.length)
+        stderr.writeln("  did you mean: redub help ", close.minElement!"a[0]"[1]);
+    stderr.writeln("  redub commands: ", cmds.join(", "));
+    stderr.writeln("  see: redub help");
+    return 2;
 }
