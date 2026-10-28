@@ -277,6 +277,15 @@ private void partiallyFinishBuildRequirements(ref BuildRequirements req, BuildCo
     if(!isAbsolute(req.cfg.outputDirectory))
         req.cfg.outputDirectory = redub.misc.path.buildNormalizedPath(req.cfg.workingDir, req.cfg.outputDirectory);
 
+    ///Libraries must not carry their entry point: another package may have a module with the same name.
+    bool excludeEntryPoint = req.cfg.targetType == TargetType.autodetect
+        ? !req.extra.isRoot
+        : req.cfg.targetType != TargetType.executable;
+    if(excludeEntryPoint)
+        foreach(p; req.cfg.sourcePaths)
+            foreach(f; ["app.d", "main.d", "app.c", "main.c"])
+                req.cfg.excludeSourceFiles.exclusiveMerge([p ~ dirSeparator ~ f]);
+
     alias StringArrayRef = string[]*;
     scope StringArrayRef[] toAbsolutize = [
         &req.cfg.importDirectories,
@@ -347,9 +356,20 @@ private void partiallyFinishBuildRequirements(ref BuildRequirements req, BuildCo
     auto libraries = req.cfg.sourceFiles.filter!((name) => name.extension.isLibraryExtension);
     req.cfg.libraries = req.cfg.libraries.exclusiveMergePaths(libraries);
 
-    //importPaths will always contain sourcePath if it is using the default https://dub.pm/dub-reference/build_settings/#sourcepaths
-    if(req.cfg.isUsingDefaultSourcePaths || req.cfg.importDirectories.length == 0)
-        req.cfg.importDirectories.exclusiveMergePaths(req.cfg.sourcePaths);
+    ///Same as dub: when importPaths is absent, use the default source folders
+    ///that exist, regardless of a custom sourcePaths.
+    if(req.cfg.isUsingDefaultImportPaths)
+    {
+        import std.file : exists;
+        foreach(defaultImport; ["source", "src"])
+        {
+            string defaultImportPath = redub.misc.path.buildNormalizedPath(req.cfg.workingDir, defaultImport);
+            if(exists(defaultImportPath))
+                req.cfg.importDirectories.exclusiveMergePaths([defaultImportPath]);
+        }
+    }
+    ///importPaths must always contain sourcePaths
+    req.cfg.importDirectories.exclusiveMergePaths(req.cfg.sourcePaths);
 
     ///Remove libraries from the sourceFiles.
     req.cfg.sourceFiles = inPlaceFilter(req.cfg.sourceFiles, (string file) => !file.extension.isLibraryExtension);

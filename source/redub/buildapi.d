@@ -308,7 +308,7 @@ struct BuildConfiguration
 
     bool isDebug;
     @cacheExclude BuildConfigurationFlags flags = BuildConfigurationFlags.defaultInit;
-    @cacheExclude bool isUsingDefaultSourcePaths = true;
+    @cacheExclude bool isUsingDefaultImportPaths = true;
     RedubLanguages language = RedubLanguages.D;
     TargetType targetType;
 
@@ -433,7 +433,7 @@ struct BuildConfiguration
         ret.targetName = either(other.targetName, ret.targetName);
         ret.targetIcon.exclusiveMerge(other.targetIcon);
         ret.outputDirectory = either(other.outputDirectory, ret.outputDirectory);
-        ret.isUsingDefaultSourcePaths = ret.isUsingDefaultSourcePaths && other.isUsingDefaultSourcePaths;
+        ret.isUsingDefaultImportPaths = ret.isUsingDefaultImportPaths && other.isUsingDefaultImportPaths;
         ret = ret.mergeCommands(other);
         ret.flags|= other.flags;
         ret = ret.mergeBundleConfiguration(other);

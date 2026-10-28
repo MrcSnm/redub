@@ -48,7 +48,8 @@ ParseConfig getParseConfig(
     string parentName,
     bool isDescribeOnly = false)
 {
-    return ParseConfig(projectWorkingDir, subConfiguration, subPackage, version_, cInfo, defaultPackageName, ParseSubConfig(null, parentName), preGenerateRun: !isDescribeOnly);
+    ///A separate-file subpackage is required by its parent package, not by its own recipe name.
+    return ParseConfig(projectWorkingDir, subConfiguration, subPackage, version_, cInfo, defaultPackageName, ParseSubConfig(parentName, parentName), preGenerateRun: !isDescribeOnly);
 }
 
 
@@ -127,7 +128,11 @@ void setBundleCategories(ref BuildRequirements req, JSONStringArray categories, 
     req.cfg.bundleConfig.categories = cast(BundleCategories[])categoriesStr;
     
 }
-void addImportPaths(ref BuildRequirements req, JSONStringArray paths, ParseConfig c){req.cfg.importDirectories.exclusiveMergePaths(paths);}
+void addImportPaths(ref BuildRequirements req, JSONStringArray paths, ParseConfig c)
+{
+    req.cfg.isUsingDefaultImportPaths = false;
+    req.cfg.importDirectories.exclusiveMergePaths(paths);
+}
 void addStringImportPaths(ref BuildRequirements req, JSONStringArray paths, ParseConfig c){req.cfg.stringImportPaths.exclusiveMergePaths(paths);}
 void addExtraDependencyFiles(ref BuildRequirements req, JSONStringArray files, ParseConfig c){req.cfg.extraDependencyFiles.exclusiveMerge(files);}
 void addFilesToCopy(ref BuildRequirements req, JSONStringArray files, ParseConfig c){req.cfg.filesToCopy = req.cfg.filesToCopy.append(files);}
@@ -172,7 +177,6 @@ void addCommands(ref BuildRequirements req, JSONStringArray cmds, ParseConfig c,
 void addSourcePaths(ref BuildRequirements req, JSONStringArray paths, ParseConfig c)
 {
     import std.array;
-    req.cfg.isUsingDefaultSourcePaths = false;
     if(c.firstRun)
         req.cfg.sourcePaths = cast(string[])paths.array;
     else

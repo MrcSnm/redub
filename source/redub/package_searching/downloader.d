@@ -275,6 +275,8 @@ string downloadPackageTo(return string path, string packageName, string repo, Se
 
     string sdlPath = buildNormalizedPath(path, "dub.sdl");
     string jsonPath = buildNormalizedPath(path, "dub.json");
+    if(!std.file.exists(sdlPath) && !std.file.exists(jsonPath))
+        jsonPath = buildNormalizedPath(path, "package.json");
     JSONValue json;
     if(std.file.exists(sdlPath))
     {
@@ -317,7 +319,8 @@ bool hasDubConfiguration(string packagePath)
     import std.file : exists;
     import std.path : buildNormalizedPath;
     return exists(buildNormalizedPath(packagePath, "dub.json")) ||
-        exists(buildNormalizedPath(packagePath, "dub.sdl"));
+        exists(buildNormalizedPath(packagePath, "dub.sdl")) ||
+        exists(buildNormalizedPath(packagePath, "package.json"));
 }
 
 string getOutputDirectoryForPackage(string baseDir, string packageName, string packageVersion)
