@@ -83,6 +83,8 @@ int main(string[] args)
             entryPoints["watch"] = &watchMain;
 
 
+        bool strictDispatch = isStrictDispatch(args);
+
         if(args.length >= 2 && args[1] == "help")
         {
             import std.stdio : writeln;
@@ -111,6 +113,11 @@ int main(string[] args)
                     return entryPoints[cmd](args);
                 }
             }
+        }
+        if(args.length >= 2 && args[1].length && args[1][0] != '-')
+        {
+            if(int code = checkUnknownCommand(args[1], entryPoints.keys ~ "help", strictDispatch))
+                return code;
         }
         return runMain(args, runArgs);
     }
@@ -149,6 +156,60 @@ int main(string[] args)
     }
 }
 
+
+/**
+ * Strict dispatch opt-in (OpenShellOrg CLI Dispatch CD-11, CD-14).
+ * `--strict` (removed from args) takes precedence over REDUB_STRICT=1.
+ * Planned: strict becomes the default in the next major version (CD-12).
+ */
+bool isStrictDispatch(ref string[] args)
+{
+    import std.algorithm.searching : countUntil;
+    import std.process : environment;
+    bool strict = environment.get("REDUB_STRICT", "") == "1";
+    ptrdiff_t idx;
+    while((idx = countUntil(args, "--strict")) != -1)
+    {
+        args = args[0..idx] ~ args[idx+1..$];
+        strict = true;
+    }
+    return strict;
+}
+
+/**
+ * Handles a first word that is not a redub command (CD-1, CD-3, CD-13).
+ * Returns 0 to continue with the deprecated implicit run, or the exit code (2) in strict mode.
+ */
+int checkUnknownCommand(string word, string[] commands, bool strict)
+{
+    import std.stdio : stderr;
+    import std.algorithm : sort, filter, map, minElement;
+    import std.algorithm.comparison : levenshteinDistance;
+    import std.array : array, join;
+    import std.typecons : tuple;
+
+    string[] cmds = commands.dup;
+    sort(cmds);
+    string suggestion;
+    auto close = cmds.map!(c => tuple(levenshteinDistance(word, c), c)).filter!(t => t[0] <= 2).array;
+    if(close.length)
+        suggestion = close.minElement!"a[0]"[1];
+
+    if(strict)
+    {
+        stderr.writeln("error: unknown command '", word, "'");
+        if(suggestion.length)
+            stderr.writeln("  did you mean: redub ", suggestion);
+        stderr.writeln("  to run a package named ", word, ": redub run ", word);
+        stderr.writeln("  redub commands: ", cmds.join(", "));
+        stderr.writeln("  see: redub help");
+        return 2;
+    }
+    stderr.writeln("warning: '", word, "' is not a redub command; running package '", word, "' implicitly is deprecated");
+    stderr.writeln("  use: redub run ", word);
+    stderr.writeln("  this will be an error in redub 2.0; enable now with --strict or REDUB_STRICT=1");
+    return 0;
+}
 
 int runMain(string[] args, string[] runArgs)
 {
