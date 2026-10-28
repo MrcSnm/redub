@@ -75,36 +75,14 @@ string getDownloadLink(string packageName, string repo, SemVer requirement, out 
 ubyte[] fetchPackage(string packageName, string repo, SemVer requirement, out SemVer out_actualVersion, out string url)
 {
     import d_downloader;
-    import core.thread : Thread;
-    import core.time : dur;
-    import redub.logging : warnTitle;
     import redub.libs.package_suppliers.utils : NetworkException;
-    immutable retryDelays = [1, 5, 10];
-    Throwable lastError;
-    if(url is null)
-    {
-        url = getDownloadLink(packageName, repo, requirement, out_actualVersion);
-        if(url is null)
-            return null;
-    }
-    foreach(attempt; 0 .. retryDelays.length + 1)
-    {
-        if(attempt)
-            Thread.sleep(dur!"seconds"(retryDelays[attempt - 1]));
-        try
-        {
-            ubyte[] content = downloadToBuffer(url);
-            if(content.length)
-                return content;
-        }
-        catch(Exception e)
-            lastError = e;
-
-        if(attempt < retryDelays.length)
-            warnTitle("Fetch failed for package ", packageName, ". Retrying in ", retryDelays[attempt], " seconds...");
-    }
-    throw new NetworkException("Could not find package '"~packageName~"' after 3 retries. Check your network connection."~
-        (lastError is null ? "" : "\nLast error: "~lastError.msg), __FILE__, __LINE__, lastError);
+    url = getDownloadLink(packageName, repo, requirement, out_actualVersion);
+    if(!url)
+        return null;
+    try
+        return downloadToBuffer(url);
+    catch(Exception e)
+        throw new NetworkException("Could not find package '"~packageName~"'. Check your network connection.\nLast error: "~e.msg, __FILE__, __LINE__, e);
 }
 
 /**
