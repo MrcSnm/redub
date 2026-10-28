@@ -91,6 +91,13 @@ bool download(string link, scope ubyte[] delegate(size_t incomingBytes, bool isI
             onDataReceived(tempBuffer[0..dwRead]);
     } while (remainingDataSize > 0);
 
+    if(contentLength != 0 && bytesRead != contentLength)
+    {
+        import std.conv : to;
+        throw new Exception("Incomplete download: received " ~ bytesRead.to!string ~
+            " of " ~ contentLength.to!string ~ " bytes.");
+    }
+
     return true;
 }
 

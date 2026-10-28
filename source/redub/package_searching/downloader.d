@@ -249,10 +249,14 @@ string downloadPackageTo(return string path, string packageName, string repo, Se
 
             throw new NetworkException("No version with requirement '"~requirement.toString~"' was found when looking for package '"~packageName~existing);
         }
-        path = getOutputDirectoryForPackage(path, packageName, actualVersion.toString);
         string installPath = getFirstFileInDirectory(tempPath);
-        if(!installPath)
-            throw new Exception("No file was extracted to directory "~tempPath~" while extracting package "~packageName);
+        ///Validate before caching so a bad download can't poison the cache.
+        if(!installPath || !hasDubConfiguration(installPath))
+            throw new NetworkException("Downloaded a dub package which has no dub configuration? Package: "~packageName~" URL: "~url);
+        path = getOutputDirectoryForPackage(path, packageName, actualVersion.toString);
+        ///A previous bad download may have left a corrupt directory in the cache. Do not keep it.
+        if(std.file.exists(path) && !hasDubConfiguration(path))
+            std.file.rmdirRecurse(path);
         ///The download might have happen while downloading ourselves
 
         if(!std.file.exists(path))
@@ -306,6 +310,14 @@ string downloadPackageTo(return string path, string packageName, string repo, Se
     entry.repo = repoName;
     entry.ver = actualVersion.toString;
     return path;
+}
+
+bool hasDubConfiguration(string packagePath)
+{
+    import std.file : exists;
+    import std.path : buildNormalizedPath;
+    return exists(buildNormalizedPath(packagePath, "dub.json")) ||
+        exists(buildNormalizedPath(packagePath, "dub.sdl"));
 }
 
 string getOutputDirectoryForPackage(string baseDir, string packageName, string packageVersion)

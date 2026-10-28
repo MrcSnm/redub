@@ -880,7 +880,10 @@ private bool subConfigurationsMatchPlatform(JSONValue projectConfiguration, ref 
                     continue;
                 JSONValue* platforms = "platforms" in conf;
                 if(platforms && !platformMatches(platforms.array, c.cInfo.targetOS, c.cInfo.isa, c.cInfo.compiler))
+                {
+                    vvlog("Rejected configuration because ", depName, ":", configName.str, " is incompatible");
                     return false;
+                }
                 break;
             }
         }
