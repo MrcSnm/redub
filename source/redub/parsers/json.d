@@ -247,6 +247,11 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
                         if(!platformMatches(platforms.array, c.cInfo.targetOS, c.cInfo.isa, c.cInfo.compiler))
                             continue;
                     }
+                    ///A config may only be platform-compatible through its subConfigurations.
+                    ///Only validate when no configuration was explicitly requested.
+                    if(!c.subConfiguration.name &&
+                        !subConfigurationsMatchPlatform(projectConfiguration, req, c))
+                        continue;
                     if(name.str == c.subConfiguration.name)
                     {
                         preferredConfiguration = i.to!int;
@@ -324,75 +329,11 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
         },
         "dependencies": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _)
         {
-            import std.path;
-            import std.exception;
-            import redub.package_searching.api;
-            import redub.package_searching.cache;
             import std.parallelism;
 
             string[] keys = v.keys;
 
             Dependency[] foundPackages = new Dependency[](keys.length);
-
-            static Dependency parseDep(JSONValue value, string depName, string workingDir, string requiredBy, string configVersion)
-            {
-                string version_, path, visibility, repo;
-                string out_mainPackage;
-                string subPackage = getSubPackageInfoRequiredBy(depName, requiredBy, out_mainPackage);
-                bool isOptional = false;
-                bool isInSameFile = false;
-                ///If the main package is the same as this dependency, then simply use the same json file.
-                if(subPackage && out_mainPackage == requiredBy)
-                {
-                    path = workingDir;
-                    isInSameFile = true;
-                }
-                if(value.type == JSONType.object) ///Uses path style
-                {
-                    path = tryStr(value, "path");
-                    version_ = tryStr(value, "version");
-                    repo = tryStr(value, "repository");
-                    visibility = value.tryStr("visibility");
-                    if(repo.length)
-                    {
-                        enforce(version_, 
-                        "Dependency named "~depName~" specified the repository "~repo~" but no branch was specified. Specify its branch at \"version\".");
-                    }
-                    enforce(version_ || path,
-                        "Dependency named "~ depName ~
-                        " must contain at least a \"path\" or \"version\" property."
-                    );
-                    import redub.misc.path;
-                    isOptional = tryBool(value, "optional") && !tryBool(value, "default");
-                    if(path)
-                    {
-                        path = isAbsolute(path) ? path : redub.misc.path.buildNormalizedPath(workingDir, path);
-                        version_ = null;
-                    }
-                }
-                else if(value.type == JSONType.string) ///Version style
-                    version_ = value.str;
-
-                if(isInSameFile)
-                {
-                    ///Match all dependencies which are subpackages should have the same version as the parent project.
-                    if(SemVer(version_).isMatchAll())
-                        version_ = configVersion;
-                }
-                PackageInfo* info;
-
-                string packageFullName = getPackageFullName(depName, requiredBy);
-                if(!path)
-                {
-                    info = redub.package_searching.cache.findPackage(packageFullName, repo, version_, requiredBy);
-                    path = info.path;
-                    version_ = info.bestVersion.toString;
-                }
-                else
-                    info = findPackage(packageFullName, repo, version_, requiredBy, path);
-                return Dependency(packageFullName, path, version_, BuildRequirements.Configuration.init, null, VisibilityFrom(visibility), info, isOptional);
-            }
-
 
             //Having a separate branch for not doing in parallel actually reduced the time needed to resolve dependencies
             //Unfortunately, this code makes dependency resolution a little slower (4ms in case of hipreme engine)
@@ -400,14 +341,14 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
             if(keys.length > 1)
             {
                 foreach(size_t i, string depName; parallel(keys))
-                    foundPackages[i] = parseDep(v[depName], depName, req.cfg.workingDir, c.extra.requiredBy, c.version_);
+                    foundPackages[i] = parseDependencyDeclaration(v[depName], depName, req.cfg.workingDir, c.extra.requiredBy, c.version_);
                 foreach(pkg; foundPackages)
                     addDependency(req, c, pkg.name, pkg.version_, BuildRequirements.Configuration.init, pkg.path, getVisibilityString(pkg.visibility), pkg.pkgInfo, pkg.isOptional);
             }
             else if(keys.length == 1)
             {
                 string depName = keys[0];
-                Dependency pkg = parseDep(v[depName], depName, req.cfg.workingDir, c.extra.requiredBy, c.version_);
+                Dependency pkg = parseDependencyDeclaration(v[depName], depName, req.cfg.workingDir, c.extra.requiredBy, c.version_);
                 addDependency(req, c, pkg.name, pkg.version_, BuildRequirements.Configuration.init, pkg.path, getVisibilityString(pkg.visibility), pkg.pkgInfo, pkg.isOptional);
             }
 
@@ -582,6 +523,14 @@ private void runHandlers(
     JSONValue target, bool bGetUnusedKeys, out string[] unusedKeys, ref BuildConfiguration pending)
 {
     import redub.libs.adv_diff.helpers.index_of;
+    struct DeferredHandler
+    {
+        immutable void function(ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration pending) fn;
+        JSONValue value;
+    }
+    DeferredHandler[] deferred;
+    auto configurationsHandler = "configurations" in handler;
+
     foreach(string key, JSONValue v; target)
     {
         bool mustExecuteHandler = true;
@@ -597,10 +546,20 @@ private void runHandlers(
             mustExecuteHandler = fn && filtered.matchesPlatform(osToMatch, cfg.cInfo.isa, cfg.cInfo.compiler);
         }
         if(mustExecuteHandler)
-            (*fn)(buildRequirements, v, cfg, pending);
+        {
+            ///Configurations depend on the dependencies being resolved. Run them after
+            ///the loop so their order in the recipe doesn't matter.
+            if(configurationsHandler !is null && *fn == *configurationsHandler)
+                deferred~= DeferredHandler(*fn, v);
+            else
+                (*fn)(buildRequirements, v, cfg, pending);
+        }
         else if(bGetUnusedKeys && !fn)
             unusedKeys~= key;
     }
+
+    foreach(d; deferred)
+        (*d.fn)(buildRequirements, d.value, cfg, pending);
 }
 
 struct JSONStringArray
@@ -810,6 +769,127 @@ private bool platformMatches(JSONValue[] platforms, OS os, ISA isa, string compi
             return true;
     }
     return false;
+}
+
+private Dependency parseDependencyDeclaration(JSONValue value, string depName, string workingDir, string requiredBy, string configVersion)
+{
+    import std.path : isAbsolute;
+    import std.exception : enforce;
+    import redub.package_searching.api : getSubPackageInfoRequiredBy, getPackageFullName, PackageInfo, SemVer;
+    import redub.package_searching.cache : findPackage;
+    import redub.misc.path;
+
+    string version_, path, visibility, repo;
+    string out_mainPackage;
+    string subPackage = getSubPackageInfoRequiredBy(depName, requiredBy, out_mainPackage);
+    bool isOptional = false;
+    bool isInSameFile = false;
+    ///If the main package is the same as this dependency, then simply use the same json file.
+    if(subPackage && out_mainPackage == requiredBy)
+    {
+        path = workingDir;
+        isInSameFile = true;
+    }
+    if(value.type == JSONType.object) ///Uses path style
+    {
+        path = tryStr(value, "path");
+        version_ = tryStr(value, "version");
+        repo = tryStr(value, "repository");
+        visibility = value.tryStr("visibility");
+        if(repo.length)
+        {
+            enforce(version_,
+            "Dependency named "~depName~" specified the repository "~repo~" but no branch was specified. Specify its branch at \"version\".");
+        }
+        enforce(version_ || path,
+            "Dependency named "~ depName ~
+            " must contain at least a \"path\" or \"version\" property."
+        );
+        isOptional = tryBool(value, "optional") && !tryBool(value, "default");
+        if(path)
+        {
+            path = isAbsolute(path) ? path : redub.misc.path.buildNormalizedPath(workingDir, path);
+            version_ = null;
+        }
+    }
+    else if(value.type == JSONType.string) ///Version style
+        version_ = value.str;
+
+    if(isInSameFile)
+    {
+        ///Match all dependencies which are subpackages should have the same version as the parent project.
+        if(SemVer(version_).isMatchAll())
+            version_ = configVersion;
+    }
+    PackageInfo* info;
+
+    string packageFullName = getPackageFullName(depName, requiredBy);
+    if(!path)
+    {
+        info = findPackage(packageFullName, repo, version_, requiredBy);
+        path = info.path;
+        version_ = info.bestVersion.toString;
+    }
+    else
+        info = findPackage(packageFullName, repo, version_, requiredBy, path);
+    return Dependency(packageFullName, path, version_, BuildRequirements.Configuration.init, null, VisibilityFrom(visibility), info, isOptional);
+}
+
+/**
+ * Checks whether the configurations referenced by a configuration's subConfigurations
+ * exist and are platform compatible for the target. Only parses the referenced
+ * dependencies, keeping dependency resolution lazy.
+ */
+private bool subConfigurationsMatchPlatform(JSONValue projectConfiguration, ref BuildRequirements req, ParseConfig c)
+{
+    JSONValue* subConfigurations = "subConfigurations" in projectConfiguration;
+    if(!subConfigurations || subConfigurations.type != JSONType.object)
+        return true;
+
+    import std.string : endsWith;
+    import redub.package_searching.entry : findEntryProjectFile;
+    import redub.parsers.automatic : getProjectJSON;
+
+    foreach(string depName, JSONValue configName; subConfigurations.object)
+    {
+        const(Dependency)* dep;
+        foreach(ref d; req.dependencies)
+        {
+            if(d.name == depName || d.name.endsWith(":" ~ depName))
+            {
+                dep = &d;
+                break;
+            }
+        }
+        if(dep is null || dep.path.length == 0)
+            continue;
+
+        try
+        {
+            string projectFile = findEntryProjectFile(dep.path);
+            if(!projectFile)
+                continue;
+            JSONValue depJSON = getProjectJSON(projectFile, dep.path);
+            JSONValue* configurations = "configurations" in depJSON;
+            if(!configurations)
+                continue;
+            foreach(conf; configurations.array)
+            {
+                JSONValue* name = "name" in conf;
+                if(!name || name.str != configName.str)
+                    continue;
+                JSONValue* platforms = "platforms" in conf;
+                if(platforms && !platformMatches(platforms.array, c.cInfo.targetOS, c.cInfo.isa, c.cInfo.compiler))
+                    return false;
+                break;
+            }
+        }
+        catch(Exception)
+        {
+            //Unable to inspect: let the normal resolution report the error.
+        }
+    }
+    return true;
 }
 
 BuildRequirements getDefaultBuildRequirement(ParseConfig cfg, JSONValue json)
