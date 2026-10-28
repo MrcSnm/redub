@@ -18,7 +18,7 @@ string[] parseBuildConfiguration(const BuildConfiguration b, CompilingSession s,
     {
         if(isDebug) cmds~= "-g";
         if(targetType.isLinkedSeparately || targetType.isStaticLibrary)
-            cmds~= "-c";
+            cmds~= "-r";
 
         cmds = mapAppendPrefix(cmds, versions, "-D", false);
         cmds~= dFlags;

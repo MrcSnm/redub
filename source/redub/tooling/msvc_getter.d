@@ -110,15 +110,20 @@ private string getWinsdkPath()
     Key k = windowsGetKeyWithPath("SOFTWARE", "Microsoft", "Windows Kits", "Installed Roots");
     if(k is null)
         return null;
+    import std.file : exists;
+    import redub.misc.path : buildNormalizedPath;
     foreach(kRoot; ["KitsRoot10", "KitsRoot81", "KitsRoot"].staticArray)
     {
         try
         {
             Value v = k.getValue(kRoot);
+            string path;
             if(v.type == REG_VALUE_TYPE.REG_SZ)
-                return v.value_SZ();
-            if(v.type == REG_VALUE_TYPE.REG_EXPAND_SZ)
-                return v.value_EXPAND_SZ();
+                path = v.value_SZ();
+            else if(v.type == REG_VALUE_TYPE.REG_EXPAND_SZ)
+                path = v.value_EXPAND_SZ();
+            if(path.length && exists(buildNormalizedPath(path, "Include")))
+                return path;
         }
         catch(Exception e){}
     }
@@ -133,7 +138,10 @@ private string getWinsdkVersion(string sdkPath)
     import redub.misc.semver_in_folder;
     if(!sdkPath.length)
         return null;
+    import std.file : exists;
     string inc = buildNormalizedPath(sdkPath, "Include");
+    if(!exists(inc))
+        return null;
     foreach_reverse(SemVer ver; sort(semverInFolder(inc)))
         return ver.toString;
     enforce(false, sdkPath~" was sent but no SDK version was found at path "~inc);

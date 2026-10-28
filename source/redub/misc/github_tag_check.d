@@ -52,10 +52,17 @@ JSONValue getGithubRepoAPI(string repo)
     import d_downloader;
     import std.conv:text;
     string api = i"https://api.github.com/repos/$(repo)/tags".text;
-    char[] tagsContent = cast(char[])downloadToBuffer(api);
-    if(tagsContent.length == 0)
+    try
+    {
+        char[] tagsContent = cast(char[])downloadToBuffer(api);
+        if(tagsContent.length == 0)
+            return JSONValue(null);
+        return parseJSON(tagsContent, true);
+    }
+    catch(Exception)
+    {
         return JSONValue(null);
-    return parseJSON(tagsContent, true);
+    }
 }
 
 string getLatestRedubVersion()

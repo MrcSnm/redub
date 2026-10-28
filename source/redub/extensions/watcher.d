@@ -134,7 +134,7 @@ int watchMain(string[] args)
 
         ProjectDetails doProjectBuild(ProjectDetails d)
         {
-            if(isProjectUpToDate(d))
+            if(!d.forceRebuild && isProjectUpToDate(d))
                 return d;
             ulong clearCount = 1 + failureCursorYOffset; //The build stats at leat.
             if(!watchArgs.run) clearCount+= choices.length + 1; //Selection hint
@@ -155,6 +155,8 @@ int watchMain(string[] args)
                 terminal.updateCursorPosition();
 
                 buildLinesCount = (terminal.cursorY - 1) - firstCursorY; //-1 because of the | Build | stats
+                if(buildLinesCount < 0)
+                    buildLinesCount = 0;
                 cursorY = terminal.cursorY;
 
 
@@ -169,6 +171,8 @@ int watchMain(string[] args)
             {
                 terminal.updateCursorPosition();
                 failureCursorYOffset = terminal.cursorY - cursorY;
+                if(failureCursorYOffset < 0)
+                    failureCursorYOffset = 0;
             }
             buildCount++;
             hasShownLastLineMessage = false;
@@ -206,6 +210,8 @@ int watchMain(string[] args)
                 executeProgram(d, null);
                 terminal.updateCursorPosition();
                 runLinesCount = (terminal.cursorY - cursorY);
+                if(runLinesCount < 0)
+                    runLinesCount = 0;
                 autoRunScheduled = false;
             }
         }
@@ -230,6 +236,8 @@ int watchMain(string[] args)
                             input.getch();
                             terminal.updateCursorPosition();
                             runLinesCount = terminal.cursorY - cursorY;
+                            if(runLinesCount < 0)
+                                runLinesCount = 0;
                             clearLines(terminal, runLinesCount, cursorY);
                             hasShownLastLineMessage = false;
                             drawnBuildStats = false;

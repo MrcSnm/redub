@@ -10,6 +10,8 @@ string getAppImageArch()
         return "x86_64";
     else version(ARM_HardFloat)
         return "armhf";
+    else version(X86)
+        return "i686";
     else
         return "x86";
 }

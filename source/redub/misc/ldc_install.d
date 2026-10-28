@@ -55,6 +55,8 @@ private string getLdcFolderName(string ver, OS os = std.system.os, ISA isa = ins
         sys = "windows-multilib";
     else if(os.isApple)
         sys = "osx-universal";
+    else if(os == OS.freeBSD)
+        sys = "freebsd-x86_64";
     else if(os.isPosix)
         sys = isa == ISA.aarch64 ? "linux-aarch64" : "linux-x86_64";
     else

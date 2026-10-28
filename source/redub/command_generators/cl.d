@@ -26,16 +26,13 @@ string[] parseBuildConfiguration(const BuildConfiguration b, CompilingSession s,
         putSourceFiles(cmds, workingDir, sourcePaths, sourceFiles, excludeSourceFiles, extensions);
 
 
-        string outFlag = getTargetTypeFlag(targetType);
+        ///Dynamic libraries are linked in the link step, not here. Compiling
+        ///multiple sources into one /Fo<file> is invalid for cl, so always
+        ///write one .obj per source into the cache directory.
         string cacheDir = getCacheOutputDir(mainPackhash, b, s, isRoot);
 
         mkdirRecurse(cacheDir);
-        if(outFlag)
-            cmds~= outFlag;
-        if(outFlag)
-            cmds ~= "/Fe"~buildNormalizedPath(cacheDir, getConfigurationOutputName(b, s.os)).escapePath;
-        else
-            cmds ~= "/Fo"~buildNormalizedPath(cacheDir, getObjectOutputName(b, os)).escapePath;
+        cmds ~= "/Fo"~cacheDir.escapePath;
     }
 
     return cmds;

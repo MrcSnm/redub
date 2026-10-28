@@ -81,10 +81,10 @@ void buildPlugin(string pluginName, string inputFile, CompilationInfo cInfo)
         return;
     }
 
-
-
+    import std.path : dirName;
     BuildConfiguration b = injectPluginCfg(BuildConfiguration.init, pluginName, cInfo);
     b.sourceFiles = [inputFile];
+    b.outputDirectory = dirName(inputFile);
 
 
     CompilingSession s = CompilingSession(getCompiler(DefaultCompiler), os, instructionSetArchitecture);
@@ -101,11 +101,17 @@ void buildPlugin(string pluginName, string inputFile, CompilationInfo cInfo)
 
     string[string] env = getRedubEnv();
 
-    errorTitle("", finishCompilerExec(b, s.compiler, inDir, b.outputDirectory, execCompiler(b, s.compiler, getCompilationFlags(b, s, pluginHash, true), buildCmds, true, cmdFile1, env)).output);
+    auto compileResult = finishCompilerExec(b, s.compiler, inDir, b.outputDirectory, execCompiler(b, s.compiler, getCompilationFlags(b, s, pluginHash, true), buildCmds, true, cmdFile1, env));
+    errorTitle("", compileResult.output);
     errorTitle("Plugin Flags: ", buildCmds);
+    if(compileResult.status)
+        throw new Exception("Plugin compilation failed for '"~pluginName~"': "~compileResult.output);
     ProcessExec2 linkProcess = linkBase(const ThreadBuildData(b, ExtraInformation()), s, pluginHash, buildCmds, cmdFile2);
-    errorTitle("", waitProcessExec(linkProcess).output);
+    auto linkResult = waitProcessExec(linkProcess);
+    errorTitle("", linkResult.output);
     errorTitle("Plugin Flags: ", buildCmds);
+    if(linkResult.status)
+        throw new Exception("Plugin link failed for '"~pluginName~"': "~linkResult.output);
     scope(exit)
     {
         if(cmdFile1)

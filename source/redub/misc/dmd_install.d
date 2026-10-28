@@ -64,6 +64,8 @@ private string getDmdFolderName(string ver, OS os = std.system.os, ISA isa = ins
         sys = isa == ISA.x86 ? "windows\\bin" : "windows\\bin64";
     else if(os.isApple)
         sys = "osx/bin";
+    else if(os == OS.freeBSD)
+        sys = "freebsd/bin64";
     else if(os.isPosix)
         sys = isa == ISA.x86 ? "linux/bin32" : "linux/bin64";
     else
@@ -89,6 +91,8 @@ string getDmdDownloadLink(string ver, OS os = std.system.os, ISA isa = instructi
             throw new RedubException("Redub is not able to install dmd for MacOS ARM");
         sys = "osx.tar.xz";
     }
+    else if(os == OS.freeBSD)
+        sys = "freebsd-64.tar.xz";
     else if(os.isPosix)
         sys = "linux.tar.xz";
     else

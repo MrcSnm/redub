@@ -31,8 +31,10 @@ void loadPlugin(string pluginName, string pluginPath, CompilationInfo cInfo)
 
 
 
+    import std.path : dirName;
     buildPlugin(pluginName, pluginPath, cInfo);
-    string fullPluginPath = getDynamicLibraryName(buildNormalizedPath(pluginPath, pluginName)~"_"~DefaultCompiler);
+    string pluginBaseDir = isDir(pluginPath) ? pluginPath : dirName(pluginPath);
+    string fullPluginPath = getDynamicLibraryName(buildNormalizedPath(pluginBaseDir, pluginName)~"_"~DefaultCompiler);
     if(!std.file.exists(fullPluginPath))
         throw new Exception("File "~fullPluginPath~" does not exists for being loaded.");
     void* pluginDll = loadLib((fullPluginPath~"\0").ptr);

@@ -115,13 +115,14 @@ exec "./usr/bin/`~projectName~`" "$@"`);
     string appImage = buildNormalizedPath(outputFolder, projectName~"-"~getAppImageArch~".AppImage");
     if(!makeFileExecutable(appImage))
         throw new Exception("Could not make file "~appImage~" executable.");
+    d.bundleGenerated = true;
 }
 
 private string getDotDesktopContent(const ProjectDetails d)
 {
     import core.interpolation;
     import std.algorithm.searching:canFind;
-    import std.path: baseName;
+    import std.path: baseName, stripExtension;
     import std.string:join;
     import std.conv:text;
     string projectName = d.tree.name;
@@ -132,7 +133,7 @@ private string getDotDesktopContent(const ProjectDetails d)
         categories = (cast(string[])d.tree.requirements.cfg.bundleConfig.categories).join(";");
 
     if(d.tree.requirements.cfg.targetIcon.length)
-        icon = d.tree.requirements.cfg.targetIcon[0].baseName;
+        icon = d.tree.requirements.cfg.targetIcon[0].baseName.stripExtension;
     bool usesTerminal = d.tree.requirements.cfg.bundleConfig.usesTerminal;
     
 

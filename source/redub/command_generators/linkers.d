@@ -133,6 +133,7 @@ string[] parseLinkConfigurationCL(const ThreadBuildData data, CompilingSession s
         cmds = mapAppendReverse(cmds, data.extra.librariesFullPath,
             (string l) => (l~getLibraryExtension(s.os)).escapePath);
         cmds = mapAppendPrefix(cmds, libraryPaths, "/LIBPATH:", true);
+        putSourceFiles(cmds, null, [cacheDir], null, null, ".obj");
         cmds~= getLinkFiles(b.sourceFiles);
         cmds = mapAppend(cmds, libraries, (string l) => stripLibraryExtension(l)~".lib");
         cmds~= linkFlags;

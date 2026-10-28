@@ -60,13 +60,17 @@ Archiver getArchiver(AcceptedArchiver archiver, const string[string] env)
     }
     string help = "--help";
     if(archiver == AcceptedArchiver.llvmLib || archiver == AcceptedArchiver.lib) help = "/help";
-    auto res = execute([archiver, help], env);
-    if(res.status == 0)
+    try
     {
-        Archiver arch = Archiver(archiver, findExecutable(archiver));
-        saveArchiver(compilersInfo, arch);
-        return arch;
+        auto res = execute([archiver, help], env);
+        if(res.status == 0)
+        {
+            Archiver arch = Archiver(archiver, findExecutable(archiver));
+            saveArchiver(compilersInfo, arch);
+            return arch;
+        }
     }
+    catch(ProcessException) {}
     return Archiver(AcceptedArchiver.none);
 }
 

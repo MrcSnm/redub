@@ -843,6 +843,86 @@ test_dependency_upgrade_deep_diamond()
     fi
 }
 
+test_ldc_cache_with_space()
+{
+    local name="ldcspace$SUFFIX"
+    local d="$WORK/ldcspace"
+    local log="$WORK/ldcspace.log"
+    if command -v ldc2 >/dev/null 2>&1 || { [ "$WINDOWS" -eq 1 ] && cmd.exe /c "where ldc2 >nul 2>nul" >/dev/null 2>&1; }; then
+        :
+    else
+        skip ldc_cache_with_space "ldc2 not found"
+        return
+    fi
+    mkdir -p "$d/root/source" "$d/home with space/dub"
+    printf '%s\n' '{"name":"'"$name"'","targetPath":"build"}' > "$d/root/dub.json"
+    printf '%s\n' 'void main(){}' > "$d/root/source/app.d"
+
+    redub_with_dub_home "$d/root" "$d/home with space" "$log" build --force --compiler=ldc2
+    if [ "$?" -eq 0 ]; then
+        pass ldc_cache_with_space
+    else
+        fail ldc_cache_with_space "LDC build failed when DUB_HOME contains a space ($(detail "$log"))"
+    fi
+}
+
+test_clang_multiple_sources()
+{
+    if [ "$WINDOWS" -eq 1 ] || [ "$(uname -s 2>/dev/null)" != "Linux" ]; then
+        skip clang_multiple_sources "requires a Linux host"
+        return
+    fi
+    if ! command -v clang >/dev/null 2>&1; then
+        skip clang_multiple_sources "clang not found"
+        return
+    fi
+    local name="clangmulti$SUFFIX"
+    local d="$WORK/clangmulti"
+    local log="$WORK/clangmulti.log"
+    mkdir -p "$d/source"
+    printf '%s\n' '{"name":"'"$name"'","language":"C","targetType":"executable","targetPath":"build"}' > "$d/dub.json"
+    printf '%s\n' 'int a(void){return 1;}' > "$d/source/a.c"
+    printf '%s\n' 'int main(void){return 0;}' > "$d/source/main.c"
+
+    redub_in "$d" 120 "$log" build --force --c-compiler=clang
+    if [ "$?" -eq 0 ]; then
+        pass clang_multiple_sources
+    else
+        fail clang_multiple_sources "clang with multiple sources failed ($(detail "$log"))"
+    fi
+}
+
+test_make_file_executable()
+{
+    if [ "$WINDOWS" -eq 1 ] || [ "$(uname -s 2>/dev/null)" != "Linux" ]; then
+        skip make_file_executable "requires a Linux host"
+        return
+    fi
+    local out="$ROOT/build/make_file_executable_test"
+    local src="tests/regression/unit/make_file_executable.d"
+    local impl="source/redub/misc/make_file_executable.d"
+    rm -f "$out"
+    if command -v dmd >/dev/null 2>&1; then
+        dmd -Isource -of="$out" "$src" "$impl" >"$WORK/make_exec_build.log" 2>&1
+    elif command -v ldc2 >/dev/null 2>&1; then
+        ldc2 -I=source -of="$out" "$src" "$impl" >"$WORK/make_exec_build.log" 2>&1
+    else
+        skip make_file_executable "no D compiler found"
+        return
+    fi
+    if [ ! -f "$out" ]; then
+        fail make_file_executable "could not compile unit test: $(detail "$WORK/make_exec_build.log")"
+        return
+    fi
+    chmod +x "$out" 2>/dev/null || true
+    "$out" >"$WORK/make_exec_run.log" 2>&1
+    if [ "$?" -eq 0 ]; then
+        pass make_file_executable
+    else
+        fail make_file_executable "$(detail "$WORK/make_exec_run.log")"
+    fi
+}
+
 test_cache_custom_source_paths
 test_test_command_forwards_args
 test_config_platform_crash
@@ -873,6 +953,9 @@ test_path_with_spaces
 test_mini_regex_matches
 test_compiler_detection_cc
 test_dependency_upgrade_deep_diamond
+test_ldc_cache_with_space
+test_clang_multiple_sources
+test_make_file_executable
 
 printf '\n%d passed, %d failed, %d skipped\n' "$PASSED" "$FAILED" "$SKIPPED"
 if [ "$FAILED" -ne 0 ]; then

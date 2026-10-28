@@ -458,6 +458,7 @@ ProjectDetails buildProject(ProjectDetails d)
         createSelectionsFile(tree);
     if(d.useExistingObjects)
         tree.requirements.cfg.changedBuildFiles = getChangedBuildFiles(tree, session);
+    string appImageBundleFolder;
     if(d.bundle != BundleType.none)
     {
         import redub.extensions.bundle;
@@ -469,9 +470,7 @@ ProjectDetails buildProject(ProjectDetails d)
                     generateMacOSBundle(folder, d);
                 break;
             case BundleType.linux: 
-                string folder = prepareForAppImageBundle(d);
-                if(!d.bundleGenerated)
-                    generateAppImageBundle(folder, d);
+                appImageBundleFolder = prepareForAppImageBundle(d);
                 break;
             default: throw new RedubException("Unknown bug occurred.");
         }
@@ -503,6 +502,12 @@ ProjectDetails buildProject(ProjectDetails d)
     bool buildSucceeded = result.value;
     if(!buildSucceeded)
         throw new BuildException(null);
+
+    if(d.bundle == BundleType.linux && !d.bundleGenerated && appImageBundleFolder.length)
+    {
+        import redub.extensions.bundle;
+        generateAppImageBundle(appImageBundleFolder, d);
+    }
 
     import redub.misc.file_size_format;
     import std.path;
@@ -551,9 +556,9 @@ ProjectDetails[] buildProjectUniversal(ArgsDetails args)
             lipoRun~= d.getOutputFile();
         }
 
-        ret[0].tree.requirements.cfg.targetName = oldTargetName~"-osx-universal";
+        ///Keep the executable name equal to CFBundleExecutable (the app name).
+        ret[0].tree.requirements.cfg.targetName = oldTargetName;
         lipoRun~= ["-output", ret[0].getOutputFile()];
-        ret[0].tree.requirements.cfg.targetName = oldTargetName~"-"~archs[0];
 
         vvlog(lipoRun);
         auto res = execute(lipoRun, getRedubEnv);

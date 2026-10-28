@@ -32,10 +32,10 @@ string[] parseBuildConfiguration(const BuildConfiguration b, CompilingSession s,
         if(b.getCompiler(s.compiler).compiler == AcceptedCompiler.ldc2 && !b.outputsDeps && !b.syntaxOnly)
         {
             import std.file;
-            string ldcObjOutDir = escapePath(cacheDir~ "_obj");
+            string ldcObjOutDir = cacheDir~ "_obj";
             mkdirRecurse(ldcObjOutDir);
 
-            cmds~= mapper(ValidDFlags.objectDir) ~ ldcObjOutDir;
+            cmds~= mapper(ValidDFlags.objectDir) ~ escapePath(ldcObjOutDir);
         }
         else if(b.outputsDeps)
             cmds~= mapper(ValidDFlags.objectDir)~getObjectDir(cacheDir).escapePath;

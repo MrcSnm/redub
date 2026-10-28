@@ -38,14 +38,18 @@ AcceptedLinker getDefaultLinker()
         {
             import std.process;
             import std.string;
-            auto res = execute(["ld", "-v"]);
-            if(res.status == 0)
+            try
             {
-                if(res.output.startsWith("GNU ld"))
-                    return gnuld;
-                else if(res.output.startsWith("@(#)PROGRAM:ld"))
-                    return ld64;
+                auto res = execute(["ld", "-v"]);
+                if(res.status == 0)
+                {
+                    if(res.output.startsWith("GNU ld"))
+                        return gnuld;
+                    else if(res.output.startsWith("@(#)PROGRAM:ld"))
+                        return ld64;
+                }
             }
+            catch(ProcessException) {}
         }
         return unknown;
     }
