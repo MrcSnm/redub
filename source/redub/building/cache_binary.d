@@ -265,8 +265,15 @@ CacheFileData decodeCacheFile(ubyte[] data)
 
 void writeCacheFile(string path, const ref CacheFileData cache)
 {
-    import std.file : write;
-    write(path, encodeCacheFile(cache));
+    import std.file : write, rename, remove;
+    import std.random : Random, unpredictableSeed, uniform;
+    import std.conv : to;
+
+    Random seed = Random(unpredictableSeed);
+    string temporaryPath = path ~ "." ~ uniform(0u, uint.max, seed).to!string ~ ".tmp";
+    write(temporaryPath, encodeCacheFile(cache));
+    scope(failure) remove(temporaryPath);
+    rename(temporaryPath, path);
 }
 
 CacheFileData readCacheFile(string path)

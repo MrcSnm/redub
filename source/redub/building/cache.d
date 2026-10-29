@@ -45,6 +45,7 @@ struct CompilationCache
     private AdvCacheFormula formula;
     private AdvCacheFormula copyFormula;
     private AdvCacheFormula sharedFormula;
+    bool fromGlobal;
 
     const(AdvCacheFormula) getSharedFormula() const
     {
@@ -73,30 +74,43 @@ struct CompilationCache
      */
     static CompilationCache get(string rootHash, const BuildRequirements req, CompilingSession s, ref AdvCacheFormula sharedFormula)
     {
-        CacheFileData* c = getCache(rootHash);
         string reqCache = req.extra.isRoot ? rootHash : hashFrom(req.cfg, s, false);
+        CacheFileData* c = getCache(rootHash);
+        CacheRequirementEntry* targetCache = reqCache in c.requirements;
+        bool loadedDepCache;
+
+        if (!targetCache && !req.extra.isRoot)
+        {
+            c = getCache(reqCache);
+            targetCache = reqCache in c.requirements;
+            loadedDepCache = true;
+        }
+
+        bool fromGlobal = loadedDepCache || (!req.extra.isRoot && rootHash == reqCache);
 
         if (sharedFormula.isEmptyFormula)
         {
             if (c.fullFormula.isEmptyFormula)
-                return CompilationCache(reqCache, rootHash, AdvCacheFormula.init, AdvCacheFormula.init, sharedFormula);
+                return CompilationCache(reqCache, rootHash, AdvCacheFormula.init, AdvCacheFormula.init, sharedFormula, fromGlobal);
             sharedFormula = c.fullFormula;
         }
+        else if (fromGlobal)
+            mergeFormula(sharedFormula, c.fullFormula);
 
-        CacheRequirementEntry* targetCache = reqCache in c.requirements;
         if (!targetCache)
-            return CompilationCache(reqCache, rootHash, AdvCacheFormula.init, AdvCacheFormula.init, sharedFormula);
+            return CompilationCache(reqCache, rootHash, AdvCacheFormula.init, AdvCacheFormula.init, sharedFormula, fromGlobal);
 
         import redub.logging;
         try
             return CompilationCache(reqCache, rootHash,
                 formulaFromSimple(targetCache.compileFormula, sharedFormula),
                 formulaFromSimple(targetCache.copyFormula, sharedFormula),
-                sharedFormula);
+                sharedFormula,
+                fromGlobal);
         catch (Exception e)
         {
             error("Cache is corrupted, regenerating...");
-            return CompilationCache(reqCache, rootHash, AdvCacheFormula.init, AdvCacheFormula.init, sharedFormula);
+            return CompilationCache(reqCache, rootHash, AdvCacheFormula.init, AdvCacheFormula.init, sharedFormula, fromGlobal);
         }
     }
 
@@ -137,6 +151,16 @@ struct CompilationCache
     }
 }
 
+void mergeFormula(ref AdvCacheFormula target, const ref AdvCacheFormula source, bool overwrite = false)
+{
+    foreach (string name, const AdvDirectory d; source.directories)
+        if (overwrite || !(name in target.directories))
+            target.directories[name] = cast() d;
+    foreach (string name, const AdvFile f; source.files)
+        if (overwrite || !(name in target.files))
+            target.files[name] = cast() f;
+}
+
 /**
  * Params:
  *   root =
@@ -168,6 +192,7 @@ void invalidateCaches(ProjectNode root, CompilingSession s, out AdvCacheFormula 
     import std.datetime.stopwatch;
     import redub.logging;
     StopWatch sw = StopWatch(AutoStart.yes);
+    string rootHash = hashFrom(root.requirements, s);
     CompilationCache[] cacheStatus = cacheStatusForProject(root, s, sharedFormula);
     import std.algorithm.comparison: min;
     ptrdiff_t i = cacheStatus.length;
@@ -180,7 +205,20 @@ void invalidateCaches(ProjectNode root, CompilingSession s, out AdvCacheFormula 
         --i;
         if (!n.isUpToDate)
             continue;
-        if (!cacheStatus[i].isCompilationUpToDate(n.requirements, s, &preprocessed, dirtyFiles, dirtyCount))
+        bool upToDate = cacheStatus[i].isCompilationUpToDate(n.requirements, s, &preprocessed, dirtyFiles, dirtyCount);
+        if (upToDate && cacheStatus[i].fromGlobal)
+            updateCache(rootHash, cacheStatus[i], false);
+        if (!upToDate && !n.isRoot && !cacheStatus[i].fromGlobal)
+        {
+            CompilationCache globalCache = CompilationCache.get(cacheStatus[i].requirementCache, n.requirements, s, sharedFormula);
+            if (globalCache.isCompilationUpToDate(n.requirements, s, &preprocessed, dirtyFiles, dirtyCount))
+            {
+                cacheStatus[i] = globalCache;
+                updateCache(rootHash, globalCache, false);
+                upToDate = true;
+            }
+        }
+        if (!upToDate)
         {
             n.setFilesDirty(dirtyFiles[0..min(dirtyCount, 64)]);
             n.invalidateCache();
@@ -231,6 +269,10 @@ string hashFrom(const BuildConfiguration cfg, CompilingSession session, bool isR
     putString(cfg.getCompiler(session.compiler).versionString);
     xxh.put(cast(ubyte)session.os);
     xxh.put(cast(ubyte)session.isa);
+    enum outputAffectingFlags = BuildConfigurationFlags.syntaxOnly
+        | BuildConfigurationFlags.preservePath
+        | BuildConfigurationFlags.outputsDeps;
+    xxh.put(cast(ubyte)(cfg.flags & outputAffectingFlags));
     // xxh.put(cast(ubyte[])req.targetConfiguration);
     // xxh.put(cast(ubyte[])req.version_);
 
@@ -349,7 +391,9 @@ string getCacheOutputDir(string mainPackHash, const BuildRequirements req, Compi
     import redub.misc.path;
     if(mainPackHash.length == 0)
         throw new Exception("No hash.");
-    return redub.misc.path.buildNormalizedPath(getCacheFolder, mainPackHash, hashFrom(req, s));
+    string reqHash = hashFrom(req, s);
+    string cacheKey = req.extra.isRoot ? mainPackHash : reqHash;
+    return redub.misc.path.buildNormalizedPath(getCacheFolder, cacheKey, reqHash);
 }
 
 string getCacheOutputDir(string mainPackHash, const BuildConfiguration cfg, CompilingSession s, bool isRoot)
@@ -357,7 +401,9 @@ string getCacheOutputDir(string mainPackHash, const BuildConfiguration cfg, Comp
     import redub.misc.path;
     if(mainPackHash.length == 0)
         throw new Exception("No hash.");
-    return redub.misc.path.buildNormalizedPath(getCacheFolder, mainPackHash, hashFrom(cfg, s, isRoot));
+    string reqHash = hashFrom(cfg, s, isRoot);
+    string cacheKey = isRoot ? mainPackHash : reqHash;
+    return redub.misc.path.buildNormalizedPath(getCacheFolder, cacheKey, reqHash);
 }
 
 
@@ -392,13 +438,23 @@ AdvCacheFormula getCopyCacheFormula(string mainPackHash, const BuildRequirements
     );
 }
 
-string[] updateCache(string rootCache, const CompilationCache cache)
+string[] updateCache(string rootCache, const CompilationCache cache, bool writeGlobal = true)
 {
-    CacheFileData* cacheFile = getCache(rootCache);
-    cacheFile.requirements[cache.requirementCache] = CacheRequirementEntry(
+    CacheRequirementEntry entry = CacheRequirementEntry(
         simpleFromFormula(cache.formula),
         simpleFromFormula(cache.copyFormula)
     );
+    getCache(rootCache).requirements[cache.requirementCache] = entry;
+
+    if (writeGlobal && cache.requirementCache != rootCache)
+    {
+        CacheFileData depData;
+        depData.fullFormula.contentHash = cache.formula.contentHash;
+        mergeFormula(depData.fullFormula, cache.formula, true);
+        mergeFormula(depData.fullFormula, cache.copyFormula, true);
+        depData.requirements[cache.requirementCache] = entry;
+        writeCacheFile(getCacheFilePath(cache.requirementCache), depData);
+    }
     return null;
 }
 
@@ -414,18 +470,7 @@ void updateCacheOnDisk(string rootCache, AdvCacheFormula* fullCache, const(AdvCa
     assert(fullCache !is null, "Full cache can't be null");
     if(!fullCache.isEmptyFormula)
     {
-        ///Merge with the fullCache if they are different
-        ///This is also a promise that it won't modify
-        foreach(string name, const AdvDirectory d; sharedFormula.directories)
-        {
-            if(!(name in fullCache.directories))
-                fullCache.directories[name] = cast()d;
-        }
-        foreach(string name, const AdvFile f; sharedFormula.files)
-        {
-            if(!(name in fullCache.files))
-                fullCache.files[name] = cast()f;
-        }
+        mergeFormula(*fullCache, *sharedFormula);
 
         //Full cache doesn't need to have a hash calculation because it will never be used.
         // fullCache.recalculateHash(&hashFunction);
