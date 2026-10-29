@@ -8,7 +8,7 @@ import redub.misc.make_file_executable;
 void main()
 {
     string path = buildPath(tempDir, "redub-make-exec-test");
-    write(path, "x");
+    std.file.write(path, "x");
     scope(exit) remove(path);
 
     assert(makeFileExecutable(path));

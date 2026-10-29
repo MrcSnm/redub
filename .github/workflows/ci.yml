@@ -35,7 +35,9 @@ jobs:
       - uses: MrcSnm/setup-dlang@v2
         with:
           compiler: ldc-latest
-          redub: master
+          # Pinned: the master nightly currently can't build this project (single-call chmod bug).
+          # Bump after a nightly built from a fixed redub is published.
+          redub: 1.33.0
 
       - name: Build
         if: runner.os != 'macOS'
