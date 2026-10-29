@@ -206,6 +206,9 @@ private bool tryInferLdc(string compilerOrPath, string vString, out CompilerBina
     ///Identify LDC and its version
     if(indexRight == -1)
     {
+        ldcVerStr = inBetween(vString, "NMC (", "):", indexRight);
+        if(indexRight == -1)
+            return false;
         ldcVerStr = inBetween(vString, "LDC - the LLVM Open D compiler (", " ", indexRight);
         if(indexRight == -1)
             return false;
