@@ -1112,16 +1112,6 @@ class ProjectNode
     bool isFullyParallelizable()
     {
         return true;
-        // bool parallelizable =
-        //     requirements.cfg.preBuildCommands.length == 0 &&
-        //     requirements.cfg.postBuildCommands.length == 0;
-        // foreach(dep; dependencies)
-        // {
-        //     //Remove since I haven't found use in not being fully parallelizable yet.
-        //     // parallelizable = parallelizable && dep.isFullyParallelizable;
-        //     if(!parallelizable) return false;
-        // }
-        // return parallelizable;
     }
 
     /**

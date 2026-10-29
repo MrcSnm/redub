@@ -21,6 +21,7 @@ string processIcon(string[] filenames, out string errors)
 
     import std.string;
     import std.file;
+    import std.conv:to;
 
     static struct Ico {
         const(ubyte)[] icoBytes;
@@ -78,7 +79,8 @@ string processIcon(string[] filenames, out string errors)
     resBytes[0x0d] = 0xff;
 
     // add the icon data first
-    foreach(ushort icoIdx, ico; icos) {
+    foreach(size_t icoIdxU, ico; icos) {
+        ushort icoIdx = cast(ushort)icoIdxU;
         ResourceHeader rh;
         rh.dataSize = cast(int) ico.icoBytes.length;
         rh.headerSize = cast(int) ResourceHeader.sizeof;

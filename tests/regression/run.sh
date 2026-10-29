@@ -1330,7 +1330,39 @@ test_clean_old_cache()
     fi
 }
 
+test_single_call_output_is_executable()
+{
+    if [ "$WINDOWS" -eq 1 ]; then
+        skip single_call_output_is_executable "posix-only executable bit check"
+        return
+    fi
+    if ! command -v dmd >/dev/null 2>&1 && ! command -v ldc2 >/dev/null 2>&1; then
+        skip single_call_output_is_executable "no D compiler found"
+        return
+    fi
+    local name="execbits$SUFFIX"
+    local d="$WORK/execbits"
+    local log="$WORK/execbits.log"
+    mkdir -p "$d/source"
+    printf '%s\n' '{"name":"'"$name"'","targetPath":"build"}' > "$d/dub.json"
+    printf '%s\n' 'void main(){}' > "$d/source/app.d"
+    if ! redub_in "$d" 120 "$log" build; then
+        fail single_call_output_is_executable "build failed: $(detail "$log")"
+        return
+    fi
+    local exe
+    exe="$(artifact "$d" "$name")"
+    if [ -z "$exe" ]; then
+        fail single_call_output_is_executable "artifact not found"
+    elif [ ! -x "$exe" ]; then
+        fail single_call_output_is_executable "output '$exe' is not executable"
+    else
+        pass single_call_output_is_executable
+    fi
+}
+
 test_cache_custom_source_paths
+test_single_call_output_is_executable
 test_shared_dependency_cache
 test_shared_dependency_cache_change
 test_shared_dependency_cache_version_flags

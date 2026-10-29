@@ -1,6 +1,18 @@
 module redub.error_driver;
 import d_dependencies;
 
+string getLinkerWorkaround(string errorMessage)
+{
+    import std.algorithm.searching : canFind;
+
+    if(!errorMessage.canFind("_DllMainCRTStartup"))
+        return null;
+
+    return "A D dynamic library was linked without a DllMain.\n"
+        ~ "\tPreferred fix: add `mixin SimpleDllMain;` from `core.sys.windows.dll` to the library.\n"
+        ~ "\tWorkaround: add `-L/DEFAULTLIB:libcmt` to the library's dflags.";
+}
+
 //hip.view.load_scene.obj : error LNK2001: símbolo externo não resolvido D3hip3api12_ModuleInfoZ
 string getUndefinedSymbolExplanationMSVC(ModuleParsing modules, string errorMessage)
 {

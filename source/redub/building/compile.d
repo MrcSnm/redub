@@ -216,7 +216,8 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
                         import redub.misc.make_file_executable;
                         import redub.misc.path;
                         string cacheExe = buildNormalizedPath(inDir, getOutputName(cfg, info.os));
-                        if(!makeFileExecutable(cacheExe) || !makeFileExecutable(outDir))
+                        string outputExe = buildNormalizedPath(cfg.outputDirectory, getOutputName(cfg, info.os));
+                        if(!makeFileExecutable(cacheExe) || !makeFileExecutable(outputExe))
                         {
                             ret.status = 1;
                             ret.output ~= "Could not make the output file executable";
@@ -332,6 +333,11 @@ bool executeCommandsAndPrint(BuildRequirements req, RedubCommands phase, const s
 }
 
 
+private bool canPersistCacheNow(const ProjectNode node)
+{
+    return !node.requirements.cfg.targetType.isLinkedSeparately || !node.isRoot;
+}
+
 bool buildProjectParallelSimple(ProjectDetails details, CompilingSession s, const(AdvCacheFormula)* existingSharedFormula, AdvCacheFormula* preprocessed)
 {
     import std.concurrency;
@@ -408,7 +414,7 @@ bool buildProjectParallelSimple(ProjectDetails details, CompilingSession s, cons
             finishedPackage.becomeIndependent();
             dependencyFreePackages = root.findLeavesNodes();
 
-            if(!finishedPackage.requirements.cfg.targetType.isLinkedSeparately)
+            if(canPersistCacheNow(finishedPackage))
             {
                 string reqCache = hashFrom(finishedPackage.requirements, s);
                 updateCache(mainPackHash, CompilationCache.make(reqCache, mainPackHash, finishedPackage.requirements, s, existingSharedFormula, &formulaCache));
@@ -531,7 +537,7 @@ bool buildProjectFullyParallelized(ProjectDetails details, CompilingSession s, c
             buildSucceeded(finishedPackage, res);
             finishedBuilds~= finishedPackage;
 
-            if(!finishedPackage.requirements.cfg.targetType.isLinkedSeparately)
+            if(canPersistCacheNow(finishedPackage))
             {
                 string reqHash = hashFrom(finishedPackage.requirements, s);
                 updateCache(mainPackHash, CompilationCache.make(reqHash, mainPackHash, finishedPackage.requirements, s, existingSharedFormula, &formulaCache));
@@ -560,7 +566,7 @@ bool buildProjectFullyParallelized(ProjectDetails details, CompilingSession s, c
             {
                 ProjectNode done = cast()res.node;
                 finishedBuilds ~= done;
-                if(!done.requirements.cfg.targetType.isLinkedSeparately)
+                if(canPersistCacheNow(done))
                 {
                     string reqHash = hashFrom(done.requirements, s);
                     updateCache(mainPackHash, CompilationCache.make(reqHash, mainPackHash, done.requirements, s, existingSharedFormula, &formulaCache));
@@ -621,7 +627,7 @@ bool buildProjectSingleThread(ProjectDetails details, CompilingSession s, const(
                     buildSucceeded(dep, res);
                 }
             }
-            if(!dep.isUpToDate && !dep.requirements.cfg.targetType.isLinkedSeparately)
+            if(!dep.isUpToDate && canPersistCacheNow(dep))
             {
                 string reqHash = hashFrom(dep.requirements, s);
                 updateCache(mainPackHash, CompilationCache.make(reqHash, mainPackHash, dep.requirements, s, existingSharedFormula, &formulaCache));
@@ -704,6 +710,10 @@ private void buildFailed(const ProjectNode node, CompilationResult res, Compilin
         res.compilationCommand,
         "\nStatus '"~res.status.to!string~"' after ", res.msNeeded,"ms "~msg
     );
+    import redub.error_driver;
+    string workaround = getLinkerWorkaround(res.message);
+    if(workaround.length)
+        errorTitle("Linker Workaround: ", workaround);
     showNewerVersionMessage();
     ///It can save anything, except the root project as it would make it up to date while it actually requires the .lib files to be up to date.
     saveBuiltPackages(finishedPackages, mainPackHash, s, formulaCache, existingSharedFormula);
@@ -792,7 +802,7 @@ private void saveFinishedBuilds(ProjNodeRange)(ProjNodeRange finishedProjects, s
     StopWatch formulaSw = StopWatch(AutoStart.yes);
     foreach(ProjectNode node; finishedProjects)
     {
-        bool hasAlreadyWrittenInCache = formulaCache != null && !node.requirements.cfg.targetType.isLinkedSeparately;
+        bool hasAlreadyWrittenInCache = formulaCache != null && canPersistCacheNow(node);
         // bool hasAlreadyWrittenInCache = false;
         if(!node.isUpToDate && !hasAlreadyWrittenInCache)
         {
@@ -835,9 +845,17 @@ private bool doLink(ProjectDetails details, CompilingSession info, string mainPa
             );
             version(Windows)
             {
+                string workaround = getLinkerWorkaround(linkRes.message);
+                if(workaround.length)
+                    redub.logging.errorTitle("Redub Linker Error Help Message: ", workaround);
+
                 ModuleParsing modules = getModulesDependencies(details);
                 if(modules !is null)
-                    redub.logging.errorTitle("Redub Linker Error Help Message: ", getUndefinedSymbolExplanationMSVC(modules, linkRes.message));
+                {
+                    string explanation = getUndefinedSymbolExplanationMSVC(modules, linkRes.message);
+                    if(explanation.length)
+                        redub.logging.errorTitle("Redub Linker Error Help Message: ", explanation);
+                }
             }
 
             showNewerVersionMessage();
