@@ -24,6 +24,8 @@ struct ProjectDetails
     bool bCreateSelections = true;
     BundleType bundle = BundleType.none;
     bool bundleGenerated = false;
+    bool cleanAll;
+    int cleanOlderThanDays = -1;
 
     bool error() const {return this == ProjectDetails.init; }
     ParallelType parallelType() const { return cDetails.parallelType; }
@@ -587,7 +589,7 @@ ProjectDetails[] buildProjectUniversal(ArgsDetails args)
 
 
 
-bool cleanProject(ProjectDetails d, bool showMessages)
+bool cleanProject(ProjectDetails d, bool showMessages, bool cleanAll = false, int olderThanDays = 0)
 {
     import std.file;
     import std.path;
@@ -665,6 +667,45 @@ bool cleanProject(ProjectDetails d, bool showMessages)
         removeFile(cacheOutput, showMessages, "Removing cache output dir "~cacheOutput);
         removeFile(cacheFile, showMessages, "Removing cache reference file" ~ cacheFile);
 
+        if(cleanAll)
+        {
+            if(showMessages)
+                info("Cleaning all cached build results");
+            removeFile(getCacheFolder, showMessages, "Removing cache folder " ~ getCacheFolder);
+            clearCompilationInfoCache();
+            return true;
+        }
+
+        if(showMessages)
+        {
+            import std.datetime : Clock;
+            import core.time : days;
+            import std.string : endsWith;
+
+            string folder = getCacheFolder;
+            if(std.file.exists(folder))
+            {
+                auto cutoff = Clock.currTime - days(olderThanDays);
+                foreach(DirEntry e; std.file.dirEntries(folder, SpanMode.shallow))
+                {
+                    string fileName = baseName(e.name);
+                    if(fileName.endsWith(".tmp"))
+                    {
+                        removeFile(e.name, showMessages, "Removing orphan temp cache " ~ e.name);
+                        continue;
+                    }
+                    if(olderThanDays > 0 && fileName.endsWith(".bin") && e.timeLastModified < cutoff)
+                    {
+                        string key = fileName[0 .. $ - 4];
+                        string cacheDir = redub.misc.path.buildNormalizedPath(folder, key);
+                        removeFile(e.name, showMessages, "Removing old cache reference file " ~ e.name);
+                        removeFile(cacheDir, showMessages, "Removing old cache output dir " ~ cacheDir);
+                    }
+                }
+            }
+        }
+
+        clearCompilationInfoCache();
         return true;
     });
 
@@ -1118,7 +1159,9 @@ Available commands
   describe [<package>[@<version-spec>]]
                         Prints a description of the specified --data files
   clean [<package>]     Removes intermediate build files and cached build
-                        results
+                        results. --all also removes shared dependency caches;
+                        --older-than N removes cache entries older than N days
+                        (default 30).
 
 Additions to redub commands --
 

@@ -368,7 +368,8 @@ int cleanMain(string[] args)
     ProjectDetails d = resolveDependencies(args);
     if(!d.tree)
         return d.getReturnCode;
-    return cleanProject(d, true);
+    int olderThanDays = d.cleanOlderThanDays < 0 ? 30 : d.cleanOlderThanDays;
+    return cleanProject(d, true, d.cleanAll, olderThanDays) ? 0 : 1;
 }
 
 int buildMain(string[] args)

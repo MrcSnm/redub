@@ -91,6 +91,13 @@ redub_with_dub_home() {
     fi
 }
 
+have_dmd()
+{
+    if command -v dmd >/dev/null 2>&1; then return 0; fi
+    if [ "$WINDOWS" -eq 1 ] && cmd.exe /c "where dmd >nul 2>nul" >/dev/null 2>&1; then return 0; fi
+    return 1
+}
+
 test_cache_custom_source_paths()
 {
     local name="cachetest$SUFFIX"
@@ -1039,7 +1046,299 @@ test_excluded_dependency_file_does_not_invalidate()
     fi
 }
 
+make_shared_cache_dep()
+{
+    local base=$1
+    mkdir -p "$base/deps/mylib/source"
+    printf '%s\n' '{"name":"mylib","targetType":"library","sourcePaths":["source"]}' > "$base/deps/mylib/dub.json"
+    printf '%s\n' 'module mylib; int answer(){ return 42; }' > "$base/deps/mylib/source/mylib.d"
+}
+
+make_shared_cache_project()
+{
+    local base=$1
+    local proj=$2
+    local name=$3
+    local version=${4:-}
+    mkdir -p "$base/$proj/source"
+    if [ -n "$version" ]; then
+        printf '%s\n' '{"name":"'"$name"'","targetType":"executable","sourcePaths":["source"],"versions":["'"$version"'"],"dependencies":{"mylib":{"path":"../deps/mylib"}}}' > "$base/$proj/dub.json"
+    else
+        printf '%s\n' '{"name":"'"$name"'","targetType":"executable","sourcePaths":["source"],"dependencies":{"mylib":{"path":"../deps/mylib"}}}' > "$base/$proj/dub.json"
+    fi
+    printf '%s\n' 'import mylib; void main(){ auto x = answer(); }' > "$base/$proj/source/app.d"
+}
+
+test_shared_dependency_cache()
+{
+    if ! have_dmd; then skip shared_dependency_cache "no D compiler found"; return; fi
+    local base="$WORK/shareddep"
+    local home="$WORK/shareddep_home"
+    local p1log="$WORK/shareddep_p1.log"
+    local p2log="$WORK/shareddep_p2.log"
+    make_shared_cache_dep "$base"
+    make_shared_cache_project "$base" p1 p1
+    make_shared_cache_project "$base" p2 p2
+
+    if ! redub_with_dub_home "$base/p1" "$home" "$p1log" build; then
+        fail shared_dependency_cache "p1 build failed: $(detail "$p1log")"
+        return
+    fi
+    if ! redub_with_dub_home "$base/p2" "$home" "$p2log" build; then
+        fail shared_dependency_cache "p2 build failed: $(detail "$p2log")"
+        return
+    fi
+    if grep -q "Built: mylib" "$p1log" && grep -q "Up-to-Date: mylib" "$p2log"; then
+        pass shared_dependency_cache
+    else
+        fail shared_dependency_cache "p2 did not reuse mylib (p2: $(detail "$p2log"))"
+    fi
+}
+
+test_shared_dependency_cache_change()
+{
+    if ! have_dmd; then skip shared_dependency_cache_change "no D compiler found"; return; fi
+    local base="$WORK/shareddep_change"
+    local home="$WORK/shareddep_change_home"
+    local p1log="$WORK/shareddep_change_p1.log"
+    local p2log="$WORK/shareddep_change_p2.log"
+    local p1againlog="$WORK/shareddep_change_p1_again.log"
+    make_shared_cache_dep "$base"
+    make_shared_cache_project "$base" p1 p1
+    make_shared_cache_project "$base" p2 p2
+
+    if ! redub_with_dub_home "$base/p1" "$home" "$p1log" build; then
+        fail shared_dependency_cache_change "p1 build failed: $(detail "$p1log")"
+        return
+    fi
+    sleep 1
+    printf '%s\n' 'module mylib; int answer(){ return 42; } int answer2(){ return 43; }' > "$base/deps/mylib/source/mylib.d"
+    if ! redub_with_dub_home "$base/p2" "$home" "$p2log" build; then
+        fail shared_dependency_cache_change "p2 build failed: $(detail "$p2log")"
+        return
+    fi
+    if ! grep -q "Built: mylib" "$p2log"; then
+        fail shared_dependency_cache_change "p2 did not rebuild changed mylib (p2: $(detail "$p2log"))"
+        return
+    fi
+    if ! redub_with_dub_home "$base/p1" "$home" "$p1againlog" build; then
+        fail shared_dependency_cache_change "p1 rebuild failed: $(detail "$p1againlog")"
+        return
+    fi
+    if grep -q "Up-to-Date: mylib" "$p1againlog"; then
+        pass shared_dependency_cache_change
+    else
+        fail shared_dependency_cache_change "p1 did not reuse mylib rebuilt by p2 (p1: $(detail "$p1againlog"))"
+    fi
+}
+
+test_shared_dependency_cache_version_flags()
+{
+    if ! have_dmd; then skip shared_dependency_cache_version_flags "no D compiler found"; return; fi
+    local base="$WORK/shareddep_flags"
+    local home="$WORK/shareddep_flags_home"
+    local p1log="$WORK/shareddep_flags_p1.log"
+    local p2log="$WORK/shareddep_flags_p2.log"
+    make_shared_cache_dep "$base"
+    make_shared_cache_project "$base" p1 p1 P1_FLAG
+    make_shared_cache_project "$base" p2 p2 P2_FLAG
+
+    if ! redub_with_dub_home "$base/p1" "$home" "$p1log" build; then
+        fail shared_dependency_cache_version_flags "p1 build failed: $(detail "$p1log")"
+        return
+    fi
+    if ! redub_with_dub_home "$base/p2" "$home" "$p2log" build; then
+        fail shared_dependency_cache_version_flags "p2 build failed: $(detail "$p2log")"
+        return
+    fi
+    if grep -q "Built: mylib" "$p2log" && ! grep -q "Up-to-Date: mylib" "$p2log"; then
+        pass shared_dependency_cache_version_flags
+    else
+        fail shared_dependency_cache_version_flags "p2 reused mylib across different version flags (p2: $(detail "$p2log"))"
+    fi
+}
+
+test_shared_dependency_cache_force()
+{
+    if ! have_dmd; then skip shared_dependency_cache_force "no D compiler found"; return; fi
+    local base="$WORK/shareddep_force"
+    local home="$WORK/shareddep_force_home"
+    local p1log="$WORK/shareddep_force_p1.log"
+    local p2log="$WORK/shareddep_force_p2.log"
+    local p1forcelog="$WORK/shareddep_force_p1_force.log"
+    local p2againlog="$WORK/shareddep_force_p2_again.log"
+    make_shared_cache_dep "$base"
+    make_shared_cache_project "$base" p1 p1
+    make_shared_cache_project "$base" p2 p2
+
+    if ! redub_with_dub_home "$base/p1" "$home" "$p1log" build; then
+        fail shared_dependency_cache_force "p1 build failed: $(detail "$p1log")"
+        return
+    fi
+    if ! redub_with_dub_home "$base/p2" "$home" "$p2log" build; then
+        fail shared_dependency_cache_force "p2 build failed: $(detail "$p2log")"
+        return
+    fi
+    if ! redub_with_dub_home "$base/p1" "$home" "$p1forcelog" build --force; then
+        fail shared_dependency_cache_force "p1 forced build failed: $(detail "$p1forcelog")"
+        return
+    fi
+    if ! grep -q "Built: mylib" "$p1forcelog"; then
+        fail shared_dependency_cache_force "forced build did not rebuild mylib (p1: $(detail "$p1forcelog"))"
+        return
+    fi
+    if ! redub_with_dub_home "$base/p2" "$home" "$p2againlog" build; then
+        fail shared_dependency_cache_force "p2 build after force failed: $(detail "$p2againlog")"
+        return
+    fi
+    if grep -q "Built: mylib" "$p2againlog"; then
+        fail shared_dependency_cache_force "p2 rebuilt mylib after p1 forced it (p2: $(detail "$p2againlog"))"
+    else
+        pass shared_dependency_cache_force
+    fi
+}
+
+test_shared_dependency_cache_parallel_modes()
+{
+    if ! have_dmd; then skip shared_dependency_cache_parallel_modes "no D compiler found"; return; fi
+    local base="$WORK/shareddep_parallel"
+    local home="$WORK/shareddep_parallel_home"
+    local p1log="$WORK/shareddep_parallel_p1.log"
+    local p2log="$WORK/shareddep_parallel_p2.log"
+    make_shared_cache_dep "$base"
+    make_shared_cache_project "$base" p1 p1
+    make_shared_cache_project "$base" p2 p2
+
+    if ! redub_with_dub_home "$base/p1" "$home" "$p1log" build --parallel=no; then
+        fail shared_dependency_cache_parallel_modes "p1 build failed: $(detail "$p1log")"
+        return
+    fi
+    if ! redub_with_dub_home "$base/p2" "$home" "$p2log" build --parallel=leaves; then
+        fail shared_dependency_cache_parallel_modes "p2 build failed: $(detail "$p2log")"
+        return
+    fi
+    if grep -q "Up-to-Date: mylib" "$p2log"; then
+        pass shared_dependency_cache_parallel_modes
+    else
+        fail shared_dependency_cache_parallel_modes "p2 did not reuse mylib (p2: $(detail "$p2log"))"
+    fi
+}
+
+test_clean_all()
+{
+    if ! have_dmd; then skip clean_all "no D compiler found"; return; fi
+    local base="$WORK/cleanall"
+    local home="$WORK/cleanall_home"
+    local buildlog="$WORK/cleanall_build.log"
+    local cleanlog="$WORK/cleanall_clean.log"
+    local rebuildlog="$WORK/cleanall_rebuild.log"
+    make_shared_cache_dep "$base"
+    make_shared_cache_project "$base" p1 p1
+
+    if ! redub_with_dub_home "$base/p1" "$home" "$buildlog" build; then
+        fail clean_all "setup build failed: $(detail "$buildlog")"
+        return
+    fi
+    if [ ! -d "$home/dub/.redub" ]; then
+        fail clean_all "cache folder was not created"
+        return
+    fi
+    if ! redub_with_dub_home "$base/p1" "$home" "$cleanlog" clean --all; then
+        fail clean_all "clean --all failed: $(detail "$cleanlog")"
+        return
+    fi
+    if [ -e "$home/dub/.redub" ]; then
+        fail clean_all "clean --all left the cache folder behind"
+        return
+    fi
+    if ! redub_with_dub_home "$base/p1" "$home" "$rebuildlog" build; then
+        fail clean_all "rebuild failed: $(detail "$rebuildlog")"
+        return
+    fi
+    if grep -q "Built: mylib" "$rebuildlog"; then
+        pass clean_all
+    else
+        fail clean_all "rebuild did not recreate mylib (log: $(detail "$rebuildlog"))"
+    fi
+}
+
+test_clean_orphan_tmp()
+{
+    if ! have_dmd; then skip clean_orphan_tmp "no D compiler found"; return; fi
+    local base="$WORK/cleantmp"
+    local home="$WORK/cleantmp_home"
+    local buildlog="$WORK/cleantmp_build.log"
+    local cleanlog="$WORK/cleantmp_clean.log"
+    local p2log="$WORK/cleantmp_p2.log"
+    make_shared_cache_dep "$base"
+    make_shared_cache_project "$base" p1 p1
+    make_shared_cache_project "$base" p2 p2
+
+    if ! redub_with_dub_home "$base/p1" "$home" "$buildlog" build; then
+        fail clean_orphan_tmp "setup build failed: $(detail "$buildlog")"
+        return
+    fi
+    printf 'orphan' > "$home/dub/.redub/orphan.tmp"
+    if ! redub_with_dub_home "$base/p1" "$home" "$cleanlog" clean; then
+        fail clean_orphan_tmp "clean failed: $(detail "$cleanlog")"
+        return
+    fi
+    if [ -e "$home/dub/.redub/orphan.tmp" ]; then
+        fail clean_orphan_tmp "clean left orphan .tmp behind"
+        return
+    fi
+    if [ "$(find "$home/dub/.redub" -maxdepth 1 -name '*.bin' 2>/dev/null | wc -l)" -lt 1 ]; then
+        fail clean_orphan_tmp "clean removed the shared dependency cache"
+        return
+    fi
+    if ! redub_with_dub_home "$base/p2" "$home" "$p2log" build; then
+        fail clean_orphan_tmp "p2 build failed: $(detail "$p2log")"
+        return
+    fi
+    if grep -q "Built: mylib" "$p2log"; then
+        fail clean_orphan_tmp "p2 recompiled mylib instead of reusing the kept cache (p2: $(detail "$p2log"))"
+    elif grep -q "Up-to-Date: mylib" "$p2log" || grep -q "Copy Enough: mylib" "$p2log"; then
+        pass clean_orphan_tmp
+    else
+        fail clean_orphan_tmp "p2 did not reuse the kept dependency cache (p2: $(detail "$p2log"))"
+    fi
+}
+
+test_clean_old_cache()
+{
+    if ! have_dmd; then skip clean_old_cache "no D compiler found"; return; fi
+    local base="$WORK/cleanold"
+    local home="$WORK/cleanold_home"
+    local buildlog="$WORK/cleanold_build.log"
+    local cleanlog="$WORK/cleanold_clean.log"
+    make_shared_cache_dep "$base"
+    make_shared_cache_project "$base" p1 p1
+
+    if ! redub_with_dub_home "$base/p1" "$home" "$buildlog" build; then
+        fail clean_old_cache "setup build failed: $(detail "$buildlog")"
+        return
+    fi
+    touch -d '40 days ago' "$home/dub/.redub"/*.bin
+    if ! redub_with_dub_home "$base/p1" "$home" "$cleanlog" clean; then
+        fail clean_old_cache "clean failed: $(detail "$cleanlog")"
+        return
+    fi
+    if [ "$(find "$home/dub/.redub" -maxdepth 1 -name '*.bin' 2>/dev/null | wc -l)" -eq 0 ]; then
+        pass clean_old_cache
+    else
+        fail clean_old_cache "clean did not remove old cache entries"
+    fi
+}
+
 test_cache_custom_source_paths
+test_shared_dependency_cache
+test_shared_dependency_cache_change
+test_shared_dependency_cache_version_flags
+test_shared_dependency_cache_force
+test_shared_dependency_cache_parallel_modes
+test_clean_all
+test_clean_orphan_tmp
+test_clean_old_cache
 test_failed_build_keeps_cache
 test_excluded_dependency_file_does_not_invalidate
 test_test_command_forwards_args

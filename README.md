@@ -24,7 +24,8 @@ Those are the additions I've made over dub
 - [**Redub Executable Icons**](#redub-executable-icons) - Adds inside the recipe file a way to define how your program icon will look
 - [**Linker Diagnostics**](#redub-linker-diagnostics) - Experimental support to improve linker message errors.
 - [**Cross Compilation Targets**](#redub-cross-compile) - Adds support to build targets, selecting a compiler, architecture and other configuration by just calling `redub --target=PSVita`
-- [**Auto PATH setup**] - Adds a way to auto setup redub paths in your system. Call `redub setup` and it will install redub, redub's ldc and redub's dmd in the PATH. Since `v1.32.0`
+- **Auto PATH setup** - Since `v1.32.0`: Adds a way to auto setup redub paths in your system. Call `redub setup` and it will install redub, redub's ldc and redub's dmd in the PATH.
+- **Cache Sharing** - Since `v1.33.2`: Whenever you build a library which has the same versions and flags between parallel projects, the built library will be reused.
 
 
 ## Redub Help

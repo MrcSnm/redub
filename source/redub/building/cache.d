@@ -74,12 +74,14 @@ struct CompilationCache
      */
     static CompilationCache get(string rootHash, const BuildRequirements req, CompilingSession s, ref AdvCacheFormula sharedFormula)
     {
+        import std.file : exists;
+
         string reqCache = req.extra.isRoot ? rootHash : hashFrom(req.cfg, s, false);
         CacheFileData* c = getCache(rootHash);
         CacheRequirementEntry* targetCache = reqCache in c.requirements;
         bool loadedDepCache;
 
-        if (!targetCache && !req.extra.isRoot)
+        if (!targetCache && !req.extra.isRoot && exists(getCacheFilePath(reqCache)))
         {
             c = getCache(reqCache);
             targetCache = reqCache in c.requirements;
@@ -190,6 +192,7 @@ CompilationCache[] cacheStatusForProject(ProjectNode root, CompilingSession s, o
 void invalidateCaches(ProjectNode root, CompilingSession s, out AdvCacheFormula sharedFormula, out AdvCacheFormula preprocessed)
 {
     import std.datetime.stopwatch;
+    import std.file : exists;
     import redub.logging;
     StopWatch sw = StopWatch(AutoStart.yes);
     string rootHash = hashFrom(root.requirements, s);
@@ -208,7 +211,7 @@ void invalidateCaches(ProjectNode root, CompilingSession s, out AdvCacheFormula 
         bool upToDate = cacheStatus[i].isCompilationUpToDate(n.requirements, s, &preprocessed, dirtyFiles, dirtyCount);
         if (upToDate && cacheStatus[i].fromGlobal)
             updateCache(rootHash, cacheStatus[i], false);
-        if (!upToDate && !n.isRoot && !cacheStatus[i].fromGlobal)
+        if (!upToDate && !n.isRoot && !cacheStatus[i].fromGlobal && exists(getCacheFilePath(cacheStatus[i].requirementCache)))
         {
             CompilationCache globalCache = CompilationCache.get(cacheStatus[i].requirementCache, n.requirements, s, sharedFormula);
             if (globalCache.isCompilationUpToDate(n.requirements, s, &preprocessed, dirtyFiles, dirtyCount))

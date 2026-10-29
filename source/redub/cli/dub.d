@@ -143,6 +143,14 @@ struct DubArguments
     @("config|c")
     string config;
 
+    @("Removes all cached build results, including shared dependency caches")
+    @("all")
+    bool cleanAll;
+
+    @("Removes cache entries older than the given number of days")
+    @("older-than")
+    int cleanOlderThan = -1;
+
     @(
         "Specifies the compiler binary to use (can be a path)\n" ~
         "dmd, ldc (For the C Compilers, use -cc or --cCompiler) gcc, g++ \n"~

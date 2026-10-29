@@ -33,6 +33,9 @@ ProjectDetails resolveDependencies(string[] args, bool isDescribeOnly = false)
     if(argsD.args.targetName)
         ret.tree.requirements.cfg.targetName = argsD.args.targetName;
 
+    ret.cleanAll = argsD.args.cleanAll;
+    ret.cleanOlderThanDays = argsD.args.cleanOlderThan;
+
     if(argsD.args.build.printBuilds)
     {
         import redub.parsers.build_type;

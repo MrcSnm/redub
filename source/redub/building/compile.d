@@ -813,11 +813,11 @@ private bool doLink(ProjectDetails details, CompilingSession info, string mainPa
     Compiler compiler = info.compiler;
     bool isUpToDate = root.isUpToDate;
     bool shouldSkipLinking = isUpToDate || (!root.requirements.cfg.targetType.isLinkedSeparately) || canBuildInSingleCall(root, info);
+    const string[string] targetEnv = getEnvForProject(root, env ? env : cast(const)getCurrentEnv());
 
     if(!shouldSkipLinking)
     {
         CompilationResult linkRes;
-        const string[string] targetEnv = getEnvForProject(root, env ? env : cast(const)getCurrentEnv());
 
         auto result = timed(() {
             linkRes = link(root, mainPackHash, root.requirements.buildData(true, info, targetEnv), info);
@@ -869,6 +869,11 @@ private bool doLink(ProjectDetails details, CompilingSession info, string mainPa
         string inDir = getCacheOutputDir(mainPackHash, cast()root.requirements, info);
         string outDir = getConfigurationOutputPath(root.requirements.cfg, os);
         copyDir(inDir, dirName(outDir));
+    }
+    else if(!isUpToDate && canBuildInSingleCall(root, info))
+    {
+        if(!executeCommandsAndPrint(root.requirements, RedubCommands.postBuild, targetEnv))
+            return false;
     }
 
     if(isUpToDate)
