@@ -449,6 +449,7 @@ ProjectDetails buildProject(ProjectDetails d)
     AdvCacheFormula preprocessed;
     if(d.forceRebuild)
     {
+        sharedFormula = loadExistingSharedFormula(d.tree, session);
         if(!cleanProject(d, false))
             throw new RedubException("Could not clean project ", d.tree.name);
         d.tree.invalidateCacheOnTree();

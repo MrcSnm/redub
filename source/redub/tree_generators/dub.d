@@ -28,8 +28,15 @@ ProjectNode getProjectTree(RootParseResult res)
     string[string] subConfigs = res.mainRequirement.getSubConfigurations;
     ProjectNode[string] visited;
     ProjectNode[] queue = [tree];
+    StopWatch treeSw = StopWatch(AutoStart.yes);
     getProjectTreeImpl(queue, res, subConfigs, visited);
+    if(hasLogLevel(LogLevel.vverbose))
+        infos("Project tree built in ", treeSw.peek.total!"msecs", "ms");
+
+    StopWatch cycleSw = StopWatch(AutoStart.yes);
     detectCycle(tree);
+    if(hasLogLevel(LogLevel.vverbose))
+        infos("Cycle detection took ", cycleSw.peek.total!"msecs", "ms");
 
     StopWatch sw = StopWatch(AutoStart.no);
     if(hasLogLevel(LogLevel.vverbose))
@@ -48,29 +55,43 @@ void detectCycle(ProjectNode t)
     bool[ProjectNode] visited;
     bool[ProjectNode] inStack;
     ProjectNode[] path;
-    void impl(ProjectNode node)
+
+    ProjectNodeDfs dfs;
+    dfs.reset(t);
+    visited[t] = true;
+    inStack[t] = true;
+    path ~= t;
+
+    while(!dfs.empty)
     {
-        visited[node] = true;
-        inStack[node] = true;
-        path~= node;
-        foreach(n; node.dependencies)
+        auto ref frame = dfs.top;
+        if(frame.nextChild >= frame.node.dependencies.length)
         {
-            if(!(n in visited))
-                impl(n);
-            else if(n in inStack)
-            {
-                string printCycle;
-                foreach(c; path)
-                {
-                    printCycle~= c.name~"->";
-                }
-                return throw new BuildException("Found a cycle at "~printCycle~n.name);
-            }
+            path = path[0 .. $ - 1];
+            inStack.remove(frame.node);
+            dfs.pop();
+            continue;
         }
-        path = path[0..$-1];
-        inStack.remove(node);
+
+        ProjectNode n = frame.node.dependencies[frame.nextChild];
+        frame.nextChild = frame.nextChild + 1;
+        if(!(n in visited))
+        {
+            visited[n] = true;
+            inStack[n] = true;
+            path ~= n;
+            dfs.push(n);
+        }
+        else if(n in inStack)
+        {
+            string printCycle;
+            foreach(c; path)
+            {
+                printCycle~= c.name~"->";
+            }
+            return throw new BuildException("Found a cycle at "~printCycle~n.name);
+        }
     }
-    impl(t);
 }
 
 /**
@@ -93,76 +114,77 @@ private void getProjectTreeImpl(
     ref ProjectNode[string] visited, 
 )
 {
-    if(queue.length == 0) return;
-    ProjectNode node = queue[0];
-    foreach(dep; node.requirements.dependencies)
+    while(queue.length != 0)
     {
-        if(dep.isSubConfigurationOnly || dep.isOptional)
-            continue;            
-        ProjectNode* visitedDep = dep.name in visited;
-        ProjectNode depNode;
-        if(dep.subConfiguration.isDefault && dep.name in subConfigurations)
-            dep.subConfiguration = BuildRequirements.Configuration(subConfigurations[dep.name], false);
-        if(visitedDep)
+        ProjectNode node = queue[0];
+        foreach(dep; node.requirements.dependencies)
         {
-            depNode = *visitedDep;
+            if(dep.isSubConfigurationOnly || dep.isOptional)
+                continue;
+            ProjectNode* visitedDep = dep.name in visited;
+            ProjectNode depNode;
+            if(dep.subConfiguration.isDefault && dep.name in subConfigurations)
+                dep.subConfiguration = BuildRequirements.Configuration(subConfigurations[dep.name], false);
+            if(visitedDep)
+            {
+                depNode = *visitedDep;
 
-            if(!dep.isOptional && depNode.isOptional)
-            {
-                depNode.makeRequired();
-                infos("Optional Included: ", dep.name);
-            }
-            ///When found 2 different packages requiring a different dependency subConfiguration
-            /// and the new is a default one.
-            if(visitedDep.requirements.configuration != dep.subConfiguration && !dep.subConfiguration.isDefault)
-            {
-                BuildRequirements depConfig = parseDependency(dep, node.requirements, res.targetCompilationInfo);
-                if(visitedDep.requirements.targetConfiguration != depConfig.targetConfiguration)
+                if(!dep.isOptional && depNode.isOptional)
                 {
-                    //Print merging different subConfigs?
+                    depNode.makeRequired();
+                    infos("Optional Included: ", dep.name);
+                }
+                ///When found 2 different packages requiring a different dependency subConfiguration
+                /// and the new is a default one.
+                if(visitedDep.requirements.configuration != dep.subConfiguration && !dep.subConfiguration.isDefault)
+                {
+                    BuildRequirements depConfig = parseDependency(dep, node.requirements, res.targetCompilationInfo);
+                    if(visitedDep.requirements.targetConfiguration != depConfig.targetConfiguration)
+                    {
+                        //Print merging different subConfigs?
+                        visitedDep.removeAllDependencies();
+                        visitedDep.requirements = mergeDifferentSubConfigurations(
+                            visitedDep.requirements,
+                            depConfig
+                        );
+                        queue ~= depNode;
+                    }
+                }
+                else if(visitedDep.requirements.version_ != dep.version_)
+                {
+                    // error("Found different versions to parse: ", visitedDep.name, " ", visitedDep.requirements.version_, "  vs ", dep.version_);
+                    BuildRequirements depConfig = parseDependency(dep, node.requirements, res.targetCompilationInfo);
+                    ///The new version may have a different dependency set. Drop the
+                    ///old edges and let the queue parse the new recipe.
                     visitedDep.removeAllDependencies();
-                    visitedDep.requirements = mergeDifferentSubConfigurations(
-                        visitedDep.requirements, 
-                        depConfig
-                    );
+                    visitedDep.requirements = depConfig;
                     queue ~= depNode;
                 }
-            }
-            else if(visitedDep.requirements.version_ != dep.version_)
-            {
-                // error("Found different versions to parse: ", visitedDep.name, " ", visitedDep.requirements.version_, "  vs ", dep.version_);
-                BuildRequirements depConfig = parseDependency(dep, node.requirements, res.targetCompilationInfo);
-                ///The new version may have a different dependency set. Drop the
-                ///old edges and let the queue parse the new recipe.
-                visitedDep.removeAllDependencies();
-                visitedDep.requirements = depConfig;
-                queue ~= depNode;
-            }
 
-        }
-        else
-        {
-            depNode = new ProjectNode(parseDependency(dep, node.requirements, res.targetCompilationInfo), dep.isOptional, res.targetRequirement, false);
-            if(dep.name != depNode.name)
-            {
-                import redub.api;
-                throw new BuildException("Dependency '"~dep.name~"' specified at path '"~dep.path~"' matches '"~depNode.name~"'. The dependency name should correctly match the one found at that path.");
             }
-            ///TODO: Improve dependency cycle detection
-            if(dep.name == node.name)
+            else
             {
-                import redub.api;
-                throw new BuildException("Package '"~dep.name~"' at path '"~dep.path~"' can't depend on itself.");
+                depNode = new ProjectNode(parseDependency(dep, node.requirements, res.targetCompilationInfo), dep.isOptional, res.targetRequirement, false);
+                if(dep.name != depNode.name)
+                {
+                    import redub.api;
+                    throw new BuildException("Dependency '"~dep.name~"' specified at path '"~dep.path~"' matches '"~depNode.name~"'. The dependency name should correctly match the one found at that path.");
+                }
+                ///TODO: Improve dependency cycle detection
+                if(dep.name == node.name)
+                {
+                    import redub.api;
+                    throw new BuildException("Package '"~dep.name~"' at path '"~dep.path~"' can't depend on itself.");
+                }
+                subConfigurations = depNode.requirements.mergeSubConfigurations(subConfigurations);
+                visited[dep.name] = depNode;
+                queue~= depNode;
             }
-            subConfigurations = depNode.requirements.mergeSubConfigurations(subConfigurations);
-            visited[dep.name] = depNode;
-            queue~= depNode;
+            node.addDependency(depNode);
         }
-        node.addDependency(depNode);
+
+        queue = queue[1..$];
     }
-
-    queue = queue[1..$];
-    getProjectTreeImpl(queue, res, subConfigurations, visited);
 }
 
 

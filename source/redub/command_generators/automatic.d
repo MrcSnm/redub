@@ -24,7 +24,7 @@ string escapeCompilationCommands(string compilerBin, string[] flags)
  *   isRoot = Whether this is the root package
  * Returns: The compilation commands those arguments generates
  */
-string[] getCompilationFlags(const BuildConfiguration cfg, CompilingSession s, string mainPackHash, bool isRoot)
+string[] getCompilationFlags(const BuildConfiguration cfg, CompilingSession s, string mainPackHash, bool isRoot, bool singleCall = false)
 {
     import redub.command_generators.commons;
     switch(cfg.getCompiler(s.compiler).compiler) with(AcceptedCompiler)
@@ -38,14 +38,14 @@ string[] getCompilationFlags(const BuildConfiguration cfg, CompilingSession s, s
         case gcc:
             return redub.command_generators.gnu_based.parseBuildConfiguration(cfg, s, mainPackHash, isRoot, cExt);
         case dmd:
-            return redub.command_generators.dmd.parseBuildConfiguration(cfg, s, mainPackHash, isRoot);
+            return redub.command_generators.dmd.parseBuildConfiguration(cfg, s, mainPackHash, isRoot, singleCall);
         case ldc2:
-            return redub.command_generators.ldc.parseBuildConfiguration(cfg, s, mainPackHash, isRoot);
+            return redub.command_generators.ldc.parseBuildConfiguration(cfg, s, mainPackHash, isRoot, singleCall);
         default:throw new Exception("Unsupported compiler '"~cfg.getCompiler(s.compiler).bin~"'");
     }
 }
 
-string[] getLinkFlags(const ThreadBuildData data, CompilingSession s, string mainPackHash)
+string[] getLinkFlags(const ThreadBuildData data, CompilingSession s, string mainPackHash, bool includeOutput = true, bool includeDFlags = true)
 {
     import redub.command_generators.commons;
     import redub.command_generators.linkers;
@@ -53,12 +53,12 @@ string[] getLinkFlags(const ThreadBuildData data, CompilingSession s, string mai
     if(isWindows(s.os))
     {
         if(c.isDCompiler)
-            return parseLinkConfigurationMSVC(data, s, mainPackHash);
+            return parseLinkConfigurationMSVC(data, s, mainPackHash, includeOutput, includeDFlags);
         if(c.compiler == AcceptedCompiler.cl)
-            return parseLinkConfigurationCL(data, s, mainPackHash);
-        return parseLinkConfiguration(data, s, mainPackHash);
+            return parseLinkConfigurationCL(data, s, mainPackHash, includeOutput, includeDFlags);
+        return parseLinkConfiguration(data, s, mainPackHash, includeOutput, includeDFlags);
     }
-    return parseLinkConfiguration(data, s, mainPackHash);
+    return parseLinkConfiguration(data, s, mainPackHash, includeOutput, includeDFlags);
 }
 
 

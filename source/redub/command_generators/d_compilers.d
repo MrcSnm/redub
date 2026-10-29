@@ -5,7 +5,7 @@ import redub.tooling.compiler_identification;
 import redub.command_generators.ldc;
 import redub.building.cache;
 
-string[] parseBuildConfiguration(const BuildConfiguration b, CompilingSession s, string mainPackhash, bool isRoot)
+string[] parseBuildConfiguration(const BuildConfiguration b, CompilingSession s, string mainPackhash, bool isRoot, bool singleCall = false)
 {
     import redub.misc.path;
     string function(ValidDFlags) mapper = getFlagMapper(s.compiler.d);
@@ -66,7 +66,7 @@ string[] parseBuildConfiguration(const BuildConfiguration b, CompilingSession s,
 
         if(!b.syntaxOnly)
         {
-            if(targetType.isLinkedSeparately)
+            if(targetType.isLinkedSeparately && !singleCall)
                 cmds~= mapper(ValidDFlags.compileOnly);
             if(targetType.isStaticLibrary)
                 cmds~= mapper(ValidDFlags.buildAsLibrary);
@@ -76,7 +76,10 @@ string[] parseBuildConfiguration(const BuildConfiguration b, CompilingSession s,
 
             //Output path for libs must still be specified
             if(!b.outputsDeps || targetType.isStaticLibrary)
-                cmds~= mapper(ValidDFlags.outputFile) ~ buildNormalizedPath(cacheDir, getConfigurationOutputName(b, s.os)).escapePath;
+            {
+                string outputName = singleCall ? getOutputName(b, s.os) : getConfigurationOutputName(b, s.os);
+                cmds~= mapper(ValidDFlags.outputFile) ~ buildNormalizedPath(cacheDir, outputName).escapePath;
+            }
         }
 
         if(b.outputsDeps)

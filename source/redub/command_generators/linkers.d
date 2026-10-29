@@ -20,7 +20,7 @@ bool canEmitStartGroup(OS os, ISA isa, AcceptedLinker linker)
 }
 
 
-string[] parseLinkConfiguration(const ThreadBuildData data, CompilingSession s, string requirementCache)
+string[] parseLinkConfiguration(const ThreadBuildData data, CompilingSession s, string requirementCache, bool includeOutput = true, bool includeDFlags = true)
 {
     import redub.misc.path;
     import redub.building.cache;
@@ -35,7 +35,7 @@ string[] parseLinkConfiguration(const ThreadBuildData data, CompilingSession s, 
         {
             import redub.command_generators.d_compilers;
 
-            if (targetType.isLinkedSeparately)
+            if (includeOutput && targetType.isLinkedSeparately)
             {
                 string cacheDir = getCacheOutputDir(requirementCache, b, s, data.extra.isRoot);
                 string objExtension = getObjectExtension(s.os);
@@ -51,13 +51,14 @@ string[] parseLinkConfiguration(const ThreadBuildData data, CompilingSession s, 
                 else
                     cmds~= buildNormalizedPath(outputDirectory, targetName~objExtension).escapePath;
             }
-            if(c.isDCompiler)
+            if(c.isDCompiler && includeOutput)
             {
                 string arch = mapArch(c.compiler, b.arch);
                 if(arch)
                     cmds~= arch;
             }
-            cmds~= filterLinkFlags(b.dFlags);
+            if(includeDFlags)
+                cmds~= filterLinkFlags(b.dFlags);
         }
         if(targetType == TargetType.dynamicLibrary)
             cmds~= getTargetTypeFlag(targetType, c);
@@ -114,7 +115,7 @@ string[] parseLinkConfiguration(const ThreadBuildData data, CompilingSession s, 
     return cmds;
 }
 
-string[] parseLinkConfigurationCL(const ThreadBuildData data, CompilingSession s, string requirementCache)
+string[] parseLinkConfigurationCL(const ThreadBuildData data, CompilingSession s, string requirementCache, bool includeOutput = true, bool includeDFlags = true)
 {
     import redub.misc.path;
     import redub.building.cache;
@@ -124,7 +125,8 @@ string[] parseLinkConfigurationCL(const ThreadBuildData data, CompilingSession s
     with(b)
     {
         string cacheDir = getCacheOutputDir(requirementCache, b, s, data.extra.isRoot);
-        cmds~= "/OUT:"~buildNormalizedPath(cacheDir, getOutputName(b, s.os)).escapePath;
+        if(includeOutput)
+            cmds~= "/OUT:"~buildNormalizedPath(cacheDir, getOutputName(b, s.os)).escapePath;
         if(!s.compiler.usesIncremental)
             cmds~= "/INCREMENTAL:NO";
         if(targetType == TargetType.dynamicLibrary)
@@ -133,7 +135,8 @@ string[] parseLinkConfigurationCL(const ThreadBuildData data, CompilingSession s
         cmds = mapAppendReverse(cmds, data.extra.librariesFullPath,
             (string l) => (l~getLibraryExtension(s.os)).escapePath);
         cmds = mapAppendPrefix(cmds, libraryPaths, "/LIBPATH:", true);
-        putSourceFiles(cmds, null, [cacheDir], null, null, ".obj");
+        if(includeOutput)
+            putSourceFiles(cmds, null, [cacheDir], null, null, ".obj");
         cmds~= getLinkFiles(b.sourceFiles);
         cmds = mapAppend(cmds, libraries, (string l) => stripLibraryExtension(l)~".lib");
         cmds~= linkFlags;
@@ -141,7 +144,7 @@ string[] parseLinkConfigurationCL(const ThreadBuildData data, CompilingSession s
     return cmds;
 }
 
-string[] parseLinkConfigurationMSVC(const ThreadBuildData data, CompilingSession s, string requirementCache)
+string[] parseLinkConfigurationMSVC(const ThreadBuildData data, CompilingSession s, string requirementCache, bool includeOutput = true, bool includeDFlags = true)
 {
     import std.algorithm.iteration;
     import redub.misc.path;
@@ -154,20 +157,27 @@ string[] parseLinkConfigurationMSVC(const ThreadBuildData data, CompilingSession
     with(b)
     {
         string cacheDir = getCacheOutputDir(requirementCache, b, s, data.extra.isRoot);
-        cmds~= "-of"~buildNormalizedPath(cacheDir, getOutputName(b, s.os)).escapePath;
-        string objExtension = getObjectExtension(s.os);
-        if(b.outputsDeps)
-            putSourceFiles(cmds, null, [getObjectDir(cacheDir)], null, null, objExtension);
-        else
-            cmds~= buildNormalizedPath(outputDirectory, targetName~objExtension).escapePath;
+        if(includeOutput)
+        {
+            cmds~= "-of"~buildNormalizedPath(cacheDir, getOutputName(b, s.os)).escapePath;
+            string objExtension = getObjectExtension(s.os);
+            if(b.outputsDeps)
+                putSourceFiles(cmds, null, [getObjectDir(cacheDir)], null, null, objExtension);
+            else
+                cmds~= buildNormalizedPath(outputDirectory, targetName~objExtension).escapePath;
+        }
 
         if(c.isDCompiler)
         {
             import redub.command_generators.d_compilers;
-            string arch = mapArch(c.compiler, b.arch);
-            if(arch)
-                cmds~= arch;
-            cmds~= filterLinkFlags(b.dFlags);
+            if(includeOutput)
+            {
+                string arch = mapArch(c.compiler, b.arch);
+                if(arch)
+                    cmds~= arch;
+            }
+            if(includeDFlags)
+                cmds~= filterLinkFlags(b.dFlags);
         }
         if(!s.compiler.usesIncremental)
         {

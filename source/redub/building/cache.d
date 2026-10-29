@@ -165,13 +165,15 @@ CompilationCache[] cacheStatusForProject(ProjectNode root, CompilingSession s, o
  */
 void invalidateCaches(ProjectNode root, CompilingSession s, out AdvCacheFormula sharedFormula, out AdvCacheFormula preprocessed)
 {
+    import std.datetime.stopwatch;
+    import redub.logging;
+    StopWatch sw = StopWatch(AutoStart.yes);
     CompilationCache[] cacheStatus = cacheStatusForProject(root, s, sharedFormula);
     import std.algorithm.comparison: min;
     ptrdiff_t i = cacheStatus.length;
 
     string[64] dirtyFiles;
     size_t dirtyCount;
-    import redub.logging;
 
     foreach_reverse (ProjectNode n; root.collapse)
     {
@@ -187,6 +189,7 @@ void invalidateCaches(ProjectNode root, CompilingSession s, out AdvCacheFormula 
         if(cacheStatus[i].needsNewCopy(n.requirements, s, &preprocessed, dirtyFiles, dirtyCount))
             n.setCopyEnough(dirtyFiles[0..min(dirtyCount, 64)]);
     }
+    vvlog("Cache invalidation took ", sw.peek.total!"msecs", "ms");
 }
 
 ubyte[] hashFunction(const ubyte[] input, ref ubyte[8] output)
@@ -432,6 +435,12 @@ void updateCacheOnDisk(string rootCache, AdvCacheFormula* fullCache, const(AdvCa
     writeCacheFile(getCacheFilePath(rootCache), *cache);
 }
 
+
+///Loads the previous full formula so a forced build can still reuse file hashes.
+AdvCacheFormula loadExistingSharedFormula(ProjectNode root, CompilingSession s)
+{
+    return getCache(hashFrom(root.requirements, s)).fullFormula;
+}
 
 private __gshared CacheFileData[string] cacheFiles;
 private CacheFileData* getCache(string rootCache)

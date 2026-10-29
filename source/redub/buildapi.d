@@ -7,7 +7,7 @@ import redub.package_searching.api;
 
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.33.0";///
+enum RedubVersionOnly = "v1.33.1";///
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -1177,17 +1177,23 @@ class ProjectNode
         privatesToMerge.reserve(128);
         dependenciesToRemove.reserve(64);
 
-        static void mergeParentInDependencies(ProjectNode root)
+        static void mergeParentInDependencies(ProjectNode root, ref ProjectNodeDfs dfs)
         {
-            foreach(dep; root.dependencies)
+            dfs.reset(root);
+            while(!dfs.empty)
             {
-                dep.requirements.cfg = dep.requirements.cfg.mergeDFlags(root.requirements.cfg)
-                    .mergeVersions(root.requirements.cfg)
-                    .mergeDebugVersions(root.requirements.cfg)
-                    .mergeFlags(root.requirements.cfg);
+                ProjectNode node = dfs.top.node;
+                dfs.pop();
+                foreach(dep; node.dependencies)
+                {
+                    dep.requirements.cfg = dep.requirements.cfg.mergeDFlags(node.requirements.cfg)
+                        .mergeVersions(node.requirements.cfg)
+                        .mergeDebugVersions(node.requirements.cfg)
+                        .mergeFlags(node.requirements.cfg);
+                }
+                foreach_reverse(dep; node.dependencies)
+                    dfs.push(dep);
             }
-            foreach(dep; root.dependencies)
-                mergeParentInDependencies(dep);
         }
 
 
@@ -1212,49 +1218,57 @@ class ProjectNode
          *   removedOptionals = String container for printing later warnings
          *   removedNull = String container for printing later warnings regarding dependencies without source files
          */
-        static void transferDependenciesAndClearOptional(ProjectNode node, ref string[] removedOptionals, ref string[] removedNull, ref bool[string] anySourceCache)
+        static void transferDependenciesAndClearOptional(ProjectNode root, ref string[] removedOptionals, ref string[] removedNull, ref bool[string] anySourceCache, ref ProjectNodeDfs dfs)
         {
             ///Enters in the deepest node
             import redub.command_generators.commons;
             import std.string:endsWith;
-            for(int i = 0; i < node.dependencies.length; i++)
+            dfs.reset(root);
+            while(!dfs.empty)
             {
-                bool noSource = !hasAnySource(node.dependencies[i].requirements.cfg, anySourceCache);
-                bool transfersDependencies =
-                    node.dependencies[i].requirements.cfg.targetType == TargetType.none ||
-                    node.dependencies[i].requirements.cfg.targetType == TargetType.sourceLibrary;
-                ///init-exec is a special case that redub will filter.
-                if(node.dependencies[i].isOptional ||
-                    node.dependencies[i].name.endsWith("init-exec") ||
-                    (noSource && !transfersDependencies))
+                auto ref frame = dfs.top;
+                ProjectNode node = frame.node;
+                if(frame.nextChild < node.dependencies.length)
                 {
-                    if(node.dependencies[i].isOptional && hasLogLevel(LogLevel.warn))
-                        removedOptionals~= node.dependencies[i].name;
-                    else if(noSource && hasLogLevel(LogLevel.warn))
-                        removedNull~= node.dependencies[i].name;
-                    node.dependencies[i].becomeIndependent();
-                    i--;
+                    ProjectNode child = node.dependencies[frame.nextChild];
+                    bool noSource = !hasAnySource(child.requirements.cfg, anySourceCache);
+                    bool transfersDependencies =
+                        child.requirements.cfg.targetType == TargetType.none ||
+                        child.requirements.cfg.targetType == TargetType.sourceLibrary;
+                    ///init-exec is a special case that redub will filter.
+                    if(child.isOptional ||
+                        child.name.endsWith("init-exec") ||
+                        (noSource && !transfersDependencies))
+                    {
+                        if(child.isOptional && hasLogLevel(LogLevel.warn))
+                            removedOptionals~= child.name;
+                        else if(noSource && hasLogLevel(LogLevel.warn))
+                            removedNull~= child.name;
+                        child.becomeIndependent();
+                        continue;
+                    }
+                    frame.nextChild = frame.nextChild + 1;
+                    dfs.push(child);
                     continue;
                 }
-                transferDependenciesAndClearOptional(node.dependencies[i], removedOptionals, removedNull, anySourceCache);
-            }
-            ///If the node is none or sourceLibrary, transfer all of its dependencies to all of its parents
-            bool shouldTransfer = (node.requirements.cfg.targetType == TargetType.none && !node.isRoot) || node.requirements.cfg.targetType == TargetType.sourceLibrary;
-            if(shouldTransfer)
-            {
-                for(int i = 0; i < node.parent.length; i++)
+                ///If the node is none or sourceLibrary, transfer all of its dependencies to all of its parents
+                bool shouldTransfer = (node.requirements.cfg.targetType == TargetType.none && !node.isRoot) || node.requirements.cfg.targetType == TargetType.sourceLibrary;
+                if(shouldTransfer)
                 {
-                    ProjectNode p = node.parent[i];
-                    foreach(dep; node.dependencies)
-                        p.addDependency(dep);
+                    for(int i = 0; i < node.parent.length; i++)
+                    {
+                        ProjectNode p = node.parent[i];
+                        foreach(dep; node.dependencies)
+                            p.addDependency(dep);
+                    }
+                    node.dependencies = null;
+
+                    ///Node is only independent when == none. It can't be independent on sourceLibrary since it needs to transfer its build commands.
+                    if(node.requirements.cfg.targetType == TargetType.none)
+                        node.becomeIndependent();
                 }
-                node.dependencies = null;
-
-                ///Node is only independent when == none. It can't be independent on sourceLibrary since it needs to transfer its build commands.
-                if(node.requirements.cfg.targetType == TargetType.none)
-                    node.becomeIndependent();
+                dfs.pop();
             }
-
         }
 
         static void finishSelfRequirements(ProjectNode node, OS targetOS, ISA isa)
@@ -1342,30 +1356,43 @@ class ProjectNode
             }
         }
 
-        static void finishPublic(ProjectNode node, ref bool[ProjectNode] visited, ref bool[ProjectNode] linkPropagated, ref ProjectNode[] privatesToMerge, ref ProjectNode[] dependenciesToRemove, OS targetOS, ISA isa)
+        static void finishPublic(ProjectNode root, ref bool[ProjectNode] visited, ref bool[ProjectNode] linkPropagated, ref ProjectNode[] privatesToMerge, ref ProjectNode[] dependenciesToRemove, OS targetOS, ISA isa, ref ProjectNodeDfs dfs)
         {
-            if(node in visited) return;
-            ///Enters in the deepest node
-            for(int i = 0; i < node.dependencies.length; i++)
+            dfs.reset(root);
+            while(!dfs.empty)
             {
-                ProjectNode dep = node.dependencies[i];
-                if(!(node in visited))
-                    finishPublic(dep, visited, linkPropagated, privatesToMerge, dependenciesToRemove, targetOS, isa);
+                auto ref frame = dfs.top;
+                ProjectNode node = frame.node;
+                if(node in visited)
+                {
+                    dfs.pop();
+                    continue;
+                }
+                ///Enters in the deepest node
+                if(frame.nextChild < node.dependencies.length)
+                {
+                    ProjectNode dep = node.dependencies[frame.nextChild];
+                    frame.nextChild = frame.nextChild + 1;
+                    if(!(dep in visited))
+                        dfs.push(dep);
+                    continue;
+                }
+                ///Finish defining its self requirements so they can be transferred to its parents
+                finishSelfRequirements(node, targetOS, isa);
+                ///If this has a private relationship, no merge occurs with parent.
+                for(int i = 0; i < node.parent.length; i++)
+                {
+                    ProjectNode p = node.parent[i];
+                    if(!hasPrivateRelationship(p, node))
+                       finishMerging(p, node, linkPropagated);
+                    else
+                        privatesToMerge~= [p, node];
+                }
+                visited[node] = true;
+                if(node.requirements.cfg.targetType == TargetType.sourceLibrary || (node.requirements.cfg.targetType == TargetType.none && !node.isRoot))
+                    dependenciesToRemove~= node;
+                dfs.pop();
             }
-            ///Finish defining its self requirements so they can be transferred to its parents
-            finishSelfRequirements(node, targetOS, isa);
-            ///If this has a private relationship, no merge occurs with parent.
-            for(int i = 0; i < node.parent.length; i++)
-            {
-                ProjectNode p = node.parent[i];
-                if(!hasPrivateRelationship(p, node))
-                   finishMerging(p, node, linkPropagated);
-                else
-                    privatesToMerge~= [p, node];
-            }
-            visited[node] = true;
-            if(node.requirements.cfg.targetType == TargetType.sourceLibrary || (node.requirements.cfg.targetType == TargetType.none && !node.isRoot))
-                dependenciesToRemove~= node;
         }
         static void finishPrivate(ProjectNode[] privatesToMerge, ProjectNode[] dependenciesToRemove, ref bool[ProjectNode] linkPropagated)
         {
@@ -1387,17 +1414,18 @@ class ProjectNode
         string[] removedOptionals;
         string[] removedNull;
         bool[string] anySourceCache;
-        transferDependenciesAndClearOptional(this, removedOptionals, removedNull, anySourceCache);
+        ProjectNodeDfs dfs;
+        transferDependenciesAndClearOptional(this, removedOptionals, removedNull, anySourceCache, dfs);
         inLogLevel(LogLevel.vverbose, vvlog("transferDependenciesAndClearOptional finished at ", sw.peek.total!"msecs", "ms"));
 
-        mergeParentInDependencies(this);
+        mergeParentInDependencies(this, dfs);
         inLogLevel(LogLevel.vverbose, vvlog("mergeParentInDependencies finished at ", sw.peek.total!"msecs", "ms"));
 
         if(removedOptionals.length)
             warn("Optional Dependencies ", removedOptionals, " not included since they weren't requested as non optional from other places.");
         if(removedNull.length)
             warn("Dependencies ", removedNull, " not included since they didn't have any source file to build.");
-        finishPublic(this, visitedBuffer, linkPropagatedBuffer, privatesToMerge, dependenciesToRemove, targetOS, isa);
+        finishPublic(this, visitedBuffer, linkPropagatedBuffer, privatesToMerge, dependenciesToRemove, targetOS, isa, dfs);
         inLogLevel(LogLevel.vverbose, vvlog("finishPublic finished at ", sw.peek.total!"msecs", "ms"));
 
         finishPrivate(privatesToMerge, dependenciesToRemove, linkPropagatedBuffer);
@@ -1599,6 +1627,35 @@ class ProjectNode
         }
         this.requirements.extra.librariesFullPath = null;
     }
+}
+
+/// Reusable explicit DFS stack. The backing array keeps its capacity between passes.
+struct ProjectNodeDfsFrame
+{
+    ProjectNode node;
+    size_t nextChild;
+}
+
+struct ProjectNodeDfs
+{
+    ProjectNodeDfsFrame[] frames;
+
+    void reset(ProjectNode root)
+    {
+        frames.length = 0;
+        push(root);
+    }
+
+    void push(ProjectNode node)
+    {
+        size_t index = frames.length;
+        frames.length = index + 1;
+        frames[index] = ProjectNodeDfsFrame(node, 0);
+    }
+
+    bool empty() const { return frames.length == 0; }
+    ref ProjectNodeDfsFrame top() { return frames[$ - 1]; }
+    void pop() { frames.length = frames.length - 1; }
 }
 
 void putLinkerFiles(const ProjectNode tree, out string[] dataContainer, OS os, ISA isa)

@@ -26,6 +26,7 @@ struct CompilationResult
     string message;
     size_t msNeeded;
     int status = 1;
+    bool linkedInCompilation;
     shared ProjectNode node;
     shared Pid pid;
 }
@@ -101,6 +102,23 @@ void execCompilationThread(immutable ThreadBuildData data, shared ProjectNode pa
     }
 }
 
+private bool canBuildInSingleCall(const ProjectNode node, CompilingSession s)
+{
+    if(!node.isRoot || node.dependencies.length != 0)
+        return false;
+    const BuildConfiguration cfg = node.requirements.cfg;
+    if(cfg.targetType != TargetType.executable || cfg.syntaxOnly || cfg.outputsDeps)
+        return false;
+    return isDCompiler(cfg.getCompiler(s.compiler));
+}
+
+private string[] getSingleCallFlags(const ThreadBuildData data, CompilingSession s, string mainPackHash)
+{
+    string[] flags = getCompilationFlags(data.cfg, s, mainPackHash, data.extra.isRoot, true);
+    flags ~= getLinkFlags(data, s, mainPackHash, false, false);
+    return flags;
+}
+
 CompilationResult execCompilation(immutable ThreadBuildData data, shared ProjectNode pack, CompilingSession info, HashPair hash, Tid owner, size_t id)
 {
     import std.file;
@@ -152,8 +170,34 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
             if(!pack.isCopyEnough)
             {
                 import std.concurrency;
+                bool singleCall = canBuildInSingleCall(cast()pack, info);
+                res.linkedInCompilation = singleCall;
+                string[] compilationFlags;
+                if(singleCall)
+                {
+                    ThreadBuildData singleCallData = ThreadBuildData(cfg, cast()data.extra, data.archiver, data.isRoot, data.isLeaf, data.env);
+                    compilationFlags = getSingleCallFlags(singleCallData, info, hash.rootHash);
+                }
+                else
+                    compilationFlags = getCompilationFlags(cfg, info, hash.rootHash, data.extra.isRoot);
+
+                if(singleCall && cfg.targetIcon.length)
+                {
+                    version(Windows)
+                    {
+                        import redub.misc.win_icon;
+                        string iconError;
+                        if(processIcon(cfg.targetIcon, iconError) is null)
+                        {
+                            res.status = 1;
+                            res.message = iconError;
+                            return res;
+                        }
+                    }
+                }
+
                 string cmdFile;
-                ProcessExec2 ex = execCompiler(cfg, compiler, getCompilationFlags(cfg, info, hash.rootHash, data.extra.isRoot), res.compilationCommand, data.isLeaf, cmdFile, data.env);
+                ProcessExec2 ex = execCompiler(cfg, compiler, compilationFlags, res.compilationCommand, data.isLeaf, cmdFile, data.env);
                 scope(exit)
                 {
                     if(cmdFile)
@@ -163,6 +207,22 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
                 if(owner != Tid.init)
                     owner.send(CompilationID(id), ProcessInfo(res.pid), CompilationResult.init);
                 ret = cast(ExecutionResult)finishCompilerExec(cfg, compiler, inDir, outDir, ex);
+
+                if(!ret.status && singleCall)
+                {
+                    version(Posix)
+                    {
+                        import redub.command_generators.commons;
+                        import redub.misc.make_file_executable;
+                        import redub.misc.path;
+                        string cacheExe = buildNormalizedPath(inDir, getOutputName(cfg, info.os));
+                        if(!makeFileExecutable(cacheExe) || !makeFileExecutable(outDir))
+                        {
+                            ret.status = 1;
+                            ret.output ~= "Could not make the output file executable";
+                        }
+                    }
+                }
             }
 
             if(!ret.status && !isDCompiler(c) && isStaticLibrary(data.cfg.targetType)) //Must call archiver when
@@ -620,7 +680,10 @@ private void buildSucceeded(ProjectNode node, CompilationResult res)
         string cfg = node.requirements.targetConfiguration ? (" ["~node.requirements.targetConfiguration~"]") : null;
         string ver = node.requirements.version_.length ? (" "~node.requirements.version_) : null;
 
-        infos("Built: ", node.name, ver, cfg, " - ", res.msNeeded, "ms");
+        if(res.linkedInCompilation)
+            infos("Built+Linked: ", node.name, ver, cfg, " - ", res.msNeeded, "ms");
+        else
+            infos("Built: ", node.name, ver, cfg, " - ", res.msNeeded, "ms");
         if(res.message.length)
             info(res.message.stripRight);
         vlog("\n\t", res.compilationCommand, " \n");
@@ -722,9 +785,11 @@ private void saveBuiltPackages(Range)(Range builtPackages, string mainPackHash, 
 
 private void saveFinishedBuilds(ProjNodeRange)(ProjNodeRange finishedProjects, string mainPackHash, CompilingSession s, AdvCacheFormula* formulaCache, const(AdvCacheFormula)* existingSharedFormula)
 {
+    import std.datetime.stopwatch;
     AdvCacheFormula cache;
     if(formulaCache != null)
         cache = *formulaCache;
+    StopWatch formulaSw = StopWatch(AutoStart.yes);
     foreach(ProjectNode node; finishedProjects)
     {
         bool hasAlreadyWrittenInCache = formulaCache != null && !node.requirements.cfg.targetType.isLinkedSeparately;
@@ -734,7 +799,10 @@ private void saveFinishedBuilds(ProjNodeRange)(ProjNodeRange finishedProjects, s
             updateCache(mainPackHash, CompilationCache.make(hashFrom(node.requirements, s), mainPackHash, node.requirements, s, existingSharedFormula, &cache));
         }
     }
+    auto formulaMs = formulaSw.peek.total!"msecs";
+    StopWatch writeSw = StopWatch(AutoStart.yes);
     updateCacheOnDisk(mainPackHash, &cache, existingSharedFormula);
+    vvlog("Cache formulas: ", formulaMs, "ms; cache write: ", writeSw.peek.total!"msecs", "ms");
 
     ///TODO: Start comparing current build time with the last one
 }
@@ -744,7 +812,7 @@ private bool doLink(ProjectDetails details, CompilingSession info, string mainPa
     ProjectNode root = details.tree;
     Compiler compiler = info.compiler;
     bool isUpToDate = root.isUpToDate;
-    bool shouldSkipLinking = isUpToDate || (!root.requirements.cfg.targetType.isLinkedSeparately);
+    bool shouldSkipLinking = isUpToDate || (!root.requirements.cfg.targetType.isLinkedSeparately) || canBuildInSingleCall(root, info);
 
     if(!shouldSkipLinking)
     {

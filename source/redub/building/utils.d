@@ -56,7 +56,9 @@ ProcessExec2 execCompiler(const BuildConfiguration cfg, Compiler compiler, strin
 auto finishCompilerExec(const BuildConfiguration cfg, Compiler compiler, string inputDir, string outDir, ProcessExec2 p)
 {
     import std.file;
+    import std.datetime.stopwatch;
     import redub.api;
+    import redub.logging;
     import std.path;
     import redub.tooling.compiler_identification;
     import redub.command_generators.commons;
@@ -68,7 +70,9 @@ auto finishCompilerExec(const BuildConfiguration cfg, Compiler compiler, string 
         //of there to the object directory
         if(cfg.outputsDeps && cfg.preservePath && cfg.getCompiler(compiler).compiler == AcceptedCompiler.dmd)
             moveGeneratedObjectFiles(cfg.sourcePaths, cfg.sourceFiles, cfg.excludeSourceFiles, getObjectDir(inputDir),getObjectExtension(os));
+        StopWatch sw = StopWatch(AutoStart.yes);
         copyDir(inputDir, dirName(outDir));
+        vvlog("Copy cache->output took ", sw.peek.total!"msecs", "ms");
     }
     return ret;
 }
