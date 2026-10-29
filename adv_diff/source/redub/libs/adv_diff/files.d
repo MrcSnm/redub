@@ -5,6 +5,7 @@
  */
 module redub.libs.adv_diff.files;
 public import hip.data.json;
+import redub.libs.adv_diff.win_dir_entries;
 import std.exception;
 import std.file;
 
@@ -269,9 +270,11 @@ struct AdvCacheFormula
 		import std.stdio;
 		try
 		{
+			string ioUrl = url;
+			version(Windows) if(url.length >= 248) ioUrl = extendedPath(url);
 			if(!isSimplified)
 			{
-				File f = File(url);
+				File f = File(ioUrl);
 				size_t fSize = f.size;
 				size_t bufferSize = fSize+url.length;
 				if(bufferSize > buffer.length)
@@ -282,7 +285,7 @@ struct AdvCacheFormula
 			}
 			else
 			{
-				DirEntry e = DirEntry(url);
+				DirEntry e = DirEntry(ioUrl);
 				long timeMod = e.timeLastModified.stdTime;
 				ulong size = e.size;
 
@@ -324,8 +327,8 @@ struct AdvCacheFormula
 		import std.file;
 		import std.array;
 		import std.stdio;
-		import redub.command_generators.commons;
 		AdvCacheFormula ret;
+		NameArena names;
 		ubyte[8] hashedContent;
 		ubyte[16] joinedHash;
 
@@ -349,18 +352,19 @@ struct AdvCacheFormula
 			if(!existingDir)
 			{
 				bool dirExists;
-				uint attr = getAttributesNothrow(dir, dirExists);
+				string attrDir = dir;
+				version(Windows) if(dir.length >= 248) attrDir = extendedPath(dir);
+				uint attr = getAttributesNothrow(attrDir, dirExists);
 				if(!dirExists || .isFileHidden(dir, attr))
 					continue;
 				enforce(.isDir(attr), "Path sent is not a directory: "~dir);
 			}
 
-			foreach(DirEntry e; dirEntries(dir, SpanMode.depth))
+			foreach(WinDirEntry e; winDirEntries(dir, SpanMode.depth, true))
             {
-				if(e.isDir || redub.command_generators.commons.isFileHidden(e) || !filterDir.shouldInclude(e.name)) continue;
-				///Move 1 since the last after length is a slash separator.
-				string fName = e.name[dir.length+1..$];
-				long time = e.timeLastModified.stdTime;
+				if(e.isDir || e.isHidden || !filterDir.shouldInclude(e.name)) continue;
+				string fName = e.relativeName;
+				long time = e.timeModified;
 				if(existingDir)
 				{
 					const(AdvFile)* existingFile = fName in existingDir.files;
@@ -368,7 +372,7 @@ struct AdvCacheFormula
 					{
 						if(existingFile.timeModified == time)
 						{
-							advDir.files[fName] = existingFile.dup;
+							advDir.files[names.add(fName)] = existingFile.dup;
 							joinedHash[0..8] = advDir.contentHash;
 							joinedHash[8..$] = existingFile.contentHash;
 							advDir.putContentHashInPlace(contentHasher(joinedHash, hashedContent)[0..8]);
@@ -377,7 +381,7 @@ struct AdvCacheFormula
 					}
 				}
 				if(!hashContent(e.name, fileBuffer, hashedContent, contentHasher, isSimplified || filterDir.useSimplifiedHashing)) continue;
-				advDir.files[fName] = AdvFile(time, hashedContent[0..8]);
+				advDir.files[names.add(fName)] = AdvFile(time, hashedContent[0..8]);
 				joinedHash[0..8] = advDir.contentHash;
 				joinedHash[8..$] = hashedContent;
 				advDir.putContentHashInPlace(contentHasher(joinedHash, hashedContent)[0..8]);
@@ -402,7 +406,9 @@ struct AdvCacheFormula
 			///May throw if it is a directory.
 			scope(failure) continue;
 
-			DirEntry e = DirEntry(file);
+			string ioFile = file;
+			version(Windows) if(file.length >= 248) ioFile = extendedPath(file);
+			DirEntry e = DirEntry(ioFile);
 			long time = e.timeLastModified.stdTime;
 
 			if(existing)

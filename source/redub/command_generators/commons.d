@@ -617,23 +617,50 @@ void putSourceFiles(
     }
     else
     {
-        foreach(path; paths)
-        DirEntryLoopDepth: foreach(DirEntry e; dirEntriesDepth(unescapePath(path), true))
+        version(Windows)
         {
-            foreach(exclusion; excludeFiles)
-                if(e.name.globMatch(exclusion))
-                {
-                    excludedCount++;
-                    continue DirEntryLoopDepth;
-                }
-            if(e.isDir)
-                continue;
-            foreach(ext; extensions)
+            import redub.misc.win_dir_entries;
+            foreach(path; paths)
+            DirEntryLoopDepth: foreach(WinDirEntry e; winDirEntries(unescapePath(path), SpanMode.depth, true, 1024, true))
             {
-                if(e.name.endsWith(ext))
+                foreach(exclusion; excludeFiles)
+                    if(e.name.globMatch(exclusion))
+                    {
+                        excludedCount++;
+                        continue DirEntryLoopDepth;
+                    }
+                if(e.isDir)
+                    continue;
+                foreach(ext; extensions)
                 {
-                    app~= escapePath(e.name);
-                    break;
+                    if(e.name.endsWith(ext))
+                    {
+                        app~= escapePath(e.name.idup);
+                        break;
+                    }
+                }
+            }
+        }
+        else
+        {
+            foreach(path; paths)
+            DirEntryLoopDepth: foreach(DirEntry e; dirEntriesDepth(unescapePath(path), true))
+            {
+                foreach(exclusion; excludeFiles)
+                    if(e.name.globMatch(exclusion))
+                    {
+                        excludedCount++;
+                        continue DirEntryLoopDepth;
+                    }
+                if(e.isDir)
+                    continue;
+                foreach(ext; extensions)
+                {
+                    if(e.name.endsWith(ext))
+                    {
+                        app~= escapePath(e.name);
+                        break;
+                    }
                 }
             }
         }
