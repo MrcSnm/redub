@@ -4,8 +4,8 @@ public import redub.libs.adv_diff.files;
 public import std.int128;
 import redub.api;
 import redub.buildapi;
+import redub.building.cache_binary;
 import std.path;
-import hip.data.json;
 
 // import std.json;
 import redub.command_generators.commons;
@@ -73,28 +73,31 @@ struct CompilationCache
      */
     static CompilationCache get(string rootHash, const BuildRequirements req, CompilingSession s, ref AdvCacheFormula sharedFormula)
     {
-        import std.exception;
-        JSONValue c = *getCache(rootHash);
+        CacheFileData* c = getCache(rootHash);
         string reqCache = req.extra.isRoot ? rootHash : hashFrom(req.cfg, s, false);
-        if (c.type != JSONType.array || c.hasErrorOccurred || c.array.length != 2 ||
-            c.array[0].type != JSONType.array || c.array[1].type != JSONType.object)
+
+        if (sharedFormula.isEmptyFormula)
         {
-            import redub.logging;
-            error("Cache is corrupted, regenerating...");
-            return CompilationCache(reqCache, rootHash);
+            if (c.fullFormula.isEmptyFormula)
+                return CompilationCache(reqCache, rootHash, AdvCacheFormula.init, AdvCacheFormula.init, sharedFormula);
+            sharedFormula = c.fullFormula;
         }
-        if(c.array[0].array.length == 3)
-        {
-            if(sharedFormula.isEmptyFormula)
-                sharedFormula = AdvCacheFormula.deserialize(c.array[0]);
-        }
-        else
-            return CompilationCache(reqCache, rootHash, AdvCacheFormula.init, AdvCacheFormula.init, sharedFormula);
-        JSONValue* targetCache = reqCache in c.array[1];
-        if (!targetCache || targetCache.type != JSONType.array || targetCache.array.length < 2)
+
+        CacheRequirementEntry* targetCache = reqCache in c.requirements;
+        if (!targetCache)
             return CompilationCache(reqCache, rootHash, AdvCacheFormula.init, AdvCacheFormula.init, sharedFormula);
 
-        return CompilationCache(reqCache, rootHash, AdvCacheFormula.deserializeSimple(targetCache.array[0], sharedFormula), AdvCacheFormula.deserializeSimple(targetCache.array[1], sharedFormula), sharedFormula);
+        import redub.logging;
+        try
+            return CompilationCache(reqCache, rootHash,
+                formulaFromSimple(targetCache.compileFormula, sharedFormula),
+                formulaFromSimple(targetCache.copyFormula, sharedFormula),
+                sharedFormula);
+        catch (Exception e)
+        {
+            error("Cache is corrupted, regenerating...");
+            return CompilationCache(reqCache, rootHash, AdvCacheFormula.init, AdvCacheFormula.init, sharedFormula);
+        }
     }
 
     /**
@@ -380,14 +383,11 @@ AdvCacheFormula getCopyCacheFormula(string mainPackHash, const BuildRequirements
 
 string[] updateCache(string rootCache, const CompilationCache cache)
 {
-    JSONValue* v = getCache(rootCache);
-    JSONValue compileFormula;
-    JSONValue copyFormula;
-    cache.formula.serializeSimple(compileFormula);
-    cache.copyFormula.serializeSimple(copyFormula);
-
-
-    v.array[1][cache.requirementCache] = JSONValue([compileFormula, copyFormula]);
+    CacheFileData* cacheFile = getCache(rootCache);
+    cacheFile.requirements[cache.requirementCache] = CacheRequirementEntry(
+        simpleFromFormula(cache.formula),
+        simpleFromFormula(cache.copyFormula)
+    );
     return null;
 }
 
@@ -399,13 +399,9 @@ string[] updateCache(string rootCache, const CompilationCache cache)
  */
 void updateCacheOnDisk(string rootCache, AdvCacheFormula* fullCache, const(AdvCacheFormula)* sharedFormula)
 {
-    static import std.file;
-    JSONValue fullCacheJson;
-    JSONValue* cache = getCache(rootCache);
+    CacheFileData* cache = getCache(rootCache);
     assert(fullCache !is null, "Full cache can't be null");
-    if(fullCache.isEmptyFormula)
-        fullCacheJson = cache.array[0];
-    else
+    if(!fullCache.isEmptyFormula)
     {
         ///Merge with the fullCache if they are different
         ///This is also a promise that it won't modify
@@ -422,25 +418,22 @@ void updateCacheOnDisk(string rootCache, AdvCacheFormula* fullCache, const(AdvCa
 
         //Full cache doesn't need to have a hash calculation because it will never be used.
         // fullCache.recalculateHash(&hashFunction);
-        fullCache.serialize(fullCacheJson);
+        cache.fullFormula = *fullCache;
     }
 
-
-    std.file.write(getCacheFilePath(rootCache),
-        JSONValue([fullCacheJson, cache.array[1]]).toString!true
-    );
+    writeCacheFile(getCacheFilePath(rootCache), *cache);
 }
 
 
-private __gshared JSONValue[string] cacheJson;
-private JSONValue* getCache(string rootCache)
+private __gshared CacheFileData[string] cacheFiles;
+private CacheFileData* getCache(string rootCache)
 {
     static import std.file;
     string folder = getCacheFolder;
     import redub.meta;
     import redub.logging;
 
-    if(cacheJson == cacheJson.init)
+    if(cacheFiles == cacheFiles.init)
     {
         ///Deletes the cache folder if the version is different from the current one.
         if(getExistingRedubVersion() != RedubVersionOnly && std.file.exists(folder))
@@ -454,28 +447,32 @@ private JSONValue* getCache(string rootCache)
 
     string file = getCacheFilePath(rootCache);
     if (!std.file.exists(file))
-        std.file.write(file, "[[], {}]");
+    {
+        CacheFileData empty;
+        writeCacheFile(file, empty);
+    }
 
-    if (!(rootCache in cacheJson))
+    if (!(rootCache in cacheFiles))
     {
         try
-            cacheJson[rootCache] = parseJSON(cast(string)std.file.read(file), true);
+            cacheFiles[rootCache] = readCacheFile(file);
         catch (Exception e)
         {
-            std.file.write(file, "[[], {}]");
-            cacheJson[rootCache] = JSONValue([JSONValue.emptyArray, JSONValue.emptyObject]);
+            CacheFileData empty;
+            writeCacheFile(file, empty);
+            cacheFiles[rootCache] = empty;
         }
     }
 
-    return &cacheJson[rootCache];
+    return &cacheFiles[rootCache];
 }
 
 /**
 *   Clears memory cache. This will allow to redub correctly identify files that changed in subsequent runs.
 */
-void clearJsonCompilationInfoCache()
+void clearCompilationInfoCache()
 {
-    cacheJson = null;
+    cacheFiles = null;
 }
 
 string getCacheFolder()
@@ -490,6 +487,6 @@ string getCacheFolder()
 string getCacheFilePath(string rootCache)
 {
     import redub.misc.path;
-    return redub.misc.path.buildNormalizedPath(getCacheFolder, rootCache ~ ".json");
+    return redub.misc.path.buildNormalizedPath(getCacheFolder, rootCache ~ ".bin");
 }
 

@@ -495,7 +495,7 @@ ProjectDetails buildProject(ProjectDetails d)
                 throw new RedubException(`Unsupported parallel type in this step.`);
         }
     });
-    clearJsonCompilationInfoCache();
+    clearCompilationInfoCache();
     clearBuildTypesCache();
     clearPackageCache();
     clearModifiedPATH();
