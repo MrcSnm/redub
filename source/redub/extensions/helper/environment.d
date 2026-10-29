@@ -38,44 +38,61 @@ void saveEnvVariables(string[2][] keyValues)
         Key HKCU = Registry.currentUser;
         Key redubKey = HKCU.createKey("Software\\Redub");
 
+        string[] pathValues;
+        string[] placeholders;
+        foreach(kv; keyValues)
+            if(kv[0].endsWith("PATH"))
+            {
+                pathValues ~= kv[1];
+                placeholders ~= "%"~kv[0]~"%";
+            }
+
         import std.stdio;
-        redubKey.setValue("ManagedEnvironment", newPathEntry);
+        ///Store both forms so uninstall can remove entries written by older versions too
+        redubKey.setValue("ManagedEnvironment", (placeholders ~ pathValues).join(pathSeparator));
         foreach(kv; keyValues)
             saveEnvVariable(kv[0], kv[1]);
 
         Key envKey = HKCU.getKey("Environment", REGSAM.KEY_READ | REGSAM.KEY_WRITE);
-        bool expandable;
         string pathEnv;
         try
-        {
-            Value pathValue = envKey.getValue("Path");
-            expandable = pathValue.type == REG_VALUE_TYPE.REG_EXPAND_SZ;
-            pathEnv = pathValue.value_SZ();
-        }
+            pathEnv = envKey.getValue("Path").value_SZ();
         catch(RegistryException e) {}
 
+        ///Path must be REG_EXPAND_SZ for the %REDUB_PATH% style entries to expand
         string[] currentPaths = pathEnv.split(pathSeparator);
-        string[] additions = newPathEntry.split(pathSeparator);
-        string[] toAdd;
-        foreach(add; additions)
+        string[] newPaths;
+        bool changed;
+        foreach(current; currentPaths)
+        {
+            if(!current.length)
+                continue;
+            string entry = current;
+            ///Migrate entries written as literal paths by older versions
+            foreach(i, value; pathValues)
+                if(toLower(current) == toLower(value))
+                    entry = placeholders[i];
+            if(entry != current)
+                changed = true;
+            newPaths ~= entry;
+        }
+        foreach(add; placeholders)
         {
             bool found;
-            foreach(current; currentPaths)
+            foreach(current; newPaths)
                 if(toLower(current) == toLower(add))
                 {
                     found = true;
                     break;
                 }
             if(!found && add.length)
-                toAdd~=add;
+            {
+                newPaths ~= add;
+                changed = true;
+            }
         }
-        if(toAdd.length)
-        {
-            string newPath = pathEnv.length
-                ? pathEnv~pathSeparator~toAdd.join(pathSeparator)
-                : toAdd.join(pathSeparator);
-            envKey.setValue("Path", newPath, expandable);
-        }
+        if(changed)
+            envKey.setValue("Path", newPaths.join(pathSeparator), true);
         notifySystemEnvUpdate();
     }
     else version(Posix)
