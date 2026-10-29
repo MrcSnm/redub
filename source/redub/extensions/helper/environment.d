@@ -43,10 +43,16 @@ void saveEnvVariables(string[2][] keyValues)
         foreach(kv; keyValues)
             saveEnvVariable(kv[0], kv[1]);
 
-        Key envKey = HKCU.getKey("Environment", REGSAM.KEY_WRITE);
-        Value pathValue = envKey.getValue("Path");
-        bool expandable = pathValue.type == REG_VALUE_TYPE.REG_EXPAND_SZ;
-        string pathEnv = pathValue.value_SZ();
+        Key envKey = HKCU.getKey("Environment", REGSAM.KEY_READ | REGSAM.KEY_WRITE);
+        bool expandable;
+        string pathEnv;
+        try
+        {
+            Value pathValue = envKey.getValue("Path");
+            expandable = pathValue.type == REG_VALUE_TYPE.REG_EXPAND_SZ;
+            pathEnv = pathValue.value_SZ();
+        }
+        catch(RegistryException e) {}
 
         string[] currentPaths = pathEnv.split(pathSeparator);
         string[] additions = newPathEntry.split(pathSeparator);
@@ -113,28 +119,31 @@ void deleteRedubEnvVariables()
         import std.algorithm;
         import redub.parsers.environment;
         Key HKCU = Registry.currentUser;
-        Key redubKey = HKCU.getKey("Software\\Redub");
         try
         {
-            import std.windows.registry;
             import std.string : split, toLower;
-            Key envKey = HKCU.getKey("Environment", REGSAM.KEY_WRITE);
-            Value appendedEnv = redubKey.getValue("ManagedEnvironment");
-            Value pathValue = envKey.getValue("Path");
-            bool expandable = pathValue.type == REG_VALUE_TYPE.REG_EXPAND_SZ;
-            string currPath = pathValue.value_SZ();
-
-            string[] existingPaths = appendedEnv.value_SZ.split(pathSeparator);
-            string[] currPaths = currPath.split(pathSeparator);
-            string[] result;
-            outer: foreach(p; currPaths)
+            Key envKey = HKCU.getKey("Environment", REGSAM.KEY_READ | REGSAM.KEY_WRITE);
+            try
             {
-                foreach(existing; existingPaths)
-                    if(toLower(p) == toLower(existing))
-                        continue outer;
-                result~= p;
+                Key redubKey = HKCU.getKey("Software\\Redub");
+                Value appendedEnv = redubKey.getValue("ManagedEnvironment");
+                Value pathValue = envKey.getValue("Path");
+                bool expandable = pathValue.type == REG_VALUE_TYPE.REG_EXPAND_SZ;
+                string currPath = pathValue.value_SZ();
+
+                string[] existingPaths = appendedEnv.value_SZ.split(pathSeparator);
+                string[] currPaths = currPath.split(pathSeparator);
+                string[] result;
+                outer: foreach(p; currPaths)
+                {
+                    foreach(existing; existingPaths)
+                        if(toLower(p) == toLower(existing))
+                            continue outer;
+                    result~= p;
+                }
+                envKey.setValue("Path", result.join(pathSeparator), expandable);
             }
-            envKey.setValue("Path", result.join(pathSeparator), expandable);
+            catch(Exception e) {}
             foreach(variable; ["REDUB_PATH", "REDUB_LDC_PATH", "REDUB_LDC", "REDUB_DMD_PATH", "REDUB_DMD"])
             {
                 try envKey.deleteValue(variable);

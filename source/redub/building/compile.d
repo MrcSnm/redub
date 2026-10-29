@@ -167,10 +167,11 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
             createOutputDirFolder(cfg);
 
             ExecutionResult ret;
+            bool singleCall;
             if(!pack.isCopyEnough)
             {
                 import std.concurrency;
-                bool singleCall = canBuildInSingleCall(cast()pack, info);
+                singleCall = canBuildInSingleCall(cast()pack, info);
                 res.linkedInCompilation = singleCall;
                 string[] compilationFlags;
                 if(singleCall)
@@ -207,23 +208,6 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
                 if(owner != Tid.init)
                     owner.send(CompilationID(id), ProcessInfo(res.pid), CompilationResult.init);
                 ret = cast(ExecutionResult)finishCompilerExec(cfg, compiler, inDir, outDir, ex);
-
-                if(!ret.status && singleCall)
-                {
-                    version(Posix)
-                    {
-                        import redub.command_generators.commons;
-                        import redub.misc.make_file_executable;
-                        import redub.misc.path;
-                        string cacheExe = buildNormalizedPath(inDir, getOutputName(cfg, info.os));
-                        string outputExe = buildNormalizedPath(cfg.outputDirectory, getOutputName(cfg, info.os));
-                        if(!makeFileExecutable(cacheExe) || !makeFileExecutable(outputExe))
-                        {
-                            ret.status = 1;
-                            ret.output ~= "Could not make the output file executable";
-                        }
-                    }
-                }
             }
 
             if(!ret.status && !isDCompiler(c) && isStaticLibrary(data.cfg.targetType)) //Must call archiver when
@@ -237,6 +221,23 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
 
             if(!ret.status && !data.cfg.syntaxOnly)
                 copyDir(inDir, dirName(outDir));
+
+            if(!ret.status && singleCall)
+            {
+                version(Posix)
+                {
+                    import redub.command_generators.commons;
+                    import redub.misc.make_file_executable;
+                    import redub.misc.path;
+                    string cacheExe = buildNormalizedPath(inDir, getOutputName(cfg, info.os));
+                    string outputExe = buildNormalizedPath(dirName(outDir), getOutputName(cfg, info.os));
+                    if(!makeFileExecutable(cacheExe) || !makeFileExecutable(outputExe))
+                    {
+                        ret.status = 1;
+                        ret.output ~= "Could not make the output file executable";
+                    }
+                }
+            }
 
             ///Shared Library(mostly?)
             if(!ret.status && isDCompiler(c) && isLinkedSeparately(data.cfg.targetType) && !pack.isRoot && !data.cfg.syntaxOnly)
