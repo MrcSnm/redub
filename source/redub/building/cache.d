@@ -161,13 +161,13 @@ CompilationCache[] cacheStatusForProject(ProjectNode root, CompilingSession s, o
  *   root = Project root for traversing
  *   s = The session on which the cache should be invalidated
  *   sharedFormula = Used later for not needing to recalculate hash from files which didn't change.
+ *   preprocessed = Source/import directories already scanned during invalidation, reused by the build.
  */
-void invalidateCaches(ProjectNode root, CompilingSession s, out AdvCacheFormula sharedFormula)
+void invalidateCaches(ProjectNode root, CompilingSession s, out AdvCacheFormula sharedFormula, out AdvCacheFormula preprocessed)
 {
     CompilationCache[] cacheStatus = cacheStatusForProject(root, s, sharedFormula);
     import std.algorithm.comparison: min;
     ptrdiff_t i = cacheStatus.length;
-    AdvCacheFormula preprocessed;
 
     string[64] dirtyFiles;
     size_t dirtyCount;
@@ -315,6 +315,11 @@ AdvCacheFormula getCompilationCacheFormula(const BuildRequirements req, string m
             sourcePaths~= path;
     }
 
+    ///Output directories change during the build, so they must be rescanned instead of reused.
+    if(preprocessed !is null)
+        foreach(dir; dirs)
+            preprocessed.directories.remove(dir);
+
     return AdvCacheFormula.make(
         &hashFunction,
         [
@@ -330,7 +335,9 @@ AdvCacheFormula getCompilationCacheFormula(const BuildRequirements req, string m
             req.cfg.targetIcon
         ]),
         existing,
-        preprocessed
+        preprocessed,
+        false,
+        false
     );
 }
 
@@ -377,7 +384,8 @@ AdvCacheFormula getCopyCacheFormula(string mainPackHash, const BuildRequirements
         joiner([getExpectedArtifacts(req, s.os, s.isa), extraRequirements]),
         existing,
         preprocessed,
-        true
+        true,
+        false
     );
 }
 

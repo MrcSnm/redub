@@ -272,7 +272,7 @@ bool executeCommandsAndPrint(BuildRequirements req, RedubCommands phase, const s
 }
 
 
-bool buildProjectParallelSimple(ProjectDetails details, CompilingSession s, const(AdvCacheFormula)* existingSharedFormula)
+bool buildProjectParallelSimple(ProjectDetails details, CompilingSession s, const(AdvCacheFormula)* existingSharedFormula, AdvCacheFormula* preprocessed)
 {
     import std.concurrency;
     ProjectNode root = details.tree;
@@ -283,7 +283,7 @@ bool buildProjectParallelSimple(ProjectDetails details, CompilingSession s, cons
     string[string] env = getCurrentEnv();
     size_t execID = buildExecutions++;
 
-    AdvCacheFormula formulaCache;
+    AdvCacheFormula formulaCache = preprocessed !is null ? *preprocessed : AdvCacheFormula.init;
 
     printCachedBuildInfo(root);
     while(true)
@@ -392,7 +392,7 @@ private void killRunningProcesses()
     }
     runningProcesses.clear();
 }
-bool buildProjectFullyParallelized(ProjectDetails details, CompilingSession s, const(AdvCacheFormula)* existingSharedFormula)
+bool buildProjectFullyParallelized(ProjectDetails details, CompilingSession s, const(AdvCacheFormula)* existingSharedFormula, AdvCacheFormula* preprocessed)
 {
     import std.concurrency;
     ProjectNode[] finishedBuilds;
@@ -428,7 +428,7 @@ bool buildProjectFullyParallelized(ProjectDetails details, CompilingSession s, c
         i++;
     }
     printCachedBuildInfo(root);
-    AdvCacheFormula formulaCache;
+    AdvCacheFormula formulaCache = preprocessed !is null ? *preprocessed : AdvCacheFormula.init;
 
     ProjectNode failedPackage;
     CompilationResult failedRes;
@@ -524,14 +524,14 @@ bool buildProjectFullyParallelized(ProjectDetails details, CompilingSession s, c
  *   existingSharedFormula = Reuses the hash of existing calculations if files haven't changed
  * Returns: Has succeeded
  */
-bool buildProjectSingleThread(ProjectDetails details, CompilingSession s, const(AdvCacheFormula)* existingSharedFormula)
+bool buildProjectSingleThread(ProjectDetails details, CompilingSession s, const(AdvCacheFormula)* existingSharedFormula, AdvCacheFormula* preprocessed)
 {
     ProjectNode root = details.tree;
     ProjectNode[] dependencyFreePackages = root.findLeavesNodes();
     ProjectNode[] finishedBuilds;
     string mainPackHash = hashFrom(root.requirements, s);
     string[string] env = getCurrentEnv();
-
+    AdvCacheFormula formulaCache = preprocessed !is null ? *preprocessed : AdvCacheFormula.init;
 
     printCachedBuildInfo(root);
     while(true)
@@ -541,7 +541,7 @@ bool buildProjectSingleThread(ProjectDetails details, CompilingSession s, const(
         {
             if(!executeCommandsAndPrint(dep.requirements, RedubCommands.postGenerate, env))
             {
-                saveBuiltPackages(finishedBuilds, mainPackHash, s, null, existingSharedFormula);
+                saveBuiltPackages(finishedBuilds, mainPackHash, s, &formulaCache, existingSharedFormula);
                 return false;
             }
             if(dep.shouldEnterCompilationThread)
@@ -552,7 +552,7 @@ bool buildProjectSingleThread(ProjectDetails details, CompilingSession s, const(
                 );
                 if(res.status)
                 {
-                    buildFailed(dep, res, s, finishedBuilds, mainPackHash, null, existingSharedFormula);
+                    buildFailed(dep, res, s, finishedBuilds, mainPackHash, &formulaCache, existingSharedFormula);
                     return false;
                 }
                 else
@@ -560,6 +560,11 @@ bool buildProjectSingleThread(ProjectDetails details, CompilingSession s, const(
                     finishedBuilds~= dep;
                     buildSucceeded(dep, res);
                 }
+            }
+            if(!dep.isUpToDate && !dep.requirements.cfg.targetType.isLinkedSeparately)
+            {
+                string reqHash = hashFrom(dep.requirements, s);
+                updateCache(mainPackHash, CompilationCache.make(reqHash, mainPackHash, dep.requirements, s, existingSharedFormula, &formulaCache));
             }
             finishedPackage = dep;
             finishedPackage.becomeIndependent();
@@ -571,7 +576,7 @@ bool buildProjectSingleThread(ProjectDetails details, CompilingSession s, const(
     runningProcesses.clear();
     if(root.requirements.cfg.syntaxOnly)
         return true;
-    return doLink(details, s, mainPackHash, null, env, existingSharedFormula) && copyFiles(root);
+    return doLink(details, s, mainPackHash, &formulaCache, env, existingSharedFormula) && copyFiles(root);
 }
 
 private void printCachedBuildInfo(ProjectNode root)

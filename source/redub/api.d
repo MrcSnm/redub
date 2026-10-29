@@ -425,7 +425,8 @@ bool isProjectUpToDate(ProjectDetails d)
 {
     import redub.building.cache;
     AdvCacheFormula sharedFormula;
-    invalidateCaches(d.tree, CompilingSession(d.compiler, d.cDetails.arch), sharedFormula);
+    AdvCacheFormula preprocessed;
+    invalidateCaches(d.tree, CompilingSession(d.compiler, d.cDetails.arch), sharedFormula, preprocessed);
     return d.tree.isUpToDate;
 }
 
@@ -445,6 +446,7 @@ ProjectDetails buildProject(ProjectDetails d)
     CompilingSession session = CompilingSession(d.compiler, d.cDetails.arch);
 
     AdvCacheFormula sharedFormula;
+    AdvCacheFormula preprocessed;
     if(d.forceRebuild)
     {
         if(!cleanProject(d, false))
@@ -452,7 +454,10 @@ ProjectDetails buildProject(ProjectDetails d)
         d.tree.invalidateCacheOnTree();
     }
     else
-        invalidateCaches(d.tree,session, sharedFormula);
+        invalidateCaches(d.tree,session, sharedFormula, preprocessed);
+    ///Top-level files and output artifacts may change during the build, so only
+    ///the already scanned source/import directories are reused.
+    preprocessed.files = null;
     ProjectNode tree = d.tree;
     if(d.bCreateSelections)
         createSelectionsFile(tree);
@@ -486,11 +491,11 @@ ProjectDetails buildProject(ProjectDetails d)
         switch(inferParallel(d))
         {
             case ParallelType.full:
-                return buildProjectFullyParallelized(d, session, &sharedFormula);
+                return buildProjectFullyParallelized(d, session, &sharedFormula, &preprocessed);
             case ParallelType.leaves:
-                return buildProjectParallelSimple(d, session, &sharedFormula);
+                return buildProjectParallelSimple(d, session, &sharedFormula, &preprocessed);
             case ParallelType.no:
-                return buildProjectSingleThread(d, session, &sharedFormula);
+                return buildProjectSingleThread(d, session, &sharedFormula, &preprocessed);
             default:
                 throw new RedubException(`Unsupported parallel type in this step.`);
         }

@@ -1,6 +1,7 @@
 module redub.parsers.adapter.json_cache;
 public import hip.data.json;
-
+import core.sync.mutex;
+private Mutex jsonCacheMutex;
 private __gshared JSONValue[string] jsonCache;
 
 /**
@@ -10,6 +11,11 @@ private __gshared JSONValue[string] jsonCache;
  */
 JSONValue parseJSONCached(string filePath)
 {
+    synchronized(jsonCacheMutex)
+    {
+        JSONValue* cached = filePath in jsonCache;
+        if(cached) return *cached;
+    }
     import std.file;
     return parseJSONCached(filePath, std.file.readText(filePath));
 }
@@ -22,7 +28,7 @@ JSONValue parseJSONCached(string filePath)
  */
 JSONValue parseJSONCached(string filePath, string fileData)
 {
-    synchronized
+    synchronized(jsonCacheMutex)
     {
         JSONValue* cached = filePath in jsonCache;
         if(cached) return *cached;
@@ -41,4 +47,9 @@ JSONValue parseJSONCached(string filePath, string fileData)
 public void clearJsonCache()
 {
     jsonCache = null;
+}
+
+shared static this()
+{
+    jsonCacheMutex = new Mutex();
 }

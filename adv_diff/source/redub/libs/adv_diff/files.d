@@ -130,10 +130,17 @@ struct DirectoriesWithFilter
 	///Uses the simplified hashing whenever inside that dir. May be used on directories with bigger files
 	bool useSimplifiedHashing;
 
+	private bool[string] ignoreSet;
+	private bool ignoreSetBuilt;
+
 	pragma(inline, true) bool shouldInclude(string target)
 	{
-		import redub.libs.adv_diff.helpers.index_of;
-		return filterType.shouldIncludeByExt(target) && indexOf(ignoreFiles, target) == -1;
+		if(!ignoreSetBuilt)
+		{
+			foreach(file; ignoreFiles) ignoreSet[cast(string)file] = true;
+			ignoreSetBuilt = true;
+		}
+		return filterType.shouldIncludeByExt(target) && !(target in ignoreSet);
 	}
 }
 
@@ -310,7 +317,8 @@ struct AdvCacheFormula
 		FileRange files,
 		const(AdvCacheFormula)* existing = null,
 		AdvCacheFormula* cacheHolder = null,
-		bool isSimplified = false
+		bool isSimplified = false,
+		bool reuseFilesInHolder = true
 	)
 	{
 		import std.file;
@@ -382,7 +390,7 @@ struct AdvCacheFormula
 		foreach(file; files)
         {
 			//Check if the file was read already for taking the time it was modified.
-			if(cacheHolder !is null)
+			if(cacheHolder !is null && reuseFilesInHolder)
 			{
 				AdvFile* fileInCache = file in cacheHolder.files;
 				if(fileInCache)
