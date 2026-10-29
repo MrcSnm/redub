@@ -7,7 +7,7 @@ import redub.package_searching.api;
 
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.32.10";
+enum RedubVersionOnly = "v1.33.0";///
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -502,6 +502,7 @@ struct BuildConfiguration
             ret.sourcePaths.exclusiveMergePaths(other.sourcePaths);
             ret.extraDependencyFiles.exclusiveMergePaths(other.extraDependencyFiles);
         }
+        ret.excludeSourceFiles.exclusiveMerge(other.excludeSourceFiles);
         ret.stringImportPaths.exclusiveMergePaths(other.stringImportPaths);
         ret.importDirectories.exclusiveMergePaths(other.importDirectories);
         ret.versions.exclusiveMerge(other.versions);
@@ -547,6 +548,7 @@ struct BuildConfiguration
     {
         BuildConfiguration ret = clone;
         ret.importDirectories.exclusiveMergePaths(other.importDirectories);
+        ret.excludeSourceFiles.exclusiveMerge(other.excludeSourceFiles);
         return ret;
     }
     BuildConfiguration mergeStringImport(const ref BuildConfiguration other) const

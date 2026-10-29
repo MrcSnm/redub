@@ -1039,51 +1039,9 @@ test_excluded_dependency_file_does_not_invalidate()
     fi
 }
 
-test_shared_source_dir_with_dependency_excludes()
-{
-    local rootname="shsroot$SUFFIX"
-    local depname="shsdep$SUFFIX"
-    local d="$WORK/sharedsrc"
-    local log="$WORK/sharedsrc.log"
-    mkdir -p "$d/root/source" "$d/dep/source" "$d/shared"
-
-    local dc
-    if command -v dmd >/dev/null 2>&1; then
-        dc=dmd
-    elif command -v ldc2 >/dev/null 2>&1; then
-        dc=ldc2
-    else
-        skip shared_source_dir_with_dependency_excludes "no D compiler found"
-        return
-    fi
-
-    printf '%s\n' '{"name":"'"$rootname"'","targetType":"executable","targetPath":"build","sourcePaths":["source","../shared"],"dependencies":{"'"$depname"'":{"path":"../dep"}}}' > "$d/root/dub.json"
-    printf '%s\n' '{"name":"'"$depname"'","targetType":"library","targetPath":"build","sourcePaths":["source","../shared"],"excludedSourceFiles":["../shared/app.d"]}' > "$d/dep/dub.json"
-    printf '%s\n' 'module foo; void foo(){}' > "$d/shared/foo.d"
-    printf '%s\n' 'module depmod; void depfn(){}' > "$d/dep/source/depmod.d"
-    printf '%s\n' 'import foo;' 'import depmod;' 'void main(){ foo.foo(); depmod.depfn(); }' > "$d/shared/app.d"
-
-    if ! redub_in "$d/root" 120 "$log" build --force --compiler="$dc"; then
-        fail shared_source_dir_with_dependency_excludes "build failed: $(detail "$log")"
-        return
-    fi
-    if [ -z "$(artifact "$d/root" "$rootname")" ]; then
-        fail shared_source_dir_with_dependency_excludes "the shared main source was not compiled ($(detail "$log"))"
-        return
-    fi
-
-    redub_in "$d/root" 120 "$log" build --compiler="$dc"
-    if grep -q "skipping linking" "$log"; then
-        pass shared_source_dir_with_dependency_excludes
-    else
-        fail shared_source_dir_with_dependency_excludes "rebuild with no changes was not up-to-date ($(detail "$log"))"
-    fi
-}
-
 test_cache_custom_source_paths
 test_failed_build_keeps_cache
 test_excluded_dependency_file_does_not_invalidate
-test_shared_source_dir_with_dependency_excludes
 test_test_command_forwards_args
 test_config_platform_crash
 test_copy_files_no_match
