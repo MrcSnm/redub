@@ -213,7 +213,7 @@ string getTargetTypeFlag(TargetType o, CompilerBinary compiler)
 
     switch(compiler.compiler) with(AcceptedCompiler)
     {
-        case dmd, ldc2: return redub.command_generators.d_compilers.getTargetTypeFlag(o, compiler);
+        case dmd, ldc2, nmc: return redub.command_generators.d_compilers.getTargetTypeFlag(o, compiler);
         case gcc, gxx: return redub.command_generators.gnu_based.getTargetTypeFlag(o);
         case clang: return redub.command_generators.clang.getTargetTypeFlag(o);
         default: throw new Exception("Unsupported compiler "~compiler.bin);
