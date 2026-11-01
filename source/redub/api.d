@@ -537,9 +537,18 @@ private bool autoPrefersObjects(BuildConfiguration cfg, Compiler compiler, Compi
         string[] sourceDirs = cfg.sourceFiles.length ? null : cfg.sourcePaths;
         SourceImportGraph graph = parseSourceImportGraph(sourceDirs, cfg.sourceFiles,
             cfg.excludeSourceFiles, ctx, true);
+        ///Without trustworthy imports the object mode must rebuild every
+        ///module, which the single compiler run already does faster.
+        if(graph.skippedFiles.length)
+            return false;
         size_t weight;
         foreach(name; graph.compileOrder)
-            weight += graph.byName[name].compileWeight;
+        {
+            auto mod = graph.byName[name];
+            if(mod.isImportRisk || mod.hasUnresolvedStringMixins)
+                return false;
+            weight += mod.compileWeight;
+        }
         return graph.modules.length >= AUTO_MIN_MODULES
             && weight >= AUTO_MIN_COMPILE_WEIGHT;
     }

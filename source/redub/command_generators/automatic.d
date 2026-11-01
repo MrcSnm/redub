@@ -42,7 +42,8 @@ string[] getCompilationFlags(const BuildConfiguration cfg, CompilingSession s, s
             return redub.command_generators.dmd.parseBuildConfiguration(cfg, s, mainPackHash, isRoot, singleCall,
                 moduleObject, moduleSource);
         case ldc2:
-            return redub.command_generators.ldc.parseBuildConfiguration(cfg, s, mainPackHash, isRoot, singleCall);
+            return redub.command_generators.ldc.parseBuildConfiguration(cfg, s, mainPackHash, isRoot, singleCall,
+                moduleObject, moduleSource);
         case nmc:
             // TODO: Create custom generator for nmc
             return redub.command_generators.ldc.parseBuildConfiguration(cfg, s, mainPackHash, isRoot, singleCall,
