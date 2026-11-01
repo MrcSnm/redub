@@ -24,7 +24,8 @@ string escapeCompilationCommands(string compilerBin, string[] flags)
  *   isRoot = Whether this is the root package
  * Returns: The compilation commands those arguments generates
  */
-string[] getCompilationFlags(const BuildConfiguration cfg, CompilingSession s, string mainPackHash, bool isRoot, bool singleCall = false)
+string[] getCompilationFlags(const BuildConfiguration cfg, CompilingSession s, string mainPackHash, bool isRoot, bool singleCall = false,
+    string moduleObject = null, string moduleSource = null)
 {
     import redub.command_generators.commons;
     switch(cfg.getCompiler(s.compiler).compiler) with(AcceptedCompiler)
@@ -38,12 +39,14 @@ string[] getCompilationFlags(const BuildConfiguration cfg, CompilingSession s, s
         case gcc:
             return redub.command_generators.gnu_based.parseBuildConfiguration(cfg, s, mainPackHash, isRoot, cExt);
         case dmd:
-            return redub.command_generators.dmd.parseBuildConfiguration(cfg, s, mainPackHash, isRoot, singleCall);
+            return redub.command_generators.dmd.parseBuildConfiguration(cfg, s, mainPackHash, isRoot, singleCall,
+                moduleObject, moduleSource);
         case ldc2:
             return redub.command_generators.ldc.parseBuildConfiguration(cfg, s, mainPackHash, isRoot, singleCall);
         case nmc:
             // TODO: Create custom generator for nmc
-            return redub.command_generators.ldc.parseBuildConfiguration(cfg, s, mainPackHash, isRoot, singleCall);
+            return redub.command_generators.ldc.parseBuildConfiguration(cfg, s, mainPackHash, isRoot, singleCall,
+                moduleObject, moduleSource);
         default:throw new Exception("Unsupported compiler '"~cfg.getCompiler(s.compiler).bin~"'");
     }
 }

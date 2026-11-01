@@ -7,7 +7,7 @@ import redub.package_searching.api;
 
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.33.2";
+enum RedubVersionOnly = "v1.34.0";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -255,10 +255,44 @@ enum RedubCommands : ubyte
     run ///Addition on redub to let you launch your artifact when cross compiling with a target.
 }
 
+///Object builds only pay off with at least this many cores.
+enum MIN_OBJECT_BUILD_CPUS = 4;
+
+enum BuildStrategy : ubyte
+{
+    ///Timing based choice between the other modes.
+    auto_,
+    ///No cache reuse: compiles every source in a single compiler invocation
+    ///and links in that same invocation.
+    fullOnce,
+    ///Incremental: reuses cached objects and recompiles only changed files and
+    ///their dependents in a single compiler invocation, then links separately.
+    incrementalOnce,
+    ///Incremental and parallel: reuses cached objects and compiles affected
+    ///modules one per compiler process, then links separately.
+    incrementalParallel,
+    ///No cache reuse and parallel: compiles every module one per process, then
+    ///links separately. Does not clean cached dependencies.
+    fullParallel
+}
+
+BuildStrategy parseBuildStrategy(string value)
+{
+    switch(value)
+    {
+        case "auto": return BuildStrategy.auto_;
+        case "full-once": return BuildStrategy.fullOnce;
+        case "incremental-once": return BuildStrategy.incrementalOnce;
+        case "incremental-parallel": return BuildStrategy.incrementalParallel;
+        case "full-parallel": return BuildStrategy.fullParallel;
+        default: throw new Exception("Unknown build strategy '"~value~"'. Use auto, full-once, incremental-once, incremental-parallel or full-parallel.");
+    }
+}
+
 enum BuildConfigurationFlags : ubyte
 {
     none = 0,
-    ///Whenever present, --deps= will be pased to the compiler for using advanced compilation mode
+    ///Obsolete: whenever present, --deps= will be passed to the compiler.
     outputsDeps           = 1 << 0,
     ///Uses --oq on ldc, -op on dmd (rename+move while bug exists)
     preservePath          = 1 << 1,
@@ -267,6 +301,8 @@ enum BuildConfigurationFlags : ubyte
     defaultSource         = 1 << 4,
     defaultStringImport   = 1 << 5,
     syntaxOnly            = 1 << 6,
+    ///Compile modules separately into the object dir and link the cached objects.
+    reuseObjects          = 1 << 7,
 
 
     defaultInit = preservePath,
@@ -275,6 +311,22 @@ enum BuildConfigurationFlags : ubyte
 }
 
 
+
+///Redub-only project options. Kept out of BuildConfiguration so every copied
+///configuration does not pay for fields only the root build needs.
+private __gshared string[][string] trustedNoImportMixinsByProject;
+
+void setTrustedNoImportMixins(string workingDir, string[] mixins)
+{
+    trustedNoImportMixinsByProject[workingDir] = mixins;
+}
+
+string[] trustedNoImportMixinsFor(string workingDir)
+{
+    if(auto p = workingDir in trustedNoImportMixinsByProject)
+        return *p;
+    return null;
+}
 
 struct BuildConfiguration
 {
@@ -294,14 +346,14 @@ struct BuildConfiguration
     string[] extraDependencyFiles;
     @absolutized string[] filesToCopy;
     string[][] commands;
+    ///When having those files, the build will use them instead of sourcePaths + sourceFiles
+    @cacheExclude string[] changedBuildFiles;
     PluginExecution[] preBuildPlugins;
     string workingDir;
     string arch;
     string targetName;
     @absolutized string[] targetIcon;
 
-    ///When having those files, the build will use them instead of sourcePaths + sourceFiles
-    @cacheExclude string[] changedBuildFiles;
     @excludeRoot string outputDirectory;
     @cacheExclude string runtimeWorkingDir;
     BundleConfiguration bundleConfig;
@@ -311,6 +363,10 @@ struct BuildConfiguration
     @cacheExclude bool isUsingDefaultImportPaths = true;
     RedubLanguages language = RedubLanguages.D;
     TargetType targetType;
+    ///Redub-only preference. CLI overrides it.
+    @cacheExclude BuildStrategy buildStrategy;
+    ///False disables passive timing collection.
+    @cacheExclude bool buildStats = true;
 
     static BuildConfiguration defaultInit(string workingDir, RedubLanguages l)
     {
@@ -373,6 +429,7 @@ struct BuildConfiguration
     }
 
     bool outputsDeps() const {return (flags & BuildConfigurationFlags.outputsDeps) != 0;}
+    bool reuseObjects() const {return (flags & BuildConfigurationFlags.reuseObjects) != 0;}
     bool preservePath() const {return (flags & BuildConfigurationFlags.preservePath) != 0;}
     bool syntaxOnly() const {return (flags & BuildConfigurationFlags.syntaxOnly) != 0;}
     bool compilerVerbose() const {return (flags & BuildConfigurationFlags.compilerVerbose) != 0;}
@@ -1027,7 +1084,7 @@ class ProjectNode
     private bool needsCopyOnly = false;
     private bool _isOptional = false;
     private string[] dirtyFiles;
-    private bool dirtyTruncated;
+    private bool dirtyTruncated = false;
 
     string name() const { return requirements.name; }
     string targetName() const { return requirements.cfg.targetName; }

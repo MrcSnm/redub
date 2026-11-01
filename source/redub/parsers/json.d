@@ -141,6 +141,27 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
             foreach(key, value; v.object)
                 addPreBuildPlugins(req, key, value.strArr, c);
         },
+        "redub": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _)
+        {
+            import std.conv : to;
+            enforce(v.type == JSONType.object, `"redub" must be an object.`);
+            if(auto p = "buildStrategy" in v.object)
+            {
+                enforce(p.type == JSONType.string, `"redub.buildStrategy" must be a string.`);
+                req.cfg.buildStrategy = parseBuildStrategy(p.str);
+            }
+            if(auto p = "buildStats" in v.object)
+            {
+                enforce(p.type == JSONType.bool_, `"redub.buildStats" must be a boolean.`);
+                req.cfg.buildStats = p.get!bool;
+            }
+            if(auto p = "trustedNoImportMixins" in v.object)
+            {
+                enforce(p.type == JSONType.array, `"redub.trustedNoImportMixins" must be an array.`);
+                import std.array : array;
+                setTrustedNoImportMixins(req.cfg.workingDir, cast(string[]) (*p).strArr.array);
+            }
+        },
         "buildTypes": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _)
         {
             static import redub.parsers.build_type;

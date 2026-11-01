@@ -271,23 +271,36 @@ test_zip_slip()
     fi
 }
 
-test_parallel_with_dependency_commands()
-{
-    local rootname="parroot$SUFFIX"
-    local depname="dep$SUFFIX"
-    local d="$WORK/parallel"
-    local log="$WORK/parallel.log"
-    mkdir -p "$d/source" "$d/dep/source"
-    printf '%s\n' '{"name":"'"$rootname"'","targetPath":"build","dependencies":{"'"$depname"'":{"path":"dep"}}}' > "$d/dub.json"
-    printf '%s\n' 'import '"$depname"'; void main(){foo();}' > "$d/source/app.d"
-    printf '%s\n' '{"name":"'"$depname"'","targetPath":"build","preBuildCommands":["echo prebuild"]}' > "$d/dep/dub.json"
-    printf '%s\n' 'module '"$depname"'; void foo(){}' > "$d/dep/source/dep.d"
 
-    redub_in "$d" 120 "$log" build --force -v
-    if grep -q 'full parallel' "$log"; then
-        fail parallel_with_dependency_commands "auto picked full parallel although a dependency has preBuildCommands ($(grep 'Resolved:' "$log" | head -1))"
+test_root_only_dirty_uses_single_call()
+{
+    if ! command -v dmd >/dev/null 2>&1 && ! command -v ldc2 >/dev/null 2>&1; then
+        skip root_only_dirty_uses_single_call "no D compiler found"
+        return
+    fi
+    local name="rootsingle$SUFFIX"
+    local depname="rootdep$SUFFIX"
+    local d="$WORK/rootsingle"
+    local log="$WORK/rootsingle.log"
+    mkdir -p "$d/source" "$d/dep/source"
+    printf '%s\n' '{"name":"'"$name"'","targetPath":"build","dependencies":{"'"$depname"'":{"path":"dep"}}}' > "$d/dub.json"
+    printf '%s\n' 'import '"$depname"'; void main(){foo();}' > "$d/source/app.d"
+    printf '%s\n' '{"name":"'"$depname"'","targetPath":"build"}' > "$d/dep/dub.json"
+    printf '%s\n' 'module '"$depname"'; void foo(){}' > "$d/dep/source/$depname.d"
+
+    if ! redub_in "$d" 120 "$WORK/rootsingle_first.log" build; then
+        fail root_only_dirty_uses_single_call "setup build failed: $(detail "$WORK/rootsingle_first.log")"
+        return
+    fi
+    printf '%s\n' 'import '"$depname"'; void main(){foo();} // changed' > "$d/source/app.d"
+    if ! redub_in "$d" 120 "$log" build -v; then
+        fail root_only_dirty_uses_single_call "incremental build failed: $(detail "$log")"
+        return
+    fi
+    if grep -q 'Built+Linked:' "$log"; then
+        pass root_only_dirty_uses_single_call
     else
-        pass parallel_with_dependency_commands
+        fail root_only_dirty_uses_single_call "root-only build did not use single-call ($(detail "$log"))"
     fi
 }
 
@@ -997,7 +1010,7 @@ test_failed_build_keeps_cache()
     redub_in "$d" 120 "$log" build --compiler="$dc"
     if grep -q "Will Build:.*$depname" "$log"; then
         fail failed_build_keeps_cache "the already compiled dependency was rebuilt after a failed build ($(detail "$log"))"
-    elif grep -q "Up-to-Date:.*$depname" "$log"; then
+    elif grep -qE "Up-to-Date:.*$depname|Copy Enough:.*$depname" "$log"; then
         pass failed_build_keeps_cache
     else
         fail failed_build_keeps_cache "dependency was neither up-to-date nor rebuilt ($(detail "$log"))"
@@ -1378,7 +1391,7 @@ test_config_platform_crash
 test_copy_files_no_match
 test_unused_key_warning
 test_zip_slip
-test_parallel_with_dependency_commands
+test_root_only_dirty_uses_single_call
 test_assume_compiler_version
 test_parallel_environment
 test_platform_filter_typo

@@ -10,6 +10,7 @@ import std.path;
 // import std.json;
 import redub.command_generators.commons;
 
+///Maximum number of dirty paths the cache diff keeps. Above this we do a full rebuild.
 public enum MAX_DIRTY_FILES = 256;
 
 enum CACHE_FOLDER_NAME = ".redub";
@@ -281,6 +282,10 @@ string hashFrom(const BuildConfiguration cfg, CompilingSession session, bool isR
         | BuildConfigurationFlags.preservePath
         | BuildConfigurationFlags.outputsDeps;
     xxh.put(cast(ubyte)(cfg.flags & outputAffectingFlags));
+    ///The one-shot build does not fill the per-module object cache, so the root
+    ///must use a distinct key. Dependencies ignore the strategy entirely.
+    if(isRoot)
+        xxh.put(cast(ubyte)(cfg.buildStrategy == BuildStrategy.fullOnce));
     // xxh.put(cast(ubyte[])req.targetConfiguration);
     // xxh.put(cast(ubyte[])req.version_);
 
@@ -344,12 +349,7 @@ AdvCacheFormula getCompilationCacheFormula(const BuildRequirements req, string m
     string cacheDir = getCacheOutputDir(mainPackHash, req, s);
 
     string[] dirs = [cacheDir];
-    if(req.getCompiler(s.compiler).compiler == AcceptedCompiler.ldc2)
-    {
-        ///LDC object output directory
-        dirs~= cacheDir~ "_obj";
-    }
-    if(req.cfg.outputsDeps)
+    if(req.getCompiler(s.compiler).isDCompiler)
         dirs~= getObjectDir(cacheDir);
 
     ///sourcePaths is not guaranteed to be inside importDirectories. Users may compile
@@ -559,4 +559,3 @@ string getCacheFilePath(string rootCache)
     import redub.misc.path;
     return redub.misc.path.buildNormalizedPath(getCacheFolder, rootCache ~ ".bin");
 }
-

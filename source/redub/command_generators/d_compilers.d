@@ -5,7 +5,8 @@ import redub.tooling.compiler_identification;
 import redub.command_generators.ldc;
 import redub.building.cache;
 
-string[] parseBuildConfiguration(const BuildConfiguration b, CompilingSession s, string mainPackhash, bool isRoot, bool singleCall = false)
+string[] parseBuildConfiguration(const BuildConfiguration b, CompilingSession s, string mainPackhash, bool isRoot,
+    bool singleCall = false, string moduleObject = null, string moduleSource = null)
 {
     import redub.misc.path;
     string function(ValidDFlags) mapper = getFlagMapper(s.compiler.d);
@@ -26,42 +27,38 @@ string[] parseBuildConfiguration(const BuildConfiguration b, CompilingSession s,
         if(syntaxOnly) cmds~= mapper(ValidDFlags.syntaxOnly);
 
 
-        string cacheDir = getCacheOutputDir(mainPackhash, b, s, isRoot);
+        string cacheDir = moduleObject.length ? null : getCacheOutputDir(mainPackhash, b, s, isRoot);
         ///Whenever a single output file is specified, DMD does not output obj files
         ///For LDC, it does output them anyway
-        if(b.getCompiler(s.compiler).compiler == AcceptedCompiler.ldc2 && !b.outputsDeps && !b.syntaxOnly)
+        if(moduleObject.length == 0)
         {
-            import std.file;
-            string ldcObjOutDir = cacheDir~ "_obj";
-            mkdirRecurse(ldcObjOutDir);
+            ///LDC/nmc write their objects to a single-process temp dir; the
+            ///per-module builds share the unified obj dir.
+            if(comp.isLDCBased && !b.reuseObjects && !b.syntaxOnly)
+            {
+                import std.file;
+                string objOutDir = cacheDir~ "_full";
+                mkdirRecurse(objOutDir);
 
-            cmds~= mapper(ValidDFlags.objectDir) ~ escapePath(ldcObjOutDir);
+                cmds~= mapper(ValidDFlags.objectDir) ~ escapePath(objOutDir);
+            }
+            else if(b.reuseObjects)
+                cmds~= mapper(ValidDFlags.objectDir)~getObjectDir(cacheDir).escapePath;
         }
-        else if(b.getCompiler(s.compiler).compiler == AcceptedCompiler.nmc && !b.outputsDeps && !b.syntaxOnly)
-        {
-            import std.file;
-            string ldcObjOutDir = cacheDir~ "_obj";
-            mkdirRecurse(ldcObjOutDir);
-
-            cmds~= mapper(ValidDFlags.objectDir) ~ escapePath(ldcObjOutDir);
-        }
-        else if(b.outputsDeps)
-            cmds~= mapper(ValidDFlags.objectDir)~getObjectDir(cacheDir).escapePath;
 
         cmds~= dFlags;
-        if(comp == AcceptedCompiler.ldc2 && !s.os.isApple && !b.syntaxOnly) //Broken on apple
+        ///A single invocation may compile only a subset of modules. Without this
+        ///each object is not self-contained and linking cached objects fails.
+        if(comp.isLDCBased && b.reuseObjects && !b.syntaxOnly)
+            cmds~= "--linkonce-templates";
+        ///Per-module builds run one process per module; LDC's shared cache
+        ///directory is not safe under concurrency, so only use it single-process.
+        if(comp.isLDCBased && !s.os.isApple && !b.syntaxOnly && moduleObject.length == 0)
         {
             ///cmds~= "--cache-retrieval=hardlink"; // Doesn't work on Windows when using a multi drives projects
-            cmds~= "--cache=.ldc2_cache";
+            cmds~= comp == AcceptedCompiler.ldc2 ? "--cache=.ldc2_cache" : "--cache=.nmc_cache";;
             cmds~= "--cache-prune";
         }
-        else if(comp == AcceptedCompiler.nmc && !s.os.isApple && !b.syntaxOnly) //Broken on apple
-        {
-            ///cmds~= "--cache-retrieval=hardlink"; // Doesn't work on Windows when using a multi drives projects
-            cmds~= "--cache=.nmc_cache";
-            cmds~= "--cache-prune";
-        }
-
 
         cmds = mapAppendPrefix(cmds, debugVersions, mapper(ValidDFlags.debugVersions), false);
         cmds = mapAppendPrefix(cmds, versions, mapper(ValidDFlags.versions), false);
@@ -69,7 +66,9 @@ string[] parseBuildConfiguration(const BuildConfiguration b, CompilingSession s,
 
         cmds = mapAppendPrefix(cmds, stringImportPaths, mapper(ValidDFlags.stringImportPaths), true);
 
-        if(changedBuildFiles.length)
+        if(moduleSource.length)
+            cmds~= moduleSource;
+        else if(changedBuildFiles.length)
             cmds~= changedBuildFiles;
         else
             putSourceFiles(cmds, workingDir, sourcePaths, sourceFiles, excludeSourceFiles, ".d");
@@ -88,8 +87,10 @@ string[] parseBuildConfiguration(const BuildConfiguration b, CompilingSession s,
                 cmds~= mapper(ValidDFlags.buildAsShared);
 
 
+            if(moduleObject.length)
+                cmds~= mapper(ValidDFlags.outputFile) ~ escapePath(moduleObject);
             //Output path for libs must still be specified
-            if(!b.outputsDeps || targetType.isStaticLibrary)
+            else if(!b.reuseObjects || targetType.isStaticLibrary)
             {
                 string outputName = singleCall ? getOutputName(b, s.os) : getConfigurationOutputName(b, s.os);
                 cmds~= mapper(ValidDFlags.outputFile) ~ buildNormalizedPath(cacheDir, outputName).escapePath;

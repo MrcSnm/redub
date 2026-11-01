@@ -46,7 +46,7 @@ string[] parseLinkConfiguration(const ThreadBuildData data, CompilingSession s, 
                     cmds~= "-o";
                     cmds~= buildNormalizedPath(cacheDir, getOutputName(b, s.os)).escapePath;
                 }
-                if(b.outputsDeps)
+                if(b.reuseObjects)
                     putSourceFiles(cmds, null, [getObjectDir(cacheDir)], null, null, objExtension);
                 else
                     cmds~= buildNormalizedPath(outputDirectory, targetName~objExtension).escapePath;
@@ -161,7 +161,7 @@ string[] parseLinkConfigurationMSVC(const ThreadBuildData data, CompilingSession
         {
             cmds~= "-of"~buildNormalizedPath(cacheDir, getOutputName(b, s.os)).escapePath;
             string objExtension = getObjectExtension(s.os);
-            if(b.outputsDeps)
+            if(b.reuseObjects)
                 putSourceFiles(cmds, null, [getObjectDir(cacheDir)], null, null, objExtension);
             else
                 cmds~= buildNormalizedPath(outputDirectory, targetName~objExtension).escapePath;

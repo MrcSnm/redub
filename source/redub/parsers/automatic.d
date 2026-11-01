@@ -20,7 +20,6 @@ import hip.data.json;
  *   subPackage = Optional sub package
  *   recipe = Optional recipe to read. Its path is not used as root.
  *   version = The actual version of that project, may be null on root
- *   useExistingObj = Makes the project output dependencies if it is a root project. Disabled by default since compilation may be way slower
  *   isDescribeOnly = Do not execute preGenerate commands when true
  * Returns: The build requirements to the project. Not recursive.
  */
@@ -31,7 +30,6 @@ RootParseResult parseProject(
     string subPackage,
     string recipe,
     string target,
-    bool useExistingObj = false,
     bool isDescribeOnly = false
 )
 {
@@ -57,7 +55,7 @@ RootParseResult parseProject(
     }
 
     JSONValue projectJSON = getProjectJSON(projectFile, projectWorkingDir);
-    return parseProject(projectJSON, projectWorkingDir, cInfo, subConfiguration, subPackage, target, useExistingObj, isDescribeOnly);
+    return parseProject(projectJSON, projectWorkingDir, cInfo, subConfiguration, subPackage, target, isDescribeOnly);
 }
 
 /**
@@ -70,7 +68,6 @@ RootParseResult parseProject(
  *   subConfiguration = Sub configuration to use
  *   subPackage = Optional sub package
  *   version = The actual version of that project, may be null on root
- *   useExistingObj = Makes the project output dependencies if it is a root project. Disabled by default since compilation may be way slower
  *   isDescribeOnly = Do not execute preGenerate commands when true
  * Returns: The build requirements to the project. Not recursive.
  */
@@ -81,7 +78,6 @@ RootParseResult parseProject(
     BuildRequirements.Configuration subConfiguration,
     string subPackage,
     string target,
-    bool useExistingObj = false,
     bool isDescribeOnly = false,
     string defaultPackageName = null
 )
@@ -102,11 +98,11 @@ RootParseResult parseProject(
     result.targetCompilationInfo = cInfo;
     BuildConfiguration pending;
     result.mainRequirement = redub.parsers.json.parse(projectJSON, cfg, pending, true);
-    result.mainRequirement= postProcessBuildRequirements(result.mainRequirement, pending, cInfo, true, useExistingObj);
+    result.mainRequirement= postProcessBuildRequirements(result.mainRequirement, pending, cInfo, true);
     redub.parsers.environment.setupEnvironmentVariablesForRootPackage(result.mainRequirement);
     //Post process for target must be after setting up env variables for root as it may access them.
     if(target.length)
-        result.targetRequirement = postProcessBuildRequirements(targetInfo.targetRequirement, targetInfo.pending, cInfo, false, useExistingObj);
+        result.targetRequirement = postProcessBuildRequirements(targetInfo.targetRequirement, targetInfo.pending, cInfo, false);
 
 
     return result;
@@ -128,7 +124,6 @@ RootParseResult parseProject(
  *   isRoot = When the package is root, it is added to the package searching cache automatically with version 0.0.0
  *   isTarget = When the package is target, it propagates that isTarget flag for not merging the globals with themselves
  *   version = The actual version of that project, may be null on root
- *   useExistingObj = Makes the project output dependencies if it is a root project. Disabled by default since compilation may be way slower
  *   isDescribeOnly = Do not execute preGenerate commands when true
  * Returns: The build requirements to the project. Not recursive.
  */
@@ -142,7 +137,6 @@ BuildRequirements parseProjectCommon(
     bool isRoot = false,
     bool isTarget = false,
     string version_ = null,
-    bool useExistingObj = false,
     bool isDescribeOnly = false
 )
 {
@@ -174,7 +168,7 @@ BuildRequirements parseProjectCommon(
     JSONValue parseData = getProjectJSON(projectFile, projectWorkingDir);
 
     req = redub.parsers.json.parse(parseData, cfg, pending, false);
-    return postProcessBuildRequirements(req, pending, cInfo, isRoot, useExistingObj);
+    return postProcessBuildRequirements(req, pending, cInfo, isRoot);
 }
 
 JSONValue getProjectJSON(string projectFile, string projectWorkingDir)
@@ -236,10 +230,9 @@ string getPackageName(string projectWorkingDir, string recipe)
  *   req = Input requirement
  *   cInfo = Compilation Info for setting the configuration arch
  *   isRoot = Decides whether to output objects or not
- *   useExistingObj = Decides whether to output objects or not
  * Returns: Post processed build requirements and now ready to use
  */
-BuildRequirements postProcessBuildRequirements(BuildRequirements req, BuildConfiguration pending, CompilationInfo cInfo, bool isRoot, bool useExistingObj)
+BuildRequirements postProcessBuildRequirements(BuildRequirements req, BuildConfiguration pending, CompilationInfo cInfo, bool isRoot)
 {
     req.cfg.arch = cInfo.arch;
     req.extra.isRoot = isRoot;
@@ -247,9 +240,6 @@ BuildRequirements postProcessBuildRequirements(BuildRequirements req, BuildConfi
     {
         dep.isTarget = req.extra.isTarget;
     }
-
-    if(isRoot && useExistingObj)
-        req.cfg.flags|= BuildConfigurationFlags.outputsDeps;
 
     req.cfg = redub.parsers.environment.parseEnvironment(req.cfg); //First pass in env parsing
     partiallyFinishBuildRequirements(req, pending);    ///Merge need to happen after partial finish, since other configuration will be merged

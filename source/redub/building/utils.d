@@ -68,7 +68,7 @@ auto finishCompilerExec(const BuildConfiguration cfg, Compiler compiler, string 
     {
         //For working around bug 3541, 24748, dmd generates .obj files besides files, redub will move them out
         //of there to the object directory
-        if(cfg.outputsDeps && cfg.preservePath && cfg.getCompiler(compiler).compiler == AcceptedCompiler.dmd)
+        if(cfg.reuseObjects && cfg.preservePath && cfg.getCompiler(compiler).compiler == AcceptedCompiler.dmd)
             moveGeneratedObjectFiles(cfg.sourcePaths, cfg.sourceFiles, cfg.excludeSourceFiles, getObjectDir(inputDir),getObjectExtension(os));
         StopWatch sw = StopWatch(AutoStart.yes);
 

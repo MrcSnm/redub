@@ -6,7 +6,9 @@ import redub.command_generators.d_compilers;
 
 
 
-string[] parseBuildConfiguration(const BuildConfiguration b, CompilingSession s, string requirementCache, bool isRoot, bool singleCall = false)
+string[] parseBuildConfiguration(const BuildConfiguration b, CompilingSession s, string requirementCache, bool isRoot,
+    bool singleCall = false, string moduleObject = null, string moduleSource = null)
 {
-    return redub.command_generators.d_compilers.parseBuildConfiguration(b, s, requirementCache, isRoot, singleCall);
+    return redub.command_generators.d_compilers.parseBuildConfiguration(b, s, requirementCache, isRoot, singleCall,
+        moduleObject, moduleSource);
 }

@@ -22,7 +22,6 @@ import redub.tree_generators.dub;
  *   isa = Instruction Set Architecture to use for filtering commands
  *   isRoot = When the package is root, it is added to the package searching cache automatically with version 0.0.0
  *   version = The actual version of that project, may be null on root
- *   useExistingObj = Makes the project output dependencies if it is a root project. Disabled by default since compilation may be way slower
  * Returns: The build requirements to the project. Not recursive.
  */
 RootParseResult parseProject(
@@ -31,8 +30,7 @@ RootParseResult parseProject(
     BuildRequirements.Configuration subConfiguration,
     string subPackage, 
     string recipe,
-    string target,
-    bool useExistingObj = false
+    string target
 )
 {
     import std.path;
@@ -64,7 +62,7 @@ RootParseResult parseProject(
                 import redub.parsers.adapter.json_cache;
                 parseData = parseJSONCached(recipe, singleInfo.recipe);
             }
-            res = redub.parsers.automatic.parseProject(parseData, projectWorkingDir, cInfo, subConfiguration, subPackage, target, useExistingObj, false, singleInfo.defaultPackageName);
+            res = redub.parsers.automatic.parseProject(parseData, projectWorkingDir, cInfo, subConfiguration, subPackage, target, false, singleInfo.defaultPackageName);
             break;
         default: throw new Exception("Unsupported project type "~recipe~" at dir "~projectWorkingDir);
     }

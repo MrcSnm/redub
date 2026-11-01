@@ -58,7 +58,6 @@ struct RedubPluginData
     string[] excludeSourceFiles;
     string[] extraDependencyFiles;
     string[] filesToCopy;
-    ///Do not rely on that, since it needs useExistingObjFiles on
     string[] changedBuildFiles;
     string outputDirectory;
     string targetName;

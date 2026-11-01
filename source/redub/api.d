@@ -29,7 +29,6 @@ struct ProjectDetails
 
     bool error() const {return this == ProjectDetails.init; }
     ParallelType parallelType() const { return cDetails.parallelType; }
-    bool useExistingObjects() const { return cDetails.useExistingObj; }
 
     bool usesExternalErrorCode() const { return this.printOnly && externalErrorCode != int.min; }
 
@@ -102,12 +101,16 @@ struct CompilationDetails
     string assumption;
     ///Makes the build incremental or not
     Inference incremental;
-    ///Makes the build use existing files
-    bool useExistingObj;
+    ///Obsolete: writes a compiler .deps file instead of using redub's parser.
+    bool outputDeps;
     ///Whether the build should force single project
     bool combinedBuild;
     ///Whether the build should be fully parallel, simple, no or inferred
     ParallelType parallelType;
+    ///CLI override for the root strategy. Empty means project config wins.
+    string buildStrategyOverride;
+    ///CLI opt-out for passive build timing collection.
+    bool recordBuildStats = true;
     /**
      * When true, it will parse the environment and merge it into the project's configuration.
      * Details can be found in `redub.parsers.environment.parse()`.
@@ -173,6 +176,15 @@ auto timed(T)(scope T delegate() action)
     return ret;
 }
 
+///Full parallel only pays off when a dependency also needs compiling.
+private bool onlyRootDirty(ProjectNode root)
+{
+    foreach(node; root.collapse)
+        if(node !is root && node.shouldEnterCompilationThread)
+            return false;
+    return true;
+}
+
 ParallelType inferParallel(ProjectDetails d)
 {
     if(d.parallelType == ParallelType.auto_)
@@ -204,62 +216,89 @@ class BuildException : Exception
     }
 }
 
-/**
- * Unchanged files can't deal with directories at the moment.
- * Params:
- *   root = The root of the project
- */
 string[] getChangedBuildFiles(ProjectNode root, CompilingSession s)
 {
-    import std.file;
-    import std.path : isAbsolute;
-    import redub.misc.path;
-    import std.algorithm.iteration : map;
-    import std.array : array;
-    import redub.command_generators.commons;
+    import d_dependencies;
+    import redub.building.cache;
+    import std.string : replace, endsWith;
     if(!root.isRoot)
         throw new RedubException("Can only exclude unchanged files from root at this moment.");
 
-    string depsPath = getDepsFilePath(root, s);
-    if(!exists(depsPath))
+    if(root.isUpToDate)
         return null;
-    ///Cache diffs are relative to the watched directory while the deps file
-    ///uses absolute paths, so resolve them before matching.
-    string[] watchedDirs = root.requirements.cfg.sourcePaths.dup;
-    watchedDirs ~= root.requirements.cfg.importDirectories;
-    string[] dirtyFiles;
-    foreach(f; root.getDirtyFiles())
-    {
-        string resolved = isAbsolute(f) ? f : null;
-        if(!resolved)
-            foreach(dir; watchedDirs)
-            {
-                string candidate = buildNormalizedPath(dir, f);
-                if(exists(candidate))
-                {
-                    resolved = candidate;
-                    break;
-                }
-            }
-        if(!resolved && exists(f))
-            resolved = f;
-        if(resolved.length && !resolved.isDir)
-            dirtyFiles ~= resolved;
-    }
+    const string[] dirtyFiles = root.getDirtyFiles();
+    ///Too many changes (or none known) are cheaper to rebuild all at once.
     if(dirtyFiles.length == 0 || root.isDirtyTruncated())
         return null;
 
-    import d_dependencies;
+    BuildConfiguration cfg = root.requirements.cfg;
+    ImportScanContext ctx = defaultImportScanContext(s.os, s.isa);
+    foreach(version_; cfg.versions)
+        ctx.addVersion(version_);
+    foreach(version_; cfg.debugVersions)
+        ctx.addDebugVersion(version_);
+    ctx.debugMode = cfg.isDebug;
+    ctx.stringImportPaths = cfg.stringImportPaths;
 
-    //TODO: Improve that
-    ModuleParsing moduleParse = parseDependencies(std.file.readText(depsPath),
-        buildNormalizedPath("/Library/D/dmd")
-    );
+    SourceImportGraph graph = parseSourceImportGraph(cfg.sourcePaths, cfg.sourceFiles,
+        cfg.excludeSourceFiles, ctx);
+    if(graph.modules.length == 0)
+        return null;
 
-    string[] buildFiles = map!((ModuleDef def) => def.modPath)(moduleParse.findDependees(dirtyFiles)).array;
-    if(hasLogLevel(LogLevel.verbose))
+    ///Cache diffs are relative to the watched directory while module paths are
+    ///absolute, so match on the path suffix.
+    static bool matchesModule(string modPath, string dirty)
+    {
+        string normalizedPath = modPath.replace("\\", "/");
+        string normalizedDirty = dirty.replace("\\", "/");
+        return normalizedPath == normalizedDirty
+            || normalizedPath.endsWith("/" ~ normalizedDirty);
+    }
+
+    bool[string] matchedDirty;
+    bool[string] changed;
+    foreach(name; graph.compileOrder)
+    {
+        auto mod = graph.byName[name];
+        foreach(dirty; dirtyFiles)
+            if(matchesModule(mod.modPath, dirty))
+            {
+                changed[name] = true;
+                matchedDirty[dirty] = true;
+                break;
+            }
+    }
+    ///A dirty source file that no longer maps to a module was removed or
+    ///renamed; rebuild everything and let the caller clean the object dir.
+    foreach(dirty; dirtyFiles)
+        if(dirty.endsWith(".d") && !(dirty in matchedDirty))
+            return null;
+    ///Changes outside the source graph (or an unknown state) need a full build.
+    if(changed.length == 0)
+        return null;
+
+    bool[string] affected;
+    foreach(name, _; changed)
+    {
+        affected[name] = true;
+        foreach(dependent; graph.findDependents(name))
+            affected[dependent] = true;
+    }
+
+    ///Unresolved imports may hide dependents, so the incremental set is not trustworthy.
+    foreach(name, mod; graph.byName)
+        if(mod.isImportRisk || mod.hasUnresolvedStringMixins)
+            return null;
+    if(graph.skippedFiles.length)
+        return null;
+
+    string[] buildFiles;
+    foreach(name; graph.compileOrder)
+        if(name in affected)
+            buildFiles ~= graph.byName[name].modPath;
+     if(hasLogLevel(LogLevel.verbose))
         warnTitle("Project files to rebuild: ", buildFiles);
-    return buildFiles;
+    return buildFiles.length ? buildFiles : null;
 }
 
 ModuleParsing getModulesDependencies(ProjectDetails d)
@@ -456,6 +495,113 @@ bool isProjectUpToDate(ProjectDetails d)
 }
 
 
+private enum AUTO_MIN_MODULES = 8;
+private enum AUTO_MIN_COMPILE_WEIGHT = 10_000;
+
+private struct ResolvedBuildStrategy
+{
+    BuildStrategy strategy;
+    bool reuseObjects;
+}
+
+private bool isPerModuleStrategy(BuildStrategy strategy)
+{
+    return strategy == BuildStrategy.incrementalParallel
+        || strategy == BuildStrategy.fullParallel;
+}
+
+///Combined merges dependencies into the root and drops the per-package link
+///metadata, so the separate object link cannot find its entry point.
+private BuildStrategy guardCombinedBuildStrategy(BuildStrategy strategy, bool combinedBuild)
+{
+    if(!combinedBuild || !isPerModuleStrategy(strategy))
+        return strategy;
+    warn("Per-module build strategies are not supported with --combined; using 'full-once'.");
+    return BuildStrategy.fullOnce;
+}
+
+private bool autoPrefersObjects(BuildConfiguration cfg, Compiler compiler, CompilingSession session)
+{
+    CompilerBinary rootCompiler = cfg.getCompiler(compiler);
+    if(!isDCompiler(rootCompiler) || cfg.targetType != TargetType.executable || cfg.syntaxOnly)
+        return false;
+    try
+    {
+        ImportScanContext ctx = defaultImportScanContext(session.os, session.isa);
+        foreach(version_; cfg.versions)
+            ctx.addVersion(version_);
+        foreach(version_; cfg.debugVersions)
+            ctx.addDebugVersion(version_);
+        ctx.debugMode = cfg.isDebug;
+        ctx.stringImportPaths = cfg.stringImportPaths;
+        string[] sourceDirs = cfg.sourceFiles.length ? null : cfg.sourcePaths;
+        SourceImportGraph graph = parseSourceImportGraph(sourceDirs, cfg.sourceFiles,
+            cfg.excludeSourceFiles, ctx, true);
+        size_t weight;
+        foreach(name; graph.compileOrder)
+            weight += graph.byName[name].compileWeight;
+        return graph.modules.length >= AUTO_MIN_MODULES
+            && weight >= AUTO_MIN_COMPILE_WEIGHT;
+    }
+    catch(Exception) {}
+    return false;
+}
+
+private BuildStrategy resolveAutoStrategy(BuildConfiguration cfg, Compiler compiler, CompilingSession session)
+{
+    import std.parallelism : totalCPUs;
+    if(totalCPUs < MIN_OBJECT_BUILD_CPUS)
+    {
+        vlog("Only ", totalCPUs, " cores available, using the incremental single build.");
+        return BuildStrategy.incrementalOnce;
+    }
+    const bool useObjects = autoPrefersObjects(cfg, compiler, session);
+    vlog("auto: ", useObjects ? "incremental-parallel" : "full-once",
+        " (", cfg.targetType, ", weight-aware)");
+    return useObjects ? BuildStrategy.incrementalParallel : BuildStrategy.fullOnce;
+}
+
+///DMD emits template instances into one object when compiling several modules
+///at once, so a subset build cannot link them back.
+private ResolvedBuildStrategy validateIncrementalOnce(
+    BuildStrategy strategy, BuildConfiguration cfg, Compiler compiler, bool explicitIncremental)
+{
+    if(strategy != BuildStrategy.incrementalOnce)
+        return ResolvedBuildStrategy(strategy);
+    CompilerBinary rootCompiler = cfg.getCompiler(compiler);
+    if(!isDCompiler(rootCompiler))
+    {
+        if(explicitIncremental)
+            warn("Build strategy 'incremental-once' requires a D compiler, using 'full-once'.");
+        return ResolvedBuildStrategy(BuildStrategy.fullOnce);
+    }
+    if(rootCompiler.compiler == AcceptedCompiler.dmd)
+    {
+        const string message = "Build strategy 'incremental-once' is unsafe with DMD for template-heavy code; using 'incremental-parallel'.";
+        if(explicitIncremental) warn(message); else vlog(message);
+        return ResolvedBuildStrategy(BuildStrategy.incrementalParallel);
+    }
+    return ResolvedBuildStrategy(BuildStrategy.incrementalOnce, true);
+}
+
+///Resolves the root build mode before the cache key is computed. auto must pick
+///a concrete mode here: a one-shot fallback would otherwise update the object
+///cache key without writing objects.
+private ResolvedBuildStrategy resolveBuildStrategy(
+    BuildConfiguration cfg, Compiler compiler, CompilingSession session,
+    string overrideStrategy, bool combinedBuild)
+{
+    BuildStrategy strategy = overrideStrategy.length
+        ? parseBuildStrategy(overrideStrategy)
+        : cfg.buildStrategy;
+    if(strategy == BuildStrategy.auto_)
+        strategy = resolveAutoStrategy(cfg, compiler, session);
+    ResolvedBuildStrategy resolved = validateIncrementalOnce(strategy, cfg, compiler,
+        overrideStrategy == "incremental" || overrideStrategy == "single");
+    resolved.strategy = guardCombinedBuildStrategy(resolved.strategy, combinedBuild);
+    return resolved;
+}
+
 ProjectDetails buildProject(ProjectDetails d)
 {
     import redub.building.compile;
@@ -468,7 +614,15 @@ ProjectDetails buildProject(ProjectDetails d)
     if(!d.tree)
         return d;
 
+    if(d.cDetails.outputDeps)
+        d.tree.requirements.cfg.flags |= BuildConfigurationFlags.outputsDeps;
     CompilingSession session = CompilingSession(d.compiler, d.cDetails.arch);
+    const ResolvedBuildStrategy resolved = resolveBuildStrategy(
+        d.tree.requirements.cfg, d.compiler, session,
+        d.cDetails.buildStrategyOverride, d.cDetails.combinedBuild);
+    d.tree.requirements.cfg.buildStrategy = resolved.strategy;
+    if(resolved.reuseObjects)
+        d.tree.requirements.cfg.flags |= BuildConfigurationFlags.reuseObjects;
 
     AdvCacheFormula sharedFormula;
     AdvCacheFormula preprocessed;
@@ -485,10 +639,27 @@ ProjectDetails buildProject(ProjectDetails d)
     ///the already scanned source/import directories are reused.
     preprocessed.files = null;
     ProjectNode tree = d.tree;
+    if(!d.cDetails.recordBuildStats)
+        tree.requirements.cfg.buildStats = false;
+    if(tree.requirements.cfg.reuseObjects && !tree.isUpToDate)
+    {
+        tree.requirements.cfg.changedBuildFiles = getChangedBuildFiles(tree, session);
+        ///A full rebuild must not link objects left by removed sources or old flags.
+        if(tree.requirements.cfg.changedBuildFiles.length == 0)
+        {
+            import std.file : exists, rmdirRecurse;
+            string objDir = getObjectDir(getCacheOutputDir(hashFrom(tree.requirements, session),
+                tree.requirements.cfg, session, tree.isRoot));
+            if(exists(objDir))
+                rmdirRecurse(objDir);
+        }
+    }
+    if((tree.requirements.cfg.buildStrategy == BuildStrategy.incrementalParallel
+        || tree.requirements.cfg.buildStrategy == BuildStrategy.fullParallel)
+        && tree.requirements.cfg.targetType != TargetType.executable)
+        warn("Parallel build strategies ignored: target is not an executable.");
     if(d.bCreateSelections)
         createSelectionsFile(tree);
-    if(d.useExistingObjects)
-        tree.requirements.cfg.changedBuildFiles = getChangedBuildFiles(tree, session);
     string appImageBundleFolder;
     if(d.bundle != BundleType.none)
     {
@@ -514,7 +685,10 @@ ProjectDetails buildProject(ProjectDetails d)
 
     auto result = timed(()
     {
-        switch(inferParallel(d))
+        ParallelType parallel = inferParallel(d);
+        if(d.parallelType == ParallelType.auto_ && parallel == ParallelType.full && onlyRootDirty(d.tree))
+            parallel = ParallelType.no;
+        switch(parallel)
         {
             case ParallelType.full:
                 return buildProjectFullyParallelized(d, session, &sharedFormula, &preprocessed);
@@ -823,7 +997,7 @@ ArgsDetails resolveArguments(string[] args, bool isDescribeOnly = false)
     string bt = either(bArgs.buildType, BuildType.debug_);
     return ArgsDetails(
         bArgs,
-        CompilationDetails(bArgs.compiler, bArgs.cCompiler, bArgs.arch, bArgs.compilerAssumption, bArgs.build.incremental, bArgs.build.useExistingObj, bArgs.build.combined, bArgs.build.parallel),
+        CompilationDetails(bArgs.compiler, bArgs.cCompiler, bArgs.arch, bArgs.compilerAssumption, bArgs.build.incremental, bArgs.build.outputDeps, bArgs.build.combined, bArgs.build.parallel, bArgs.build.buildStrategy, !bArgs.build.noBuildStats),
         ProjectToParse(bArgs.config, workingDir, subPackage, recipe, bArgs.single.length != 0, isDescribeOnly),
         getInitialDubVariablesFromArguments(bArgs, DubBuildArguments.init, os, args),
         bt, bArgs.target
@@ -894,8 +1068,7 @@ ProjectDetails resolveDependencies(
                 BuildRequirements.Configuration(proj.configuration, false),
                 proj.subPackage,
                 proj.recipe,
-                target,
-                cDetails.useExistingObj
+                target
             );
         else
             res = redub.parsers.automatic.parseProject(
@@ -905,7 +1078,6 @@ ProjectDetails resolveDependencies(
                 proj.subPackage,
                 proj.recipe,
                 target,
-                cDetails.useExistingObj,
                 proj.isDescribeOnly
             );
     }

@@ -274,13 +274,26 @@ struct DubBuildArguments
     ParallelType parallel;
 
     @(
-        "Whether or not to use existing .obj/.o files on the root build. Supported options are |auto|on|off. "~
-        "Based on tests, it can bring faster compilation when your package is not using libraries. "~
-        "Auto will deactivate existing objects when your package has any lib dependencies, while keep it active when " ~
-        "no dependency is there"
+        "Root build strategy: |auto|full-once|incremental-once|incremental-parallel|full-parallel|. Overrides the project's redub config.\n"~
+        "  strategy              incremental  processes                          link\n"~
+        "  full-once             no           1 compiler                         same invocation\n"~
+        "  incremental-once      yes          1 compiler + 1 linker              separate\n"~
+        "  incremental-parallel  yes          N compilers (1 per module) + link  separate\n"~
+        "  full-parallel         no           N compilers (1 per module) + link  separate\n"~
+        "  auto                  picks full-once or incremental-parallel from module count/weight;\n"~
+        "                         fewer than 4 cores picks incremental-once.\n"~
+        "  link is separate whenever per-module objects are reused"
     )
-    @("use-existing-obj")
-    bool useExistingObj;
+    @("build-strategy")
+    string buildStrategy;
+
+    @("Disable passive build timing collection.")
+    @("no-build-stats")
+    bool noBuildStats;
+
+    @("(Obsolete) Write a compiler .deps file. The incremental build uses redub's own parser instead.")
+    @("output-deps")
+    bool outputDeps;
 
     @("Tries to build the whole project in a single compiler run")
     bool combined;

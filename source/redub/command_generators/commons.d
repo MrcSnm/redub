@@ -708,12 +708,35 @@ void moveGeneratedObjectFiles(
     string extension
 )
 {
+    import d_dependencies : scanDImports;
     import std.file;
     import redub.misc.path;
     import std.path;
-    import std.string:endsWith;
+    import std.string : endsWith;
     import std.algorithm.searching;
     import std.exception;
+
+    ///DMD names objects after the source path; LDC (--oq) names them after the
+    ///module. Rename DMD's output to <moduleName><extension> so both compilers
+    ///share the same object cache.
+    static string moduleObjectPath(string objectPath, string moveDir, string extension)
+    {
+        import std.path : setExtension;
+        string sourcePath = setExtension(objectPath, ".d");
+        try
+        {
+            if(exists(sourcePath))
+            {
+                string moduleName;
+                scanDImports(readText(sourcePath), moduleName);
+                if(moduleName.length)
+                    return redub.misc.path.buildNormalizedPath(moveDir, moduleName ~ extension);
+            }
+        }
+        catch(Exception) {}
+        return null;
+    }
+
     foreach(path; paths)
     {
         string basePath = unescapePath(path);
@@ -726,7 +749,9 @@ void moveGeneratedObjectFiles(
                 continue;
             if(e.name.endsWith(extension))
             {
-                string targetPath = redub.misc.path.buildNormalizedPath(moveDir, e.name[basePath.length+1..$]);
+                string targetPath = moduleObjectPath(e.name, moveDir, extension);
+                if(targetPath.length == 0)
+                    targetPath = redub.misc.path.buildNormalizedPath(moveDir, e.name[basePath.length+1..$]);
                 string targetDir = dirName(targetPath);
                 if(!exists(targetDir))
                     mkdirRecurse(targetDir);
@@ -736,8 +761,13 @@ void moveGeneratedObjectFiles(
     }
     foreach(i, file; files)
     {
-        string targetPath = redub.misc.path.buildNormalizedPath(moveDir, baseName(setExtension(file, extension)));
-        renameOrCopy(file, targetPath);
+        string objectPath = setExtension(file, extension);
+        if(!exists(objectPath))
+            continue;
+        string targetPath = moduleObjectPath(objectPath, moveDir, extension);
+        if(targetPath.length == 0)
+            targetPath = redub.misc.path.buildNormalizedPath(moveDir, baseName(objectPath));
+        renameOrCopy(objectPath, targetPath);
     }
 }
 

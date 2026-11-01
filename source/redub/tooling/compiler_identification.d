@@ -100,7 +100,11 @@ bool isDCompiler(const CompilerBinary comp)
 }
 bool isDCompiler(AcceptedCompiler c)
 {
-    return c == AcceptedCompiler.dmd || c == AcceptedCompiler.ldc2 || c == AcceptedCompiler.nmc;
+    return c == AcceptedCompiler.dmd || c.isLDCBased;
+}
+bool isLDCBased(AcceptedCompiler c)
+{
+    return c == AcceptedCompiler.ldc2 || c == AcceptedCompiler.nmc;
 }
 
 

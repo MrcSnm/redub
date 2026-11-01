@@ -1,6 +1,8 @@
 module redub.building.compile;
 import redub.building.utils;
 import redub.building.cache;
+import redub.building.root_objects;
+import redub.building.build_timings;
 import redub.logging;
 import redub.buildapi;
 import std.system;
@@ -102,12 +104,42 @@ void execCompilationThread(immutable ThreadBuildData data, shared ProjectNode pa
     }
 }
 
-private bool canBuildInSingleCall(const ProjectNode node, CompilingSession s)
+private bool hasDirtyDependency(const ProjectNode node)
 {
-    if(!node.isRoot || node.dependencies.length != 0)
+    foreach(dep; node.dependencies)
+    {
+        ///A copy-enough dependency is already built; only its artifact needs
+        ///copying, so it does not block single-call or object builds.
+        if((dep.shouldEnterCompilationThread && !dep.isCopyEnough) || hasDirtyDependency(dep))
+            return true;
+    }
+    return false;
+}
+
+///Guards the per-module object strategy. Unlike canBuildInSingleCall this is
+///compatible with reuseObjects: both modes share the same object dir.
+private bool canUseRootObjectStrategy(const ProjectNode node, CompilingSession s)
+{
+    if(!node.isRoot)
+        return false;
+    if(hasDirtyDependency(node))
         return false;
     const BuildConfiguration cfg = node.requirements.cfg;
-    if(cfg.targetType != TargetType.executable || cfg.syntaxOnly || cfg.outputsDeps)
+    if(cfg.targetType != TargetType.executable || cfg.syntaxOnly)
+        return false;
+    return isDCompiler(cfg.getCompiler(s.compiler));
+}
+
+private bool canBuildInSingleCall(const ProjectNode node, CompilingSession s)
+{
+    if(!node.isRoot)
+        return false;
+    ///Single-call links against already-built dependencies. If any still needs
+    ///compiling, they must be built first and the separate link path is used.
+    if(hasDirtyDependency(node))
+        return false;
+    const BuildConfiguration cfg = node.requirements.cfg;
+    if(cfg.targetType != TargetType.executable || cfg.syntaxOnly || cfg.reuseObjects)
         return false;
     return isDCompiler(cfg.getCompiler(s.compiler));
 }
@@ -599,6 +631,7 @@ bool buildProjectSingleThread(ProjectDetails details, CompilingSession s, const(
     string mainPackHash = hashFrom(root.requirements, s);
     string[string] env = getCurrentEnv();
     AdvCacheFormula formulaCache = preprocessed !is null ? *preprocessed : AdvCacheFormula.init;
+    bool linkedInObjectBuild;
 
     printCachedBuildInfo(root);
     while(true)
@@ -613,10 +646,33 @@ bool buildProjectSingleThread(ProjectDetails details, CompilingSession s, const(
             }
             if(dep.shouldEnterCompilationThread)
             {
-                CompilationResult res = execCompilation(dep.requirements.buildData(true, s, getEnvForProject(dep, env)), cast(shared)dep,
-                    s,
-                    HashPair(mainPackHash, hashFrom(dep.requirements, s)), Tid.init, 0
-                );
+                CompilationResult res;
+                if(details.parallelType != ParallelType.no
+                    && dep is root && canUseRootObjectStrategy(dep, s) && canUseRootObjects(dep, s))
+                {
+                    RootObjectResult obj = buildRootObjects(dep, s, mainPackHash,
+                        getEnvForProject(dep, env));
+                    if(obj.notApplicable)
+                        res = execCompilation(dep.requirements.buildData(true, s, getEnvForProject(dep, env)), cast(shared)dep,
+                            s,
+                            HashPair(mainPackHash, hashFrom(dep.requirements, s)), Tid.init, 0
+                        );
+                    else
+                    {
+                        res.status = obj.status;
+                        res.message = obj.message;
+                        res.compilationCommand = obj.command;
+                        res.msNeeded = obj.msNeeded;
+                        res.linkedInCompilation = obj.status == 0;
+                        res.node = cast(shared)dep;
+                        linkedInObjectBuild = obj.status == 0;
+                    }
+                }
+                else
+                    res = execCompilation(dep.requirements.buildData(true, s, getEnvForProject(dep, env)), cast(shared)dep,
+                        s,
+                        HashPair(mainPackHash, hashFrom(dep.requirements, s)), Tid.init, 0
+                    );
                 if(res.status)
                 {
                     buildFailed(dep, res, s, finishedBuilds, mainPackHash, &formulaCache, existingSharedFormula);
@@ -624,6 +680,11 @@ bool buildProjectSingleThread(ProjectDetails details, CompilingSession s, const(
                 }
                 else
                 {
+                    if(dep is root && !linkedInObjectBuild && res.linkedInCompilation
+                        && dep.requirements.cfg.buildStats)
+                        recordBuildTiming(mainPackHash, TimingStrategy.single, false,
+                            dep.requirements.cfg.buildStrategy == BuildStrategy.incrementalOnce,
+                            1, 0, 0, cast(uint)res.msNeeded);
                     finishedBuilds~= dep;
                     buildSucceeded(dep, res);
                 }
@@ -643,7 +704,8 @@ bool buildProjectSingleThread(ProjectDetails details, CompilingSession s, const(
     runningProcesses.clear();
     if(root.requirements.cfg.syntaxOnly)
         return true;
-    return doLink(details, s, mainPackHash, &formulaCache, env, existingSharedFormula) && copyFiles(root);
+    return doLink(details, s, mainPackHash, &formulaCache, env, existingSharedFormula,
+        linkedInObjectBuild) && copyFiles(root);
 }
 
 private void printCachedBuildInfo(ProjectNode root)
@@ -818,12 +880,15 @@ private void saveFinishedBuilds(ProjNodeRange)(ProjNodeRange finishedProjects, s
     ///TODO: Start comparing current build time with the last one
 }
 
-private bool doLink(ProjectDetails details, CompilingSession info, string mainPackHash, AdvCacheFormula* formulaCache = null, const string[string] env = null, const(AdvCacheFormula)* existingSharedFormula)
+private bool doLink(ProjectDetails details, CompilingSession info, string mainPackHash,
+    AdvCacheFormula* formulaCache = null, const string[string] env = null,
+    const(AdvCacheFormula)* existingSharedFormula, bool linkedAlready = false)
 {
     ProjectNode root = details.tree;
     Compiler compiler = info.compiler;
     bool isUpToDate = root.isUpToDate;
-    bool shouldSkipLinking = isUpToDate || (!root.requirements.cfg.targetType.isLinkedSeparately) || canBuildInSingleCall(root, info);
+    bool shouldSkipLinking = linkedAlready || isUpToDate
+        || (!root.requirements.cfg.targetType.isLinkedSeparately) || canBuildInSingleCall(root, info);
     const string[string] targetEnv = getEnvForProject(root, env ? env : cast(const)getCurrentEnv());
 
     if(!shouldSkipLinking)
@@ -889,7 +954,7 @@ private bool doLink(ProjectDetails details, CompilingSession info, string mainPa
         string outDir = getConfigurationOutputPath(root.requirements.cfg, os);
         copyDir(inDir, dirName(outDir));
     }
-    else if(!isUpToDate && canBuildInSingleCall(root, info))
+    else if(!isUpToDate && (linkedAlready || canBuildInSingleCall(root, info)))
     {
         if(!executeCommandsAndPrint(root.requirements, RedubCommands.postBuild, targetEnv))
             return false;
