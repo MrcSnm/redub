@@ -352,6 +352,15 @@ BuildConfiguration parseEnvironmentForPreGenerate(BuildConfiguration cfg, out st
     return cfg;
 }
 
+/**
+*   execs = List of PluginExecution instances.
+*/
+void parsePluginExecutionsWithEnvironment(ref PluginExecution[] execs)
+{
+    foreach(ref exec; execs)
+        exec.args = arrParseEnv(exec.args);
+}
+
 /** 
  * 
  * Params:
@@ -372,6 +381,9 @@ BuildConfiguration parseEnvironment(BuildConfiguration cfg)
             )
                 __traits(getMember, cfg, mem) = arrParseEnv(__traits(getMember, cfg, mem));
         }
+
+        parsePluginExecutionsWithEnvironment(cfg.preBuildPlugins);
+
         if(cfg.targetName.length) cfg.targetName = parseStringWithEnvironment(cfg.targetName);
         if(cfg.commands.length > RedubCommands.postGenerate)
             cfg.commands[RedubCommands.postGenerate] = arrParseEnv(cfg.commands[RedubCommands.postGenerate]);

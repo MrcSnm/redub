@@ -106,8 +106,7 @@ void buildPlugin(string pluginName, string inputFile, CompilationInfo cInfo)
         errorTitle("Plugin Flags: ", buildCmds);
         throw new Exception("Plugin compilation failed for '"~pluginName~"': "~compileResult.output);
     }
-
-    string linkDir = getCacheOutputDir(pluginHash, b, s, true);
+    
     auto linkProcess = linkBase(const ThreadBuildData(b, ExtraInformation(isRoot: true)), s, pluginHash, buildCmds, cmdFile2);
     auto linkResult = waitProcessExec(linkProcess);
     if(linkResult.status) {

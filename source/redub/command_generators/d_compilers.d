@@ -55,10 +55,10 @@ string[] parseBuildConfiguration(const BuildConfiguration b, CompilingSession s,
             cmds~= "--cache=.ldc2_cache";
             cmds~= "--cache-prune";
         }
-        if(comp == AcceptedCompiler.nmc && !s.os.isApple && !b.syntaxOnly) //Broken on apple
+        else if(comp == AcceptedCompiler.nmc && !s.os.isApple && !b.syntaxOnly) //Broken on apple
         {
             ///cmds~= "--cache-retrieval=hardlink"; // Doesn't work on Windows when using a multi drives projects
-            cmds~= "--cache=.ldc2_cache";
+            cmds~= "--cache=.nmc_cache";
             cmds~= "--cache-prune";
         }
 
