@@ -10,6 +10,8 @@ import std.path;
 // import std.json;
 import redub.command_generators.commons;
 
+public enum MAX_DIRTY_FILES = 256;
+
 enum CACHE_FOLDER_NAME = ".redub";
 enum BIN_CACHE_FOLDER = "bin";
 
@@ -125,12 +127,13 @@ struct CompilationCache
      *   cache = Optional argument which stores precalculated results
      * Returns: isCompilationUpToDate
      */
-    bool isCompilationUpToDate(const BuildRequirements req, CompilingSession s, AdvCacheFormula* preprocessed, out string[64] diffs, out size_t diffCount) const
+    bool isCompilationUpToDate(const BuildRequirements req, CompilingSession s, AdvCacheFormula* preprocessed, out string[MAX_DIRTY_FILES] diffs, out size_t diffCount) const
     {
         if(requirementCache != hashFrom(req, s))
             return false;
         AdvCacheFormula otherFormula = getCompilationCacheFormula(req, rootHash, s, &sharedFormula, preprocessed);
-        diffs = formula.diffStatus(otherFormula, diffCount);
+        string[] sink = diffs;
+        formula.diffStatus(otherFormula, sink, diffCount);
         return diffCount == 0;
     }
 
@@ -143,12 +146,13 @@ struct CompilationCache
      *   cache = Optional argument which stores precalculated results
      * Returns: isCompilationUpToDate
      */
-    bool needsNewCopy(const BuildRequirements req, CompilingSession s, AdvCacheFormula* preprocessed, out string[64] diffs, out size_t diffCount) const
+    bool needsNewCopy(const BuildRequirements req, CompilingSession s, AdvCacheFormula* preprocessed, out string[MAX_DIRTY_FILES] diffs, out size_t diffCount) const
     {
         if(copyFormula.isEmptyFormula)
             return false;
         AdvCacheFormula otherFormula = getCopyCacheFormula(rootHash, req, s, &sharedFormula, preprocessed);
-        diffs = copyFormula.diffStatus(otherFormula, diffCount);
+        string[] sink = diffs;
+        copyFormula.diffStatus(otherFormula, sink, diffCount);
         return diffCount != 0;
     }
 }
@@ -200,7 +204,7 @@ void invalidateCaches(ProjectNode root, CompilingSession s, out AdvCacheFormula 
     import std.algorithm.comparison: min;
     ptrdiff_t i = cacheStatus.length;
 
-    string[64] dirtyFiles;
+    string[MAX_DIRTY_FILES] dirtyFiles;
     size_t dirtyCount;
 
     foreach_reverse (ProjectNode n; root.collapse)
@@ -223,12 +227,13 @@ void invalidateCaches(ProjectNode root, CompilingSession s, out AdvCacheFormula 
         }
         if (!upToDate)
         {
-            n.setFilesDirty(dirtyFiles[0..min(dirtyCount, 64)]);
+            n.setFilesDirty(dirtyFiles[0..min(dirtyCount, MAX_DIRTY_FILES)]);
+            n.setDirtyTruncated(dirtyCount > MAX_DIRTY_FILES);
             n.invalidateCache();
             continue;
         }
         if(cacheStatus[i].needsNewCopy(n.requirements, s, &preprocessed, dirtyFiles, dirtyCount))
-            n.setCopyEnough(dirtyFiles[0..min(dirtyCount, 64)]);
+            n.setCopyEnough(dirtyFiles[0..min(dirtyCount, MAX_DIRTY_FILES)]);
     }
     vvlog("Cache invalidation took ", sw.peek.total!"msecs", "ms");
 }

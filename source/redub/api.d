@@ -212,8 +212,9 @@ class BuildException : Exception
 string[] getChangedBuildFiles(ProjectNode root, CompilingSession s)
 {
     import std.file;
+    import std.path : isAbsolute;
     import redub.misc.path;
-    import std.algorithm.iteration;
+    import std.algorithm.iteration : map;
     import std.array : array;
     import redub.command_generators.commons;
     if(!root.isRoot)
@@ -222,8 +223,30 @@ string[] getChangedBuildFiles(ProjectNode root, CompilingSession s)
     string depsPath = getDepsFilePath(root, s);
     if(!exists(depsPath))
         return null;
-    const string[] dirtyFiles = filter!((string f) => !f.isDir)(root.getDirtyFiles()).array;
-    if(dirtyFiles.length == 0)
+    ///Cache diffs are relative to the watched directory while the deps file
+    ///uses absolute paths, so resolve them before matching.
+    string[] watchedDirs = root.requirements.cfg.sourcePaths.dup;
+    watchedDirs ~= root.requirements.cfg.importDirectories;
+    string[] dirtyFiles;
+    foreach(f; root.getDirtyFiles())
+    {
+        string resolved = isAbsolute(f) ? f : null;
+        if(!resolved)
+            foreach(dir; watchedDirs)
+            {
+                string candidate = buildNormalizedPath(dir, f);
+                if(exists(candidate))
+                {
+                    resolved = candidate;
+                    break;
+                }
+            }
+        if(!resolved && exists(f))
+            resolved = f;
+        if(resolved.length && !resolved.isDir)
+            dirtyFiles ~= resolved;
+    }
+    if(dirtyFiles.length == 0 || root.isDirtyTruncated())
         return null;
 
     import d_dependencies;

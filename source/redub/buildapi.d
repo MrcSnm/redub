@@ -1027,6 +1027,7 @@ class ProjectNode
     private bool needsCopyOnly = false;
     private bool _isOptional = false;
     private string[] dirtyFiles;
+    private bool dirtyTruncated;
 
     string name() const { return requirements.name; }
     string targetName() const { return requirements.cfg.targetName; }
@@ -1456,6 +1457,8 @@ class ProjectNode
         this.dirtyFiles = files.dup;
     }
     const(string[]) getDirtyFiles() const { return cast(const)this.dirtyFiles; }
+    void setDirtyTruncated(bool value) { dirtyTruncated = value; }
+    bool isDirtyTruncated() const { return dirtyTruncated; }
 
     ///Invalidates self and parent caches
     void invalidateCache()
@@ -1690,19 +1693,26 @@ private TargetType inferTargetType(const ProjectNode node)
 {
     static immutable string[] filesThatInfersExecutable = ["app.d", "main.d", "app.c", "main.c"];
     import redub.misc.path;
-    if(node.parent.length == 0) foreach(p; node.requirements.cfg.sourcePaths)
+    import std.algorithm.searching : canFind;
+    import std.file : exists, dirEntries, SpanMode, DirEntry;
+    import std.path : baseName;
+    if(node.parent.length == 0)
     {
-        static import std.file;
-        static import std.path;
         static char[4096] normalizeBuffer;
-        char[] temp = normalizeBuffer;
-
-
-        foreach(f; filesThatInfersExecutable)
+        foreach(p; node.requirements.cfg.sourcePaths)
         {
-            if(std.file.exists(normalizePath(temp, p,f)))
-                return TargetType.executable;
+            char[] temp = normalizeBuffer;
+            foreach(f; filesThatInfersExecutable)
+                if(exists(normalizePath(temp, p, f)))
+                    return TargetType.executable;
+            ///main.d/app.d may live in a package folder (e.g. src/dfmt/main.d).
+            foreach(DirEntry e; dirEntries(p, SpanMode.depth))
+                if(!e.isDir && filesThatInfersExecutable.canFind(baseName(e.name)))
+                    return TargetType.executable;
         }
+        foreach(file; node.requirements.cfg.sourceFiles)
+            if(filesThatInfersExecutable.canFind(baseName(file)))
+                return TargetType.executable;
     }
     return TargetType.library;
 }

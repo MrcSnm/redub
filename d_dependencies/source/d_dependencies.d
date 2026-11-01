@@ -71,15 +71,19 @@ class ModuleParsing
 	ModuleDef[] findDependees(const string[] filesPath, ref bool[string] visited)
 	{
 		ModuleDef[] ret;
-		static void findDependeesImpl(ModuleDef* input, ref ModuleDef[] ret, ref bool[string] visited)
+		void findDependeesImpl(ModuleDef* input, ref ModuleDef[] ret, ref bool[string] visited)
 		{
 			foreach(modPath, ref modDef; input.importedBy)
 			{
 				if(!(modPath in visited))
 				{
 					visited[modPath] = true;
-					ret~= modDef;
-					findDependeesImpl(&modDef, ret, visited);
+					///importedBy stores copies taken before the importer had
+					///imports of its own, so use the live module from the graph.
+					ModuleDef* live = modPath in allModules;
+					ModuleDef* target = live is null ? &modDef : live;
+					ret~= *target;
+					findDependeesImpl(target, ret, visited);
 				}
 			}
 		}

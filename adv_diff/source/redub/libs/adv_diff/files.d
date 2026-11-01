@@ -479,7 +479,7 @@ struct AdvCacheFormula
 	 * Params:
 	 *   other = The other cache formula to compare.
 	 *   diffs = A variable to store the diffs. It's length is never increased, since this function is nogc
-	 *   diffCount = How many diffs are there, you can do a double pass on this function to store every diff
+	 *   diffCount = Total number of diffs. May exceed diffs.length when the buffer is too small.
 	 * Returns: true if they're the same
 	 */
 	bool diffStatus(const ref AdvCacheFormula other, ref string[] diffs, out size_t diffCount) const @nogc
@@ -497,16 +497,21 @@ struct AdvCacheFormula
 				if(advFile is null ||  (otherAdv.timeModified != advFile.timeModified &&
 				otherAdv.contentHash != advFile.contentHash))
 				{
-					if(diffCount + 1 < diffs.length)
-						diffs[diffCount++] = fileName;
+					if(diffCount < diffs.length)
+						diffs[diffCount] = fileName;
+					diffCount++;
 				}
 			}
 			ptrdiff_t plainDiff = cast(ptrdiff_t)filesOther.length - cast(ptrdiff_t)files.length;
 			if(plainDiff < 0)
 			{
 				foreach(fileName, currAdv; files)
-					if(diffCount + 1 < diffs.length && !(fileName in filesOther))
-						diffs[diffCount++] = fileName;
+					if(!(fileName in filesOther))
+					{
+						if(diffCount < diffs.length)
+							diffs[diffCount] = fileName;
+						diffCount++;
+					}
 			}
 			return diffCount;
 		}
@@ -517,17 +522,16 @@ struct AdvCacheFormula
 			const(AdvDirectory)* advDir = dirName in directories;
 			if(advDir is null)
 			{
-				if(diffCount + 1 < diffs.length)
-				{
-					diffs[diffCount++] = dirName;
-				}
+				if(diffCount < diffs.length)
+					diffs[diffCount] = dirName;
+				diffCount++;
 			}
 			else
 			{
 				if(otherAdvDir.contentHash != advDir.contentHash)
 				{
 					//If directory total is different, check per file
-					diffCount+= diffFiles(otherAdvDir.files, advDir.files, diffs, diffCount);
+					diffCount = diffFiles(otherAdvDir.files, advDir.files, diffs, diffCount);
 				}
 			}
 		}
@@ -604,8 +608,9 @@ unittest
 	AdvCacheFormula formula2 = AdvCacheFormula.make(&hasher, [DirectoriesWithFilter(["source", "source/redub"], true)], string[].init);
 
 	import std.stdio;
+	import std.algorithm.comparison : min;
 	size_t diffCount;
-	writeln(formula.diffStatus(formula2, diffCount)[0..diffCount]);
+	writeln(formula.diffStatus(formula2, diffCount)[0..min(diffCount, 64)]);
 
 	JSONValue v = JSONValue.emptyObject;
 	formula.serialize(v);
