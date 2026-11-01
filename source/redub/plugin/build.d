@@ -11,6 +11,8 @@ import redub.tree_generators.dub;
 
 version(DigitalMars)
     enum DefaultCompiler = "dmd";
+else version(NMC)
+    enum DefaultCompiler = "nmc";
 else
     enum DefaultCompiler = "ldc2";
 
@@ -52,7 +54,7 @@ BuildConfiguration injectPluginCfg(BuildConfiguration base, string pluginName, C
     base.versions~= "RedubPlugin";
     base.dFlags~= "-i";
     ///DO NOT SHARE D RUNTIME AS WE CAN'T GUARANTEE REDUB IS BEING BUILT TO SHARE IT.
-    if(DefaultCompiler == "ldc2")
+    if(DefaultCompiler == "ldc2" || DefaultCompiler == "nmc")
         base.dFlags~= "-link-defaultlib-shared=false";
     base.sourcePaths~= getPluginImportDir();
     base.importDirectories~= getPluginImportDir();
@@ -95,7 +97,7 @@ void buildPlugin(string pluginName, string inputFile, CompilationInfo cInfo)
     string pluginHash = hashFrom(b, s, true);
     string inDir = getCacheOutputDir(pluginHash, b, s, true);
 
-    errorTitle(pluginHash, " ", hashFrom(b, s, false));
+    errorTitle(pluginHash, " ", hashFrom(b, s, true));
 
     string cmdFile1, cmdFile2;
 
@@ -106,6 +108,7 @@ void buildPlugin(string pluginName, string inputFile, CompilationInfo cInfo)
     errorTitle("Plugin Flags: ", buildCmds);
     if(compileResult.status)
         throw new Exception("Plugin compilation failed for '"~pluginName~"': "~compileResult.output);
+
     ProcessExec2 linkProcess = linkBase(const ThreadBuildData(b, ExtraInformation()), s, pluginHash, buildCmds, cmdFile2);
     auto linkResult = waitProcessExec(linkProcess);
     errorTitle("", linkResult.output);
@@ -131,7 +134,9 @@ void buildPluginProject(string pluginDir, CompilationInfo cInfo)
     LogLevel level = getLogLevel();
     setLogLevel(LogLevel.error);
 
-    version(LDC)
+    version(NMC)
+        enum preferredCompiler = "nmc";
+    else version(LDC)
         enum preferredCompiler = "ldc2";
     else
         enum preferredCompiler = "dmd";

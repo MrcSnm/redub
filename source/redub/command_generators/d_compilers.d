@@ -155,6 +155,7 @@ string function(ValidDFlags) getFlagMapper(CompilerBinary comp)
     {
         case AcceptedCompiler.dmd: return &dmdFlags;
         case AcceptedCompiler.ldc2: return &ldcFlags;
+        case AcceptedCompiler.nmc: return &ldcFlags;
         case AcceptedCompiler.gcc, AcceptedCompiler.gxx: return &gccFlags;
         case AcceptedCompiler.clang: return &clangFlags;
         case AcceptedCompiler.cl: return &clFlags;
@@ -378,7 +379,21 @@ private bool isWow64() {
 
 string mapArch(AcceptedCompiler compiler, string arch)
 {
-    if(compiler == AcceptedCompiler.ldc2)
+    if (compiler == AcceptedCompiler.nmc)
+    {
+        switch (arch)
+        {
+            case "": return null;
+            case "x86": return "-march=x86";
+            case "x86_mscoff":  return "-march=x86";
+            case "x86_64":  return "-march=x86-64";
+            case "aarch64":  return "-march=aarch64";
+            case "powerpc64":  return "-march=powerpc64";
+            default: return "-mtriple="~arch;
+        }
+
+    }
+    else if(compiler == AcceptedCompiler.ldc2)
     {
         switch (arch)
         {
