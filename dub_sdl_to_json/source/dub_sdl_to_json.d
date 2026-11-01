@@ -72,6 +72,8 @@ JSONValue sdlToJSON(SDLNode[] sdl)
 	JSONValue dependencies = JSONValue.emptyObject;
 	JSONValue subConfigurations = JSONValue.emptyObject;
 	JSONValue buildTypes = JSONValue.emptyObject;
+	JSONValue plugins = JSONValue.emptyObject;
+	JSONValue preBuildPlugins = JSONValue.emptyObject;
 
 	JSONValue configurations = JSONValue.emptyArray;
 	JSONValue subPackages = JSONValue.emptyArray;
@@ -111,12 +113,29 @@ JSONValue sdlToJSON(SDLNode[] sdl)
 					dependencies[depName] = dep;
 				}
 				break;
+			case "plugin":
+				enforce(v.attributes.length == 1, "A plugin must be in the form of 'plugin name=\"path\"'.");
+				enforce(v.attributes[0].value.isText, "A plugin must be in the form of 'plugin name=\"path\"'.");
+				SDLAttribute attr = v.attributes[0];
+				plugins[attr.name] = toJSONValue(attr.value);
+				break;
 			case "configuration":
 				enforce(v.values.length == 1, "A configuration can only have a single value, which is the configuration name");
 				enforce(v.values[0].isText, "The configuration value must be a string.");
 				JSONValue configSdl = sdlToJSON(v.children);
 				configSdl["name"] = v.values[0].textValue;
-				configurations.jsonArray~= configSdl;
+				configurations.jsonArray ~= configSdl;
+				break;
+			case "preBuildPlugin":
+				enforce(v.values.length < 2, "A prebuild plugin must specify a plugin and arguments.");
+				enforce(v.values[0].isText, "The first preBuildPlugin value must be the name of a plugin.");
+				string pluginName = v.values[0].textValue;
+
+				JSONValue configSdl = JSONValue.emptyArray;
+				foreach(arg; v.values[1..$]) {
+					configSdl.jsonArray ~= toJSONValue(arg);
+				}
+				preBuildPlugins[pluginName] = configSdl;
 				break;
 			case "buildType":
 				enforce(v.values.length == 1, "A buildType can only have a single value, which is the buildType name");
@@ -214,6 +233,10 @@ JSONValue sdlToJSON(SDLNode[] sdl)
 		ret["subConfigurations"] = subConfigurations;
 	if(buildTypes.data.object !is null)
 		ret["buildTypes"] = buildTypes;
+	if(plugins.data.object !is null)
+		ret["plugins"] = plugins;
+	if(preBuildPlugins.data.object !is null)
+		ret["preBuildPlugins"] = preBuildPlugins;
 
 	if(configurations.array.length != 0)
 		ret["configurations"] = configurations;
