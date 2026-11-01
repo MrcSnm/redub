@@ -207,7 +207,7 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
                 res.pid = cast(shared)ex.pipe.pid;
                 if(owner != Tid.init)
                     owner.send(CompilationID(id), ProcessInfo(res.pid), CompilationResult.init);
-                ret = cast(ExecutionResult)finishCompilerExec(cfg, compiler, inDir, outDir, ex);
+                ret = cast(ExecutionResult)finishCompilerExec(cfg, compiler, inDir, dirName(outDir), ex);
             }
 
             if(!ret.status && !isDCompiler(c) && isStaticLibrary(data.cfg.targetType)) //Must call archiver when

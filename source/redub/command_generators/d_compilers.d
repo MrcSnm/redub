@@ -37,6 +37,14 @@ string[] parseBuildConfiguration(const BuildConfiguration b, CompilingSession s,
 
             cmds~= mapper(ValidDFlags.objectDir) ~ escapePath(ldcObjOutDir);
         }
+        else if(b.getCompiler(s.compiler).compiler == AcceptedCompiler.nmc && !b.outputsDeps && !b.syntaxOnly)
+        {
+            import std.file;
+            string ldcObjOutDir = cacheDir~ "_obj";
+            mkdirRecurse(ldcObjOutDir);
+
+            cmds~= mapper(ValidDFlags.objectDir) ~ escapePath(ldcObjOutDir);
+        }
         else if(b.outputsDeps)
             cmds~= mapper(ValidDFlags.objectDir)~getObjectDir(cacheDir).escapePath;
 
@@ -45,6 +53,12 @@ string[] parseBuildConfiguration(const BuildConfiguration b, CompilingSession s,
         {
             ///cmds~= "--cache-retrieval=hardlink"; // Doesn't work on Windows when using a multi drives projects
             cmds~= "--cache=.ldc2_cache";
+            cmds~= "--cache-prune";
+        }
+        else if(comp == AcceptedCompiler.nmc && !s.os.isApple && !b.syntaxOnly) //Broken on apple
+        {
+            ///cmds~= "--cache-retrieval=hardlink"; // Doesn't work on Windows when using a multi drives projects
+            cmds~= "--cache=.nmc_cache";
             cmds~= "--cache-prune";
         }
 
@@ -155,6 +169,7 @@ string function(ValidDFlags) getFlagMapper(CompilerBinary comp)
     {
         case AcceptedCompiler.dmd: return &dmdFlags;
         case AcceptedCompiler.ldc2: return &ldcFlags;
+        case AcceptedCompiler.nmc: return &nmcFlags;
         case AcceptedCompiler.gcc, AcceptedCompiler.gxx: return &gccFlags;
         case AcceptedCompiler.clang: return &clangFlags;
         case AcceptedCompiler.cl: return &clFlags;
@@ -201,6 +216,44 @@ string dmdFlags(ValidDFlags flag)
 }
 
 string ldcFlags(ValidDFlags flag)
+{
+    final switch(flag) with (ValidDFlags)
+    {
+        case debugMode: return "-d-debug";
+        case debugInfo: return "-g";
+        case releaseMode: return "-release";
+        case optimize: return "-O3";
+        case optimizeSize: return "-Oz";
+        case inline: return "-enable-inlining";
+        case noBoundsCheck: return "-boundscheck=off";
+        case unittests: return "-unittest";
+        case syntaxOnly: return "-o-";
+        case profile: return "-fdmd-trace-functions";
+        case profileGC: return "";
+        case coverage: return "-cov";
+        case coverageCTFE: return "-cov=ctfe";
+        case mixinFile: return "-mixin=mixed_in.d";
+        case verbose: return "-v";
+        case verboseCodeGen: return "--v-cg";
+        case timeTrace: return "--ftime-trace";
+        case timeTraceFile: return "--ftime-trace-file=trace.json";
+        case enableColor: return "--enable-color=true";
+        case stringImportPaths: return "-J=";
+        case versions: return "--d-version=";
+        case debugVersions: return "--d-debug=";
+        case importPaths: return "-I";
+        case objectDir: return "--od=";
+        case outputFile: return "--of=";
+        case buildAsLibrary: return "--lib";
+        case buildAsShared: return "--shared";
+        case compileOnly: return "-c";
+        case arch: return "--mtriple=";
+        case preserveNames: return "--oq";
+        case deps: return "--deps=";
+    }
+}
+
+string nmcFlags(ValidDFlags flag)
 {
     final switch(flag) with (ValidDFlags)
     {
@@ -378,7 +431,21 @@ private bool isWow64() {
 
 string mapArch(AcceptedCompiler compiler, string arch)
 {
-    if(compiler == AcceptedCompiler.ldc2)
+    if (compiler == AcceptedCompiler.nmc)
+    {
+        switch (arch)
+        {
+            case "": return null;
+            case "x86": return "-march=x86";
+            case "x86_mscoff":  return "-march=x86";
+            case "x86_64":  return "-march=x86-64";
+            case "aarch64":  return "-march=aarch64";
+            case "powerpc64":  return "-march=powerpc64";
+            default: return "-mtriple="~arch;
+        }
+
+    }
+    else if(compiler == AcceptedCompiler.ldc2)
     {
         switch (arch)
         {

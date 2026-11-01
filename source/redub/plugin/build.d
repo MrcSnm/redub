@@ -11,6 +11,8 @@ import redub.tree_generators.dub;
 
 version(DigitalMars)
     enum DefaultCompiler = "dmd";
+else version(NMC)
+    enum DefaultCompiler = "nmc";
 else
     enum DefaultCompiler = "ldc2";
 
@@ -52,7 +54,7 @@ BuildConfiguration injectPluginCfg(BuildConfiguration base, string pluginName, C
     base.versions~= "RedubPlugin";
     base.dFlags~= "-i";
     ///DO NOT SHARE D RUNTIME AS WE CAN'T GUARANTEE REDUB IS BEING BUILT TO SHARE IT.
-    if(DefaultCompiler == "ldc2")
+    if(DefaultCompiler == "ldc2" || DefaultCompiler == "nmc")
         base.dFlags~= "-link-defaultlib-shared=false";
     base.sourcePaths~= getPluginImportDir();
     base.importDirectories~= getPluginImportDir();
@@ -94,24 +96,25 @@ void buildPlugin(string pluginName, string inputFile, CompilationInfo cInfo)
     string buildCmds;
     string pluginHash = hashFrom(b, s, true);
     string inDir = getCacheOutputDir(pluginHash, b, s, true);
-
-    errorTitle(pluginHash, " ", hashFrom(b, s, false));
-
     string cmdFile1, cmdFile2;
-
     string[string] env = getRedubEnv();
 
     auto compileResult = finishCompilerExec(b, s.compiler, inDir, b.outputDirectory, execCompiler(b, s.compiler, getCompilationFlags(b, s, pluginHash, true), buildCmds, true, cmdFile1, env));
-    errorTitle("", compileResult.output);
-    errorTitle("Plugin Flags: ", buildCmds);
-    if(compileResult.status)
+    
+    if(compileResult.status) {
+        errorTitle("", compileResult.output);
+        errorTitle("Plugin Flags: ", buildCmds);
         throw new Exception("Plugin compilation failed for '"~pluginName~"': "~compileResult.output);
-    ProcessExec2 linkProcess = linkBase(const ThreadBuildData(b, ExtraInformation()), s, pluginHash, buildCmds, cmdFile2);
+    }
+    
+    auto linkProcess = linkBase(const ThreadBuildData(b, ExtraInformation(isRoot: true)), s, pluginHash, buildCmds, cmdFile2);
     auto linkResult = waitProcessExec(linkProcess);
-    errorTitle("", linkResult.output);
-    errorTitle("Plugin Flags: ", buildCmds);
-    if(linkResult.status)
+    if(linkResult.status) {
+        errorTitle("", linkResult.output);
+        errorTitle("Plugin Flags: ", buildCmds);
         throw new Exception("Plugin link failed for '"~pluginName~"': "~linkResult.output);
+    }
+
     scope(exit)
     {
         if(cmdFile1)
@@ -131,7 +134,9 @@ void buildPluginProject(string pluginDir, CompilationInfo cInfo)
     LogLevel level = getLogLevel();
     setLogLevel(LogLevel.error);
 
-    version(LDC)
+    version(NMC)
+        enum preferredCompiler = "nmc";
+    else version(LDC)
         enum preferredCompiler = "ldc2";
     else
         enum preferredCompiler = "dmd";

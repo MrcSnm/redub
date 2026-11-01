@@ -660,6 +660,11 @@ struct PlatformFilter
     {
         import std.string:startsWith;
         if(compiler.length == 0 || this.compiler.length == 0) return true;
+
+        // NMC is technically compatible with LDC, so check that first.
+        if(compiler.startsWith("nmc") && this.compiler.startsWith("ldc"))
+            return true;
+
         if(this.compiler.startsWith("ldc")) return compiler.startsWith("ldc");
         return this.compiler == compiler;
     }

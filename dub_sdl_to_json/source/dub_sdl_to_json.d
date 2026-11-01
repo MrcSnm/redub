@@ -127,7 +127,7 @@ JSONValue sdlToJSON(SDLNode[] sdl)
 				configurations.jsonArray ~= configSdl;
 				break;
 			case "preBuildPlugin":
-				enforce(v.values.length < 2, "A prebuild plugin must specify a plugin and arguments.");
+				enforce(v.values.length >= 2, "A prebuild plugin must specify a plugin and arguments.");
 				enforce(v.values[0].isText, "The first preBuildPlugin value must be the name of a plugin.");
 				string pluginName = v.values[0].textValue;
 

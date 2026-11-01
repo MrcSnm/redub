@@ -313,7 +313,7 @@ DirectoryFilterType filterTypeFromCompiler(const ref BuildRequirements cfg, cons
 
     final switch(b.compiler) with(AcceptedCompiler)
     {
-        case dmd, ldc2: return DirectoryFilterType.d;
+        case dmd, ldc2, nmc: return DirectoryFilterType.d;
         case gcc: return DirectoryFilterType.c;
         case gxx: return DirectoryFilterType.cpp;
         case clang, cl: return DirectoryFilterType.cpp;

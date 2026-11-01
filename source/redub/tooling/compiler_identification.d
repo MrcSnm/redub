@@ -12,6 +12,7 @@ enum AcceptedCompiler : ubyte
     invalid,
     dmd,
     ldc2,
+    nmc,
     gcc,
     gxx,
     clang,
@@ -55,6 +56,7 @@ struct CompilerBinary
         {
             case dmd: return "dmd";
             case ldc2: return "ldc";
+            case nmc: return "nmc";
             case gcc: return "gcc";
             case gxx: return "g++";
             case clang: return "clang";
@@ -98,7 +100,7 @@ bool isDCompiler(const CompilerBinary comp)
 }
 bool isDCompiler(AcceptedCompiler c)
 {
-    return c == AcceptedCompiler.dmd || c == AcceptedCompiler.ldc2;
+    return c == AcceptedCompiler.dmd || c == AcceptedCompiler.ldc2 || c == AcceptedCompiler.nmc;
 }
 
 
@@ -107,7 +109,8 @@ bool isDCompiler(AcceptedCompiler c)
  */
 immutable string[] supportedDCompilers = [
     "dmd",
-    "ldc2"
+    "ldc2",
+    "nmc"
 ];
 
 immutable string[] supportedCCompilers = [
