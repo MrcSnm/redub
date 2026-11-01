@@ -71,7 +71,10 @@ auto finishCompilerExec(const BuildConfiguration cfg, Compiler compiler, string 
         if(cfg.outputsDeps && cfg.preservePath && cfg.getCompiler(compiler).compiler == AcceptedCompiler.dmd)
             moveGeneratedObjectFiles(cfg.sourcePaths, cfg.sourceFiles, cfg.excludeSourceFiles, getObjectDir(inputDir),getObjectExtension(os));
         StopWatch sw = StopWatch(AutoStart.yes);
-        copyDir(inputDir, dirName(outDir));
+
+        vvlog("Copying ", inputDir, " to ", outDir, "...");
+
+        copyDir(inputDir, outDir);
         vvlog("Copy cache->output took ", sw.peek.total!"msecs", "ms");
     }
     return ret;

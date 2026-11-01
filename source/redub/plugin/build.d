@@ -96,25 +96,26 @@ void buildPlugin(string pluginName, string inputFile, CompilationInfo cInfo)
     string buildCmds;
     string pluginHash = hashFrom(b, s, true);
     string inDir = getCacheOutputDir(pluginHash, b, s, true);
-
-    errorTitle(pluginHash, " ", hashFrom(b, s, true));
-
     string cmdFile1, cmdFile2;
-
     string[string] env = getRedubEnv();
 
     auto compileResult = finishCompilerExec(b, s.compiler, inDir, b.outputDirectory, execCompiler(b, s.compiler, getCompilationFlags(b, s, pluginHash, true), buildCmds, true, cmdFile1, env));
-    errorTitle("", compileResult.output);
-    errorTitle("Plugin Flags: ", buildCmds);
-    if(compileResult.status)
+    
+    if(compileResult.status) {
+        errorTitle("", compileResult.output);
+        errorTitle("Plugin Flags: ", buildCmds);
         throw new Exception("Plugin compilation failed for '"~pluginName~"': "~compileResult.output);
+    }
 
-    ProcessExec2 linkProcess = linkBase(const ThreadBuildData(b, ExtraInformation()), s, pluginHash, buildCmds, cmdFile2);
+    string linkDir = getCacheOutputDir(pluginHash, b, s, true);
+    auto linkProcess = linkBase(const ThreadBuildData(b, ExtraInformation(isRoot: true)), s, pluginHash, buildCmds, cmdFile2);
     auto linkResult = waitProcessExec(linkProcess);
-    errorTitle("", linkResult.output);
-    errorTitle("Plugin Flags: ", buildCmds);
-    if(linkResult.status)
+    if(linkResult.status) {
+        errorTitle("", linkResult.output);
+        errorTitle("Plugin Flags: ", buildCmds);
         throw new Exception("Plugin link failed for '"~pluginName~"': "~linkResult.output);
+    }
+
     scope(exit)
     {
         if(cmdFile1)

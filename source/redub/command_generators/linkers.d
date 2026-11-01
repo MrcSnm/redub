@@ -40,7 +40,7 @@ string[] parseLinkConfiguration(const ThreadBuildData data, CompilingSession s, 
                 string cacheDir = getCacheOutputDir(requirementCache, b, s, data.extra.isRoot);
                 string objExtension = getObjectExtension(s.os);
                 if(c.isDCompiler)
-                    cmds~= "-of"~buildNormalizedPath(cacheDir, getOutputName(b, s.os)).escapePath;
+                    cmds~= "-of="~buildNormalizedPath(cacheDir, getOutputName(b, s.os)).escapePath;
                 else
                 {
                     cmds~= "-o";

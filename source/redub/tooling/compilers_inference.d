@@ -182,8 +182,9 @@ private string getActualCompilerToUse(string preferredCompiler, ref string actua
     return compVersionRes.output;
 }
 
-private immutable bool function(string compilerOrPath, string vString, out CompilerBinary comp)[2] dCompilersInference = [
+private immutable bool function(string compilerOrPath, string vString, out CompilerBinary comp)[3] dCompilersInference = [
     &tryInferDmd,
+    &tryInferNmc,
     &tryInferLdc
 ];
 
@@ -206,9 +207,6 @@ private bool tryInferLdc(string compilerOrPath, string vString, out CompilerBina
     ///Identify LDC and its version
     if(indexRight == -1)
     {
-        ldcVerStr = inBetween(vString, "NMC (", "):", indexRight);
-        if(indexRight == -1)
-            return false;
         ldcVerStr = inBetween(vString, "LDC - the LLVM Open D compiler (", " ", indexRight);
         if(indexRight == -1)
             return false;
@@ -221,6 +219,28 @@ private bool tryInferLdc(string compilerOrPath, string vString, out CompilerBina
     return true;
 }
 
+private bool tryInferNmc(string compilerOrPath, string vString, out CompilerBinary comp)
+{
+    import std.exception;
+    import std.string;
+
+    ptrdiff_t indexRight = 0;
+    string nmcVerStr = inBetween(vString, "NMC (", "):", indexRight);
+    ///Identify LDC and its version
+    if(indexRight == -1)
+    {
+        nmcVerStr = inBetween(vString, "NMC (", "):", indexRight);
+        if(indexRight == -1)
+            return false;
+    }
+
+    ///Find DMD ver
+    string frontEndVer = inBetweenAny(vString, "based on DMD v", [' ', '\t', '\n', '\r'], indexRight);
+    enforce(indexRight != -1, "Found NMC but could not find DMD Frontend version");
+
+    comp = CompilerBinary(AcceptedCompiler.nmc, compilerOrPath, SemVer(nmcVerStr), SemVer(frontEndVer), vString);
+    return true;
+}
 
 private bool tryInferDmd(string compilerOrPath, string vString, out CompilerBinary comp)
 {
@@ -315,7 +335,7 @@ private CompilerBinary assumeCompiler(string compilerOrPath, string compilerAssu
             ret.version_ = SemVer(dmdVer);
             ret.frontendVersion = feVer is null ? ret.version_ : SemVer(feVer);
             break;
-        case "ldc", "ldc2":
+        case "ldc", "ldc2", "nmc":
             ptrdiff_t _;
             string ldcVer = inBetween(compilerAssumption, "v[", "]", _);
             enforce(ldcVer !is null, "LDC2 assumption must contain a compiler version, received "~compilerAssumption);

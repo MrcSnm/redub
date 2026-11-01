@@ -41,6 +41,9 @@ string[] getCompilationFlags(const BuildConfiguration cfg, CompilingSession s, s
             return redub.command_generators.dmd.parseBuildConfiguration(cfg, s, mainPackHash, isRoot, singleCall);
         case ldc2:
             return redub.command_generators.ldc.parseBuildConfiguration(cfg, s, mainPackHash, isRoot, singleCall);
+        case nmc:
+            // TODO: Create custom generator for nmc
+            return redub.command_generators.ldc.parseBuildConfiguration(cfg, s, mainPackHash, isRoot, singleCall);
         default:throw new Exception("Unsupported compiler '"~cfg.getCompiler(s.compiler).bin~"'");
     }
 }

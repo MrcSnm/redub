@@ -178,7 +178,7 @@ string getDynamicLibraryName(string dynamicLibPath)
         return buildNormalizedPath(dir, "lib"~name~".so");
     else version(FreeBSD)
         return buildNormalizedPath(dir, "lib"~name~".so");
-    else version(OSX)
+    else version(Apple)
         return buildNormalizedPath(dir, "lib"~name~".dylib");
     else static assert(false, "No support for dynamic libraries on that OS.");
 }
