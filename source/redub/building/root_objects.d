@@ -44,7 +44,7 @@ bool canUseRootObjects(const ProjectNode root, CompilingSession s)
         return false;
     if(cfg.buildStrategy != BuildStrategy.incrementalParallel && cfg.buildStrategy != BuildStrategy.fullParallel && totalCPUs < MIN_OBJECT_BUILD_CPUS)
         return false;
-    if(cfg.targetType != TargetType.executable || cfg.syntaxOnly)
+    if(cfg.syntaxOnly || !cfg.targetType.hasBuildableOutput)
         return false;
     return isDCompiler(cfg.getCompiler(s.compiler));
 }
@@ -319,14 +319,17 @@ RootObjectResult buildRootObjects(ProjectNode root, CompilingSession s, string m
     }
 
     string cacheExe = buildNormalizedPath(cacheDir, getOutputName(cfg, s.os));
-    version(Posix)
+    if(cfg.targetType == TargetType.executable)
     {
-        import redub.misc.make_file_executable : makeFileExecutable;
-        if(!makeFileExecutable(cacheExe))
+        version(Posix)
         {
-            result.status = 1;
-            result.message = "Could not make the output file executable";
-            return result;
+            import redub.misc.make_file_executable : makeFileExecutable;
+            if(!makeFileExecutable(cacheExe))
+            {
+                result.status = 1;
+                result.message = "Could not make the output file executable";
+                return result;
+            }
         }
     }
     copyDir(cacheDir, cfg.outputDirectory);

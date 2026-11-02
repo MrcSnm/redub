@@ -84,9 +84,11 @@ string[] parseBuildConfiguration(const BuildConfiguration b, CompilingSession s,
 
         if(!b.syntaxOnly)
         {
-            if(targetType.isLinkedSeparately && !singleCall)
+            ///Per-module builds always compile only: the objects are archived
+            ///or linked by the follow-up step, so the library flag must wait.
+            if((targetType.isLinkedSeparately || moduleObject.length) && !singleCall)
                 cmds~= mapper(ValidDFlags.compileOnly);
-            if(targetType.isStaticLibrary)
+            if(targetType.isStaticLibrary && moduleObject.length == 0)
                 cmds~= mapper(ValidDFlags.buildAsLibrary);
             else if(targetType == TargetType.dynamicLibrary)
                 cmds~= mapper(ValidDFlags.buildAsShared);

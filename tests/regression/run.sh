@@ -304,6 +304,55 @@ test_root_only_dirty_uses_single_call()
     fi
 }
 
+test_static_library_incremental_parallel()
+{
+    local dc=dmd
+    if ! have_dmd; then
+        if command -v ldc2 >/dev/null 2>&1; then
+            dc=ldc2
+        else
+            skip static_library_incremental_parallel "no D compiler found"
+            return
+        fi
+    fi
+    local name="libpar$SUFFIX"
+    local d="$WORK/libpar"
+    local log="$WORK/libpar.log"
+    local lib="$d/build/$name.lib"
+    mkdir -p "$d/source"
+    printf '%s\n' '{"name":"'"$name"'","targetType":"library","targetPath":"build","sourcePaths":["source"]}' > "$d/dub.json"
+    printf '%s\n' 'module a; int answer(){return 1;}' > "$d/source/a.d"
+    printf '%s\n' 'module b; import a; int twice(){return answer()*2;}' > "$d/source/b.d"
+    printf '%s\n' 'module c; import b; int quad(){return twice()*2;}' > "$d/source/c.d"
+
+    if ! redub_in "$d" 120 "$log" build --force --compiler="$dc" --build-strategy=incremental-parallel; then
+        fail static_library_incremental_parallel "cold build failed: $(detail "$log")"
+        return
+    fi
+    if [ -f "$d/build/lib$name.a" ]; then
+        lib="$d/build/lib$name.a"
+    fi
+    if [ ! -s "$lib" ]; then
+        fail static_library_incremental_parallel "library artifact not found ($(detail "$log"))"
+        return
+    fi
+    if ! grep -q 'Built+Linked:' "$log"; then
+        fail static_library_incremental_parallel "root library did not use the object build ($(detail "$log"))"
+        return
+    fi
+
+    printf '%s\n' 'module a; int answer(){return 2;}' > "$d/source/a.d"
+    if ! redub_in "$d" 120 "$log" build --compiler="$dc" --build-strategy=incremental-parallel; then
+        fail static_library_incremental_parallel "incremental build failed: $(detail "$log")"
+        return
+    fi
+    if [ ! -s "$lib" ]; then
+        fail static_library_incremental_parallel "library artifact missing after rebuild: $(detail "$log")"
+        return
+    fi
+    pass static_library_incremental_parallel
+}
+
 test_assume_compiler_version()
 {
     local name="assumetest$SUFFIX"
@@ -1392,6 +1441,7 @@ test_copy_files_no_match
 test_unused_key_warning
 test_zip_slip
 test_root_only_dirty_uses_single_call
+test_static_library_incremental_parallel
 test_assume_compiler_version
 test_parallel_environment
 test_platform_filter_typo

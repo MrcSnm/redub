@@ -35,7 +35,7 @@ string[] parseLinkConfiguration(const ThreadBuildData data, CompilingSession s, 
         {
             import redub.command_generators.d_compilers;
 
-            if (includeOutput && targetType.isLinkedSeparately)
+            if (includeOutput && targetType.hasBuildableOutput)
             {
                 string cacheDir = getCacheOutputDir(requirementCache, b, s, data.extra.isRoot);
                 string objExtension = getObjectExtension(s.os);
@@ -60,7 +60,7 @@ string[] parseLinkConfiguration(const ThreadBuildData data, CompilingSession s, 
             if(includeDFlags)
                 cmds~= filterLinkFlags(b.dFlags);
         }
-        if(targetType == TargetType.dynamicLibrary)
+        if(targetType.isAnyLibrary)
             cmds~= getTargetTypeFlag(targetType, c);
 
         if (targetType.isLinkedSeparately)
@@ -184,7 +184,7 @@ string[] parseLinkConfigurationMSVC(const ThreadBuildData data, CompilingSession
             cmds~= "-L/INCREMENTAL:NO";
         }
 
-        if(targetType == TargetType.dynamicLibrary)
+        if(targetType.isAnyLibrary)
             cmds~= getTargetTypeFlag(targetType, c);
 
         cmds = mapAppendReverse(cmds, data.extra.librariesFullPath, (string l) => (l~getLibraryExtension(s.os)).escapePath);

@@ -181,6 +181,12 @@ bool isAnyLibrary(TargetType t)
     return t == TargetType.staticLibrary || t == TargetType.library || t == TargetType.dynamicLibrary;
 }
 
+///Whether the target type produces a build artifact (executable or library).
+bool hasBuildableOutput(TargetType t)
+{
+    return t == TargetType.executable || t.isAnyLibrary;
+}
+
 bool isLinkedSeparately(TargetType t)
 {
     return t == TargetType.executable || t == TargetType.dynamicLibrary;

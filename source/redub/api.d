@@ -523,7 +523,7 @@ private BuildStrategy guardCombinedBuildStrategy(BuildStrategy strategy, bool co
 private bool autoPrefersObjects(BuildConfiguration cfg, Compiler compiler, CompilingSession session)
 {
     CompilerBinary rootCompiler = cfg.getCompiler(compiler);
-    if(!isDCompiler(rootCompiler) || cfg.targetType != TargetType.executable || cfg.syntaxOnly)
+    if(!isDCompiler(rootCompiler) || cfg.syntaxOnly || !cfg.targetType.hasBuildableOutput)
         return false;
     try
     {
@@ -665,8 +665,8 @@ ProjectDetails buildProject(ProjectDetails d)
     }
     if((tree.requirements.cfg.buildStrategy == BuildStrategy.incrementalParallel
         || tree.requirements.cfg.buildStrategy == BuildStrategy.fullParallel)
-        && tree.requirements.cfg.targetType != TargetType.executable)
-        warn("Parallel build strategies ignored: target is not an executable.");
+        && !tree.requirements.cfg.targetType.hasBuildableOutput)
+        warn("Parallel build strategies ignored: target has no buildable output.");
     if(d.bCreateSelections)
         createSelectionsFile(tree);
     string appImageBundleFolder;

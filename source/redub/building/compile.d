@@ -125,7 +125,7 @@ private bool canUseRootObjectStrategy(const ProjectNode node, CompilingSession s
     if(hasDirtyDependency(node))
         return false;
     const BuildConfiguration cfg = node.requirements.cfg;
-    if(cfg.targetType != TargetType.executable || cfg.syntaxOnly)
+    if(cfg.syntaxOnly || !cfg.targetType.hasBuildableOutput)
         return false;
     return isDCompiler(cfg.getCompiler(s.compiler));
 }
