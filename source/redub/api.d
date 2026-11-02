@@ -825,6 +825,8 @@ bool cleanProject(ProjectDetails d, bool showMessages, bool cleanAll = false, in
         import std.typecons;
         if(showMessages)
             info("Cleaning project ", d.tree.name);
+        import redub.building.cache;
+        CompilingSession session = CompilingSession(d.compiler, osFromArch(d.cDetails.arch), isaFromArch(d.cDetails.arch));
         foreach(ProjectNode node; d.tree.collapse)
         {
             import redub.misc.path;
@@ -856,6 +858,18 @@ bool cleanProject(ProjectDetails d, bool showMessages, bool cleanAll = false, in
                 }
             }
             removeFile(redub.misc.path.buildNormalizedPath(node.requirements.cfg.workingDir, ".ldc2_cache"), showMessages, "Removing ldc2 cache");
+            ///Compiler caches live next to the redub cache, one directory per
+            ///configuration. Also check the full-once key: the strategy is only
+            ///resolved when the project is built, and it changes the root hash.
+            foreach(strategy; [BuildStrategy.fullOnce, BuildStrategy.auto_])
+            {
+                auto cfg = node.requirements.cfg;
+                cfg.buildStrategy = strategy;
+                string reqHash = hashFrom(cfg, session, node.isRoot);
+                foreach(cacheRoot; ["ldc_cache", "nmc_cache"])
+                    removeFile(redub.misc.path.buildNormalizedPath(getCacheFolder(), cacheRoot, reqHash),
+                        showMessages, "Removing "~cacheRoot);
+            }
             foreach(copiedFile; node.requirements.cfg.filesToCopy)
             {
                 string outFile = redub.misc.path.buildNormalizedPath(d.tree.requirements.cfg.outputDirectory, isAbsolute(copiedFile) ? baseName(copiedFile) : copiedFile);
@@ -864,14 +878,16 @@ bool cleanProject(ProjectDetails d, bool showMessages, bool cleanAll = false, in
         }
 
 
-        import redub.building.cache;
-
-        string hash = hashFrom(d.tree.requirements, CompilingSession(d.compiler, osFromArch(d.cDetails.arch), isaFromArch(d.cDetails.arch)));
-        string cacheOutput = redub.misc.path.buildNormalizedPath(getCacheFolder, hash);
-        string cacheFile = getCacheFilePath(hash);
-
-        removeFile(cacheOutput, showMessages, "Removing cache output dir "~cacheOutput);
-        removeFile(cacheFile, showMessages, "Removing cache reference file" ~ cacheFile);
+        foreach(strategy; [BuildStrategy.fullOnce, BuildStrategy.auto_])
+        {
+            auto cfg = d.tree.requirements.cfg;
+            cfg.buildStrategy = strategy;
+            string rootHash = hashFrom(cfg, session, d.tree.isRoot);
+            string cacheOutput = redub.misc.path.buildNormalizedPath(getCacheFolder(), rootHash);
+            string cacheFile = getCacheFilePath(rootHash);
+            removeFile(cacheOutput, showMessages, "Removing cache output dir "~cacheOutput);
+            removeFile(cacheFile, showMessages, "Removing cache reference file " ~ cacheFile);
+        }
 
         if(cleanAll)
         {

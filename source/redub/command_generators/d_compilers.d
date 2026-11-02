@@ -51,12 +51,17 @@ string[] parseBuildConfiguration(const BuildConfiguration b, CompilingSession s,
         ///each object is not self-contained and linking cached objects fails.
         if(comp.isLDCBased && b.reuseObjects && !b.syntaxOnly)
             cmds~= "--linkonce-templates";
-        ///Per-module builds run one process per module; LDC's shared cache
-        ///directory is not safe under concurrency, so only use it single-process.
+        ///Per-module builds run one process per module; the compiler cache is
+        ///not safe under concurrency, so only use it single-process. Sibling
+        ///sub-packages share the package directory, so each configuration gets
+        ///its own cache directory keyed by its requirements hash.
         if(comp.isLDCBased && !s.os.isApple && !b.syntaxOnly && moduleObject.length == 0)
         {
+            import std.path : baseName;
             ///cmds~= "--cache-retrieval=hardlink"; // Doesn't work on Windows when using a multi drives projects
-            cmds~= comp == AcceptedCompiler.ldc2 ? "--cache=.ldc2_cache" : "--cache=.nmc_cache";;
+            string cacheRoot = comp == AcceptedCompiler.ldc2 ? "ldc_cache" : "nmc_cache";
+            string compilerCache = buildNormalizedPath(getCacheFolder(), cacheRoot, baseName(cacheDir));
+            cmds~= "--cache=" ~ escapePath(compilerCache);
             cmds~= "--cache-prune";
         }
 

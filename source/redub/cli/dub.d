@@ -143,7 +143,7 @@ struct DubArguments
     @("config|c")
     string config;
 
-    @("Removes all cached build results, including shared dependency caches")
+    @("Removes all cached build results, including shared dependency and compiler caches")
     @("all")
     bool cleanAll;
 
