@@ -281,7 +281,7 @@ string hashFrom(const BuildConfiguration cfg, CompilingSession session, bool isR
     enum outputAffectingFlags = BuildConfigurationFlags.syntaxOnly
         | BuildConfigurationFlags.preservePath
         | BuildConfigurationFlags.outputsDeps;
-    xxh.put(cast(ubyte)(cfg.flags & outputAffectingFlags));
+    xxh.put(cast(ushort)(cfg.flags & outputAffectingFlags));
     ///The one-shot build does not fill the per-module object cache, so the root
     ///must use a distinct key. Dependencies ignore the strategy entirely.
     if(isRoot)

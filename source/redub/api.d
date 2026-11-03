@@ -238,6 +238,7 @@ string[] getChangedBuildFiles(ProjectNode root, CompilingSession s)
     foreach(version_; cfg.debugVersions)
         ctx.addDebugVersion(version_);
     ctx.debugMode = cfg.isDebug;
+    ctx.unittestMode = cfg.isUnittest;
     ctx.stringImportPaths = cfg.stringImportPaths;
     foreach(name; trustedNoImportMixinsFor(cfg.workingDir))
         ctx.addTrustedNoImportMixin(name);
@@ -535,6 +536,7 @@ private bool autoPrefersObjects(BuildConfiguration cfg, Compiler compiler, Compi
         foreach(version_; cfg.debugVersions)
             ctx.addDebugVersion(version_);
         ctx.debugMode = cfg.isDebug;
+        ctx.unittestMode = cfg.isUnittest;
         ctx.stringImportPaths = cfg.stringImportPaths;
         foreach(name; trustedNoImportMixinsFor(cfg.workingDir))
             ctx.addTrustedNoImportMixin(name);
@@ -1388,6 +1390,10 @@ Available commands
                         Executes the tests of the selected package
   describe [<package>[@<version-spec>]]
                         Prints a description of the specified --data files
+  imports [--source=DIR...]
+                        Scans the project's D sources and prints the import graph.
+                        --edges prints MODULE/EDGE lines; --stats prints one TSV
+                        summary line.
   clean [<package>]     Removes intermediate build files and cached build
                         results. --all also removes shared dependency caches;
                         --older-than N removes cache entries older than N days

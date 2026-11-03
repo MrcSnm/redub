@@ -60,6 +60,7 @@ int main(string[] args)
         import redub.extensions.update;
         import redub.extensions.setup;
         import redub.extensions.watcher;
+        import redub.extensions.imports;
 
 
         int function(string[])[string] entryPoints = [
@@ -70,6 +71,7 @@ int main(string[] args)
             "clean": &cleanMain,
             "describe": &describeMain,
             "deps": &depsMain,
+            "imports": &importsMain,
             "init": &initMain,
             "install": &installMain,
             "configure": &configureMain,

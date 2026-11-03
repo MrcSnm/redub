@@ -681,6 +681,8 @@ private class ConstantTable
 	}
 	private Entry[string] entries;
 	private bool[string] ambiguous;
+	private string[string] typeAliases;
+	private bool[string] ambiguousTypeAliases;
 	private ConditionValue[string] cache;
 	private bool[string] resolving;
 	private bool[string] resolvingImports;
@@ -705,6 +707,31 @@ private class ConstantTable
 			entries[name] = Entry(name, expr);
 		if(parent !is null)
 			parent.add(name, expr);
+	}
+
+	void addTypeAlias(string name, string target)
+	{
+		if(name in ambiguousTypeAliases) return;
+		if(name in typeAliases)
+		{
+			if(typeAliases[name] != target)
+				ambiguousTypeAliases[name] = true;
+		}
+		else
+			typeAliases[name] = target;
+		if(parent !is null)
+			parent.addTypeAlias(name, target);
+	}
+
+	bool lookupTypeAlias(string name, out string target) const
+	{
+		if(name in ambiguousTypeAliases) return false;
+		if(name in typeAliases)
+		{
+			target = typeAliases[name];
+			return true;
+		}
+		return parent !is null ? parent.lookupTypeAlias(name, target) : false;
 	}
 
 	ConditionValue resolve(string name)
@@ -813,10 +840,28 @@ private class ConstantTable
 		return ConstantImportStatus.unknown;
 	}
 
+	string resolveTypedName(string name)
+	{
+		import std.string : indexOf;
+		bool[string] visited;
+		string current = name;
+		while(true)
+		{
+			ptrdiff_t dot = indexOf(current, ".");
+			string first = dot < 0 ? current : current[0 .. dot];
+			string target;
+			if(first in visited) return current;
+			if(!lookupTypeAlias(first, target)) return current;
+			visited[first] = true;
+			current = target ~ (dot < 0 ? "" : current[dot .. $]);
+		}
+	}
+
 	bool resolveString(string name, out string value)
 	{
 		import std.array : join;
 
+		name = resolveTypedName(name);
 		if(name in stringCache)
 		{
 			value = stringCache[name];
@@ -857,10 +902,19 @@ private class ConstantTable
 			}
 			if(expr[j].kind == DTokenKind.ident)
 			{
+				string dotted = expr[j].text;
+				size_t next = j + 1;
+				while(next + 1 < expr.length && expr[next].text == "."
+					&& expr[next + 1].kind == DTokenKind.ident)
+				{
+					dotted ~= "." ~ expr[next + 1].text;
+					next += 2;
+				}
+				dotted = resolveTypedName(dotted);
 				string sub;
-				if(!resolveString(expr[j].text, sub)) { ok = false; break; }
+				if(!resolveString(dotted, sub)) { ok = false; break; }
 				parts ~= sub;
-				j++;
+				j = next;
 				continue;
 			}
 			ok = false;
@@ -1505,6 +1559,8 @@ private struct MixinTemplateBody
 	string source;
 	///Template parameter names, in declaration order.
 	string[] params;
+	///The body can contribute a mixin/import when instantiated.
+	bool mayEmitImports;
 }
 
 ///Body of a string-returning function, used to prove simple mixin helpers do
@@ -1525,6 +1581,11 @@ private struct DImportParser
 	ImportScanContext ctx;
 	MixinTemplateBody[string] templates;
 	StringFunctionBody[][string] functions;
+	///Module-scoped alias name -> template name.
+	string[string] aliases;
+	///Templates whose bodies can be expanded at their use sites instead of
+	///being scanned as module code.
+	bool[string] resolvedTemplates;
 	bool[string] expandingTemplates;
 	string[] imports;
 	string moduleName;
@@ -1541,6 +1602,8 @@ private struct DImportParser
 	bool constantsOnly;
 	string[string] stringParams;
 	string[][string] arrayParams;
+	///Nested block depth; module-level aliases are only collected at depth 0.
+	int blockDepth;
 
 	this(DToken[] tokens, ImportScanContext ctx, MixinTemplateBody[string] templates)
 	{
@@ -1583,11 +1646,131 @@ private struct DImportParser
 		}
 	}
 
+	///Collects string-valued members of `enum Name { m = "x" }` as
+	///`Name.m`, so dotted enum members can resolve like literals.
+	bool tryParseEnumBody()
+	{
+		size_t j = i + 1;
+		string typeName;
+		if(j < tokens.length && tokens[j].kind == DTokenKind.ident)
+		{
+			typeName = tokens[j].text;
+			j++;
+		}
+		if(j < tokens.length && tokens[j].text == ":")
+		{
+			j++;
+			while(j < tokens.length && tokens[j].text != "{" && tokens[j].text != ";")
+				j++;
+		}
+		if(j >= tokens.length || tokens[j].text != "{") return false;
+		size_t k = j + 1;
+		int depth = 1;
+		for(; k < tokens.length; k++)
+		{
+			if(tokens[k].text == "{") depth++;
+			else if(tokens[k].text == "}")
+			{
+				depth--;
+				if(depth == 0) break;
+			}
+		}
+		if(k >= tokens.length) return false;
+		size_t m = j + 1;
+		while(m < k)
+		{
+			if(tokens[m].text == "@")
+			{
+				m++;
+				if(m < k && tokens[m].kind == DTokenKind.ident) m++;
+				if(m < k && tokens[m].text == "(")
+				{
+					int d;
+					for(; m < k; m++)
+					{
+						if(tokens[m].text == "(") d++;
+						else if(tokens[m].text == ")")
+						{
+							d--;
+							if(d == 0) { m++; break; }
+						}
+					}
+				}
+				continue;
+			}
+			if(tokens[m].kind != DTokenKind.ident) { m++; continue; }
+			string memberName = tokens[m].text;
+			m++;
+			if(m >= k || tokens[m].text != "=") continue;
+			m++;
+			size_t exprStart = m;
+			int d;
+			for(; m < k; m++)
+			{
+				string t = tokens[m].text;
+				if(t == "(" || t == "[" || t == "{") d++;
+				else if(t == ")" || t == "]" || t == "}") d--;
+				else if(t == "," && d == 0) break;
+			}
+			if(m > exprStart)
+			{
+				string key = typeName.length ? typeName ~ "." ~ memberName : memberName;
+				constants.add(key, tokens[exprStart .. m]);
+			}
+			if(m < k && tokens[m].text == ",") m++;
+		}
+		i = k + 1;
+		if(i < tokens.length && tokens[i].text == ";") i++;
+		return true;
+	}
+
+	///Collects unconditional module-level aliases so `alias B = A;` can be
+	///resolved to an enum and `alias b = A.b;` to a constant.
+	bool tryParseAliasDeclaration()
+	{
+		if(i > 0)
+		{
+			string previous = tokens[i - 1].text;
+			bool declarationStart = previous == ";" || previous == "}"
+				|| previous == "public" || previous == "private"
+				|| previous == "protected" || previous == "package"
+				|| previous == "export";
+			if(!declarationStart) return false;
+		}
+		if(i + 3 >= tokens.length) return false;
+		if(tokens[i + 1].kind != DTokenKind.ident || tokens[i + 2].text != "=")
+			return false;
+		string name = tokens[i + 1].text;
+		size_t k = i + 3;
+		size_t exprStart = k;
+		int depth;
+		for(; k < tokens.length; k++)
+		{
+			string t = tokens[k].text;
+			if(t == "(" || t == "[" || t == "{") depth++;
+			else if(t == ")" || t == "]" || t == "}")
+			{
+				depth--;
+				if(depth < 0) return false;
+			}
+			else if(t == ";" && depth == 0) break;
+		}
+		if(k >= tokens.length || tokens[k].text != ";" || k == exprStart)
+			return false;
+		if(k == exprStart + 1 && tokens[exprStart].kind == DTokenKind.ident)
+			constants.addTypeAlias(name, tokens[exprStart].text);
+		else
+			constants.add(name, tokens[exprStart .. k]);
+		i = k + 1;
+		return true;
+	}
+
 	bool tryParseConstantDeclaration(bool active)
 	{
 		if(!collectConstants || !active || eof) return false;
 		string name;
 		size_t exprStart;
+		if(curIs("enum") && tryParseEnumBody()) return true;
 		if(curIs("enum"))
 		{
 			size_t j = i + 1;
@@ -1784,6 +1967,8 @@ private struct DImportParser
 			foreach(value; iterableValues)
 			{
 				DImportParser sub = DImportParser(bodyTokens, ctx, templates);
+				sub.aliases = aliases;
+				sub.resolvedTemplates = resolvedTemplates;
 				sub.expandingTemplates = expandingTemplates;
 				sub.constants = constants;
 				sub.stringParams = stringParams.dup;
@@ -1796,6 +1981,8 @@ private struct DImportParser
 		else
 		{
 			DImportParser sub = DImportParser(bodyTokens, ctx, templates);
+			sub.aliases = aliases;
+			sub.resolvedTemplates = resolvedTemplates;
 			sub.expandingTemplates = expandingTemplates;
 			sub.constants = constants;
 			sub.stringParams = stringParams.dup;
@@ -1820,7 +2007,17 @@ private struct DImportParser
 		if(i >= tokens.length) return;
 		string t = tokens[i].text;
 		if(tryParseConstantDeclaration(active)) return;
-		if(collectConstants && t == "template") { skipMixinTemplateDeclaration(); return; }
+		if(t == "alias" && collectConstants && active && blockDepth == 0
+			&& tryParseAliasDeclaration()) return;
+		if(t == "template")
+		{
+			string name = i + 1 < tokens.length ? tokens[i + 1].text : null;
+			if(collectConstants || (name !is null && name in resolvedTemplates))
+			{
+				skipMixinTemplateDeclaration();
+				return;
+			}
+		}
 		if(tokens[i].isChar('{')) { if(active && !constantsOnly) parseBlock(true); else skipBlock(); return; }
 		if(t == "version" || t == "debug") { parseVersionOrDebug(active); return; }
 		if(t == "static" && i + 1 < tokens.length && tokens[i + 1].text == "if") { parseStaticIf(active); return; }
@@ -1839,6 +2036,9 @@ private struct DImportParser
 		if(t == "import") { if(active && !constantsOnly) parseImport(); else skipToSemicolon(); return; }
 		if(t == "mixin") { parseMixin(active, i > 0 && isExpressionPrecedingToken(tokens[i - 1].text)); return; }
 		if(t == "unittest" && parseUnittestBlock(active)) return;
+		if(active && !constantsOnly && resolvedTemplates.length
+			&& i + 1 < tokens.length && tokens[i].kind == DTokenKind.ident
+			&& tokens[i + 1].isChar('!') && tryExpandTemplateInstantiation()) return;
 		i++;
 	}
 
@@ -1857,6 +2057,8 @@ private struct DImportParser
 	void parseBlock(bool active)
 	{
 		i++;
+		blockDepth++;
+		scope(exit) blockDepth--;
 		while(i < tokens.length && !tokens[i].isChar('}'))
 			parseDeclaration(active);
 		if(i < tokens.length) i++;
@@ -1907,6 +2109,18 @@ private struct DImportParser
 			if(t == "import") { if(active && !constantsOnly) parseImport(); else skipToSemicolon(); return; }
 			if(t == "mixin") { parseMixin(active, i > 0 && isExpressionPrecedingToken(tokens[i - 1].text)); return; }
 			if(t == "unittest" && parseUnittestBlock(active)) return;
+			if(t == "template")
+			{
+				string name = i + 1 < tokens.length ? tokens[i + 1].text : null;
+				if(collectConstants || (name !is null && name in resolvedTemplates))
+				{
+					skipMixinTemplateDeclaration();
+					return;
+				}
+			}
+			if(active && !constantsOnly && resolvedTemplates.length
+				&& i + 1 < tokens.length && tokens[i].kind == DTokenKind.ident
+				&& tokens[i + 1].isChar('!') && tryExpandTemplateInstantiation()) return;
 			i++;
 		}
 	}
@@ -2144,7 +2358,14 @@ private struct DImportParser
 				{
 					i++;
 					string target = readDottedName();
-					if(target !is null) name = target;
+					///An incomplete alias in a partial mixin snippet has no
+					///module on the right side, so the alias is not an import.
+					if(target is null)
+					{
+						skipToSemicolon();
+						return;
+					}
+					name = target;
 				}
 				addImport(name);
 				continue;
@@ -2284,18 +2505,40 @@ private struct DImportParser
 					ok = decodeDLiteral(chunk[2].text, text);
 				if(ok) arrays[param] = splitLines(text);
 			}
-			else if(chunk.length == 1 && chunk[0].kind == DTokenKind.ident)
+			else
 			{
-				string value;
-				if(lookupString(chunk[0].text, value)) strings[param] = value;
-				else if(chunk[0].text in arrays) arrays[param] = arrays[chunk[0].text];
+				string name;
+				if(dottedName(chunk, name))
+				{
+					string value;
+					if(lookupString(name, value)) strings[param] = value;
+					else if(name in arrays) arrays[param] = arrays[name];
+				}
 			}
 		}
 	}
 
+	///Expands a literal instantiation of a template whose body was not scanned
+	///as module code. Attribution stays at the use site.
+	bool tryExpandTemplateInstantiation()
+	{
+		DToken[] args;
+		size_t end;
+		if(!templateInstantiationAt(tokens, i, args, end)) return false;
+		string name = tokens[i].text;
+		string templateName = (name in aliases) ? aliases[name] : name;
+		if(!(templateName in resolvedTemplates)) return false;
+		MixinTemplateBody* body = templateName in templates;
+		if(body is null || !body.mayEmitImports) return false;
+		i = end;
+		expandTemplateMixin(templateName, args);
+		return true;
+	}
+
 	void expandTemplateMixin(string name, DToken[] args)
 	{
-		MixinTemplateBody* body = name in templates;
+		string templateName = (name in aliases) ? aliases[name] : name;
+		MixinTemplateBody* body = templateName in templates;
 		if(body is null)
 		{
 			if(name in ctx.trustedNoImportMixins)
@@ -2310,13 +2553,15 @@ private struct DImportParser
 			}
 			return;
 		}
-		if(name in expandingTemplates) return;
-		expandingTemplates[name] = true;
-		scope(exit) expandingTemplates.remove(name);
+		if(templateName in expandingTemplates) return;
+		expandingTemplates[templateName] = true;
+		scope(exit) expandingTemplates.remove(templateName);
 		string[string] strings = stringParams.dup;
 		string[][string] arrays = arrayParams.dup;
 		applyTemplateArgs(body, args, strings, arrays);
 		DImportParser sub = DImportParser(body.tokens, ctx, templates);
+		sub.aliases = aliases;
+		sub.resolvedTemplates = resolvedTemplates;
 		sub.expandingTemplates = expandingTemplates;
 		sub.constants = constants;
 		sub.functions = functions;
@@ -2354,6 +2599,8 @@ private struct DImportParser
 
 			//Plain imports inside a delegate/lambda in the expression are real imports.
 			DImportParser sub = DImportParser(args, ctx, templates);
+			sub.aliases = aliases;
+			sub.resolvedTemplates = resolvedTemplates;
 			sub.expandingTemplates = expandingTemplates;
 			sub.constants = constants;
 			sub.functions = functions;
@@ -2381,8 +2628,12 @@ private struct DImportParser
 			return;
 		}
 		DToken[] generated = tokenizeDSource(content);
-		collectMixinTemplates(generated, content, templates);
+		size_t[2][] generatedUnittestRanges;
+		collectMixinTemplates(generated, content, templates, ctx.unittestMode,
+			generatedUnittestRanges);
 		DImportParser sub = DImportParser(generated, ctx, templates);
+		sub.aliases = aliases;
+		sub.resolvedTemplates = resolvedTemplates;
 		sub.expandingTemplates = expandingTemplates;
 		sub.constants = constants;
 		sub.functions = functions;
@@ -2856,10 +3107,37 @@ private string[] templateParamNames(DToken[] tokens)
 	return ret;
 }
 
-private void collectMixinTemplates(DToken[] tokens, string source, ref MixinTemplateBody[string] templates)
+///Returns the token index after the block starting at openIndex.
+private size_t skipTokenBlockEnd(DToken[] tokens, size_t openIndex)
 {
+	int depth;
+	for(size_t k = openIndex; k < tokens.length; k++)
+	{
+		if(tokens[k].isChar('{')) depth++;
+		else if(tokens[k].isChar('}'))
+		{
+			depth--;
+			if(depth == 0) return k + 1;
+		}
+	}
+	return tokens.length;
+}
+
+private void collectMixinTemplates(DToken[] tokens, string source,
+	ref MixinTemplateBody[string] templates, bool unittestMode,
+	ref size_t[2][] unittestRanges)
+{
+	unittestRanges = null;
 	for(size_t j = 0; j + 1 < tokens.length; j++)
 	{
+		if(!unittestMode && tokens[j].kind == DTokenKind.ident
+			&& tokens[j].text == "unittest" && tokens[j + 1].isChar('{'))
+		{
+			size_t end = skipTokenBlockEnd(tokens, j + 1);
+			unittestRanges ~= [j, end];
+			j = end - 1;
+			continue;
+		}
 		bool isMixinTemplate = tokens[j].text == "mixin" && tokens[j + 1].text == "template";
 		bool isPlainTemplate = tokens[j].text == "template"
 			&& (j == 0 || tokens[j - 1].text != "mixin");
@@ -2904,8 +3182,247 @@ private void collectMixinTemplates(DToken[] tokens, string source, ref MixinTemp
 		body.tokens = tokens[start .. k];
 		body.source = source;
 		body.params = params;
+		foreach(tok; body.tokens)
+			if(tok.text == "import" || tok.text == "mixin")
+			{
+				body.mayEmitImports = true;
+				break;
+			}
 		templates[name] = body;
 	}
+}
+
+///Parses `Name!arg` / `Name!(args)` at `index`. Returns false when the token is
+///not a template instantiation.
+private bool templateInstantiationAt(DToken[] tokens, size_t index,
+	out DToken[] args, out size_t end)
+{
+	args = null;
+	end = index;
+	if(index + 1 >= tokens.length) return false;
+	if(tokens[index].kind != DTokenKind.ident || !tokens[index + 1].isChar('!'))
+		return false;
+	size_t k = index + 2;
+	if(k < tokens.length && tokens[k].isChar('('))
+	{
+		size_t open = k;
+		int depth;
+		for(; k < tokens.length; k++)
+		{
+			if(tokens[k].isChar('(')) depth++;
+			else if(tokens[k].isChar(')'))
+			{
+				depth--;
+				if(depth == 0) break;
+			}
+		}
+		if(k >= tokens.length) return false;
+		args = tokens[open + 1 .. k];
+		end = k + 1;
+		return true;
+	}
+	if(k >= tokens.length) return false;
+	args = tokens[k .. k + 1];
+	end = k + 1;
+	return true;
+}
+
+///Reconstructs a dotted identifier such as `A.b` from one argument chunk.
+private bool dottedName(DToken[] chunk, out string name)
+{
+	name = null;
+	if(chunk.length == 0 || chunk.length % 2 == 0) return false;
+	if(chunk[0].kind != DTokenKind.ident) return false;
+	name = chunk[0].text;
+	for(size_t j = 1; j < chunk.length; j += 2)
+	{
+		if(chunk[j].text != "." || chunk[j + 1].kind != DTokenKind.ident)
+			return false;
+		name ~= "." ~ chunk[j + 1].text;
+	}
+	return true;
+}
+
+///Whether every template argument can be bound without running CTFE: literals,
+///arrays of literals, or known string constants. Empty argument lists qualify.
+private bool literalTemplateArgs(DToken[] args, ConstantTable constants)
+{
+	if(args.length == 0) return true;
+	size_t start;
+	int depth;
+	bool any;
+	for(size_t j = 0; j <= args.length; j++)
+	{
+		bool atEnd = j == args.length;
+		string t = atEnd ? null : args[j].text;
+		if(!atEnd)
+		{
+			if(t == "(" || t == "[" || t == "{") depth++;
+			else if(t == ")" || t == "]" || t == "}") depth--;
+		}
+		if(!atEnd && !(t == "," && depth == 0)) continue;
+		DToken[] chunk = args[start .. j];
+		start = j + 1;
+		if(chunk.length == 0) return false;
+		if(chunk.length == 1 && chunk[0].kind == DTokenKind.literal)
+		{
+			any = true;
+			continue;
+		}
+		if(constants !is null)
+		{
+			string name;
+			if(dottedName(chunk, name))
+			{
+				string value;
+				if(constants.resolveString(name, value))
+				{
+					any = true;
+					continue;
+				}
+			}
+		}
+		if(chunk[0].text == "[" && chunk[$ - 1].text == "]")
+		{
+			bool ok = true;
+			foreach(tok; chunk[1 .. $ - 1])
+			{
+				if(tok.text == ",") continue;
+				if(tok.kind != DTokenKind.literal) { ok = false; break; }
+			}
+			if(ok)
+			{
+				any = true;
+				continue;
+			}
+		}
+		return false;
+	}
+	return any;
+}
+
+///Classifies template uses and collects module-level template aliases in one
+///token pass. Any occurrence that is not a declaration or bindable literal
+///instantiation marks the template opaque.
+private void collectTemplateUsesAndAliases(DToken[] tokens, const bool[string] templates,
+	ConstantTable constants, ref string[][string] aliases, ref bool[string] opaque,
+	const size_t[2][] unittestRanges = null)
+{
+	if(templates.length == 0) return;
+	bool inModule;
+	bool inImport;
+	int depth;
+	string previous;
+	size_t rangeIdx;
+	for(size_t j = 0; j < tokens.length; j++)
+	{
+		if(rangeIdx < unittestRanges.length && j == unittestRanges[rangeIdx][0])
+		{
+			j = unittestRanges[rangeIdx][1] - 1;
+			rangeIdx++;
+			previous = "}";
+			continue;
+		}
+		auto token = tokens[j];
+		string t = token.text;
+		if(inModule || inImport)
+		{
+			if(token.isChar(';')) { inModule = false; inImport = false; previous = ";"; }
+			continue;
+		}
+		if(token.isChar('{')) { depth++; previous = t; continue; }
+		if(token.isChar('}'))
+		{
+			if(depth > 0) depth--;
+			previous = t;
+			continue;
+		}
+		if(token.isChar(';')) { previous = t; continue; }
+		if(token.kind != DTokenKind.ident)
+		{
+			previous = t;
+			continue;
+		}
+		if(t == "module") { inModule = true; previous = t; continue; }
+		if(t == "import" && !(j + 1 < tokens.length && tokens[j + 1].isChar('(')))
+		{
+			inImport = true;
+			previous = t;
+			continue;
+		}
+		if(t in templates)
+		{
+			bool declaration = j > 0 && tokens[j - 1].text == "template";
+			bool qualified = j > 0 && tokens[j - 1].isChar('.');
+			if(qualified)
+				opaque[t] = true;
+			else if(!declaration)
+			{
+				DToken[] args;
+				size_t end;
+				if(!(templateInstantiationAt(tokens, j, args, end)
+					&& literalTemplateArgs(args, constants)))
+					opaque[t] = true;
+			}
+		}
+		if(depth == 0 && t == "alias")
+		{
+			bool declarationStart = previous.length == 0 || previous == ";"
+				|| previous == "}" || previous == "public" || previous == "private"
+				|| previous == "protected" || previous == "package" || previous == "export";
+			if(declarationStart && j + 4 < tokens.length
+				&& tokens[j + 1].kind == DTokenKind.ident
+				&& tokens[j + 2].isChar('=')
+				&& tokens[j + 3].kind == DTokenKind.ident
+				&& tokens[j + 4].isChar(';'))
+			{
+				aliases[tokens[j + 1].text] ~= tokens[j + 3].text;
+				j += 4;
+				previous = ";";
+				continue;
+			}
+		}
+		previous = t;
+	}
+}
+
+///Resolves module-scoped aliases to template names. Ambiguous or partly
+///unresolved aliases stay out so imports remain conservative.
+private string[string] resolveTemplateAliases(MixinTemplateBody[string] templates,
+	string[][string] aliases)
+{
+	string[string] resolvedAliases;
+	string resolve(string name, bool[string] visiting, ref bool unresolved)
+	{
+		if(name in templates) return name;
+		auto candidates = name in aliases;
+		if(candidates is null || name in visiting)
+		{
+			unresolved = true;
+			return null;
+		}
+		visiting[name] = true;
+		string resolved;
+		foreach(candidate; *candidates)
+		{
+			string target = resolve(candidate, visiting, unresolved);
+			if(target is null) { unresolved = true; continue; }
+			if(resolved.length == 0) resolved = target;
+			else if(resolved != target) { unresolved = true; return null; }
+		}
+		visiting.remove(name);
+		return unresolved ? null : resolved;
+	}
+	foreach(name; aliases.byKey)
+	{
+		if(name in templates) continue;
+		bool[string] visiting;
+		bool unresolved;
+		string target = resolve(name, visiting, unresolved);
+		if(target !is null && !unresolved)
+			resolvedAliases[name] = target;
+	}
+	return resolvedAliases;
 }
 
 private bool isFunctionParamType(string text)
@@ -2976,11 +3493,18 @@ private string[] functionParamNames(DToken[] tokens)
 ///Collects string-returning function bodies so mixin helpers defined in the
 ///project can be checked for import evidence without running CTFE.
 private void collectStringFunctions(DToken[] tokens, string source,
-	ref StringFunctionBody[][string] functions)
+	ref StringFunctionBody[][string] functions, const size_t[2][] unittestRanges = null)
 {
 	int parenDepth;
+	size_t rangeIdx;
 	for(size_t j = 0; j + 1 < tokens.length; j++)
 	{
+		if(rangeIdx < unittestRanges.length && j == unittestRanges[rangeIdx][0])
+		{
+			j = unittestRanges[rangeIdx][1] - 1;
+			rangeIdx++;
+			continue;
+		}
 		if(tokens[j].text == "(")
 		{
 			parenDepth++;
@@ -3096,8 +3620,9 @@ ImportScanInfo scanDImportInfo(string source, ImportScanContext ctx)
 	MixinTemplateBody[string] templates;
 	StringFunctionBody[][string] functions;
 	DToken[] tokens = tokenizeDSource(source);
-	collectMixinTemplates(tokens, source, templates);
-	collectStringFunctions(tokens, source, functions);
+	size_t[2][] unittestRanges;
+	collectMixinTemplates(tokens, source, templates, ctx.unittestMode, unittestRanges);
+	collectStringFunctions(tokens, source, functions, unittestRanges);
 	ConstantTable constants = new ConstantTable();
 	constants.stringImportPaths = ctx.stringImportPaths;
 	{
@@ -3108,7 +3633,23 @@ ImportScanInfo scanDImportInfo(string source, ImportScanContext ctx)
 		collector.constantsOnly = true;
 		collector.parseAll();
 	}
+	bool[string] importTemplates;
+	foreach(name, body; templates)
+		if(body.mayEmitImports)
+			importTemplates[name] = true;
+	string[][string] templateAliases;
+	bool[string] opaqueTemplates;
+	if(importTemplates.length)
+		collectTemplateUsesAndAliases(tokens, importTemplates, constants,
+			templateAliases, opaqueTemplates, unittestRanges);
+	string[string] resolvedAliases = resolveTemplateAliases(templates, templateAliases);
+	bool[string] resolvedTemplates;
+	foreach(name; importTemplates.byKey)
+		if(!(name in opaqueTemplates))
+			resolvedTemplates[name] = true;
 	DImportParser parser = DImportParser(tokens, ctx, templates);
+	parser.aliases = resolvedAliases;
+	parser.resolvedTemplates = resolvedTemplates;
 	parser.constants = constants;
 	parser.functions = functions;
 	parser.parseAll();
@@ -3251,6 +3792,9 @@ SourceImportGraph parseSourceImportGraph(string[] sourceDirectories, string[] so
 		string root;
 		string source;
 		DToken[] tokens;
+		size_t[2][] unittestRanges;
+		string[][string] rawAliases;
+		string[string] aliases;
 	}
 	struct FileEntry
 	{
@@ -3359,13 +3903,15 @@ SourceImportGraph parseSourceImportGraph(string[] sourceDirectories, string[] so
 	///can be used from a different module than the one that declares it.
 	MixinTemplateBody[string] templates;
 	StringFunctionBody[][string] functions;
-	foreach(f; files)
+	foreach(ref f; files)
 	{
-		collectMixinTemplates(f.tokens, f.source, templates);
-		collectStringFunctions(f.tokens, f.source, functions);
+		collectMixinTemplates(f.tokens, f.source, templates, ctx.unittestMode,
+			f.unittestRanges);
+		collectStringFunctions(f.tokens, f.source, functions, f.unittestRanges);
 	}
 
-	///Collect enum/static const values first so static if can use them across modules.
+	///Collect enum/static const values first so template arguments and static if
+	///can resolve them across modules.
 	ConstantTable constants = new ConstantTable();
 	constants.stringImportPaths = ctx.stringImportPaths;
 	foreach(f; files)
@@ -3377,6 +3923,26 @@ SourceImportGraph parseSourceImportGraph(string[] sourceDirectories, string[] so
 		collector.constantsOnly = true;
 		collector.parseAll();
 	}
+
+	///Only templates that can emit imports and are referenced exclusively
+	///through bindable instantiations can skip the conservative body scan.
+	bool[string] importTemplates;
+	foreach(name, body; templates)
+		if(body.mayEmitImports)
+			importTemplates[name] = true;
+	bool[string] opaqueTemplates;
+	if(importTemplates.length)
+		foreach(ref f; files)
+			collectTemplateUsesAndAliases(f.tokens, importTemplates, constants,
+				f.rawAliases, opaqueTemplates, f.unittestRanges);
+	///Aliases are module-scoped, so resolve them per file against the full
+	///template map.
+	foreach(ref f; files)
+		f.aliases = resolveTemplateAliases(templates, f.rawAliases);
+	bool[string] resolvedTemplates;
+	foreach(name; importTemplates.byKey)
+		if(!(name in opaqueTemplates))
+			resolvedTemplates[name] = true;
 
 	struct ParsedFile
 	{
@@ -3396,6 +3962,8 @@ SourceImportGraph parseSourceImportGraph(string[] sourceDirectories, string[] so
 	foreach(f; files)
 	{
 		DImportParser parser = DImportParser(f.tokens, ctx, templates);
+		parser.aliases = f.aliases;
+		parser.resolvedTemplates = resolvedTemplates;
 		parser.constants = constants;
 		parser.functions = functions;
 		parser.parseAll();
@@ -3508,6 +4076,132 @@ unittest
 	string[] imports = scanDImports(source, mod);
 	assert(mod == "foo.bar", mod);
 	assert(imports == ["std.stdio", "core.thread", "a.b", "c.d", "std.algorithm", "x.y.z"], imports.to!string);
+}
+
+unittest
+{
+	import std.conv : to;
+	///A partial aliased import in a concatenated string mixin must not treat
+	///the alias as a module name (`unit_threaded.from` pattern).
+	ImportScanInfo info = scanDImportInfo(q{
+		module partial.alias;
+		mixin("import from = " ~ moduleName ~ ";");
+	}, ImportScanContext.init);
+	assert(info.imports.length == 0, info.imports.to!string);
+	assert(info.hasUnresolvedStringMixins);
+}
+
+unittest
+{
+	import std.conv : to;
+	///Module-level template aliases resolve mixin template uses.
+	ImportScanInfo info = scanDImportInfo(q{
+		module alias.mixin;
+		mixin template M() { import std.traits; }
+		alias a = M;
+		mixin a!();
+	}, ImportScanContext.init);
+	assert(info.imports == ["std.traits"], info.imports.to!string);
+	assert(!info.hasUnresolvedMixins, info.doubts.to!string);
+}
+
+unittest
+{
+	///Conflicting aliases are ambiguous, so the mixin stays unresolved.
+	ImportScanInfo info = scanDImportInfo(q{
+		module alias.ambiguous;
+		mixin template A() { import a.mod; }
+		mixin template B() { import b.mod; }
+		alias x = A;
+		alias x = B;
+		mixin x!();
+	}, ImportScanContext.init);
+	assert(info.hasUnresolvedMixins);
+}
+
+unittest
+{
+	import std.conv : to;
+	///A template used only with literal arguments has its imports resolved at
+	///the use site (e.g. `from!"std.traits"`).
+	ImportScanInfo info = scanDImportInfo(q{
+		module template.literal;
+		template from(string moduleName) { mixin("import from = " ~ moduleName ~ ";"); }
+		alias A = from!"std.traits".isSomeString;
+	}, ImportScanContext.init);
+	assert(info.imports == ["std.traits"], info.imports.to!string);
+	assert(!info.hasUnresolvedMixins, info.doubts.to!string);
+}
+
+unittest
+{
+	import std.conv : to;
+	///A string constant/enum argument resolves like a literal.
+	ImportScanInfo info = scanDImportInfo(q{
+		module template.constant;
+		enum mod = "std.traits";
+		template T(string s) { mixin("import " ~ s ~ ";"); }
+		alias A = T!mod;
+	}, ImportScanContext.init);
+	assert(info.imports == ["std.traits"], info.imports.to!string);
+	assert(!info.hasUnresolvedMixins, info.doubts.to!string);
+}
+
+unittest
+{
+	import std.conv : to;
+	///A string-valued enum member resolves like a literal argument.
+	ImportScanInfo info = scanDImportInfo(q{
+		module template.enumarg;
+		enum A : string { b = "std" ~ ".traits" }
+		template T(string s) { mixin("import " ~ s ~ ";"); }
+		alias X = T!(A.b);
+	}, ImportScanContext.init);
+	assert(info.imports == ["std.traits"], info.imports.to!string);
+	assert(!info.hasUnresolvedMixins, info.doubts.to!string);
+}
+
+unittest
+{
+	import std.conv : to;
+	///Aliases to an enum/enum member resolve dotted constants.
+	ImportScanInfo info = scanDImportInfo(q{
+		module template.enumalias;
+		enum A { b = "std.traits" }
+		alias B = A;
+		alias C = B;
+		alias b = A.b;
+		template T(string s) { mixin("import " ~ s ~ ";"); }
+		alias X = T!(C.b);
+		alias Y = T!b;
+	}, ImportScanContext.init);
+	assert(info.imports == ["std.traits"], info.imports.to!string);
+	assert(!info.hasUnresolvedMixins, info.doubts.to!string);
+}
+
+unittest
+{
+	import std.conv : to;
+	///A template with no uses contributes no imports.
+	ImportScanInfo info = scanDImportInfo(q{
+		module template.unused;
+		template unused() { import never.imported; }
+	}, ImportScanContext.init);
+	assert(info.imports.length == 0, info.imports.to!string);
+}
+
+unittest
+{
+	import std.conv : to;
+	import std.algorithm.searching : canFind;
+	///Anything but a literal instantiation keeps the conservative body scan.
+	ImportScanInfo info = scanDImportInfo(q{
+		module template.opaque;
+		template T(string s) { import kept.import; mixin("import " ~ s ~ ";"); }
+		void f(string x) { alias A = T!x; }
+	}, ImportScanContext.init);
+	assert(info.imports.canFind("kept.import"), info.imports.to!string);
+	assert(info.hasUnresolvedMixins);
 }
 
 unittest

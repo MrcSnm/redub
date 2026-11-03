@@ -1,6 +1,7 @@
 module redub.building.build_timings;
 
 import redub.building.cache : getCacheFolder;
+import redub.logging : warn;
 import std.file : exists, mkdirRecurse, read, remove, rename, write;
 import std.path : buildNormalizedPath, dirName;
 import std.algorithm : map, sort;
@@ -24,6 +25,10 @@ private enum magic = "RDBT";
 private enum formatVersion = 1;
 private enum recordSize = 20;
 private enum maxRecords = 64;
+private enum timingRegressionPercent = 30;
+private enum timingRegressionMinMs = 50;
+private enum timingRegressionMinIncreaseMs = 25;
+private enum timingRegressionMinSamples = 3;
 
 private struct TimingRecord
 {
@@ -220,6 +225,47 @@ StrategyPreference timingPreference(string rootHash, uint affected, uint modules
     return StrategyPreference.none;
 }
 
+
+private string timingStrategyName(TimingStrategy strategy)
+{
+    final switch(strategy) with(TimingStrategy)
+    {
+        case single: return "single";
+        case objectIncremental: return "incremental";
+        case objectFull: return "full";
+    }
+}
+
+///Returns a warning when the current build is much slower than comparable
+///previous runs for the same strategy and build shape.
+private string timingRegressionWarning(const TimingRecord[] previous, const TimingRecord current)
+{
+    uint[] samples;
+    foreach(record; previous)
+    {
+        if(record.strategy != current.strategy) continue;
+        if(record.cold != current.cold) continue;
+        if(record.forced != current.forced) continue;
+        if(!sameShape(record, current.affected, current.modules)) continue;
+        if(record.elapsedMs == 0) continue;
+        samples ~= record.elapsedMs;
+    }
+    if(samples.length < timingRegressionMinSamples)
+        return null;
+    long baseline = median(samples);
+    if(baseline < timingRegressionMinMs)
+        return null;
+    long increase = cast(long)current.elapsedMs - baseline;
+    if(increase < timingRegressionMinIncreaseMs
+        || increase * 100 <= baseline * timingRegressionPercent)
+        return null;
+    import std.conv : to;
+    return "Build timing regression: " ~ timingStrategyName(current.strategy)
+        ~ " took " ~ current.elapsedMs.to!string ~ "ms vs " ~ baseline.to!string
+        ~ "ms median of " ~ samples.length.to!string ~ " similar builds (+"
+        ~ (increase * 100 / baseline).to!string ~ "%).";
+}
+
 ///Records one root build. Failures are ignored: timing is diagnostic data.
 void recordBuildTiming(string rootHash, TimingStrategy strategy, bool cold, bool forced,
     uint jobs, uint affected, uint modules, uint elapsedMs, uint compileMs = 0, uint linkMs = 0)
@@ -228,9 +274,41 @@ void recordBuildTiming(string rootHash, TimingStrategy strategy, bool cold, bool
     {
         string path = timingsPath(rootHash);
         auto records = load(path);
-        records ~= TimingRecord(strategy, cold, forced, cast(ushort)jobs, cast(ushort)affected,
-            cast(ushort)modules, elapsedMs, compileMs, linkMs);
+        TimingRecord current = TimingRecord(strategy, cold, forced, cast(ushort)jobs,
+            cast(ushort)affected, cast(ushort)modules, elapsedMs, compileMs, linkMs);
+        string warning = timingRegressionWarning(records, current);
+        records ~= current;
+        if(warning.length)
+            warn(warning);
         save(path, records);
     }
     catch(Exception) {}
+}
+
+unittest
+{
+    static TimingRecord rec(TimingStrategy strategy, bool cold, bool forced,
+        uint affected, uint modules, uint ms)
+    {
+        return TimingRecord(strategy, cold, forced, 1,
+            cast(ushort)affected, cast(ushort)modules, ms, 0, 0);
+    }
+
+    TimingRecord[] single = [
+        rec(TimingStrategy.single, false, false, 0, 0, 100),
+        rec(TimingStrategy.single, false, false, 0, 0, 110),
+        rec(TimingStrategy.single, false, false, 0, 0, 105),
+    ];
+    assert(timingRegressionWarning(single, rec(TimingStrategy.single, false, false, 0, 0, 150)) !is null);
+    assert(timingRegressionWarning(single, rec(TimingStrategy.single, false, false, 0, 0, 120)) is null);
+    assert(timingRegressionWarning(single, rec(TimingStrategy.objectFull, true, false, 0, 0, 500)) is null);
+    assert(timingRegressionWarning(single[0 .. 2], rec(TimingStrategy.single, false, false, 0, 0, 500)) is null);
+
+    TimingRecord[] object = [
+        rec(TimingStrategy.objectIncremental, false, true, 10, 100, 200),
+        rec(TimingStrategy.objectIncremental, false, true, 10, 100, 210),
+        rec(TimingStrategy.objectIncremental, false, true, 10, 100, 205),
+    ];
+    assert(timingRegressionWarning(object, rec(TimingStrategy.objectIncremental, false, true, 10, 100, 300)) !is null);
+    assert(timingRegressionWarning(object, rec(TimingStrategy.objectIncremental, false, true, 10, 200, 500)) is null);
 }

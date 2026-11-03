@@ -25,6 +25,7 @@ string[] parseBuildConfiguration(const BuildConfiguration b, CompilingSession s,
         if(compilerVerbose) cmds~= mapper(ValidDFlags.verbose);
         if(compilerVerboseCodeGen) cmds~= mapper(ValidDFlags.verboseCodeGen);
         if(syntaxOnly) cmds~= mapper(ValidDFlags.syntaxOnly);
+        if(isUnittest) cmds~= mapper(ValidDFlags.unittests);
 
 
         string cacheDir = moduleObject.length ? null : getCacheOutputDir(mainPackhash, b, s, isRoot);

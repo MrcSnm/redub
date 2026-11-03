@@ -7,7 +7,7 @@ import redub.package_searching.api;
 
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.34.2";
+enum RedubVersionOnly = "v1.35.0";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -295,7 +295,7 @@ BuildStrategy parseBuildStrategy(string value)
     }
 }
 
-enum BuildConfigurationFlags : ubyte
+enum BuildConfigurationFlags : ushort
 {
     none = 0,
     ///Obsolete: whenever present, --deps= will be passed to the compiler.
@@ -309,11 +309,13 @@ enum BuildConfigurationFlags : ubyte
     syntaxOnly            = 1 << 6,
     ///Compile modules separately into the object dir and link the cached objects.
     reuseObjects          = 1 << 7,
+    ///The build enables D unittests.
+    unittestMode          = 1 << 8,
 
 
     defaultInit = preservePath,
 
-    mergeFlags = preservePath | compilerVerbose | compilerVerboseCodeGen | syntaxOnly
+    mergeFlags = preservePath | compilerVerbose | compilerVerboseCodeGen | syntaxOnly | unittestMode
 }
 
 
@@ -434,6 +436,13 @@ struct BuildConfiguration
         return ret;
     }
 
+    bool isUnittest() const
+    {
+        if((flags & BuildConfigurationFlags.unittestMode) != 0)
+            return true;
+        import std.algorithm.searching : canFind;
+        return dFlags.canFind("-unittest") || dFlags.canFind("-funittest");
+    }
     bool outputsDeps() const {return (flags & BuildConfigurationFlags.outputsDeps) != 0;}
     bool reuseObjects() const {return (flags & BuildConfigurationFlags.reuseObjects) != 0;}
     bool preservePath() const {return (flags & BuildConfigurationFlags.preservePath) != 0;}

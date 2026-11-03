@@ -27,6 +27,7 @@ Those are the additions I've made over dub
 - **Auto PATH setup** - Since `v1.32.0`: Adds a way to auto setup redub paths in your system. Call `redub setup` and it will install redub, redub's ldc and redub's dmd in the PATH.
 - **Cache Sharing** - Since `v1.33.2`: Whenever you build a library which has the same versions and flags between parallel projects, the built library will be reused.
 - [**Incremental Compilation**](#redub-incremental-compilation) - Since `v1.34.0`: Redub is able to parse your root project and detect whether it is better to use a single compilation unit vs per module in parallel
+- **Build Time Regression Warn** - Since `v1.35.0`: Redub now also warns you if you've done some change that done a big regression in the build time, allowing you to be aware of your own changes.
 
 
 ## Redub Help
