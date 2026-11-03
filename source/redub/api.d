@@ -537,18 +537,24 @@ private bool autoPrefersObjects(BuildConfiguration cfg, Compiler compiler, Compi
         string[] sourceDirs = cfg.sourceFiles.length ? null : cfg.sourcePaths;
         SourceImportGraph graph = parseSourceImportGraph(sourceDirs, cfg.sourceFiles,
             cfg.excludeSourceFiles, ctx, true);
-        ///Without trustworthy imports the object mode must rebuild every
-        ///module, which the single compiler run already does faster.
+        ///A skipped file means the graph is incomplete, so object mode cannot
+        ///know what to compile.
         if(graph.skippedFiles.length)
             return false;
         size_t weight;
+        bool importRisk;
         foreach(name; graph.compileOrder)
         {
             auto mod = graph.byName[name];
-            if(mod.isImportRisk || mod.hasUnresolvedStringMixins)
-                return false;
+            importRisk = importRisk || mod.isImportRisk || mod.hasUnresolvedStringMixins;
             weight += mod.compileWeight;
         }
+        vlog("auto graph: ", graph.modules.length, " modules, weight ", weight,
+            ", import risk ", importRisk);
+        ///Unresolved mixins may hide imports, so the object graph is not
+        ///trustworthy even if the object build would rebuild everything.
+        if(importRisk)
+            return false;
         return graph.modules.length >= AUTO_MIN_MODULES
             && weight >= AUTO_MIN_COMPILE_WEIGHT;
     }
