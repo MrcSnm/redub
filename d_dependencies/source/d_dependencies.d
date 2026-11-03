@@ -57,11 +57,7 @@ struct ModuleDef
 	@property void usedTrustedNoImportMixin(bool value) pure nothrow @safe { setFlag(ModuleFlag.usedTrustedNoImportMixin, value); }
 
 	///True when the import list may be incomplete or conservative.
-	bool isDoubtful() const
-	{
-		return doubts.length != 0 || hasUnknownConditionals || hasUnresolvedMixins ||
-			hasUnresolvedStringMixins || hasUnknownVersionIdentifiers;
-	}
+	bool isDoubtful() const { return scanIsDoubtful(doubts.length, hasUnknownConditionals, hasUnresolvedMixins, hasUnresolvedStringMixins, hasUnknownVersionIdentifiers); }
 
 	///We cannot evaluate these mixins; imports may be missing.
 	bool isUnsupported() const { return hasUnresolvedMixins || hasUnresolvedStringMixins; }
@@ -364,15 +360,7 @@ private struct DSourceScanner
 		pos += 2;
 		if(empty) return;
 		char delim = src[pos];
-		char closing = delim;
-		switch(delim)
-		{
-			case '(': closing = ')'; break;
-			case '[': closing = ']'; break;
-			case '{': closing = '}'; break;
-			case '<': closing = '>'; break;
-			default: break;
-		}
+		char closing = closingDelimiter(delim);
 		string identDelim;
 		if(isIdentStart(delim))
 		{
@@ -432,6 +420,63 @@ private struct DSourceScanner
 }
 
 private enum DTokenKind : ubyte { ident, number, literal, punct }
+
+private bool bodyMayEmitImports(DToken[] body)
+{
+	foreach(tok; body)
+		if(tok.text == "import" || tok.text == "mixin")
+			return true;
+	return false;
+}
+
+private bool scanIsDoubtful(size_t doubtCount, bool unknownConditionals,
+	bool unresolvedMixins, bool unresolvedStringMixins, bool unknownVersionIds)
+	pure nothrow @safe
+{
+	return doubtCount != 0 || unknownConditionals || unresolvedMixins ||
+		unresolvedStringMixins || unknownVersionIds;
+}
+
+private char closingDelimiter(char delim) pure nothrow @safe
+{
+	switch(delim)
+	{
+		case '(': return ')';
+		case '[': return ']';
+		case '{': return '}';
+		case '<': return '>';
+		default: return delim;
+	}
+}
+
+private bool isGroupingOpen(string text) pure nothrow @safe
+{
+	return text == "(" || text == "[" || text == "{";
+}
+
+private bool isGroupingClose(string text) pure nothrow @safe
+{
+	return text == ")" || text == "]" || text == "}";
+}
+
+private bool isBuiltinMixinCall(string name) pure nothrow @safe
+{
+	return name == "cast" || name == "typeof"
+		|| name == "__traits" || name == "is";
+}
+
+private bool isIgnoredMixinCall(DToken[] tokens, size_t j)
+{
+	string next = tokens[j + 1].text;
+	return (next != "(" && next != "!") || isBuiltinMixinCall(tokens[j].text);
+}
+
+private bool updateGroupingDepth(ref int depth, string text) pure nothrow @safe
+{
+	if(isGroupingOpen(text)) { depth++; return true; }
+	if(isGroupingClose(text)) { if(depth > 0) depth--; return true; }
+	return false;
+}
 
 private bool isExpressionPrecedingToken(string text)
 {
@@ -816,6 +861,10 @@ private class ConstantTable
 		{
 			auto token = expr[j];
 			if(token.text == "mixin")
+				return ConstantImportStatus.unknown;
+			if(token.text == "foreach" || token.text == "foreach_reverse"
+				|| token.text == "while" || token.text == "for"
+				|| token.text == "if" || token.text == "switch")
 				return ConstantImportStatus.unknown;
 			if(token.text == "import" && j + 1 < expr.length
 				&& expr[j + 1].text == "(")
@@ -1561,6 +1610,10 @@ private struct MixinTemplateBody
 	string[] params;
 	///The body can contribute a mixin/import when instantiated.
 	bool mayEmitImports;
+	///Declared as a function template (`void f(T)()`) instead of `template`.
+	bool isFunctionTemplate;
+	///Declaration is directly marked `private`/`package` (not a `private:` section).
+	bool isPrivate;
 }
 
 ///Body of a string-returning function, used to prove simple mixin helpers do
@@ -1586,6 +1639,8 @@ private struct DImportParser
 	///Templates whose bodies can be expanded at their use sites instead of
 	///being scanned as module code.
 	bool[string] resolvedTemplates;
+	///Templates with at least one occurrence outside their declaration.
+	bool[string] usedTemplates;
 	bool[string] expandingTemplates;
 	string[] imports;
 	string moduleName;
@@ -1708,8 +1763,8 @@ private struct DImportParser
 			for(; m < k; m++)
 			{
 				string t = tokens[m].text;
-				if(t == "(" || t == "[" || t == "{") d++;
-				else if(t == ")" || t == "]" || t == "}") d--;
+				if(isGroupingOpen(t)) d++;
+				else if(isGroupingClose(t)) d--;
 				else if(t == "," && d == 0) break;
 			}
 			if(m > exprStart)
@@ -1741,21 +1796,9 @@ private struct DImportParser
 		if(tokens[i + 1].kind != DTokenKind.ident || tokens[i + 2].text != "=")
 			return false;
 		string name = tokens[i + 1].text;
-		size_t k = i + 3;
-		size_t exprStart = k;
-		int depth;
-		for(; k < tokens.length; k++)
-		{
-			string t = tokens[k].text;
-			if(t == "(" || t == "[" || t == "{") depth++;
-			else if(t == ")" || t == "]" || t == "}")
-			{
-				depth--;
-				if(depth < 0) return false;
-			}
-			else if(t == ";" && depth == 0) break;
-		}
-		if(k >= tokens.length || tokens[k].text != ";" || k == exprStart)
+		size_t exprStart = i + 3;
+		size_t k;
+		if(!expressionEnd(exprStart, k) || k == exprStart)
 			return false;
 		if(k == exprStart + 1 && tokens[exprStart].kind == DTokenKind.ident)
 			constants.addTypeAlias(name, tokens[exprStart].text);
@@ -1765,102 +1808,72 @@ private struct DImportParser
 		return true;
 	}
 
+	///Finds the `;` at depth 0 starting at start.
+	bool expressionEnd(size_t start, out size_t end)
+	{
+		int depth;
+		for(size_t k = start; k < tokens.length; k++)
+		{
+			string text = tokens[k].text;
+			if(isGroupingOpen(text)) depth++;
+			else if(isGroupingClose(text))
+			{
+				depth--;
+				if(depth < 0) return false;
+			}
+			else if(text == ";" && depth == 0) { end = k; return true; }
+		}
+		return false;
+	}
+
+	///Parses `name =` or `Type name =` starting at j.
+	bool constantNameAt(size_t j, out string name, out size_t exprStart)
+	{
+		name = null;
+		exprStart = size_t.max;
+		if(j >= tokens.length || tokens[j].kind != DTokenKind.ident) return false;
+		if(j + 1 < tokens.length && tokens[j + 1].text == "=")
+		{
+			name = tokens[j].text;
+			exprStart = j + 2;
+			return true;
+		}
+		if(j + 2 < tokens.length && tokens[j + 1].kind == DTokenKind.ident
+			&& tokens[j + 2].text == "=" && isConstantType(tokens[j].text))
+		{
+			name = tokens[j + 1].text;
+			exprStart = j + 3;
+			return true;
+		}
+		return false;
+	}
+
 	bool tryParseConstantDeclaration(bool active)
 	{
 		if(!collectConstants || !active || eof) return false;
 		string name;
 		size_t exprStart;
 		if(curIs("enum") && tryParseEnumBody()) return true;
-		if(curIs("enum"))
+		if(curIs("enum") || curIs("const"))
 		{
 			size_t j = i + 1;
-			if(j >= tokens.length || tokens[j].kind != DTokenKind.ident) return false;
-			if(j + 1 < tokens.length && tokens[j + 1].text == "=")
-			{
-				name = tokens[j].text;
-				exprStart = j + 2;
-			}
-			else if(j + 2 < tokens.length && tokens[j + 1].kind == DTokenKind.ident
-				&& tokens[j + 2].text == "=" && isConstantType(tokens[j].text))
-			{
-				name = tokens[j + 1].text;
-				exprStart = j + 3;
-			}
-			else
-				return false;
+			if(!constantNameAt(j, name, exprStart)) return false;
 		}
 		else if(curIs("static") && i + 1 < tokens.length && tokens[i + 1].text == "const")
 		{
 			size_t j = i + 2;
-			if(j >= tokens.length || tokens[j].kind != DTokenKind.ident) return false;
-			if(j + 1 < tokens.length && tokens[j + 1].text == "=")
-			{
-				name = tokens[j].text;
-				exprStart = j + 2;
-			}
-			else if(j + 2 < tokens.length && tokens[j + 1].kind == DTokenKind.ident
-				&& tokens[j + 2].text == "=" && isConstantType(tokens[j].text))
-			{
-				name = tokens[j + 1].text;
-				exprStart = j + 3;
-			}
-			else
-				return false;
-		}
-		else if(curIs("const"))
-		{
-			size_t j = i + 1;
-			if(j >= tokens.length || tokens[j].kind != DTokenKind.ident) return false;
-			if(j + 1 < tokens.length && tokens[j + 1].text == "=")
-			{
-				name = tokens[j].text;
-				exprStart = j + 2;
-			}
-			else if(j + 2 < tokens.length && tokens[j + 1].kind == DTokenKind.ident
-				&& tokens[j + 2].text == "=" && isConstantType(tokens[j].text))
-			{
-				name = tokens[j + 1].text;
-				exprStart = j + 3;
-			}
-			else
-				return false;
+			if(!constantNameAt(j, name, exprStart)) return false;
 		}
 		else if(curIs("immutable") || (curIs("static") && i + 1 < tokens.length && tokens[i + 1].text == "immutable"))
 		{
 			size_t j = curIs("static") ? i + 2 : i + 1;
-			if(j >= tokens.length || tokens[j].kind != DTokenKind.ident) return false;
-			if(j + 1 < tokens.length && tokens[j + 1].text == "=")
-			{
-				name = tokens[j].text;
-				exprStart = j + 2;
-			}
-			else if(j + 2 < tokens.length && tokens[j + 1].kind == DTokenKind.ident
-				&& tokens[j + 2].text == "=" && isConstantType(tokens[j].text))
-			{
-				name = tokens[j + 1].text;
-				exprStart = j + 3;
-			}
-			else
-				return false;
+			if(!constantNameAt(j, name, exprStart)) return false;
 		}
 		else
 			return false;
 
-		size_t k = exprStart;
-		int depth;
-		while(k < tokens.length)
-		{
-			string t = tokens[k].text;
-			if(t == "(" || t == "[" || t == "{") depth++;
-			else if(t == ")" || t == "]" || t == "}")
-			{
-				depth--;
-				if(depth < 0) return false;
-			}
-			else if(t == ";" && depth == 0) break;
-			k++;
-		}
-		if(k >= tokens.length || tokens[k].text != ";" || k == exprStart)
+		size_t k;
+		if(!expressionEnd(exprStart, k) || k == exprStart)
 			return false;
 		constants.add(name, tokens[exprStart .. k]);
 		i = k + 1;
@@ -1901,8 +1914,8 @@ private struct DImportParser
 		while(i < tokens.length)
 		{
 			string text = tokens[i].text;
-			if(text == "(" || text == "[" || text == "{") depth++;
-			else if(text == ")" || text == "]" || text == "}") depth--;
+			if(isGroupingOpen(text)) depth++;
+			else if(isGroupingClose(text)) depth--;
 			i++;
 			if(text == ";" && depth == 0) break;
 		}
@@ -1920,8 +1933,8 @@ private struct DImportParser
 		for(size_t j = 0; j < header.length; j++)
 		{
 			string text = header[j].text;
-			if(text == "(" || text == "[" || text == "{") depth++;
-			else if(text == ")" || text == "]" || text == "}") depth--;
+			if(isGroupingOpen(text)) depth++;
+			else if(isGroupingClose(text)) depth--;
 			else if(text == ";" && depth == 0) { semi = j; break; }
 		}
 		if(semi == header.length) return;
@@ -1967,12 +1980,7 @@ private struct DImportParser
 			foreach(value; iterableValues)
 			{
 				DImportParser sub = DImportParser(bodyTokens, ctx, templates);
-				sub.aliases = aliases;
-				sub.resolvedTemplates = resolvedTemplates;
-				sub.expandingTemplates = expandingTemplates;
-				sub.constants = constants;
-				sub.stringParams = stringParams.dup;
-				sub.arrayParams = arrayParams.dup;
+				sub.inheritFrom(this);
 				if(var.length) sub.stringParams[var] = value;
 				sub.parseAll();
 				mergeFrom(sub);
@@ -1981,12 +1989,7 @@ private struct DImportParser
 		else
 		{
 			DImportParser sub = DImportParser(bodyTokens, ctx, templates);
-			sub.aliases = aliases;
-			sub.resolvedTemplates = resolvedTemplates;
-			sub.expandingTemplates = expandingTemplates;
-			sub.constants = constants;
-			sub.stringParams = stringParams.dup;
-			sub.arrayParams = arrayParams.dup;
+			sub.inheritFrom(this);
 			sub.parseAll();
 			mergeFrom(sub);
 		}
@@ -2002,6 +2005,55 @@ private struct DImportParser
 		return true;
 	}
 
+	bool parseTemplateDeclaration()
+	{
+		string name = i + 1 < tokens.length ? tokens[i + 1].text : null;
+		///A nested function template can replace the outer template in the
+		///name map; keep scanning so its body still contributes imports.
+		bool replaced;
+		if(name !is null)
+		{
+			auto tb = name in templates;
+			replaced = tb !is null && tb.isFunctionTemplate;
+		}
+		if(collectConstants || (name !is null && name in resolvedTemplates
+			&& !replaced))
+		{
+			skipMixinTemplateDeclaration();
+			return true;
+		}
+		return false;
+	}
+
+	///Branches shared by module-level and controlled declarations.
+	bool parseSharedDeclaration(bool active)
+	{
+		string t = tokens[i].text;
+		if(t == "version" || t == "debug") { parseVersionOrDebug(active); return true; }
+		if(t == "static" && i + 1 < tokens.length && tokens[i + 1].text == "if")
+		{
+			parseStaticIf(active);
+			return true;
+		}
+		if(t == "static" && i + 1 < tokens.length && tokens[i + 1].text == "foreach")
+		{
+			if(constantsOnly) skipStaticForeach();
+			else parseStaticForeach(active);
+			return true;
+		}
+		if(t == "import") { if(active && !constantsOnly) parseImport(); else skipToSemicolon(); return true; }
+		if(t == "mixin")
+		{
+			parseMixin(active, i > 0 && isExpressionPrecedingToken(tokens[i - 1].text));
+			return true;
+		}
+		if(t == "unittest" && parseUnittestBlock(active)) return true;
+		if(active && !constantsOnly && resolvedTemplates.length
+			&& i + 1 < tokens.length && tokens[i].kind == DTokenKind.ident
+			&& tokens[i + 1].isChar('!') && tryExpandTemplateInstantiation()) return true;
+		return false;
+	}
+
 	void parseDeclaration(bool active)
 	{
 		if(i >= tokens.length) return;
@@ -2009,36 +2061,35 @@ private struct DImportParser
 		if(tryParseConstantDeclaration(active)) return;
 		if(t == "alias" && collectConstants && active && blockDepth == 0
 			&& tryParseAliasDeclaration()) return;
-		if(t == "template")
+		if(t == "template" && parseTemplateDeclaration()) return;
+		if(tokens[i].kind == DTokenKind.ident && i + 1 < tokens.length
+			&& tokens[i + 1].isChar('('))
 		{
-			string name = i + 1 < tokens.length ? tokens[i + 1].text : null;
-			if(collectConstants || (name !is null && name in resolvedTemplates))
+			auto ft = t in templates;
+			if(ft !is null && ft.isFunctionTemplate
+				&& functionTemplateDeclarationAt(tokens, i)
+				&& (collectConstants || (t in resolvedTemplates
+					&& (t in usedTemplates || ft.isPrivate))))
 			{
-				skipMixinTemplateDeclaration();
-				return;
+				string name;
+				string[] params;
+				size_t bodyStart, bodyEnd;
+				if(functionTemplateDeclaration(tokens, i, name, params,
+					bodyStart, bodyEnd))
+				{
+					i = bodyEnd + 1;
+					return;
+				}
 			}
 		}
 		if(tokens[i].isChar('{')) { if(active && !constantsOnly) parseBlock(true); else skipBlock(); return; }
-		if(t == "version" || t == "debug") { parseVersionOrDebug(active); return; }
-		if(t == "static" && i + 1 < tokens.length && tokens[i + 1].text == "if") { parseStaticIf(active); return; }
-		if(t == "static" && i + 1 < tokens.length && tokens[i + 1].text == "foreach")
-		{
-			if(constantsOnly) skipStaticForeach();
-			else parseStaticForeach(active);
-			return;
-		}
 		if(t == "module")
 		{
 			if(constantsOnly) skipToSemicolon();
 			else parseModuleDeclaration(active);
 			return;
 		}
-		if(t == "import") { if(active && !constantsOnly) parseImport(); else skipToSemicolon(); return; }
-		if(t == "mixin") { parseMixin(active, i > 0 && isExpressionPrecedingToken(tokens[i - 1].text)); return; }
-		if(t == "unittest" && parseUnittestBlock(active)) return;
-		if(active && !constantsOnly && resolvedTemplates.length
-			&& i + 1 < tokens.length && tokens[i].kind == DTokenKind.ident
-			&& tokens[i + 1].isChar('!') && tryExpandTemplateInstantiation()) return;
+		if(parseSharedDeclaration(active)) return;
 		i++;
 	}
 
@@ -2066,13 +2117,7 @@ private struct DImportParser
 
 	void skipBlock()
 	{
-		int depth;
-		while(i < tokens.length)
-		{
-			if(tokens[i].isChar('{')) depth++;
-			else if(tokens[i].isChar('}')) { depth--; i++; if(depth <= 0) return; continue; }
-			i++;
-		}
+		i = skipTokenBlockEnd(tokens, i);
 	}
 
 	void skipStaticForeach()
@@ -2098,29 +2143,8 @@ private struct DImportParser
 			if(tryParseConstantDeclaration(active)) return;
 			if(tokens[i].isChar(';')) { i++; return; }
 			if(tokens[i].isChar('{')) { if(active) parseBlock(true); else skipBlock(); return; }
-			if(t == "version" || t == "debug") { parseVersionOrDebug(active); return; }
-			if(t == "static" && i + 1 < tokens.length && tokens[i + 1].text == "if") { parseStaticIf(active); return; }
-			if(t == "static" && i + 1 < tokens.length && tokens[i + 1].text == "foreach")
-			{
-				if(constantsOnly) skipStaticForeach();
-				else parseStaticForeach(active);
-				return;
-			}
-			if(t == "import") { if(active && !constantsOnly) parseImport(); else skipToSemicolon(); return; }
-			if(t == "mixin") { parseMixin(active, i > 0 && isExpressionPrecedingToken(tokens[i - 1].text)); return; }
-			if(t == "unittest" && parseUnittestBlock(active)) return;
-			if(t == "template")
-			{
-				string name = i + 1 < tokens.length ? tokens[i + 1].text : null;
-				if(collectConstants || (name !is null && name in resolvedTemplates))
-				{
-					skipMixinTemplateDeclaration();
-					return;
-				}
-			}
-			if(active && !constantsOnly && resolvedTemplates.length
-				&& i + 1 < tokens.length && tokens[i].kind == DTokenKind.ident
-				&& tokens[i + 1].isChar('!') && tryExpandTemplateInstantiation()) return;
+			if(t == "template" && parseTemplateDeclaration()) return;
+			if(parseSharedDeclaration(active)) return;
 			i++;
 		}
 	}
@@ -2207,11 +2231,23 @@ private struct DImportParser
 			return;
 		}
 		parseControlledStatement(active && cond == ConditionValue.yes);
+		parseElseControlled(active, cond);
+	}
+
+	void parseElseControlled(bool active, ConditionValue cond)
+	{
 		if(curIs("else"))
 		{
 			i++;
 			parseControlledStatement(active && cond != ConditionValue.yes);
 		}
+	}
+
+	void addStaticIfDoubt(ref string conditionText, DToken[] inner)
+	{
+		hasUnknownConditionals = true;
+		if(conditionText.length == 0) conditionText = tokensText(inner);
+		addDoubt("static if: " ~ conditionText);
 	}
 
 	void parseStaticIf(bool active)
@@ -2234,54 +2270,43 @@ private struct DImportParser
 			if(!active || cond == ConditionValue.no)
 				skipToScopeEnd();
 			else if(cond == ConditionValue.unknown && !constantsOnly)
-			{
-				hasUnknownConditionals = true;
-				if(conditionText.length == 0) conditionText = tokensText(inner);
-				addDoubt("static if: " ~ conditionText);
-			}
+				addStaticIfDoubt(conditionText, inner);
 			return;
 		}
 		size_t importsBefore = imports.length;
 		// Unknown conditions keep both branches: an union is safer than dropping an import.
 		parseControlledStatement(active && cond != ConditionValue.no);
-		if(curIs("else"))
-		{
-			i++;
-			parseControlledStatement(active && cond != ConditionValue.yes);
-		}
+		parseElseControlled(active, cond);
 		//Only doubtful if the undecidable condition actually gates an import.
 		if(active && cond == ConditionValue.unknown && imports.length != importsBefore)
-		{
-			hasUnknownConditionals = true;
-			if(conditionText.length == 0) conditionText = tokensText(inner);
-			addDoubt("static if: " ~ conditionText);
-		}
+			addStaticIfDoubt(conditionText, inner);
 	}
 
 	void collectParens(out DToken[] inner)
 	{
-		i++; // (
-		size_t start = i;
-		int depth = 1;
-		while(i < tokens.length)
+		size_t open = i;
+		size_t close;
+		if(i < tokens.length && tokens[i].isChar('(')
+			&& tokenParenEnd(tokens, i, close))
 		{
-			if(tokens[i].isChar('(')) depth++;
-			else if(tokens[i].isChar(')')) { depth--; if(depth == 0) break; }
-			i++;
+			inner = tokens[open + 1 .. close];
+			i = close + 1;
 		}
-		inner = tokens[start .. i];
-		if(i < tokens.length) i++; // )
+		else
+		{
+			inner = tokens[open + 1 .. $];
+			i = tokens.length;
+		}
 	}
 
 	void skipParens()
 	{
-		int depth;
-		while(i < tokens.length)
-		{
-			if(tokens[i].isChar('(')) depth++;
-			else if(tokens[i].isChar(')')) { depth--; i++; if(depth == 0) return; continue; }
-			i++;
-		}
+		size_t close;
+		if(i < tokens.length && tokens[i].isChar('(')
+			&& tokenParenEnd(tokens, i, close))
+			i = close + 1;
+		else
+			i = tokens.length;
 	}
 
 	void skipToSemicolon()
@@ -2426,26 +2451,6 @@ private struct DImportParser
 		if(i < tokens.length) skipBlock();
 	}
 
-	DToken[][] splitTemplateArgs(DToken[] args)
-	{
-		DToken[][] chunks;
-		size_t start;
-		int depth;
-		for(size_t j = 0; j < args.length; j++)
-		{
-			string text = args[j].text;
-			if(text == "(" || text == "[" || text == "{") depth++;
-			else if(text == ")" || text == "]" || text == "}") depth--;
-			else if(text == "," && depth == 0)
-			{
-				chunks ~= args[start .. j];
-				start = j + 1;
-			}
-		}
-		if(start < args.length) chunks ~= args[start .. $];
-		return chunks;
-	}
-
 	bool lookupString(string name, out string value)
 	{
 		if(name in stringParams)
@@ -2472,7 +2477,7 @@ private struct DImportParser
 	void applyTemplateArgs(MixinTemplateBody* body, DToken[] args,
 		ref string[string] strings, ref string[][string] arrays)
 	{
-		DToken[][] chunks = splitTemplateArgs(args);
+		DToken[][] chunks = splitTopLevelCommas(args);
 		foreach(idx, param; body.params)
 		{
 			if(idx >= chunks.length) break;
@@ -2486,16 +2491,8 @@ private struct DImportParser
 			else if(chunk[0].text == "[" && chunk[$ - 1].text == "]")
 			{
 				string[] values;
-				bool ok = true;
-				foreach(tok; chunk[1 .. $ - 1])
-				{
-					if(tok.text == ",") continue;
-					if(tok.kind != DTokenKind.literal) { ok = false; break; }
-					string value;
-					if(!decodeDLiteral(tok.text, value)) { ok = false; break; }
-					values ~= value;
-				}
-				if(ok) arrays[param] = values;
+				if(literalStringArray(chunk, values))
+					arrays[param] = values;
 			}
 			else if(chunk.length == 4 && chunk[0].text == "splitLines"
 				&& chunk[1].text == "(" && chunk[3].text == ")")
@@ -2563,13 +2560,7 @@ private struct DImportParser
 		string[][string] arrays = arrayParams.dup;
 		applyTemplateArgs(body, args, strings, arrays);
 		DImportParser sub = DImportParser(body.tokens, ctx, templates);
-		sub.aliases = aliases;
-		sub.resolvedTemplates = resolvedTemplates;
-		sub.expandingTemplates = expandingTemplates;
-		sub.constants = constants;
-		sub.functions = functions;
-		sub.collectConstants = true;
-		sub.constantsOnly = constantsOnly;
+		sub.inheritForExpansion(this);
 		sub.stringParams = strings;
 		sub.arrayParams = arrays;
 		sub.parseAll();
@@ -2602,13 +2593,8 @@ private struct DImportParser
 
 			//Plain imports inside a delegate/lambda in the expression are real imports.
 			DImportParser sub = DImportParser(args, ctx, templates);
-			sub.aliases = aliases;
-			sub.resolvedTemplates = resolvedTemplates;
-			sub.expandingTemplates = expandingTemplates;
-			sub.constants = constants;
+			sub.inheritFrom(this);
 			sub.functions = functions;
-			sub.stringParams = stringParams.dup;
-			sub.arrayParams = arrayParams.dup;
 			sub.parseAll();
 			mergeFrom(sub);
 			if(sub.hasUnresolvedMixins || sub.hasUnresolvedStringMixins)
@@ -2635,17 +2621,30 @@ private struct DImportParser
 		collectMixinTemplates(generated, content, templates, ctx.unittestMode,
 			generatedUnittestRanges);
 		DImportParser sub = DImportParser(generated, ctx, templates);
-		sub.aliases = aliases;
-		sub.resolvedTemplates = resolvedTemplates;
-		sub.expandingTemplates = expandingTemplates;
-		sub.constants = constants;
-		sub.functions = functions;
-		sub.collectConstants = true;
-		sub.constantsOnly = constantsOnly;
-		sub.stringParams = stringParams.dup;
-		sub.arrayParams = arrayParams.dup;
+		sub.inheritForExpansion(this);
 		sub.parseAll();
 		mergeFrom(sub);
+	}
+
+	///Copies the context a nested parser inherits from its parent.
+	void inheritFrom(ref DImportParser other)
+	{
+		aliases = other.aliases;
+		resolvedTemplates = other.resolvedTemplates;
+		usedTemplates = other.usedTemplates;
+		expandingTemplates = other.expandingTemplates;
+		constants = other.constants;
+		stringParams = other.stringParams.dup;
+		arrayParams = other.arrayParams.dup;
+	}
+
+	///Inherits plus the fields needed when expanding a template/mixin body.
+	void inheritForExpansion(ref DImportParser other)
+	{
+		inheritFrom(other);
+		functions = other.functions;
+		collectConstants = true;
+		constantsOnly = other.constantsOnly;
 	}
 
 	void mergeFrom(ref DImportParser sub)
@@ -2660,18 +2659,6 @@ private struct DImportParser
 		foreach(doubt; sub.doubts)
 			addDoubt(doubt);
 	}
-}
-
-private string[] mixinLiterals(DToken[] args)
-{
-	string[] ret;
-	foreach(tok; args)
-	{
-		if(tok.kind != DTokenKind.literal) continue;
-		string decoded;
-		if(decodeDLiteral(tok.text, decoded)) ret ~= decoded;
-	}
-	return ret;
 }
 
 private enum MixinExpressionStatus
@@ -2689,12 +2676,8 @@ private DToken[][] splitTopLevelCommas(DToken[] tokens)
 	for(size_t j = 0; j < tokens.length; j++)
 	{
 		string text = tokens[j].text;
-		if(text == "(" || text == "[" || text == "{") depth++;
-		else if(text == ")" || text == "]" || text == "}")
-		{
-			if(depth > 0) depth--;
-		}
-		else if(text == "," && depth == 0)
+		if(updateGroupingDepth(depth, text)) continue;
+		if(text == "," && depth == 0)
 		{
 			chunks ~= tokens[start .. j];
 			start = j + 1;
@@ -2709,19 +2692,8 @@ private DToken[][] splitTopLevelCommas(DToken[] tokens)
 private bool literalCallArgs(DToken[] args, size_t openIndex, ConstantTable constants,
 	out string[] literalArgs)
 {
-	int depth;
-	size_t close = size_t.max;
-	for(size_t j = openIndex; j < args.length; j++)
-	{
-		if(args[j].text == "(") depth++;
-		else if(args[j].text == ")")
-		{
-			depth--;
-			if(depth == 0) { close = j; break; }
-		}
-	}
-	if(close == size_t.max)
-		return false;
+	size_t close;
+	if(!tokenParenEnd(args, openIndex, close)) return false;
 	literalArgs = new string[0];
 	foreach(chunk; splitTopLevelCommas(args[openIndex + 1 .. close]))
 	{
@@ -2759,6 +2731,14 @@ private bool literalImports(string text, ImportScanContext ctx, ref string[] imp
 		if(!exists) imports ~= imp;
 	}
 	return !info.hasUnresolvedMixins && !info.hasUnresolvedStringMixins;
+}
+
+private bool literalTokenMayImport(DToken token, ImportScanContext ctx,
+	ref string[] foundImports)
+{
+	string text;
+	return decodeDLiteral(token.text, text)
+		&& !literalImports(text, ctx, foundImports);
 }
 
 ///Classifies an unresolved mixin expression without running CTFE. Literal-only
@@ -2801,9 +2781,7 @@ private MixinExpressionStatus mixinExpressionStatus(DToken[] args,
 		auto token = args[j];
 		if(token.kind == DTokenKind.literal)
 		{
-			string text;
-			if(decodeDLiteral(token.text, text)
-				&& !literalImports(text, ctx, foundImports))
+			if(literalTokenMayImport(token, ctx, foundImports))
 				return MixinExpressionStatus.mayImport;
 			continue;
 		}
@@ -2811,18 +2789,14 @@ private MixinExpressionStatus mixinExpressionStatus(DToken[] args,
 			return MixinExpressionStatus.mayImport;
 		if(token.kind != DTokenKind.ident || j + 1 >= args.length)
 			continue;
-		string next = args[j + 1].text;
-		if(next != "(" && next != "!")
-			continue;
-		if(token.text == "cast" || token.text == "typeof"
-			|| token.text == "__traits" || token.text == "is")
+		if(isIgnoredMixinCall(args, j))
 			continue;
 		if(auto bodies = token.text in functions)
 		{
 			if(token.text in visited) continue;
 			visited[token.text] = true;
 			string[] literalArgs;
-			bool knownArgs = next == "(" && literalCallArgs(args, j + 1,
+			bool knownArgs = args[j + 1].text == "(" && literalCallArgs(args, j + 1,
 				constants, literalArgs);
 			if(functionMayImport(*bodies, functions, visited, ctx, constants,
 				knownArgs ? literalArgs : null, foundImports))
@@ -2858,8 +2832,8 @@ private bool functionMayImport(StringFunctionBody[] bodies,
 			for(size_t j = 0; j < body.tokens.length; j++)
 			{
 				string text = body.tokens[j].text;
-				if(text == "(" || text == "[" || text == "{") depth++;
-				else if(text == ")" || text == "]" || text == "}")
+				if(isGroupingOpen(text)) depth++;
+				else if(isGroupingClose(text))
 				{
 					if(depth > 0) depth--;
 				}
@@ -2876,8 +2850,8 @@ private bool functionMayImport(StringFunctionBody[] bodies,
 				for(; end < body.tokens.length; end++)
 				{
 					string text = body.tokens[end].text;
-					if(text == "(" || text == "[" || text == "{") d++;
-					else if(text == ")" || text == "]" || text == "}")
+					if(isGroupingOpen(text)) d++;
+					else if(isGroupingClose(text))
 					{
 						if(d > 0) d--;
 					}
@@ -2911,9 +2885,7 @@ private bool functionMayImport(StringFunctionBody[] bodies,
 			auto token = body.tokens[j];
 			if(token.kind == DTokenKind.literal)
 			{
-				string text;
-				if(decodeDLiteral(token.text, text)
-					&& !literalImports(text, ctx, foundImports))
+				if(literalTokenMayImport(token, ctx, foundImports))
 					return true;
 				continue;
 			}
@@ -2924,11 +2896,7 @@ private bool functionMayImport(StringFunctionBody[] bodies,
 				return true;
 			if(token.kind != DTokenKind.ident || j + 1 >= body.tokens.length)
 				continue;
-			string next = body.tokens[j + 1].text;
-			if(next != "(" && next != "!")
-				continue;
-			if(token.text == "cast" || token.text == "typeof"
-				|| token.text == "__traits" || token.text == "is")
+			if(isIgnoredMixinCall(body.tokens, j))
 				continue;
 			if(auto callees = token.text in functions)
 			{
@@ -3057,15 +3025,7 @@ private bool decodeDLiteral(string raw, out string content)
 			return true;
 		}
 		char delim = raw[2];
-		char closing = delim;
-		switch(delim)
-		{
-			case '(': closing = ')'; break;
-			case '[': closing = ']'; break;
-			case '{': closing = '}'; break;
-			case '<': closing = '>'; break;
-			default: break;
-		}
+		char closing = closingDelimiter(delim);
 		if(raw.length < 4 || raw[$ - 2] != closing || raw[$ - 1] != '"') return false;
 		content = raw[3 .. $ - 2];
 		return true;
@@ -3073,41 +3033,46 @@ private bool decodeDLiteral(string raw, out string content)
 	return false;
 }
 
+///Index of the first `=` at grouping depth 0, or size_t.max.
+private size_t depthZeroEquals(DToken[] chunk)
+{
+	int d;
+	for(size_t j = 0; j < chunk.length; j++)
+	{
+		string text = chunk[j].text;
+		if(isGroupingOpen(text)) d++;
+		else if(isGroupingClose(text)) d--;
+		else if(d == 0 && text == "=") return j;
+	}
+	return size_t.max;
+}
+
 private string[] templateParamNames(DToken[] tokens)
 {
 	string[] ret;
-	size_t start;
-	int depth;
-	void processChunk(size_t end)
+	foreach(chunk; splitTopLevelCommas(tokens))
 	{
-		size_t eq = end;
-		int d;
-		for(size_t j = start; j < end; j++)
-		{
-			string text = tokens[j].text;
-			if(text == "(" || text == "[" || text == "{") d++;
-			else if(text == ")" || text == "]" || text == "}") d--;
-			else if(text == "=" && d == 0) { eq = j; break; }
-		}
+		size_t eq = depthZeroEquals(chunk);
+		if(eq == size_t.max) eq = chunk.length;
 		string name;
-		for(size_t j = start; j < eq; j++)
-			if(tokens[j].kind == DTokenKind.ident)
-				name = tokens[j].text;
+		for(size_t j = 0; j < eq; j++)
+			if(chunk[j].kind == DTokenKind.ident)
+				name = chunk[j].text;
 		if(name.length) ret ~= name;
 	}
-	for(size_t j = 0; j < tokens.length; j++)
-	{
-		string text = tokens[j].text;
-		if(text == "(" || text == "[" || text == "{") depth++;
-		else if(text == ")" || text == "]" || text == "}") depth--;
-		else if(text == "," && depth == 0)
-		{
-			processChunk(j);
-			start = j + 1;
-		}
-	}
-	processChunk(tokens.length);
 	return ret;
+}
+
+private bool skipUnittestRange(const size_t[2][] ranges, ref size_t rangeIdx,
+	ref size_t j)
+{
+	if(rangeIdx < ranges.length && j == ranges[rangeIdx][0])
+	{
+		j = ranges[rangeIdx][1] - 1;
+		rangeIdx++;
+		return true;
+	}
+	return false;
 }
 
 ///Returns the token index after the block starting at openIndex.
@@ -3124,6 +3089,125 @@ private size_t skipTokenBlockEnd(DToken[] tokens, size_t openIndex)
 		}
 	}
 	return tokens.length;
+}
+
+///Returns the index of the `)` matching the `(` at openIndex.
+private bool tokenParenEnd(DToken[] tokens, size_t openIndex, out size_t closeIndex)
+{
+	closeIndex = size_t.max;
+	int depth;
+	for(size_t k = openIndex; k < tokens.length; k++)
+	{
+		if(tokens[k].isChar('(')) depth++;
+		else if(tokens[k].isChar(')'))
+		{
+			depth--;
+			if(depth == 0) { closeIndex = k; return true; }
+		}
+	}
+	return false;
+}
+
+///Detects `ReturnType name(TemplateParams)(RuntimeParams) { body }`.
+///shortcut: attributes and constraints are skipped, and `in`/`out` contracts
+///are skipped by brace block; upgrade if contract-local imports matter.
+private bool functionTemplateDeclaration(DToken[] tokens, size_t nameIndex,
+	out string name, out string[] params, out size_t bodyStart, out size_t bodyEnd)
+{
+	name = null;
+	params = null;
+	bodyStart = size_t.max;
+	bodyEnd = size_t.max;
+	if(nameIndex == 0 || nameIndex + 1 >= tokens.length) return false;
+	if(tokens[nameIndex].kind != DTokenKind.ident) return false;
+	if(!tokens[nameIndex + 1].isChar('(')) return false;
+	auto prev = tokens[nameIndex - 1];
+	bool typeLike = prev.kind == DTokenKind.ident
+		|| prev.isChar(')') || prev.isChar(']') || prev.isChar('*');
+	if(!typeLike) return false;
+	if(prev.kind == DTokenKind.ident)
+	{
+		switch(prev.text)
+		{
+			case "return", "throw", "new", "delete", "cast", "typeof",
+				"if", "while", "for", "foreach", "foreach_reverse",
+				"switch", "with", "assert", "mixin", "import", "alias",
+				"enum", "struct", "class", "union", "template", "version",
+				"debug", "static", "public", "private", "protected", "package":
+				return false;
+			default: break;
+		}
+	}
+	size_t closeTemplate;
+	if(!tokenParenEnd(tokens, nameIndex + 1, closeTemplate)) return false;
+	if(closeTemplate + 1 >= tokens.length || !tokens[closeTemplate + 1].isChar('('))
+		return false;
+	size_t closeRuntime;
+	if(!tokenParenEnd(tokens, closeTemplate + 1, closeRuntime)) return false;
+	int depth;
+	size_t k = closeRuntime + 1;
+	for(; k < tokens.length; k++)
+	{
+		string text = tokens[k].text;
+		if(text == "(" || text == "[") depth++;
+		else if(text == ")" || text == "]")
+		{
+			if(depth == 0) return false;
+			depth--;
+		}
+		else if(depth == 0)
+		{
+			if((text == "in" || text == "out") && k + 1 < tokens.length
+				&& tokens[k + 1].isChar('{'))
+			{
+				k = skipTokenBlockEnd(tokens, k + 1) - 1;
+				continue;
+			}
+			if(text == "{") break;
+			if(text == ";" || text == "}") return false;
+		}
+	}
+	if(k >= tokens.length || !tokens[k].isChar('{')) return false;
+	size_t end = skipTokenBlockEnd(tokens, k);
+	if(end > tokens.length || end <= k + 1) return false;
+	bodyStart = k;
+	bodyEnd = end - 1;
+	if(!tokens[bodyEnd].isChar('}')) return false;
+	name = tokens[nameIndex].text;
+	params = templateParamNames(tokens[nameIndex + 2 .. closeTemplate]);
+	return true;
+}
+
+private bool functionTemplateDeclarationAt(DToken[] tokens, size_t nameIndex)
+{
+	string name;
+	string[] params;
+	size_t bodyStart, bodyEnd;
+	return functionTemplateDeclaration(tokens, nameIndex, name, params,
+		bodyStart, bodyEnd);
+}
+
+///Only looks at the current declaration prefix. `private:` sections and
+///`private { }` blocks stay conservative (treated as externally visible).
+///shortcut: section visibility is not tracked; upgrade if it becomes common.
+private bool declarationIsPrivate(DToken[] tokens, size_t nameIndex)
+{
+	size_t start = nameIndex;
+	while(start > 0)
+	{
+		string text = tokens[start - 1].text;
+		if(text == ";" || text == "{" || text == "}" || text == ":") break;
+		start--;
+	}
+	bool isPrivate;
+	for(size_t k = start; k < nameIndex; k++)
+	{
+		string text = tokens[k].text;
+		if(text == "private" || text == "package") isPrivate = true;
+		else if(text == "public" || text == "protected" || text == "export")
+			isPrivate = false;
+	}
+	return isPrivate;
 }
 
 private void collectMixinTemplates(DToken[] tokens, string source,
@@ -3144,7 +3228,25 @@ private void collectMixinTemplates(DToken[] tokens, string source,
 		bool isMixinTemplate = tokens[j].text == "mixin" && tokens[j + 1].text == "template";
 		bool isPlainTemplate = tokens[j].text == "template"
 			&& (j == 0 || tokens[j - 1].text != "mixin");
-		if(!isMixinTemplate && !isPlainTemplate) continue;
+		if(!isMixinTemplate && !isPlainTemplate)
+		{
+			string fname;
+			string[] fparams;
+			size_t bodyStart, bodyEnd;
+			if(functionTemplateDeclaration(tokens, j, fname, fparams,
+				bodyStart, bodyEnd))
+			{
+				MixinTemplateBody body;
+				body.tokens = tokens[bodyStart + 1 .. bodyEnd];
+				body.source = source;
+				body.params = fparams;
+				body.isFunctionTemplate = true;
+				body.isPrivate = declarationIsPrivate(tokens, j);
+				body.mayEmitImports = bodyMayEmitImports(body.tokens);
+				templates[fname] = body;
+			}
+			continue;
+		}
 		size_t nameIndex = isMixinTemplate ? j + 2 : j + 1;
 		if(nameIndex >= tokens.length || tokens[nameIndex].kind != DTokenKind.ident) continue;
 		string name = tokens[nameIndex].text;
@@ -3152,21 +3254,11 @@ private void collectMixinTemplates(DToken[] tokens, string source,
 		size_t k = nameIndex + 1;
 		if(k < tokens.length && tokens[k].text == "(")
 		{
-			size_t open = k;
-			int parenDepth;
-			for(; k < tokens.length; k++)
+			size_t close;
+			if(tokenParenEnd(tokens, k, close))
 			{
-				if(tokens[k].text == "(") parenDepth++;
-				else if(tokens[k].text == ")")
-				{
-					parenDepth--;
-					if(parenDepth == 0) break;
-				}
-			}
-			if(k < tokens.length)
-			{
-				params = templateParamNames(tokens[open + 1 .. k]);
-				k++;
+				params = templateParamNames(tokens[k + 1 .. close]);
+				k = close + 1;
 			}
 		}
 		while(k < tokens.length && tokens[k].text != "{") k++;
@@ -3185,12 +3277,8 @@ private void collectMixinTemplates(DToken[] tokens, string source,
 		body.tokens = tokens[start .. k];
 		body.source = source;
 		body.params = params;
-		foreach(tok; body.tokens)
-			if(tok.text == "import" || tok.text == "mixin")
-			{
-				body.mayEmitImports = true;
-				break;
-			}
+		body.isPrivate = declarationIsPrivate(tokens, nameIndex);
+		body.mayEmitImports = bodyMayEmitImports(body.tokens);
 		templates[name] = body;
 	}
 }
@@ -3208,20 +3296,10 @@ private bool templateInstantiationAt(DToken[] tokens, size_t index,
 	size_t k = index + 2;
 	if(k < tokens.length && tokens[k].isChar('('))
 	{
-		size_t open = k;
-		int depth;
-		for(; k < tokens.length; k++)
-		{
-			if(tokens[k].isChar('(')) depth++;
-			else if(tokens[k].isChar(')'))
-			{
-				depth--;
-				if(depth == 0) break;
-			}
-		}
-		if(k >= tokens.length) return false;
-		args = tokens[open + 1 .. k];
-		end = k + 1;
+		size_t close;
+		if(!tokenParenEnd(tokens, k, close)) return false;
+		args = tokens[k + 1 .. close];
+		end = close + 1;
 		return true;
 	}
 	if(k >= tokens.length) return false;
@@ -3248,6 +3326,22 @@ private bool dottedName(DToken[] chunk, out string name)
 
 ///Whether every template argument can be bound without running CTFE: literals,
 ///arrays of literals, or known string constants. Empty argument lists qualify.
+private bool literalStringArray(DToken[] chunk, out string[] values)
+{
+	values = null;
+	if(chunk.length < 2 || chunk[0].text != "[" || chunk[$ - 1].text != "]")
+		return false;
+	foreach(tok; chunk[1 .. $ - 1])
+	{
+		if(tok.text == ",") continue;
+		if(tok.kind != DTokenKind.literal) return false;
+		string value;
+		if(!decodeDLiteral(tok.text, value)) return false;
+		values ~= value;
+	}
+	return true;
+}
+
 private bool literalTemplateArgs(DToken[] args, ConstantTable constants)
 {
 	if(args.length == 0) return true;
@@ -3258,11 +3352,7 @@ private bool literalTemplateArgs(DToken[] args, ConstantTable constants)
 	{
 		bool atEnd = j == args.length;
 		string t = atEnd ? null : args[j].text;
-		if(!atEnd)
-		{
-			if(t == "(" || t == "[" || t == "{") depth++;
-			else if(t == ")" || t == "]" || t == "}") depth--;
-		}
+		if(!atEnd) updateGroupingDepth(depth, t);
 		if(!atEnd && !(t == "," && depth == 0)) continue;
 		DToken[] chunk = args[start .. j];
 		start = j + 1;
@@ -3287,13 +3377,8 @@ private bool literalTemplateArgs(DToken[] args, ConstantTable constants)
 		}
 		if(chunk[0].text == "[" && chunk[$ - 1].text == "]")
 		{
-			bool ok = true;
-			foreach(tok; chunk[1 .. $ - 1])
-			{
-				if(tok.text == ",") continue;
-				if(tok.kind != DTokenKind.literal) { ok = false; break; }
-			}
-			if(ok)
+			string[] values;
+			if(literalStringArray(chunk, values))
 			{
 				any = true;
 				continue;
@@ -3309,7 +3394,7 @@ private bool literalTemplateArgs(DToken[] args, ConstantTable constants)
 ///instantiation marks the template opaque.
 private void collectTemplateUsesAndAliases(DToken[] tokens, const bool[string] templates,
 	ConstantTable constants, ref string[][string] aliases, ref bool[string] opaque,
-	const size_t[2][] unittestRanges = null)
+	ref bool[string] used, const size_t[2][] unittestRanges = null)
 {
 	if(templates.length == 0) return;
 	bool inModule;
@@ -3319,10 +3404,8 @@ private void collectTemplateUsesAndAliases(DToken[] tokens, const bool[string] t
 	size_t rangeIdx;
 	for(size_t j = 0; j < tokens.length; j++)
 	{
-		if(rangeIdx < unittestRanges.length && j == unittestRanges[rangeIdx][0])
+		if(skipUnittestRange(unittestRanges, rangeIdx, j))
 		{
-			j = unittestRanges[rangeIdx][1] - 1;
-			rangeIdx++;
 			previous = "}";
 			continue;
 		}
@@ -3357,7 +3440,10 @@ private void collectTemplateUsesAndAliases(DToken[] tokens, const bool[string] t
 		{
 			bool declaration = j > 0 && tokens[j - 1].text == "template";
 			if(!declaration)
+				declaration = functionTemplateDeclarationAt(tokens, j);
+			if(!declaration)
 			{
+				used[t] = true;
 				DToken[] args;
 				size_t end;
 				if(!(templateInstantiationAt(tokens, j, args, end)
@@ -3425,6 +3511,52 @@ private string[string] resolveTemplateAliases(MixinTemplateBody[string] template
 	return resolvedAliases;
 }
 
+///Names of templates whose bodies can emit imports.
+private bool[string] importTemplateNames(MixinTemplateBody[string] templates)
+{
+	bool[string] ret;
+	foreach(name, body; templates)
+		if(body.mayEmitImports)
+			ret[name] = true;
+	return ret;
+}
+
+///Templates safe to expand at use sites instead of scanning as module code.
+private bool[string] resolvedTemplateNames(bool[string] importTemplates,
+	bool[string] opaque)
+{
+	bool[string] ret;
+	foreach(name; importTemplates.byKey)
+		if(!(name in opaque))
+			ret[name] = true;
+	return ret;
+}
+
+///Fields shared by the single-file and multi-file final parse.
+private void prepareParser(ref DImportParser parser, string[string] aliases,
+	bool[string] resolvedTemplates, bool[string] usedTemplates,
+	ConstantTable constants, StringFunctionBody[][string] functions)
+{
+	parser.aliases = aliases;
+	parser.resolvedTemplates = resolvedTemplates;
+	parser.usedTemplates = usedTemplates;
+	parser.constants = constants;
+	parser.functions = functions;
+}
+
+///First pass that fills the constant table for template/mixin arguments.
+private void collectConstantDeclarations(DToken[] tokens, ImportScanContext ctx,
+	MixinTemplateBody[string] templates, ConstantTable constants,
+	StringFunctionBody[][string] functions)
+{
+	DImportParser collector = DImportParser(tokens, ctx, templates);
+	collector.constants = constants;
+	collector.functions = functions;
+	collector.collectConstants = true;
+	collector.constantsOnly = true;
+	collector.parseAll();
+}
+
 private bool isFunctionParamType(string text)
 {
 	switch(text)
@@ -3444,49 +3576,24 @@ private bool isFunctionParamType(string text)
 private string[] functionParamNames(DToken[] tokens)
 {
 	string[] names;
-	size_t start;
-	int depth;
-	void process(size_t end)
+	foreach(chunk; splitTopLevelCommas(tokens))
 	{
-		if(end <= start) return;
-		size_t eq = size_t.max;
-		int d;
-		for(size_t j = start; j < end; j++)
-		{
-			string text = tokens[j].text;
-			if(text == "(" || text == "[" || text == "{") d++;
-			else if(text == ")" || text == "]" || text == "}") d--;
-			else if(d == 0 && text == "=") { eq = j; break; }
-		}
-		size_t stop = eq == size_t.max ? end : eq;
+		if(chunk.length == 0) continue;
+		size_t eq = depthZeroEquals(chunk);
+		size_t stop = eq == size_t.max ? chunk.length : eq;
 		size_t last = size_t.max;
 		int d2;
-		for(size_t j = start; j < stop; j++)
+		for(size_t j = 0; j < stop; j++)
 		{
-			string text = tokens[j].text;
-			if(text == "(" || text == "[" || text == "{") d2++;
-			else if(text == ")" || text == "]" || text == "}") d2--;
-			if(d2 == 0 && tokens[j].kind == DTokenKind.ident)
+			string text = chunk[j].text;
+			if(isGroupingOpen(text)) d2++;
+			else if(isGroupingClose(text)) d2--;
+			if(d2 == 0 && chunk[j].kind == DTokenKind.ident)
 				last = j;
 		}
-		if(last != size_t.max && !isFunctionParamType(tokens[last].text))
-			names ~= tokens[last].text;
+		if(last != size_t.max && !isFunctionParamType(chunk[last].text))
+			names ~= chunk[last].text;
 	}
-	for(size_t j = 0; j < tokens.length; j++)
-	{
-		string text = tokens[j].text;
-		if(text == "(" || text == "[" || text == "{") depth++;
-		else if(text == ")" || text == "]" || text == "}")
-		{
-			if(depth > 0) depth--;
-		}
-		else if(text == "," && depth == 0)
-		{
-			process(j);
-			start = j + 1;
-		}
-	}
-	process(tokens.length);
 	return names;
 }
 
@@ -3499,12 +3606,8 @@ private void collectStringFunctions(DToken[] tokens, string source,
 	size_t rangeIdx;
 	for(size_t j = 0; j + 1 < tokens.length; j++)
 	{
-		if(rangeIdx < unittestRanges.length && j == unittestRanges[rangeIdx][0])
-		{
-			j = unittestRanges[rangeIdx][1] - 1;
-			rangeIdx++;
+		if(skipUnittestRange(unittestRanges, rangeIdx, j))
 			continue;
-		}
 		if(tokens[j].text == "(")
 		{
 			parenDepth++;
@@ -3590,11 +3693,7 @@ struct ImportScanInfo
 	bool hasUnknownVersionIdentifiers;
 	string[] doubts;
 
-	bool isDoubtful() const
-	{
-		return doubts.length != 0 || hasUnknownConditionals || hasUnresolvedMixins ||
-			hasUnresolvedStringMixins || hasUnknownVersionIdentifiers;
-	}
+	bool isDoubtful() const { return scanIsDoubtful(doubts.length, hasUnknownConditionals, hasUnresolvedMixins, hasUnresolvedStringMixins, hasUnknownVersionIdentifiers); }
 
 	bool isUnsupported() const { return hasUnresolvedMixins || hasUnresolvedStringMixins; }
 	bool isImportRisk() const { return hasUnresolvedMixins; }
@@ -3625,33 +3724,20 @@ ImportScanInfo scanDImportInfo(string source, ImportScanContext ctx)
 	collectStringFunctions(tokens, source, functions, unittestRanges);
 	ConstantTable constants = new ConstantTable();
 	constants.stringImportPaths = ctx.stringImportPaths;
-	{
-		DImportParser collector = DImportParser(tokens, ctx, templates);
-		collector.constants = constants;
-		collector.functions = functions;
-		collector.collectConstants = true;
-		collector.constantsOnly = true;
-		collector.parseAll();
-	}
-	bool[string] importTemplates;
-	foreach(name, body; templates)
-		if(body.mayEmitImports)
-			importTemplates[name] = true;
+	collectConstantDeclarations(tokens, ctx, templates, constants, functions);
+	bool[string] importTemplates = importTemplateNames(templates);
 	string[][string] templateAliases;
 	bool[string] opaqueTemplates;
+	bool[string] usedTemplates;
 	if(importTemplates.length)
 		collectTemplateUsesAndAliases(tokens, importTemplates, constants,
-			templateAliases, opaqueTemplates, unittestRanges);
+			templateAliases, opaqueTemplates, usedTemplates, unittestRanges);
 	string[string] resolvedAliases = resolveTemplateAliases(templates, templateAliases);
-	bool[string] resolvedTemplates;
-	foreach(name; importTemplates.byKey)
-		if(!(name in opaqueTemplates))
-			resolvedTemplates[name] = true;
+	bool[string] resolvedTemplates = resolvedTemplateNames(importTemplates,
+		opaqueTemplates);
 	DImportParser parser = DImportParser(tokens, ctx, templates);
-	parser.aliases = resolvedAliases;
-	parser.resolvedTemplates = resolvedTemplates;
-	parser.constants = constants;
-	parser.functions = functions;
+	prepareParser(parser, resolvedAliases, resolvedTemplates, usedTemplates,
+		constants, functions);
 	parser.parseAll();
 	ImportScanInfo ret;
 	ret.imports = parser.imports;
@@ -3915,34 +4001,23 @@ SourceImportGraph parseSourceImportGraph(string[] sourceDirectories, string[] so
 	ConstantTable constants = new ConstantTable();
 	constants.stringImportPaths = ctx.stringImportPaths;
 	foreach(f; files)
-	{
-		DImportParser collector = DImportParser(f.tokens, ctx, templates);
-		collector.constants = constants;
-		collector.functions = functions;
-		collector.collectConstants = true;
-		collector.constantsOnly = true;
-		collector.parseAll();
-	}
+		collectConstantDeclarations(f.tokens, ctx, templates, constants, functions);
 
 	///Only templates that can emit imports and are referenced exclusively
 	///through bindable instantiations can skip the conservative body scan.
-	bool[string] importTemplates;
-	foreach(name, body; templates)
-		if(body.mayEmitImports)
-			importTemplates[name] = true;
+	bool[string] importTemplates = importTemplateNames(templates);
 	bool[string] opaqueTemplates;
+	bool[string] usedTemplates;
 	if(importTemplates.length)
 		foreach(ref f; files)
 			collectTemplateUsesAndAliases(f.tokens, importTemplates, constants,
-				f.rawAliases, opaqueTemplates, f.unittestRanges);
+				f.rawAliases, opaqueTemplates, usedTemplates, f.unittestRanges);
 	///Aliases are module-scoped, so resolve them per file against the full
 	///template map.
 	foreach(ref f; files)
 		f.aliases = resolveTemplateAliases(templates, f.rawAliases);
-	bool[string] resolvedTemplates;
-	foreach(name; importTemplates.byKey)
-		if(!(name in opaqueTemplates))
-			resolvedTemplates[name] = true;
+	bool[string] resolvedTemplates = resolvedTemplateNames(importTemplates,
+		opaqueTemplates);
 
 	struct ParsedFile
 	{
@@ -3962,10 +4037,8 @@ SourceImportGraph parseSourceImportGraph(string[] sourceDirectories, string[] so
 	foreach(f; files)
 	{
 		DImportParser parser = DImportParser(f.tokens, ctx, templates);
-		parser.aliases = f.aliases;
-		parser.resolvedTemplates = resolvedTemplates;
-		parser.constants = constants;
-		parser.functions = functions;
+		prepareParser(parser, f.aliases, resolvedTemplates, usedTemplates,
+			constants, functions);
 		parser.parseAll();
 		string moduleName = parser.moduleName;
 		if(moduleName.length == 0)
@@ -4129,6 +4202,99 @@ unittest
 	}, ImportScanContext.init);
 	assert(info.imports == ["std.traits"], info.imports.to!string);
 	assert(!info.hasUnresolvedMixins, info.doubts.to!string);
+}
+
+unittest
+{
+	import std.conv : to;
+	///A function template with a literal string argument binds like `template`.
+	ImportScanInfo info = scanDImportInfo(q{
+		module function.literal;
+		void f(string n)() { mixin("import " ~ n ~ ";"); }
+		alias X = f!"std.traits";
+	}, ImportScanContext.init);
+	assert(info.imports == ["std.traits"], info.imports.to!string);
+	assert(!info.hasUnresolvedMixins, info.doubts.to!string);
+	assert(!info.hasUnresolvedStringMixins, info.doubts.to!string);
+}
+
+unittest
+{
+	import std.conv : to;
+	///A function template argument can be a string-valued enum constant.
+	ImportScanInfo info = scanDImportInfo(q{
+		module function.enumarg;
+		enum mod = "std.traits";
+		void f(string n)() { mixin("import " ~ n ~ ";"); }
+		alias X = f!mod;
+	}, ImportScanContext.init);
+	assert(info.imports == ["std.traits"], info.imports.to!string);
+	assert(!info.hasUnresolvedStringMixins, info.doubts.to!string);
+}
+
+unittest
+{
+	import std.conv : to;
+	///A normal function and a zero-parameter function template are distinct.
+	ImportScanInfo info = scanDImportInfo(q{
+		module function.vs_template;
+		void normal() { import normal.import; }
+		void templ()() { import template.import; }
+		alias X = templ!();
+	}, ImportScanContext.init);
+	assert(info.imports == ["normal.import", "template.import"], info.imports.to!string);
+	assert(!info.isDoubtful, info.doubts.to!string);
+}
+
+unittest
+{
+	import std.conv : to;
+	import std.algorithm.searching : canFind;
+	///An unused function template keeps its body scan (it may be public API).
+	ImportScanInfo info = scanDImportInfo(q{
+		module function.unused;
+		void f(string n)() { import kept.import; mixin("import " ~ n ~ ";"); }
+	}, ImportScanContext.init);
+	assert(info.imports.canFind("kept.import"), info.imports.to!string);
+	assert(info.hasUnresolvedStringMixins, info.doubts.to!string);
+}
+
+unittest
+{
+	import std.conv : to;
+	///An unused private function template cannot be instantiated elsewhere.
+	ImportScanInfo info = scanDImportInfo(q{
+		module function.private_unused;
+		private void f(T)() { import private.import; }
+	}, ImportScanContext.init);
+	assert(info.imports.length == 0, info.imports.to!string);
+	assert(!info.isDoubtful, info.doubts.to!string);
+}
+
+unittest
+{
+	import std.algorithm.searching : canFind;
+	import std.conv : to;
+	///`private:` sections are not tracked, so the body stays conservative.
+	ImportScanInfo info = scanDImportInfo(q{
+		module function.private_section;
+		private:
+		void f(T)() { import kept.import; }
+	}, ImportScanContext.init);
+	assert(info.imports.canFind("kept.import"), info.imports.to!string);
+}
+
+unittest
+{
+	import std.conv : to;
+	///An opaque function template use keeps its body scan.
+	ImportScanInfo info = scanDImportInfo(q{
+		module function.opaque;
+		void f(string n)() { import fixed.import; mixin("import " ~ n ~ ";"); }
+		void g(string x)() { alias A = f!x; }
+	}, ImportScanContext.init);
+	assert(info.imports == ["fixed.import"], info.imports.to!string);
+	assert(info.hasUnresolvedStringMixins, info.doubts.to!string);
 }
 
 unittest
@@ -4365,6 +4531,20 @@ unittest
 	}, defaultImportScanContext());
 	assert(!ctfeImport.hasUnresolvedStringMixins, ctfeImport.doubts.to!string);
 	assert(ctfeImport.imports.canFind("created"), ctfeImport.imports.to!string);
+
+	//A loop can build the string at CTFE; concatenating source literals is unsound.
+	ImportScanInfo ctfeLoop = scanDImportInfo(q{
+		module trusted.ctfe_loop;
+		enum generated = (() {
+			string s = "hello";
+			string[] parts = ["world", "join", "here"];
+			foreach(p; parts) s ~= p;
+			return s;
+		})();
+		mixin(generated);
+	}, defaultImportScanContext());
+	assert(ctfeLoop.hasUnresolvedStringMixins, ctfeLoop.doubts.to!string);
+	assert(ctfeLoop.isDoubtful);
 
 	//Import evidence with a dynamic piece cannot be resolved.
 	ImportScanInfo ctfeDynamic = scanDImportInfo(q{
