@@ -666,6 +666,12 @@ private ConditionValue notValue(ConditionValue v)
 }
 
 ///Manifest constants (enum/static const) used to resolve `static if` conditions.
+private enum ConstantImportStatus
+{
+	unknown,
+	safe,
+}
+
 private class ConstantTable
 {
 	private struct Entry
@@ -677,6 +683,7 @@ private class ConstantTable
 	private bool[string] ambiguous;
 	private ConditionValue[string] cache;
 	private bool[string] resolving;
+	private bool[string] resolvingImports;
 	///Per-file tables delegate resolution to the package-wide table.
 	ConstantTable parent;
 
@@ -759,6 +766,51 @@ private class ConstantTable
 			catch(Exception) {}
 		}
 		return false;
+	}
+
+	///Estimates imports for a constant whose initializer is not a simple
+	///string (e.g. a CTFE function literal). Scans all string literals in the
+	///initializer: complete imports are added, dynamic import evidence is
+	///unknown, and no import evidence is safe.
+	ConstantImportStatus importStatus(string name, ImportScanContext ctx,
+		ref string[] imports)
+	{
+		import std.string : indexOf;
+		if(name in ambiguous) return ConstantImportStatus.unknown;
+		if(!(name in entries))
+			return parent !is null ? parent.importStatus(name, ctx, imports)
+				: ConstantImportStatus.unknown;
+		if(name in resolvingImports) return ConstantImportStatus.unknown;
+		resolvingImports[name] = true;
+		scope(exit) resolvingImports.remove(name);
+		DToken[] expr = entries[name].expr;
+		string literals;
+		foreach(size_t j; 0 .. expr.length)
+		{
+			auto token = expr[j];
+			if(token.text == "mixin")
+				return ConstantImportStatus.unknown;
+			if(token.text == "import" && j + 1 < expr.length
+				&& expr[j + 1].text == "(")
+				return ConstantImportStatus.unknown;
+			if(token.kind == DTokenKind.literal)
+			{
+				string decoded;
+				if(decodeDLiteral(token.text, decoded))
+					literals ~= decoded;
+			}
+			if(token.kind == DTokenKind.ident && token.text != name
+				&& token.text in entries)
+			{
+				auto sub = importStatus(token.text, ctx, imports);
+				if(sub != ConstantImportStatus.safe) return sub;
+			}
+		}
+		if(indexOf(literals, "import") == -1)
+			return ConstantImportStatus.safe;
+		if(literalImports(literals, ctx, imports))
+			return ConstantImportStatus.safe;
+		return ConstantImportStatus.unknown;
 	}
 
 	bool resolveString(string name, out string value)
@@ -1411,6 +1463,15 @@ ImportScanContext importScanContextFor(OS targetOS, ISA targetISA,
 	version(D_BetterC) ctx.versions["D_BetterC"] = true;
 	ctx.versions["D_Version2"] = true;
 	ctx.compilerVersion = targetCompilerVersion ? targetCompilerVersion : __VERSION__;
+	///Well-known standard library mixin templates that never emit imports.
+	///Local definitions are still expanded first, so a project template with
+	///the same name keeps its real body.
+	static immutable string[] builtinTrustedNoImportMixins = [
+		"basicExceptionCtors",
+		"Proxy",
+	];
+	foreach(name; builtinTrustedNoImportMixins)
+		ctx.trustedNoImportMixins[name] = true;
 	return ctx;
 }
 
@@ -1440,12 +1501,24 @@ private struct MixinTemplateBody
 	string[] params;
 }
 
+///Body of a string-returning function, used to prove simple mixin helpers do
+///not emit imports without running CTFE.
+private struct StringFunctionBody
+{
+	DToken[] tokens;
+	///Keeps the source the token pointers refer to alive.
+	string source;
+	///Function parameter names, in declaration order.
+	string[] params;
+}
+
 private struct DImportParser
 {
 	DToken[] tokens;
 	size_t i;
 	ImportScanContext ctx;
 	MixinTemplateBody[string] templates;
+	StringFunctionBody[][string] functions;
 	bool[string] expandingTemplates;
 	string[] imports;
 	string moduleName;
@@ -1530,6 +1603,24 @@ private struct DImportParser
 		else if(curIs("static") && i + 1 < tokens.length && tokens[i + 1].text == "const")
 		{
 			size_t j = i + 2;
+			if(j >= tokens.length || tokens[j].kind != DTokenKind.ident) return false;
+			if(j + 1 < tokens.length && tokens[j + 1].text == "=")
+			{
+				name = tokens[j].text;
+				exprStart = j + 2;
+			}
+			else if(j + 2 < tokens.length && tokens[j + 1].kind == DTokenKind.ident
+				&& tokens[j + 2].text == "=" && isConstantType(tokens[j].text))
+			{
+				name = tokens[j + 1].text;
+				exprStart = j + 3;
+			}
+			else
+				return false;
+		}
+		else if(curIs("const"))
+		{
+			size_t j = i + 1;
 			if(j >= tokens.length || tokens[j].kind != DTokenKind.ident) return false;
 			if(j + 1 < tokens.length && tokens[j + 1].text == "=")
 			{
@@ -2198,14 +2289,14 @@ private struct DImportParser
 
 	void expandTemplateMixin(string name, DToken[] args)
 	{
-		if(name in ctx.trustedNoImportMixins)
-		{
-			usedTrustedNoImportMixin = true;
-			return;
-		}
 		MixinTemplateBody* body = name in templates;
 		if(body is null)
 		{
+			if(name in ctx.trustedNoImportMixins)
+			{
+				usedTrustedNoImportMixin = true;
+				return;
+			}
 			if(!constantsOnly)
 			{
 				hasUnresolvedMixins = true;
@@ -2222,6 +2313,7 @@ private struct DImportParser
 		DImportParser sub = DImportParser(body.tokens, ctx, templates);
 		sub.expandingTemplates = expandingTemplates;
 		sub.constants = constants;
+		sub.functions = functions;
 		sub.collectConstants = true;
 		sub.constantsOnly = constantsOnly;
 		sub.stringParams = strings;
@@ -2238,36 +2330,47 @@ private struct DImportParser
 		{
 			//An unresolved string mixin cannot contribute constants.
 			if(constantsOnly) return;
-			bool importEvidence;
-			string[] literals = mixinLiterals(args);
-			foreach(literal; literals)
-				if(indexOf(literal, "import") != -1)
+			///Literal/stringof-style expressions, complete literal imports, or
+			///trusted/verified project helpers cannot introduce hidden imports.
+			bool[string] visited;
+			string[] foundImports;
+			MixinExpressionStatus status = mixinExpressionStatus(args, functions,
+				visited, ctx, constants, foundImports);
+			if(args.length >= 2 && args[0].kind == DTokenKind.ident
+				&& (args[1].text == "(" || args[1].text == "!"))
+				if(args[0].text in ctx.trustedNoImportMixins)
 				{
-					importEvidence = true;
-					break;
+					usedTrustedNoImportMixin = true;
+					status = MixinExpressionStatus.safe;
 				}
-			//import("file") inside the expression can also hide imports.
-			for(size_t j = 0; j + 1 < args.length; j++)
-				if(args[j].kind == DTokenKind.ident && args[j].text == "import"
-					&& args[j + 1].text == "(")
-					importEvidence = true;
+			bool mayImport = status == MixinExpressionStatus.mayImport;
+			bool unknown = status == MixinExpressionStatus.unknown;
+
 			//Plain imports inside a delegate/lambda in the expression are real imports.
 			DImportParser sub = DImportParser(args, ctx, templates);
 			sub.expandingTemplates = expandingTemplates;
 			sub.constants = constants;
+			sub.functions = functions;
 			sub.stringParams = stringParams.dup;
 			sub.arrayParams = arrayParams.dup;
 			sub.parseAll();
 			mergeFrom(sub);
-			if(importEvidence)
+			if(sub.hasUnresolvedMixins || sub.hasUnresolvedStringMixins)
+				unknown = true;
+
+			foreach(imp; foundImports)
+				addImport(imp);
+
+			if(mayImport)
+			{
 				hasUnresolvedMixins = true;
-			// shortcut: expression mixins without import evidence are treated as
-			// non-importing; a lambda inside one could still hide a local import.
-			if(!expressionContext || importEvidence)
+				hasUnresolvedStringMixins = true;
+				addDoubt("string mixin import: " ~ tokensText(args));
+			}
+			else if(unknown && !expressionContext)
 			{
 				hasUnresolvedStringMixins = true;
-				addDoubt((importEvidence ? "string mixin import: " : "string mixin: ")
-					~ tokensText(args));
+				addDoubt("string mixin: " ~ tokensText(args));
 			}
 			return;
 		}
@@ -2276,6 +2379,7 @@ private struct DImportParser
 		DImportParser sub = DImportParser(generated, ctx, templates);
 		sub.expandingTemplates = expandingTemplates;
 		sub.constants = constants;
+		sub.functions = functions;
 		sub.collectConstants = true;
 		sub.constantsOnly = constantsOnly;
 		sub.stringParams = stringParams.dup;
@@ -2308,6 +2412,275 @@ private string[] mixinLiterals(DToken[] args)
 		if(decodeDLiteral(tok.text, decoded)) ret ~= decoded;
 	}
 	return ret;
+}
+
+private enum MixinExpressionStatus
+{
+	safe,
+	mayImport,
+	unknown,
+}
+
+private DToken[][] splitTopLevelCommas(DToken[] tokens)
+{
+	DToken[][] chunks;
+	size_t start;
+	int depth;
+	for(size_t j = 0; j < tokens.length; j++)
+	{
+		string text = tokens[j].text;
+		if(text == "(" || text == "[" || text == "{") depth++;
+		else if(text == ")" || text == "]" || text == "}")
+		{
+			if(depth > 0) depth--;
+		}
+		else if(text == "," && depth == 0)
+		{
+			chunks ~= tokens[start .. j];
+			start = j + 1;
+		}
+	}
+	if(start < tokens.length)
+		chunks ~= tokens[start .. $];
+	return chunks;
+}
+
+///Resolves a call like `gen("name")` or `gen(KnownConstant)` to literal strings.
+private bool literalCallArgs(DToken[] args, size_t openIndex, ConstantTable constants,
+	out string[] literalArgs)
+{
+	int depth;
+	size_t close = size_t.max;
+	for(size_t j = openIndex; j < args.length; j++)
+	{
+		if(args[j].text == "(") depth++;
+		else if(args[j].text == ")")
+		{
+			depth--;
+			if(depth == 0) { close = j; break; }
+		}
+	}
+	if(close == size_t.max)
+		return false;
+	literalArgs = new string[0];
+	foreach(chunk; splitTopLevelCommas(args[openIndex + 1 .. close]))
+	{
+		string value;
+		if(chunk.length == 1 && chunk[0].kind == DTokenKind.literal)
+		{
+			if(!decodeDLiteral(chunk[0].text, value))
+				return false;
+			literalArgs ~= value;
+		}
+		else if(chunk.length == 1 && chunk[0].kind == DTokenKind.ident
+			&& constants !is null && constants.resolveString(chunk[0].text, value))
+			literalArgs ~= value;
+		else
+			return false;
+	}
+	return true;
+}
+
+///Extracts imports from a literal snippet. Returns false when the snippet has
+///import evidence that is not a complete declaration (e.g. `"import " ~ name`).
+private bool literalImports(string text, ImportScanContext ctx, ref string[] imports)
+{
+	import std.string : indexOf;
+	if(indexOf(text, "import") == -1)
+		return true;
+	auto info = scanDImportInfo(text, ctx);
+	if(info.imports.length == 0)
+		return false;
+	foreach(imp; info.imports)
+	{
+		bool exists;
+		foreach(existing; imports)
+			if(existing == imp) { exists = true; break; }
+		if(!exists) imports ~= imp;
+	}
+	return !info.hasUnresolvedMixins && !info.hasUnresolvedStringMixins;
+}
+
+///Classifies an unresolved mixin expression without running CTFE. Literal-only
+///expressions and calls to verified project helpers are safe; known helpers
+///that emit imports are `mayImport`; anything else (unknown calls/templates) is
+///`unknown`.
+private MixinExpressionStatus mixinExpressionStatus(DToken[] args,
+	StringFunctionBody[][string] functions, bool[string] visited,
+	ImportScanContext ctx, ConstantTable constants, ref string[] foundImports)
+{
+	///A bare/qualified identifier is a runtime string unless it was already
+	///resolved above: it can be anything, including an import.
+	bool simpleIdentifier = args.length == 1 && args[0].kind == DTokenKind.ident;
+	if(!simpleIdentifier && args.length >= 3 && args.length % 2 == 1)
+	{
+		simpleIdentifier = true;
+		for(size_t k = 0; k < args.length; k++)
+		{
+			if(k % 2 == 0)
+			{
+				if(args[k].kind != DTokenKind.ident) { simpleIdentifier = false; break; }
+			}
+			else if(args[k].text != ".") { simpleIdentifier = false; break; }
+		}
+	}
+	if(simpleIdentifier)
+	{
+		if(args.length == 1 && constants !is null)
+		{
+			auto constantStatus = constants.importStatus(args[0].text, ctx, foundImports);
+			if(constantStatus == ConstantImportStatus.safe)
+				return MixinExpressionStatus.safe;
+		}
+		return MixinExpressionStatus.unknown;
+	}
+
+	MixinExpressionStatus status = MixinExpressionStatus.safe;
+	for(size_t j = 0; j < args.length; j++)
+	{
+		auto token = args[j];
+		if(token.kind == DTokenKind.literal)
+		{
+			string text;
+			if(decodeDLiteral(token.text, text)
+				&& !literalImports(text, ctx, foundImports))
+				return MixinExpressionStatus.mayImport;
+			continue;
+		}
+		if(token.text == "import" || token.text == "mixin")
+			return MixinExpressionStatus.mayImport;
+		if(token.kind != DTokenKind.ident || j + 1 >= args.length)
+			continue;
+		string next = args[j + 1].text;
+		if(next != "(" && next != "!")
+			continue;
+		if(token.text == "cast" || token.text == "typeof"
+			|| token.text == "__traits" || token.text == "is")
+			continue;
+		if(auto bodies = token.text in functions)
+		{
+			if(token.text in visited) continue;
+			visited[token.text] = true;
+			string[] literalArgs;
+			bool knownArgs = next == "(" && literalCallArgs(args, j + 1,
+				constants, literalArgs);
+			if(functionMayImport(*bodies, functions, visited, ctx, constants,
+				knownArgs ? literalArgs : null, foundImports))
+				return MixinExpressionStatus.mayImport;
+		}
+		else
+			status = MixinExpressionStatus.unknown;
+	}
+	return status;
+}
+
+///Scans a project string-returning function without CTFE. Only string literals
+///and dynamic mixins count as import evidence; the function's own local imports
+///do not end up in the returned code. Calls to other known project functions are
+///followed recursively; unknown calls are assumed not to emit imports.
+private bool functionMayImport(StringFunctionBody[] bodies,
+	StringFunctionBody[][string] functions, bool[string] visited,
+	ImportScanContext ctx, ConstantTable constants, string[] literalArgs,
+	ref string[] foundImports)
+{
+	foreach(body; bodies)
+	{
+		///With literal arguments we can evaluate a simple `return a ~ b;`
+		///without running CTFE.
+		if(literalArgs !is null && body.params.length == literalArgs.length)
+		{
+			string[string] bound;
+			foreach(i, param; body.params)
+				bound[param] = literalArgs[i];
+			size_t returnIndex = size_t.max;
+			int returnCount;
+			int depth;
+			for(size_t j = 0; j < body.tokens.length; j++)
+			{
+				string text = body.tokens[j].text;
+				if(text == "(" || text == "[" || text == "{") depth++;
+				else if(text == ")" || text == "]" || text == "}")
+				{
+					if(depth > 0) depth--;
+				}
+				if(depth == 0 && text == "return")
+				{
+					returnCount++;
+					returnIndex = j;
+				}
+			}
+			if(returnCount == 1)
+			{
+				size_t end = returnIndex + 1;
+				int d;
+				for(; end < body.tokens.length; end++)
+				{
+					string text = body.tokens[end].text;
+					if(text == "(" || text == "[" || text == "{") d++;
+					else if(text == ")" || text == "]" || text == "}")
+					{
+						if(d > 0) d--;
+					}
+					else if(d == 0 && text == ";")
+						break;
+				}
+				if(end < body.tokens.length)
+				{
+					string content;
+					if(extractMixinString(body.tokens[returnIndex + 1 .. end],
+						bound, constants, content))
+					{
+						auto info = scanDImportInfo(content, ctx);
+						foreach(imp; info.imports)
+						{
+							bool exists;
+							foreach(existing; foundImports)
+								if(existing == imp) { exists = true; break; }
+							if(!exists) foundImports ~= imp;
+						}
+						if(info.hasUnresolvedMixins || info.hasUnresolvedStringMixins)
+							return true;
+						return false;
+					}
+				}
+			}
+		}
+
+		for(size_t j = 0; j < body.tokens.length; j++)
+		{
+			auto token = body.tokens[j];
+			if(token.kind == DTokenKind.literal)
+			{
+				string text;
+				if(decodeDLiteral(token.text, text)
+					&& !literalImports(text, ctx, foundImports))
+					return true;
+				continue;
+			}
+			if(token.text == "mixin")
+				return true;
+			if(token.text == "import" && j + 1 < body.tokens.length
+				&& body.tokens[j + 1].text == "(")
+				return true;
+			if(token.kind != DTokenKind.ident || j + 1 >= body.tokens.length)
+				continue;
+			string next = body.tokens[j + 1].text;
+			if(next != "(" && next != "!")
+				continue;
+			if(token.text == "cast" || token.text == "typeof"
+				|| token.text == "__traits" || token.text == "is")
+				continue;
+			if(auto callees = token.text in functions)
+			{
+				if(token.text in visited) continue;
+				visited[token.text] = true;
+				if(functionMayImport(*callees, functions, visited, ctx, constants,
+					null, foundImports))
+					return true;
+			}
+		}
+	}
+	return false;
 }
 
 private bool extractMixinString(DToken[] args, string[string] stringParams,
@@ -2529,6 +2902,153 @@ private void collectMixinTemplates(DToken[] tokens, string source, ref MixinTemp
 	}
 }
 
+private bool isFunctionParamType(string text)
+{
+	switch(text)
+	{
+		case "string", "wstring", "dstring", "int", "uint", "long", "ulong",
+			"short", "ushort", "byte", "ubyte", "char", "wchar", "dchar",
+			"bool", "float", "double", "real", "size_t", "ptrdiff_t",
+			"auto", "alias", "const", "immutable", "shared", "inout", "scope",
+			"ref", "out", "lazy", "in", "static", "void":
+			return true;
+		default:
+			return false;
+	}
+}
+
+///Extract parameter names from one balanced parameter list.
+private string[] functionParamNames(DToken[] tokens)
+{
+	string[] names;
+	size_t start;
+	int depth;
+	void process(size_t end)
+	{
+		if(end <= start) return;
+		size_t eq = size_t.max;
+		int d;
+		for(size_t j = start; j < end; j++)
+		{
+			string text = tokens[j].text;
+			if(text == "(" || text == "[" || text == "{") d++;
+			else if(text == ")" || text == "]" || text == "}") d--;
+			else if(d == 0 && text == "=") { eq = j; break; }
+		}
+		size_t stop = eq == size_t.max ? end : eq;
+		size_t last = size_t.max;
+		int d2;
+		for(size_t j = start; j < stop; j++)
+		{
+			string text = tokens[j].text;
+			if(text == "(" || text == "[" || text == "{") d2++;
+			else if(text == ")" || text == "]" || text == "}") d2--;
+			if(d2 == 0 && tokens[j].kind == DTokenKind.ident)
+				last = j;
+		}
+		if(last != size_t.max && !isFunctionParamType(tokens[last].text))
+			names ~= tokens[last].text;
+	}
+	for(size_t j = 0; j < tokens.length; j++)
+	{
+		string text = tokens[j].text;
+		if(text == "(" || text == "[" || text == "{") depth++;
+		else if(text == ")" || text == "]" || text == "}")
+		{
+			if(depth > 0) depth--;
+		}
+		else if(text == "," && depth == 0)
+		{
+			process(j);
+			start = j + 1;
+		}
+	}
+	process(tokens.length);
+	return names;
+}
+
+///Collects string-returning function bodies so mixin helpers defined in the
+///project can be checked for import evidence without running CTFE.
+private void collectStringFunctions(DToken[] tokens, string source,
+	ref StringFunctionBody[][string] functions)
+{
+	int parenDepth;
+	for(size_t j = 0; j + 1 < tokens.length; j++)
+	{
+		if(tokens[j].text == "(")
+		{
+			parenDepth++;
+			continue;
+		}
+		if(tokens[j].text == ")")
+		{
+			if(parenDepth > 0) parenDepth--;
+			continue;
+		}
+		if(parenDepth != 0 || tokens[j].text != "string")
+			continue;
+		size_t nameIndex = j + 1;
+		if(nameIndex >= tokens.length || tokens[nameIndex].kind != DTokenKind.ident)
+			continue;
+		string name = tokens[nameIndex].text;
+		size_t k = nameIndex + 1;
+		int depth;
+		bool sawParens;
+		size_t groupStart = size_t.max;
+		string[] params;
+		size_t bodyStart = size_t.max;
+		for(; k < tokens.length; k++)
+		{
+			string text = tokens[k].text;
+			if(text == "(")
+			{
+				if(depth == 0) groupStart = k;
+				depth++;
+				sawParens = true;
+			}
+			else if(text == ")")
+			{
+				if(depth > 0)
+				{
+					depth--;
+					if(depth == 0 && groupStart != size_t.max)
+					{
+						params = functionParamNames(tokens[groupStart + 1 .. k]);
+						groupStart = size_t.max;
+					}
+				}
+			}
+			else if(depth == 0 && text == "{")
+			{
+				bodyStart = k;
+				break;
+			}
+			else if(depth == 0 && text == ";")
+				break;
+		}
+		if(!sawParens || bodyStart == size_t.max)
+			continue;
+		int braceDepth = 1;
+		size_t end = bodyStart + 1;
+		for(; end < tokens.length; end++)
+		{
+			if(tokens[end].text == "{") braceDepth++;
+			else if(tokens[end].text == "}")
+			{
+				braceDepth--;
+				if(braceDepth == 0) break;
+			}
+		}
+		if(end >= tokens.length)
+			continue;
+		StringFunctionBody body;
+		body.tokens = tokens[bodyStart + 1 .. end];
+		body.source = source;
+		body.params = params;
+		functions[name] ~= body;
+	}
+}
+
 ///Everything a source scan found, including how trustworthy the import list is.
 struct ImportScanInfo
 {
@@ -2568,19 +3088,23 @@ struct ImportScanInfo
 ImportScanInfo scanDImportInfo(string source, ImportScanContext ctx)
 {
 	MixinTemplateBody[string] templates;
+	StringFunctionBody[][string] functions;
 	DToken[] tokens = tokenizeDSource(source);
 	collectMixinTemplates(tokens, source, templates);
+	collectStringFunctions(tokens, source, functions);
 	ConstantTable constants = new ConstantTable();
 	constants.stringImportPaths = ctx.stringImportPaths;
 	{
 		DImportParser collector = DImportParser(tokens, ctx, templates);
 		collector.constants = constants;
+		collector.functions = functions;
 		collector.collectConstants = true;
 		collector.constantsOnly = true;
 		collector.parseAll();
 	}
 	DImportParser parser = DImportParser(tokens, ctx, templates);
 	parser.constants = constants;
+	parser.functions = functions;
 	parser.parseAll();
 	ImportScanInfo ret;
 	ret.imports = parser.imports;
@@ -2825,11 +3349,15 @@ SourceImportGraph parseSourceImportGraph(string[] sourceDirectories, string[] so
 		files = okFiles;
 	}
 
-	///Mixin templates are resolved package-wide, so a template can be mixed in
-	///from a different module than the one that declares it.
+	///Mixin templates and string helpers are resolved package-wide, so a mixin
+	///can be used from a different module than the one that declares it.
 	MixinTemplateBody[string] templates;
+	StringFunctionBody[][string] functions;
 	foreach(f; files)
+	{
 		collectMixinTemplates(f.tokens, f.source, templates);
+		collectStringFunctions(f.tokens, f.source, functions);
+	}
 
 	///Collect enum/static const values first so static if can use them across modules.
 	ConstantTable constants = new ConstantTable();
@@ -2838,6 +3366,7 @@ SourceImportGraph parseSourceImportGraph(string[] sourceDirectories, string[] so
 	{
 		DImportParser collector = DImportParser(f.tokens, ctx, templates);
 		collector.constants = constants;
+		collector.functions = functions;
 		collector.collectConstants = true;
 		collector.constantsOnly = true;
 		collector.parseAll();
@@ -2862,6 +3391,7 @@ SourceImportGraph parseSourceImportGraph(string[] sourceDirectories, string[] so
 	{
 		DImportParser parser = DImportParser(f.tokens, ctx, templates);
 		parser.constants = constants;
+		parser.functions = functions;
 		parser.parseAll();
 		string moduleName = parser.moduleName;
 		if(moduleName.length == 0)
@@ -3037,6 +3567,128 @@ unittest
 	}, ImportScanContext.init);
 	assert(info.imports.length == 0);
 	assert(!info.isDoubtful);
+}
+
+unittest
+{
+	import std.conv : to;
+	import std.algorithm.searching : canFind;
+	//Known standard-library mixin templates are trusted by default.
+	ImportScanInfo stdMixins = scanDImportInfo(q{
+		module trusted.std;
+		import std.exception;
+		class E : Exception { mixin basicExceptionCtors; }
+	}, defaultImportScanContext());
+	assert(!stdMixins.hasUnresolvedMixins, stdMixins.doubts.to!string);
+
+	//Literal/stringof concatenations with no calls cannot emit imports.
+	ImportScanInfo literals = scanDImportInfo(q{
+		module trusted.literals;
+		void f(T)() { mixin("alias set" ~ T.stringof ~ " = int;"); }
+	}, defaultImportScanContext());
+	assert(!literals.hasUnresolvedStringMixins, literals.doubts.to!string);
+
+	//A project helper that returns a complete literal import is resolved.
+	ImportScanInfo importingHelper = scanDImportInfo(q{
+		module trusted.importing;
+		string gen() { return "import generated;"; }
+		mixin(gen());
+	}, defaultImportScanContext());
+	assert(!importingHelper.hasUnresolvedStringMixins, importingHelper.doubts.to!string);
+	assert(importingHelper.imports.canFind("generated"), importingHelper.imports.to!string);
+
+	//A helper that builds the import from a runtime value stays unresolved.
+	ImportScanInfo dynamicHelper = scanDImportInfo(q{
+		module trusted.dynamic;
+		string gen(string name) { return "import " ~ name ~ ";"; }
+		void f(string runtimeName) { mixin(gen(runtimeName)); }
+	}, defaultImportScanContext());
+	assert(dynamicHelper.hasUnresolvedStringMixins, dynamicHelper.doubts.to!string);
+
+	//The same helper with a literal argument is resolved.
+	ImportScanInfo literalArg = scanDImportInfo(q{
+		module trusted.literal_arg;
+		string gen(string name) { return "import " ~ name ~ ";"; }
+		mixin(gen("generated"));
+	}, defaultImportScanContext());
+	assert(!literalArg.hasUnresolvedStringMixins, literalArg.doubts.to!string);
+	assert(literalArg.imports.canFind("generated"), literalArg.imports.to!string);
+
+	//Module-level const strings are compile-time constants too.
+	ImportScanInfo constString = scanDImportInfo(q{
+		module trusted.const_string;
+		const string pkg = "generated";
+		mixin("import " ~ pkg ~ ";");
+	}, defaultImportScanContext());
+	assert(!constString.hasUnresolvedStringMixins, constString.doubts.to!string);
+	assert(constString.imports.canFind("generated"), constString.imports.to!string);
+
+	//A CTFE enum with no import evidence in its body is safe.
+	ImportScanInfo ctfeSafe = scanDImportInfo(q{
+		module trusted.ctfe_safe;
+		enum generated = ({ string s; s ~= "int x;"; return s; }());
+		mixin(generated);
+	}, defaultImportScanContext());
+	assert(!ctfeSafe.hasUnresolvedStringMixins, ctfeSafe.doubts.to!string);
+
+	//A complete import assembled from literals can be estimated.
+	ImportScanInfo ctfeImport = scanDImportInfo(q{
+		module trusted.ctfe_import;
+		enum generated = ({ string s = "import "; s ~= "created;"; return s; }());
+		mixin(generated);
+	}, defaultImportScanContext());
+	assert(!ctfeImport.hasUnresolvedStringMixins, ctfeImport.doubts.to!string);
+	assert(ctfeImport.imports.canFind("created"), ctfeImport.imports.to!string);
+
+	//Import evidence with a dynamic piece cannot be resolved.
+	ImportScanInfo ctfeDynamic = scanDImportInfo(q{
+		module trusted.ctfe_dynamic;
+		enum generated(string name) = ({ string s = "import "; s ~= name; return s; }());
+		void f(string runtime) { mixin(generated!(runtime)); }
+	}, defaultImportScanContext());
+	assert(ctfeDynamic.hasUnresolvedStringMixins, ctfeDynamic.doubts.to!string);
+
+	//A mixin template fed a runtime string stays unresolved.
+	ImportScanInfo dynamicTemplate = scanDImportInfo(q{
+		module trusted.dynamic_template;
+		mixin template Dynamic(string s) { mixin(s); }
+		void f(string runtime) { mixin Dynamic!(runtime); }
+	}, defaultImportScanContext());
+	assert(dynamicTemplate.hasUnresolvedStringMixins, dynamicTemplate.doubts.to!string);
+
+	//The same template with a literal argument resolves the import.
+	ImportScanInfo literalTemplate = scanDImportInfo(q{
+		module trusted.literal_template;
+		mixin template Dynamic(string s) { mixin(s); }
+		mixin Dynamic!("import generated;");
+	}, defaultImportScanContext());
+	assert(!literalTemplate.hasUnresolvedStringMixins, literalTemplate.doubts.to!string);
+	assert(literalTemplate.imports.canFind("generated"), literalTemplate.imports.to!string);
+
+	//A project helper that returns no import is safe.
+	ImportScanInfo safeHelper = scanDImportInfo(q{
+		module trusted.safe;
+		string safeGen() { return "int x;"; }
+		mixin(safeGen());
+	}, defaultImportScanContext());
+	assert(!safeHelper.hasUnresolvedStringMixins, safeHelper.doubts.to!string);
+
+	//User-provided trust overrides an unknown helper.
+	ImportScanContext ctx = defaultImportScanContext();
+	ctx.addTrustedNoImportMixin("gen");
+	ImportScanInfo trustedHelper = scanDImportInfo(q{
+		module trusted.user;
+		mixin(gen());
+	}, ctx);
+	assert(!trustedHelper.hasUnresolvedStringMixins, trustedHelper.doubts.to!string);
+
+	//A local template with a built-in trusted name keeps its real body.
+	ImportScanInfo localProxy = scanDImportInfo(q{
+		module trusted.local_proxy;
+		mixin template Proxy() { import local.from_proxy; }
+		mixin Proxy;
+	}, defaultImportScanContext());
+	assert(localProxy.imports.canFind("local.from_proxy"), localProxy.imports.to!string);
 }
 
 unittest

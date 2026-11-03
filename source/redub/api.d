@@ -239,6 +239,8 @@ string[] getChangedBuildFiles(ProjectNode root, CompilingSession s)
         ctx.addDebugVersion(version_);
     ctx.debugMode = cfg.isDebug;
     ctx.stringImportPaths = cfg.stringImportPaths;
+    foreach(name; trustedNoImportMixinsFor(cfg.workingDir))
+        ctx.addTrustedNoImportMixin(name);
 
     SourceImportGraph graph = parseSourceImportGraph(cfg.sourcePaths, cfg.sourceFiles,
         cfg.excludeSourceFiles, ctx);
@@ -534,6 +536,8 @@ private bool autoPrefersObjects(BuildConfiguration cfg, Compiler compiler, Compi
             ctx.addDebugVersion(version_);
         ctx.debugMode = cfg.isDebug;
         ctx.stringImportPaths = cfg.stringImportPaths;
+        foreach(name; trustedNoImportMixinsFor(cfg.workingDir))
+            ctx.addTrustedNoImportMixin(name);
         string[] sourceDirs = cfg.sourceFiles.length ? null : cfg.sourcePaths;
         SourceImportGraph graph = parseSourceImportGraph(sourceDirs, cfg.sourceFiles,
             cfg.excludeSourceFiles, ctx, true);
