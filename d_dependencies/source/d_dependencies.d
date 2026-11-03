@@ -2394,8 +2394,11 @@ private struct DImportParser
 		}
 		if(tokens[i].kind == DTokenKind.ident)
 		{
-			string name = tokens[i].text;
-			i++;
+			string qualified = readDottedName();
+			string name = qualified;
+			import std.string : lastIndexOf;
+			auto dot = name.lastIndexOf('.');
+			if(dot >= 0) name = name[dot + 1 .. $];
 			DToken[] templateArgs;
 			if(i < tokens.length && tokens[i].isChar('!'))
 			{
@@ -3353,10 +3356,7 @@ private void collectTemplateUsesAndAliases(DToken[] tokens, const bool[string] t
 		if(t in templates)
 		{
 			bool declaration = j > 0 && tokens[j - 1].text == "template";
-			bool qualified = j > 0 && tokens[j - 1].isChar('.');
-			if(qualified)
-				opaque[t] = true;
-			else if(!declaration)
+			if(!declaration)
 			{
 				DToken[] args;
 				size_t end;
@@ -4100,6 +4100,32 @@ unittest
 		mixin template M() { import std.traits; }
 		alias a = M;
 		mixin a!();
+	}, ImportScanContext.init);
+	assert(info.imports == ["std.traits"], info.imports.to!string);
+	assert(!info.hasUnresolvedMixins, info.doubts.to!string);
+}
+
+unittest
+{
+	import std.conv : to;
+	///A qualified mixin template resolves to its final name segment.
+	ImportScanInfo info = scanDImportInfo(q{
+		module qualified.mixin;
+		mixin template M() { import std.traits; }
+		mixin qualified.mixin.M;
+	}, ImportScanContext.init);
+	assert(info.imports == ["std.traits"], info.imports.to!string);
+	assert(!info.hasUnresolvedMixins, info.doubts.to!string);
+}
+
+unittest
+{
+	import std.conv : to;
+	///A qualified literal template instantiation resolves like an unqualified one.
+	ImportScanInfo info = scanDImportInfo(q{
+		module qualified.template;
+		template from(string moduleName) { mixin("import from = " ~ moduleName ~ ";"); }
+		alias A = qualified.template.from!"std.traits".isSomeString;
 	}, ImportScanContext.init);
 	assert(info.imports == ["std.traits"], info.imports.to!string);
 	assert(!info.hasUnresolvedMixins, info.doubts.to!string);
