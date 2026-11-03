@@ -59,10 +59,12 @@ string[] parseBuildConfiguration(const BuildConfiguration b, CompilingSession s,
         if(comp.isLDCBased && !s.os.isApple && !b.syntaxOnly && moduleObject.length == 0)
         {
             import std.path : baseName;
-            ///cmds~= "--cache-retrieval=hardlink"; // Doesn't work on Windows when using a multi drives projects
             string cacheRoot = comp == AcceptedCompiler.ldc2 ? "ldc_cache" : "nmc_cache";
             string compilerCache = buildNormalizedPath(getCacheFolder(), cacheRoot, baseName(cacheDir));
             cmds~= "--cache=" ~ escapePath(compilerCache);
+            ///Hardlinks cannot cross volumes; fall back to LDC's copy mode.
+            if(sameVolume(compilerCache, cacheDir))
+                cmds~= "--cache-retrieval=hardlink";
             cmds~= "--cache-prune";
         }
 

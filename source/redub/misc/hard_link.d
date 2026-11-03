@@ -7,19 +7,48 @@ extern(Windows) int CreateHardLinkW(const(wchar)* to, const(wchar)* from, void* 
 private bool isSameFile(string a, string b)
 {
     import std.file;
-    DirEntry aDir = DirEntry(a);
-    DirEntry bDir = DirEntry(b);
     version(Posix)
     {
-		return aDir.statBuf == bDir.statBuf;
+        return DirEntry(a).statBuf == DirEntry(b).statBuf;
+    }
+    else version(Windows)
+    {
+        import core.sys.windows.basetsd : HANDLE;
+        import core.sys.windows.winbase : CreateFileW, GetFileInformationByHandle,
+            CloseHandle, BY_HANDLE_FILE_INFORMATION, OPEN_EXISTING,
+            FILE_FLAG_BACKUP_SEMANTICS, INVALID_HANDLE_VALUE;
+        import core.sys.windows.winnt : FILE_SHARE_READ, FILE_SHARE_WRITE, FILE_SHARE_DELETE;
+        import std.utf : toUTFz;
+
+        struct FileId
+        {
+            uint volume;
+            ulong index;
+        }
+
+        static bool fileId(string path, out FileId id)
+        {
+            HANDLE h = CreateFileW(toUTFz!(const(wchar)*)(path), 0u,
+                FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                null, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, null);
+            if(h == INVALID_HANDLE_VALUE)
+                return false;
+            scope(exit) CloseHandle(h);
+            BY_HANDLE_FILE_INFORMATION info;
+            if(!GetFileInformationByHandle(h, &info))
+                return false;
+            id.volume = info.dwVolumeSerialNumber;
+            id.index = (cast(ulong)info.nFileIndexHigh << 32) | info.nFileIndexLow;
+            return true;
+        }
+
+        FileId aId, bId;
+        if(!fileId(a, aId) || !fileId(b, bId))
+            return false;
+        return aId.volume == bId.volume && aId.index == bId.index;
     }
     else
-    {
-        return aDir.isDir == bDir.isDir &&
-                aDir.timeLastModified == bDir.timeLastModified &&
-                aDir.size == bDir.size &&
-                aDir.isSymlink == bDir.isSymlink;
-    }
+        return false;
 }
 
 

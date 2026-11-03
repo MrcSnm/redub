@@ -8,6 +8,59 @@ string buildNormalizedPath(scope string[] paths...)
 	return output;
 }
 
+///Whether two paths live on the same volume. Hardlinks cannot cross volumes.
+bool sameVolume(string a, string b)
+{
+    version(Windows)
+    {
+        import std.path : rootName;
+        import std.string : icmp;
+        return icmp(rootName(a), rootName(b)) == 0;
+    }
+    else
+    {
+        import core.sys.posix.sys.stat : stat, stat_t;
+        import core.sys.posix.sys.types : dev_t;
+
+        static bool deviceOf(string path, out dev_t dev)
+        {
+            enum bufSize = 4096;
+            char[bufSize] buf;
+            size_t len = path.length;
+            if(len == 0 || len >= bufSize)
+                return false;
+            buf[0 .. len] = path[];
+            while(true)
+            {
+                buf[len] = '\0';
+                stat_t st;
+                if(stat(buf.ptr, &st) == 0)
+                {
+                    dev = st.st_dev;
+                    return true;
+                }
+                while(len > 1 && buf[len - 1] == '/')
+                    len--;
+                size_t slash = len;
+                while(slash > 0 && buf[slash - 1] != '/')
+                    slash--;
+                if(slash == 0)
+                {
+                    if(len == 1 && buf[0] == '.')
+                        return false;
+                    buf[0] = '.';
+                    len = 1;
+                }
+                else
+                    len = slash > 1 ? slash - 1 : 1;
+            }
+        }
+
+        dev_t aDev, bDev;
+        return deviceOf(a, aDev) && deviceOf(b, bDev) && aDev == bDev;
+    }
+}
+
 string normalizePath(return ref char[] output, scope string[] paths...)
 {
     size_t start, length;
