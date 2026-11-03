@@ -127,7 +127,7 @@ string[] parseLinkConfigurationCL(const ThreadBuildData data, CompilingSession s
         string cacheDir = getCacheOutputDir(requirementCache, b, s, data.extra.isRoot);
         if(includeOutput)
             cmds~= "/OUT:"~buildNormalizedPath(cacheDir, getOutputName(b, s.os)).escapePath;
-        if(!s.compiler.usesIncremental)
+        if(!s.compiler.linkIncremental)
             cmds~= "/INCREMENTAL:NO";
         if(targetType == TargetType.dynamicLibrary)
             cmds~= "/DLL";
@@ -179,7 +179,7 @@ string[] parseLinkConfigurationMSVC(const ThreadBuildData data, CompilingSession
             if(includeDFlags)
                 cmds~= filterLinkFlags(b.dFlags);
         }
-        if(!s.compiler.usesIncremental)
+        if(!s.compiler.linkIncremental)
         {
             cmds~= "-L/INCREMENTAL:NO";
         }

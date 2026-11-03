@@ -99,8 +99,8 @@ struct CompilationDetails
     string arch;
     ///Assumption to make dependency resolution slightly faster
     string assumption;
-    ///Makes the build incremental or not
-    Inference incremental;
+    ///Allows the MSVC linker to do incremental linking. Unrelated to the build strategy.
+    Inference linkIncremental;
     ///Obsolete: writes a compiler .deps file instead of using redub's parser.
     bool outputDeps;
     ///Whether the build should force single project
@@ -1032,7 +1032,7 @@ ArgsDetails resolveArguments(string[] args, bool isDescribeOnly = false)
     string bt = either(bArgs.buildType, BuildType.debug_);
     return ArgsDetails(
         bArgs,
-        CompilationDetails(bArgs.compiler, bArgs.cCompiler, bArgs.arch, bArgs.compilerAssumption, bArgs.build.incremental, bArgs.build.outputDeps, bArgs.build.combined, bArgs.build.parallel, bArgs.build.buildStrategy, !bArgs.build.noBuildStats),
+        CompilationDetails(bArgs.compiler, bArgs.cCompiler, bArgs.arch, bArgs.compilerAssumption, bArgs.build.linkIncremental, bArgs.build.outputDeps, bArgs.build.combined, bArgs.build.parallel, bArgs.build.buildStrategy, !bArgs.build.noBuildStats),
         ProjectToParse(bArgs.config, workingDir, subPackage, recipe, bArgs.single.length != 0, isDescribeOnly),
         getInitialDubVariablesFromArguments(bArgs, DubBuildArguments.init, os, args),
         bt, bArgs.target
@@ -1132,7 +1132,7 @@ ProjectDetails resolveDependencies(
     if(cDetails.combinedBuild)
         tree.combine();
 
-    compiler.usesIncremental = isIncremental(cDetails.incremental, tree);
+    compiler.linkIncremental = isLinkIncremental(cDetails.linkIncremental, tree);
     redub.parsers.environment.setupEnvironmentVariablesForPackageTree(tree);
     ///That now only happens at the last stage since some environment variables only finished the definition at that stage
     foreach(ProjectNode n; tree.collapse)
@@ -1195,13 +1195,13 @@ bool shouldFetchPackage(string localPackageName, string targetPackage, string ta
 /**
  *
  * Params:
- *   incremental = If auto, it will disable incremental when having more than 3 compilation units
+ *   linkIncremental = If auto, it will disable MSVC incremental linking when having more than 3 compilation units
  *   tree = The tree to find compilation units
  * Returns:
  */
-bool isIncremental(Inference incremental, ProjectNode tree)
+bool isLinkIncremental(Inference linkIncremental, ProjectNode tree)
 {
-    final switch(incremental)
+    final switch(linkIncremental)
     {
         case Inference.auto_: return tree.collapse.length < 3;
         case Inference.on: return true;

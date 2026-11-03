@@ -84,10 +84,10 @@ struct Compiler
     CompilerBinary c;
 
     /**
-     * Currently a flag that only affects Windows. Usually it is turned off since depending on the case, it might
-     * make compilation slower
+     * Allows the MSVC linker to do incremental linking. Only affects Windows and is unrelated to the build strategy.
+     * Off by default since it is usually slower.
      */
-    bool usesIncremental = false;
+    bool linkIncremental = false;
 
     ///Currently unused. Was used before for checking whether --start-group should be emitted or not. Since it is emitted
     ///by default, only on webAssembly which is not, it lost its usage for now.

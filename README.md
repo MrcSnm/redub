@@ -26,6 +26,7 @@ Those are the additions I've made over dub
 - [**Cross Compilation Targets**](#redub-cross-compile) - Adds support to build targets, selecting a compiler, architecture and other configuration by just calling `redub --target=PSVita`
 - **Auto PATH setup** - Since `v1.32.0`: Adds a way to auto setup redub paths in your system. Call `redub setup` and it will install redub, redub's ldc and redub's dmd in the PATH.
 - **Cache Sharing** - Since `v1.33.2`: Whenever you build a library which has the same versions and flags between parallel projects, the built library will be reused.
+- [**Incremental Compilation**](#redub-incremental-compilation) - Since `v1.34.0`: Redub is able to parse your root project and detect whether it is better to use a single compilation unit vs per module in parallel
 
 
 ## Redub Help
@@ -189,6 +190,36 @@ Redub has also an experimental support for building and linking C/C++ code toget
 {
   "language": "C"
 }
+```
+
+## Redub Incremental Compilation
+Depending on the project size, it may be more useful to build it in parallel per module vs in a single command how it is done by default. Note that this is only valid for the root project.
+
+The `auto` option will parse your D source and identify whether it is cheaper to use incremental-prallel or full-once, which is the default behavior. It is also possible to override that in 2 ways: 
+`auto` also execute multiple compilation strategies and collect in its cache the build timings to get which strategy is faster and better decide.
+
+- **Project Configuration**:
+```json
+"redub": {
+  "buildStrategy": "incremental-parallel",
+  "buildStats": false, //Do not collect build stats. Since we're not using auto, there's not much gain by doing that.
+  "trustedNoImportMixins": [ //Mixins that can't be resolved but you guarantee they do not import anything.
+    "my.NoImportMixin"
+  ]
+}
+```
+- **Command Line**:
+
+```
+  --build-strategy Root build strategy: |auto|full-once|incremental-once|incremental-parallel|full-parallel|. Overrides the project's redub config.
+  strategy              incremental  processes                          link
+  full-once             no           1 compiler                         same invocation
+  incremental-once      yes          1 compiler + 1 linker              separate
+  incremental-parallel  yes          N compilers (1 per module) + link  separate
+  full-parallel         no           N compilers (1 per module) + link  separate
+  auto(default)         picks full-once or incremental-parallel from module count/weight;
+                         fewer than 4 cores picks incremental-once.
+  link is separate whenever per-module objects are reused
 ```
 
 ## Using its library API

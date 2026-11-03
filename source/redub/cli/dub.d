@@ -261,10 +261,10 @@ struct DubBuildArguments
     @("n|non-interactive")
     bool nonInteractive;
 
-    @("Build incrementally. This usually works on a case basis, so for you case, disabling it might make it faster."~ 
-    "It is inferred to be incremental when dependencies count >= 3. Supports |auto|on|off|")
-    @("incremental")
-    Inference incremental;
+    @("Allow the MSVC linker to do incremental linking (Windows only). Unrelated to --build-strategy. "~
+    "Auto disables it when dependencies count >= 3. Supports |auto|on|off|")
+    @("link-incremental")
+    Inference linkIncremental;
 
     @("Build parallelization type. Supported options are |auto|full|leaves|no|. Default being auto. Full will attempt "~ 
     " to build every dependency at the same time. Leaves will build in parallel the dependencies that has no dependency. No will "~
@@ -280,7 +280,7 @@ struct DubBuildArguments
         "  incremental-once      yes          1 compiler + 1 linker              separate\n"~
         "  incremental-parallel  yes          N compilers (1 per module) + link  separate\n"~
         "  full-parallel         no           N compilers (1 per module) + link  separate\n"~
-        "  auto                  picks full-once or incremental-parallel from module count/weight;\n"~
+        "  auto(default)         picks full-once or incremental-parallel from module count/weight;\n"~
         "                         fewer than 4 cores picks incremental-once.\n"~
         "  link is separate whenever per-module objects are reused"
     )

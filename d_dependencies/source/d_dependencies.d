@@ -1463,12 +1463,18 @@ ImportScanContext importScanContextFor(OS targetOS, ISA targetISA,
 	version(D_BetterC) ctx.versions["D_BetterC"] = true;
 	ctx.versions["D_Version2"] = true;
 	ctx.compilerVersion = targetCompilerVersion ? targetCompilerVersion : __VERSION__;
-	///Well-known standard library mixin templates that never emit imports.
+	///Well-known standard library mixin templates. Their imports are limited to
+	///standard library modules, so they cannot hide project dependencies.
 	///Local definitions are still expanded first, so a project template with
 	///the same name keeps its real body.
 	static immutable string[] builtinTrustedNoImportMixins = [
 		"basicExceptionCtors",
 		"Proxy",
+		"AllocatorState",
+		"Signal",
+		"ForwardStrings",
+		"MSVCLinkDirectives",
+		"SimpleDllMain",
 	];
 	foreach(name; builtinTrustedNoImportMixins)
 		ctx.trustedNoImportMixins[name] = true;
