@@ -190,3 +190,11 @@ jobs:
         name: ${{ startsWith(github.ref, 'refs/tags/') && format('Redub {0}', github.ref_name) || 'Redub Nightly' }}
         prerelease: ${{ startsWith(github.ref, 'refs/tags/') && 'false' || 'true' }}
         bodyFile: release_notes.txt
+    - name: Update code.dlang.org release
+      env: 
+        DUB_SECRET: ${{secrets.DUB_SECRET}}
+      run: |
+        curl --fail-with-body -sS -X POST \
+          https://code.dlang.org/api/packages/redub/update/github?secret=$DUB_SECRET \
+          -H "Content-Type: application/json" -H "X-GitHub-Event: create" \
+          -d "{}"
