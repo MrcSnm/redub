@@ -117,8 +117,33 @@ PackageInfo* findPackage(string packageName, string repo, string packageVersion,
         if(newPkg.isInvalid || pkg.requiredVersion.isInvalid)
         {
             if(packageVersion != pkg.requiredVersion.toString)
-                throw new Exception("Package "~packageName~" with first requirement found '"~pkg.requiredVersion.toString~"' from the dependency '" ~
-                    getBetterPackageInfo(pkg, packageName)~"' is not compatible with the new requirement: "~packageVersion ~ " required by "~requiredBy~ " ("~getBetterPackageInfo(requiredBy in packagesCache, requiredBy)~")");
+            {
+                ///Internal subpackages are cached with their parent's version,
+                ///which is a placeholder for branch requirements.
+                if(pkg.isInternalSubPackage && (newPkg.isInvalid || newPkg.isMatchAll()))
+                {
+                    if(!newPkg.isMatchAll())
+                        pkg.requiredVersion = newPkg;
+                    return pkg;
+                }
+                bool existingWildcard = pkg.requiredVersion.isMatchAll();
+                bool newWildcard = newPkg.isMatchAll();
+                if(existingWildcard || newWildcard)
+                {
+                    ///A wildcard is compatible with a git branch. Prefer the
+                    ///branch requirement, since it carries the actual path.
+                    if(existingWildcard && !newWildcard)
+                    {
+                        PackageInfo newPkgInfo = getPackage(packageName, repo, packageVersion, requiredBy);
+                        pkg.bestVersion = newPkgInfo.bestVersion;
+                        pkg.path = newPkgInfo.path;
+                        pkg.requiredVersion = newPkgInfo.requiredVersion;
+                    }
+                }
+                else
+                    throw new Exception("Package "~packageName~" with first requirement found '"~pkg.requiredVersion.toString~"' from the dependency '" ~
+                        getBetterPackageInfo(pkg, packageName)~"' is not compatible with the new requirement: "~packageVersion ~ " required by "~requiredBy~ " ("~getBetterPackageInfo(requiredBy in packagesCache, requiredBy)~")");
+            }
         }
         else if(!pkg.bestVersion.satisfies(newPkg))
         {
