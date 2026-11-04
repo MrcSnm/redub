@@ -319,7 +319,41 @@ ModuleParsing getModulesDependencies(ProjectDetails d)
     return parseDependencies(std.file.readText(depsPath));
 }
 
-int createNewProject(string projectType, string  single, string targetDirectory)
+private int createAndroidProject(string path, string projectName, string userName,
+    string gitIgnore, string gitIgnorePath, string targetDub)
+{
+    import redub.logging : infos;
+    import redub.misc.path : buildNormalizedPath;
+    import std.file : exists, mkdirRecurse, write;
+    import std.conv : text;
+    import core.interpolation;
+
+    string json = i`{
+    "authors": [
+        "$(userName)"
+    ],
+    "description": "An Android OpenGL + touch application.",
+    "license": "proprietary",
+    "name": "$(projectName)",
+    "targetType": "dynamicLibrary",
+    "targetPath": "build",
+    "libs": ["EGL", "GLESv2"],
+    "bundleConfiguration": {
+        "opengl": true
+    }
+}`.text;
+    string source = import("android_opengl_main.d");
+    string sourceDir = buildNormalizedPath(path, "source");
+    mkdirRecurse(sourceDir);
+    write(buildNormalizedPath(sourceDir, "android_app.d"), source);
+    if(!exists(gitIgnorePath))
+        write(gitIgnorePath, gitIgnore);
+    write(targetDub, json);
+    infos("Success", " created Android OpenGL project in ", path);
+    return 0;
+}
+
+int createNewProject(string projectType, string  single, string targetDirectory, bool android = false)
 {
     import redub.misc.username;
     import std.conv:text;
@@ -378,6 +412,15 @@ void main()
 
     string gitIgnorePath = buildNormalizedPath(path, ".gitignore");
 
+    if(android)
+    {
+        if(projectType.length || single.length)
+        {
+            errorTitle("Cannot combine --android with --type or --single.");
+            return 1;
+        }
+        return createAndroidProject(path, projectName, userName, gitIgnore, gitIgnorePath, targetDub);
+    }
 
     if(projectType.length)
     {

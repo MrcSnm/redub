@@ -359,6 +359,9 @@ int initMain(string[] args)
         @("s")
         string singleName;
 
+        @("Creates an Android OpenGL + touch project")
+        bool android;
+
     }
     InitArgs initArgs;
     GetoptResult res = betterGetopt(args, initArgs);
@@ -369,7 +372,7 @@ int initMain(string[] args)
     }
     setLogLevel(LogLevel.info);
 
-    return createNewProject(initArgs.type, initArgs.singleName, args.length > 1 ? args[1] : null);
+    return createNewProject(initArgs.type, initArgs.singleName, args.length > 1 ? args[1] : null, initArgs.android);
 }
 
 

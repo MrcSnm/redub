@@ -11,7 +11,7 @@ import redub.command_generators.automatic;
 import std.process:Pid;
 import std.concurrency:Tid;
 
-private immutable string defaultEnvJs = import("redub/extensions/env_template.js");
+private immutable string defaultEnvJs = import("env.js");
 
 /**
  * When using redub as a library, one may spawn multiple times the same package, having a bug on it.

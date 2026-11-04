@@ -139,10 +139,11 @@ struct BundleConfiguration
     BundleCategories[] categories;
     bool usesTerminal = true;
     string[] permissions;
+    bool opengl;
 
     immutable(BundleConfiguration) idup() const
     {
-        return BundleConfiguration(categories.dup, usesTerminal, permissions.dup);
+        return BundleConfiguration(categories.dup, usesTerminal, permissions.dup, opengl);
     }
 }
 
@@ -681,6 +682,8 @@ struct BuildConfiguration
         string[] permissions = cast(string[])ret.bundleConfig.permissions;
         exclusiveMerge(permissions, cast(string[])other.bundleConfig.permissions);
         ret.bundleConfig.permissions = cast(string[])permissions;
+        if(other.bundleConfig.opengl)
+            ret.bundleConfig.opengl = true;
         return ret;
     }
 

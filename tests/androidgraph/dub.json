@@ -1,0 +1,14 @@
+{
+    "authors": [
+        "Marcelo"
+    ],
+    "description": "An Android OpenGL + touch application.",
+    "license": "proprietary",
+    "name": "androidgraph",
+    "targetType": "dynamicLibrary",
+    "targetPath": "build",
+    "libs": ["EGL", "GLESv2"],
+    "bundleConfiguration": {
+        "opengl": true
+    }
+}

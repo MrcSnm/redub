@@ -5,20 +5,9 @@ import std.string : indexOf;
 
 private immutable string redubAppIcon = import("redub_program.png");
 
-private enum androidBridgeSource = q"EOS
-struct android_app;
+private enum androidBridgeSource = import("android_minimal_bridge.c");
+private enum androidOpenGlBridgeSource = import("android_opengl_bridge.c");
 
-extern int rt_init(void);
-extern int rt_term(void);
-extern void android_main(void* app);
-
-void redub_android_main(struct android_app* app)
-{
-    rt_init();
-    android_main(app);
-    rt_term();
-}
-EOS";
 import redub.buildapi : TargetType;
 
 private string androidExeSuffix()
@@ -300,7 +289,7 @@ string prepareForAndroidBundleGen(ref ProjectDetails d)
     string clang = buildNormalizedPath(bin, "clang" ~ androidExeSuffix);
     string ar = buildNormalizedPath(bin, "llvm-ar" ~ androidExeSuffix);
     string glueCache = buildNormalizedPath(getCacheFolder(), "android-glue",
-        baseName(ndk) ~ "-" ~ arch ~ "-v1");
+        baseName(ndk) ~ "-" ~ arch ~ "-" ~ (cfg.bundleConfig.opengl ? "gl" : "plain") ~ "-v1");
     if(!exists(glueCache))
         mkdirRecurse(glueCache);
     string obj = buildNormalizedPath(glueCache, "android_native_app_glue.o");
@@ -308,13 +297,15 @@ string prepareForAndroidBundleGen(ref ProjectDetails d)
     string bridgeObj = buildNormalizedPath(glueCache, "redub_android_bridge.o");
     string glueLib = buildNormalizedPath(glueCache, "libredub_android_glue.a");
 
+    string bridgeSource = cfg.bundleConfig.opengl
+        ? androidOpenGlBridgeSource : androidBridgeSource;
     bool bridgeChanged = true;
     if(exists(bridgeC))
         try
-            bridgeChanged = readText(bridgeC) != androidBridgeSource;
+            bridgeChanged = readText(bridgeC) != bridgeSource;
         catch(Exception) {}
     if(bridgeChanged)
-        write(bridgeC, androidBridgeSource);
+        write(bridgeC, bridgeSource);
 
     bool upToDate = exists(glueLib)
         && timeLastModified(glueLib) >= timeLastModified(glueC)
@@ -332,7 +323,7 @@ string prepareForAndroidBundleGen(ref ProjectDetails d)
         if(!exists(obj) || getSize(obj) == 0)
             throw new RedubException("android_native_app_glue.c did not produce an object file.");
         auto bridgeCompile = execute([clang, "--target=" ~ arch, "-fPIC", "-c",
-            "-o", bridgeObj, bridgeC]);
+            "-I" ~ glueDir, "-o", bridgeObj, bridgeC]);
         if(bridgeCompile.status != 0)
             throw new RedubException("Could not compile the Android runtime bridge:\n" ~ bridgeCompile.output);
         if(!exists(bridgeObj) || getSize(bridgeObj) == 0)
@@ -372,11 +363,11 @@ private void setAndroidRunEnvironment(ref ProjectDetails d, string apk)
 void generateAndroidBundle(string outputFolder, ref ProjectDetails d)
 {
     import redub.command_generators.commons : isaFromArch, osFromArch;
-    import redub.logging : error, info, infos;
+    import redub.logging : error, hasLogLevel, info, infos, LogLevel;
     import redub.misc.android_install : findAndroidSdk;
     import redub.misc.path : buildNormalizedPath;
     import std.datetime : Clock;
-    import std.file : copy, exists, mkdirRecurse, read, remove, write;
+    import std.file : copy, exists, mkdirRecurse, read, remove, timeLastModified, write;
     import std.path : baseName;
     import std.zip : ArchiveMember, CompressionMethod, ZipArchive;
     import std.string : indexOf;
@@ -438,15 +429,40 @@ void generateAndroidBundle(string outputFolder, ref ProjectDetails d)
         remove(finalApk);
     mkdirRecurse(staging);
     mkdirRecurse(iconDir);
-    write(iconPath, cast(const(ubyte)[]) redubAppIcon);
 
-    write(manifest, androidManifest(androidPackageName(d.tree.name), d.tree.name,
-        androidApi(arch), cfg.bundleConfig.permissions));
-    if(runTool([aapt2, "compile", "--dir", resDir, "-o", resZip], "aapt2 compile") != 0)
-        return;
-    if(runTool([aapt2, "link", "--manifest", manifest, "-I", androidJar,
-        "-R", resZip, "-o", unsignedApk], "aapt2 link") != 0)
-        return;
+    bool iconChanged = true;
+    if(exists(iconPath))
+        try
+            iconChanged = cast(string) read(iconPath) != redubAppIcon;
+        catch(Exception) {}
+    if(iconChanged)
+        write(iconPath, cast(const(ubyte)[]) redubAppIcon);
+
+    string manifestText = androidManifest(androidPackageName(d.tree.name), d.tree.name,
+        androidApi(arch), cfg.bundleConfig.permissions);
+    bool manifestChanged = true;
+    if(exists(manifest))
+        try
+            manifestChanged = cast(string) read(manifest) != manifestText;
+        catch(Exception) {}
+    if(manifestChanged)
+        write(manifest, manifestText);
+
+    bool needPackage = !exists(unsignedApk)
+        || timeLastModified(unsignedApk) < timeLastModified(manifest)
+        || timeLastModified(unsignedApk) < timeLastModified(iconPath)
+        || timeLastModified(unsignedApk) < timeLastModified(androidJar)
+        || timeLastModified(unsignedApk) < timeLastModified(aapt2);
+    if(needPackage)
+    {
+        if(runTool([aapt2, "compile", "--dir", resDir, "-o", resZip], "aapt2 compile") != 0)
+            return;
+        if(runTool([aapt2, "link", "--manifest", manifest, "-I", androidJar,
+            "-R", resZip, "-o", unsignedApk], "aapt2 link") != 0)
+            return;
+    }
+    else
+        vlog("Android resources are up to date.");
 
     auto apkData = cast(ubyte[]) read(unsignedApk);
     auto archive = new ZipArchive(apkData);
@@ -457,7 +473,6 @@ void generateAndroidBundle(string outputFolder, ref ProjectDetails d)
     member.time = Clock.currTime();
     archive.addMember(member);
     write(withLibApk, cast(ubyte[]) archive.build());
-    remove(unsignedApk);
 
     if(runTool([zipalign, "-f", "4", withLibApk, alignedApk], "zipalign") != 0)
         return;
@@ -476,7 +491,8 @@ void generateAndroidBundle(string outputFolder, ref ProjectDetails d)
         "apksigner") != 0)
         return;
     remove(alignedApk);
-    if(runBat(apksigner, ["verify", signedApk], "apksigner verify") != 0)
+    if(hasLogLevel(LogLevel.verbose)
+        && runBat(apksigner, ["verify", signedApk], "apksigner verify") != 0)
         return;
 
     if(exists(finalApk))

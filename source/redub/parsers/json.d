@@ -47,10 +47,29 @@ struct TargetInfo
  * Returns: TargetInfo with the pending buildconfiguration, a new valid parseConfig to use instead of the `cfg` argument and the targetRequirement
  */
 ///LDC 1.43+ cross-compilation presets. Recipe targets take precedence.
+private bool isWebTarget(string target)
+{
+    import std.string : startsWith;
+
+    return target == "wasm" || target == "web" || target.startsWith("wasi")
+        || target == "emscripten";
+}
+
+private bool isBareWasmTarget(string target)
+{
+    return target == "wasm" || target == "web";
+}
+
+private bool needsAllowUndefined(string target)
+{
+    import std.string : startsWith;
+
+    return isBareWasmTarget(target) || target.startsWith("wasi");
+}
+
 private bool getBuiltinTarget(string target, out JSONValue value)
 {
     string arch;
-    bool webOutput;
     switch(target)
     {
         case "windows": arch = "x86_64-windows-msvc"; break;
@@ -62,10 +81,10 @@ private bool getBuiltinTarget(string target, out JSONValue value)
         case "android-armv7a": arch = "armv7a-linux-androideabi29"; break;
         case "android-x86_64": arch = "x86_64-linux-android29"; break;
         case "android-i686": arch = "i686-linux-android29"; break;
-        case "wasi", "wasi-p1", "wasip1": arch = "wasm32-unknown-wasip1"; webOutput = true; break;
-        case "wasi-p2", "wasip2": arch = "wasm32-unknown-wasip2"; webOutput = true; break;
-        case "emscripten": arch = "wasm32-unknown-emscripten"; webOutput = true; break;
-        case "web", "wasm": arch = "wasm32-unknown-unknown"; webOutput = true; break;
+        case "wasi", "wasi-p1", "wasip1": arch = "wasm32-unknown-wasip1"; break;
+        case "wasi-p2", "wasip2": arch = "wasm32-unknown-wasip2"; break;
+        case "emscripten": arch = "wasm32-unknown-emscripten"; break;
+        case "web", "wasm": arch = "wasm32-unknown-unknown"; break;
         default: return false;
     }
     value = JSONValue.emptyObject;
@@ -81,11 +100,16 @@ private bool getBuiltinTarget(string target, out JSONValue value)
             JSONValue("${BUILD_ARTIFACT}"),
         ]);
     }
-    if(target == "wasm" || target == "web")
-        value["dflags"] = JSONValue([
-            JSONValue("-L--no-entry"),
-            JSONValue("-L--allow-undefined"),
-        ]);
+    bool webOutput = isWebTarget(target);
+    JSONValue[] lflags;
+    if(isBareWasmTarget(target))
+        lflags ~= JSONValue("--no-entry");
+    // Web outputs use env.js for JS imports; undefined D externs must become
+    // imports instead of link errors.
+    if(needsAllowUndefined(target))
+        lflags ~= JSONValue("--allow-undefined");
+    if(lflags.length)
+        value["lflags"] = JSONValue(lflags);
     if(webOutput)
     {
         value["serveAfterBuild"] = JSONValue(true);
@@ -152,8 +176,17 @@ unittest
     assert(v["arch"].str == "armv7a-linux-androideabi29");
     assert(getBuiltinTarget("wasi-p2", v));
     assert(v["arch"].str == "wasm32-unknown-wasip2");
+    assert(v["lflags"].array.length == 1);
+    assert(getBuiltinTarget("web", v));
+    assert(v["lflags"].array.length == 2);
     assert(getBuiltinTarget("emscripten", v));
     assert(v["arch"].str == "wasm32-unknown-emscripten");
+    assert(("lflags" in v) is null);
+    assert(isWebTarget("wasm"));
+    assert(isWebTarget("emscripten"));
+    assert(!isWebTarget("android"));
+    assert(needsAllowUndefined("wasi-p2"));
+    assert(!needsAllowUndefined("emscripten"));
     assert(!getBuiltinTarget("nope", v));
 }
 
@@ -289,6 +322,12 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
             {
                 enforce(terminal.type == JSONType.bool_, `"terminal" in "bundleConfiguration" must be a boolean, not `~terminal.type.to!string);
                 req.cfg.bundleConfig.usesTerminal = terminal.get!bool;
+            }
+            JSONValue* opengl = "opengl" in v;
+            if(opengl)
+            {
+                enforce(opengl.type == JSONType.bool_, `"opengl" in "bundleConfiguration" must be a boolean, not `~opengl.type.to!string);
+                req.cfg.bundleConfig.opengl = opengl.get!bool;
             }
             JSONValue* permissions = "permissions" in v;
             if(permissions)

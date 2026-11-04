@@ -29,6 +29,7 @@ Those are the additions I've made over dub
 - **Cache Sharing** - Since `v1.33.2`: Whenever you build a library which has the same versions and flags between parallel projects, the built library will be reused.
 - [**Incremental Compilation**](#redub-incremental-compilation) - Since `v1.34.0`: Redub is able to parse your root project and detect whether it is better to use a single compilation unit vs per module in parallel
 - **Build Time Regression Warn** - Since `v1.35.0`: Redub now also warns you if you've done some change that done a big regression in the build time, allowing you to be aware of your own changes.
+- [**Built-in Cross Runner**](#built-in-targets) - Since `v1.36.1`: It is now possible to use redub to run D on android and web without any modification: `redub --target=android --bundle=android`|`redub --target=wasm` - builds and runs a server loading your executable
 
 
 ## Redub Help
@@ -203,10 +204,10 @@ Since `v1.36.1`: use `redub --target=<name>`; a recipe target with the same name
 
 **Remarks**
 - **macOS:** compiles everywhere; linking needs Apple tooling. Use `--build=syntax` for a pure syntax check.
-- **Android:** redub finds the NDK via env/Android Studio paths or `redub install android-ndk`; `adb` (platform-tools) is auto-downloaded and `ANDROID_SERIAL` selects a device. APK requires `extern(C) void android_main(void*)`; `redub run --target=android --bundle=android` builds, installs, starts and streams `logcat`. The APK uses the redub icon; permissions go in `"bundleConfiguration": { "permissions": ["INTERNET"] }`. See `tests/android`.
+- **Android:** redub finds the NDK via env/Android Studio paths or `redub install android-ndk`; `adb` (platform-tools) is auto-downloaded and `ANDROID_SERIAL` selects a device. APK requires `extern(C) void android_main(void*)`; `redub run --target=android --bundle=android` builds, installs, starts and streams `logcat`. The APK uses the redub icon; permissions go in `"bundleConfiguration": { "permissions": ["INTERNET"] }`. `redub init --android <dir>` creates an OpenGL ES + touch template (`bundleConfiguration.opengl = true`, callbacks `redub_android_init/draw/touch/destroy`). See `tests/android`.
 - **WASI:** install the SDK with `redub install wasi-sdk`; p1 runs in the browser via `redub serve`; p2 outputs are components, transpile with `jco`.
 - **Emscripten:** install with `redub install emsdk`; no system Python needed.
-- **wasm/web:** no SDK; links with `-L--no-entry`, so use `-betterC` or provide an entry point/runtime. `env.js` can provide JS imports for `extern(C)`; builds create a template in the project root.
+- **wasm/web:** no SDK; links with `--no-entry` and `--allow-undefined`, so use `-betterC` or provide an entry point/runtime. `env.js` can provide JS imports for `extern(C)`; builds create a template in the project root.
 - **serve:** `redub serve [<artifact|dir>] [--port=8080] [--host=127.0.0.1] [--no-open]` serves the build directory, opens the browser (unless `--no-open`), and generates `index.html`/`redub.js` when missing.
 
 ## Multi language
