@@ -61,6 +61,7 @@ int main(string[] args)
         import redub.extensions.setup;
         import redub.extensions.watcher;
         import redub.extensions.imports;
+        version(RedubCLI) import redub.extensions.serve;
 
 
         int function(string[])[string] entryPoints = [
@@ -83,6 +84,8 @@ int main(string[] args)
 
         version(RedubWatcher)
             entryPoints["watch"] = &watchMain;
+        version(RedubCLI)
+            entryPoints["serve"] = &serveMain;
 
 
         bool strictDispatch = isStrictDispatch(args);
@@ -377,7 +380,14 @@ int cleanMain(string[] args)
 int buildMain(string[] args)
 {
     ProjectDetails d = resolveDependencies(args);
-    return buildProject(d).getReturnCode;
+    d = buildProject(d);
+    if(d.error)
+        return d.getReturnCode();
+    if(d.tree.requirements.cfg.serveAfterBuild
+        && !d.tree.requirements.cfg.syntaxOnly
+        && d.tree.requirements.cfg.runCommand.length)
+        return executeProgram(d, null);
+    return d.getReturnCode();
 }
 
 int installMain(string[] args)
@@ -516,6 +526,31 @@ int installMain(string[] args)
                 error("Could not install LDC addon '", addon, "'");
                 return 1;
             }
+        }
+    }
+    else if(compiler == "wasi-sdk" || compiler == "wasi")
+    {
+        import redub.misc.wasi_sdk_install;
+        string wasiVer = args.length > 2 ? args[2] : null;
+        if(wasiVer == "help")
+        {
+            import redub.misc.github_tag_check : getGithubRepoAPI;
+            import hip.data.json;
+            JSONValue tags = getGithubRepoAPI("WebAssembly/wasi-sdk");
+            info("Listing available WASI SDK versions:");
+            int limit = 25;
+            foreach(entry; tags.array)
+            {
+                info("\t", entry["name"].str);
+                if(--limit == 0)
+                    break;
+            }
+            return 0;
+        }
+        if(!installWasiSdk(wasiVer))
+        {
+            error("Could not install WASI SDK");
+            return 1;
         }
     }
     else if(compiler == "dmd")

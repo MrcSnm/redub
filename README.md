@@ -192,8 +192,17 @@ If you installed an LDC 1.43+ addon (`redub install ldc --addon=<group>`), redub
 - Android: `android`, `android-armv7a`, `android-x86_64`, `android-i686`
 - WASI: `wasi`, `wasi-p2`
 - Emscripten: `emscripten`
+- Bare WebAssembly: `wasm` (`wasm32-unknown-unknown`, no SDK required)
 
 Use them directly, e.g. `redub --target=wasi`. A target with the same name in your recipe overrides the preset.
+
+WASI targets need a WASI SDK. Redub can install the prebuilt SDK with `redub install wasi-sdk`; it is picked up automatically for `wasip1`/`wasip2` targets (sets `WASI_SDK_PATH`, `PATH`, and `CC`). The bare `wasm` preset does not need a WASI/Emscripten SDK; it links with `-L--no-entry`, so use `-betterC` or provide your own runtime/entry point as needed.
+
+The `web`/`wasm` presets use bare `wasm32-unknown-unknown` (no SDK required) and start a minimal local web server after a successful build (`redub build --target=web`) or with `redub run --target=web`. The `wasi`, `wasi-p2`, and `emscripten` presets do the same: build and serve their `.wasm` output. `redub serve [<artifact|dir>] [--port=8080] [--host=127.0.0.1]` can also be run directly.
+
+The server serves the build directory on `http://127.0.0.1:8080/` and generates a minimal `index.html` and `redub.js` loader when no `index.html` is present.
+
+The generated loader uses `WebAssembly.instantiateStreaming` with an empty import object. For Emscripten projects that need the Emscripten JS runtime, use `--target=emscripten` (requires the Emscripten SDK/`emcc`). For WASI browser polyfills, use `--target=wasi-p2` with the WASI SDK.
 
 ## Multi language
 

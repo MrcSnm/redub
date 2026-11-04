@@ -50,6 +50,7 @@ struct TargetInfo
 private bool getBuiltinTarget(string target, out JSONValue value)
 {
     string arch;
+    bool webOutput;
     switch(target)
     {
         case "windows": arch = "x86_64-windows-msvc"; break;
@@ -59,20 +60,32 @@ private bool getBuiltinTarget(string target, out JSONValue value)
         case "android-armv7a": arch = "armv7a-linux-androideabi29"; break;
         case "android-x86_64": arch = "x86_64-linux-android29"; break;
         case "android-i686": arch = "i686-linux-android29"; break;
-        case "wasi", "wasi-p1", "wasip1": arch = "wasm32-unknown-wasip1"; break;
-        case "wasi-p2", "wasip2": arch = "wasm32-unknown-wasip2"; break;
-        case "emscripten": arch = "wasm32-unknown-emscripten"; break;
+        case "wasi", "wasi-p1", "wasip1": arch = "wasm32-unknown-wasip1"; webOutput = true; break;
+        case "wasi-p2", "wasip2": arch = "wasm32-unknown-wasip2"; webOutput = true; break;
+        case "emscripten": arch = "wasm32-unknown-emscripten"; webOutput = true; break;
+        case "web", "wasm": arch = "wasm32-unknown-unknown"; webOutput = true; break;
         default: return false;
     }
     value = JSONValue.emptyObject;
     value["compiler"] = JSONValue("ldc2");
     value["arch"] = JSONValue(arch);
+    if(target == "wasm" || target == "web")
+        value["dflags"] = JSONValue([JSONValue("-L--no-entry")]);
+    if(webOutput)
+    {
+        value["serveAfterBuild"] = JSONValue(true);
+        value["runCommand"] = JSONValue([
+            JSONValue("${REDUB}"),
+            JSONValue("serve"),
+            JSONValue("${BUILD_ARTIFACT}"),
+        ]);
+    }
     return true;
 }
 
 private immutable string builtinTargetList =
     "windows, windows-i686, windows-arm64, android, android-armv7a, "
-    ~ "android-x86_64, android-i686, wasi, wasi-p2, emscripten";
+    ~ "android-x86_64, android-i686, wasi, wasi-p2, emscripten, web, wasm";
 
 TargetInfo getTarget(JSONValue value, string target, ParseConfig cfg)
 {
@@ -268,6 +281,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
         "postBuildCommands": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){addCommands(req, v.strArr, c, RedubCommands.postBuild);},
         "preRunCommands": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){addCommands(req, v.strArr, c, RedubCommands.preRun);},
         "postRunCommands": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){addCommands(req, v.strArr, c, RedubCommands.postRun);},
+        "serveAfterBuild": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){ req.cfg.serveAfterBuild = v.get!bool; },
         "runCommand": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _)
         {
             import redub.api:BuildException;

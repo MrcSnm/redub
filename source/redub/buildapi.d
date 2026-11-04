@@ -8,7 +8,7 @@ import d_dependencies;
 
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.35.2";
+enum RedubVersionOnly = "v1.36.0";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -404,6 +404,8 @@ struct BuildConfiguration
     @cacheExclude BuildStrategy buildStrategy;
     ///False disables passive timing collection.
     @cacheExclude bool buildStats = true;
+    ///Starts runCommand after a successful build (web dev server targets).
+    @cacheExclude bool serveAfterBuild;
 
     static BuildConfiguration defaultInit(string workingDir, RedubLanguages l)
     {
@@ -552,6 +554,7 @@ struct BuildConfiguration
         ret.frameworks.exclusiveMerge(other.frameworks);
         ret.libraryPaths.exclusiveMergePaths(other.libraryPaths);
         ret.linkFlags.exclusiveMerge(other.linkFlags, null, linkerMergeKeep);
+        ret.serveAfterBuild = ret.serveAfterBuild || other.serveAfterBuild;
         return ret;
     }
 
@@ -613,6 +616,7 @@ struct BuildConfiguration
         ret.frameworks.exclusiveMerge(other.frameworks);
         ret.libraryPaths.exclusiveMergePaths(other.libraryPaths);
         ret.linkFlags.exclusiveMerge(other.linkFlags, null, linkerMergeKeep);
+        ret.serveAfterBuild = ret.serveAfterBuild || other.serveAfterBuild;
         return ret;
     }
 

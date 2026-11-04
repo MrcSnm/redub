@@ -36,7 +36,11 @@ bool extractToFolder(string inputCompressedArchive, string outputDirectory)
             goto default;
         case ".xz", ".gz":
             version(Windows)
-                return extractTarXzToFolder(inputCompressedArchive, outputDirectory);
+            {
+                if(extension(inputCompressedArchive) == ".xz")
+                    return extractTarXzToFolder(inputCompressedArchive, outputDirectory);
+                return extractTarWith7za(inputCompressedArchive, outputDirectory);
+            }
             else
                 return extractTarGzToFolder(inputCompressedArchive, outputDirectory);
         default:

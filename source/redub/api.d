@@ -1105,7 +1105,12 @@ ProjectDetails resolveDependencies(
     compiler = res.targetCompilationInfo.compilers;
     cDetails.setFromCompilationInfo(res.targetCompilationInfo);
 
+    import redub.misc.wasi_sdk_install : setupWasiSdkEnvironment;
+    setupWasiSdkEnvironment(cDetails.arch);
+
     CompilerBinary cBin = res.mainRequirement.cfg.getCompiler(compiler);
+    import redub.misc.wasi_sdk_install : checkLdcWasiAddon;
+    checkLdcWasiAddon(cDetails.arch, cBin.bin);
     if(cDetails.includeEnvironmentVariables)
         res.mainRequirement.cfg = res.mainRequirement.cfg.merge(redub.parsers.environment.parse());
 
@@ -1263,9 +1268,17 @@ int executeProgram(ProjectDetails details, string[] args)
 
     if(tree.requirements.cfg.runCommand.length)
     {
-        string artifact = getOutputPath(tree.requirements.cfg, os);
+        string artifact = getOutputPath(tree.requirements.cfg,
+            details.cDetails.targetOS, details.cDetails.isa);
         setEnvVariable("BUILD_ARTIFACT", artifact);
-        string[] cmds = arrParseEnv(tree.requirements.cfg.runCommand);
+        import std.file : thisExePath;
+        import std.algorithm.iteration : map;
+        import std.array : array;
+        import std.string : replace;
+        string[] runCommand = tree.requirements.cfg.runCommand
+            .map!(s => s.replace("${REDUB}", escapeShellCommand(thisExePath)))
+            .array;
+        string[] cmds = arrParseEnv(runCommand);
 
         string targetRunCommand = join(cmds, " ") ~ " " ~join(args, " ");
 
@@ -1278,7 +1291,8 @@ int executeProgram(ProjectDetails details, string[] args)
     else
     {
         ret = wait(spawnShell(
-            escapeShellCommand(getOutputPath(tree.requirements.cfg, os)) ~ " "~ join(args, " "), stdin, stdout,
+            escapeShellCommand(getOutputPath(tree.requirements.cfg,
+                details.cDetails.targetOS, details.cDetails.isa)) ~ " "~ join(args, " "), stdin, stdout,
             stderr, getRedubEnv, Config.none, tree.requirements.cfg.runtimeWorkingDir
             )
         );
@@ -1411,11 +1425,16 @@ watch
     Description:
         Starts watching the folders which dub.json references. If anything changes, it builds its dependents.
         You may also specify --run if you wish to run the program every time you have one change.
+serve
+    Usage: redub serve [<artifact|dir>] [--port=8080] [--host=127.0.0.1]
+    Description:
+        Serves a build directory for testing wasm/web builds. Generates a minimal index.html and redub.js loader when index.html is absent.
 install
-    Usage: redub install <dmd|ldc|opend> <version?|help> [--addon=<target>]...
+    Usage: redub install <dmd|ldc|opend|wasi-sdk> <version?|help> [--addon=<target>]...
     Description:
         Install the specified version for dmd or ldc (opend only has a single version) in the redub workspace folder.
         For LDC 1.43+, --addon installs a cross-compilation addon (windows, android, wasi, emscripten or a target triple).
+        wasi-sdk installs a prebuilt WASI SDK, exposed automatically to wasip1/wasip2 targets.
 
 use
     Usage: redub use <dmd|ldc|opend|reset> <version?|help>

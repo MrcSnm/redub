@@ -65,6 +65,24 @@ JSONValue getGithubRepoAPI(string repo)
     }
 }
 
+JSONValue getGithubReleaseAPI(string repo, string tag)
+{
+    import d_downloader;
+    import std.conv:text;
+    string api = i"https://api.github.com/repos/$(repo)/releases/tags/$(tag)".text;
+    try
+    {
+        char[] content = cast(char[])downloadToBuffer(api);
+        if(content.length == 0)
+            return JSONValue(null);
+        return parseJSON(content, true);
+    }
+    catch(Exception)
+    {
+        return JSONValue(null);
+    }
+}
+
 string getLatestRedubVersion()
 {
     static string newestVer;
