@@ -982,6 +982,7 @@ private struct StaticIfEvaluator
 	size_t i;
 	ConstantTable constants;
 	int compilerVersion;
+	string[string] stringParams;
 
 	bool empty() const { return i >= tokens.length; }
 	string cur() const { return empty ? null : tokens[i].text; }
@@ -1057,6 +1058,25 @@ private struct StaticIfEvaluator
 		}
 	}
 
+	private bool tryStringComparison(out ConditionValue result)
+	{
+		result = ConditionValue.unknown;
+		if(empty() || tokens[i].kind != DTokenKind.ident) return false;
+		string name = tokens[i].text;
+		if(!(name in stringParams)) return false;
+		if(i + 2 >= tokens.length) return false;
+		string op = tokens[i + 1].text;
+		if(op != "==" && op != "!=") return false;
+		string rhs;
+		if(tokens[i + 2].kind != DTokenKind.literal
+			|| !decodeDLiteral(tokens[i + 2].text, rhs)) return false;
+		bool equal = stringParams[name] == rhs;
+		if(op == "!=") equal = !equal;
+		result = equal ? ConditionValue.yes : ConditionValue.no;
+		i += 3;
+		return true;
+	}
+
 	private bool tryVersionComparison(out ConditionValue result)
 	{
 		if(compilerVersion == 0 || empty() || cur() != "__VERSION__") return false;
@@ -1088,7 +1108,8 @@ private struct StaticIfEvaluator
 	{
 		if(empty()) return ConditionValue.unknown;
 		ConditionValue targeted;
-		if(tryVersionComparison(targeted) || trySizeofComparison(targeted))
+		if(tryStringComparison(targeted) || tryVersionComparison(targeted)
+			|| trySizeofComparison(targeted))
 			return targeted;
 		if(eat("("))
 		{
@@ -1608,6 +1629,12 @@ private struct MixinTemplateBody
 	string source;
 	///Template parameter names, in declaration order.
 	string[] params;
+	///Default expression tokens aligned with `params`; empty when absent.
+	DToken[][] defaults;
+	///Variadic flags aligned with `params`.
+	bool[] variadic;
+	///Alias-template flags aligned with `params`.
+	bool[] aliasParams;
 	///The body can contribute a mixin/import when instantiated.
 	bool mayEmitImports;
 	///Declared as a function template (`void f(T)()`) instead of `template`.
@@ -1636,6 +1663,8 @@ private struct DImportParser
 	StringFunctionBody[][string] functions;
 	///Module-scoped alias name -> template name.
 	string[string] aliases;
+	///Template alias-parameter bindings (alias T -> template name).
+	string[string] templateAliasParams;
 	///Templates whose bodies can be expanded at their use sites instead of
 	///being scanned as module code.
 	bool[string] resolvedTemplates;
@@ -2073,9 +2102,12 @@ private struct DImportParser
 			{
 				string name;
 				string[] params;
+				DToken[][] defaults;
+				bool[] variadic;
+				bool[] aliasParams;
 				size_t bodyStart, bodyEnd;
-				if(functionTemplateDeclaration(tokens, i, name, params,
-					bodyStart, bodyEnd))
+				if(functionTemplateDeclaration(tokens, i, name, params, defaults,
+					variadic, aliasParams, bodyStart, bodyEnd))
 				{
 					i = bodyEnd + 1;
 					return;
@@ -2262,6 +2294,7 @@ private struct DImportParser
 			StaticIfEvaluator evaluator = StaticIfEvaluator(inner);
 			evaluator.constants = constants;
 			evaluator.compilerVersion = ctx.compilerVersion;
+			evaluator.stringParams = stringParams;
 			cond = evaluator.parse();
 		}
 		if(curIs(":"))
@@ -2475,26 +2508,27 @@ private struct DImportParser
 	}
 
 	void applyTemplateArgs(MixinTemplateBody* body, DToken[] args,
-		ref string[string] strings, ref string[][string] arrays)
+		ref string[string] strings, ref string[][string] arrays,
+		ref string[string] templateAliases)
 	{
 		DToken[][] chunks = splitTopLevelCommas(args);
-		foreach(idx, param; body.params)
+		void bind(DToken[] chunk, string param, bool isDefault)
 		{
-			if(idx >= chunks.length) break;
-			DToken[] chunk = chunks[idx];
-			if(chunk.length == 0) continue;
+			if(chunk.length == 0) return;
 			if(chunk.length == 1 && chunk[0].kind == DTokenKind.literal)
 			{
 				string value;
 				if(decodeDLiteral(chunk[0].text, value)) strings[param] = value;
+				return;
 			}
-			else if(chunk[0].text == "[" && chunk[$ - 1].text == "]")
+			if(chunk[0].text == "[" && chunk[$ - 1].text == "]")
 			{
 				string[] values;
 				if(literalStringArray(chunk, values))
 					arrays[param] = values;
+				return;
 			}
-			else if(chunk.length == 4 && chunk[0].text == "splitLines"
+			if(chunk.length == 4 && chunk[0].text == "splitLines"
 				&& chunk[1].text == "(" && chunk[3].text == ")")
 			{
 				string text;
@@ -2504,17 +2538,65 @@ private struct DImportParser
 				else if(chunk[2].kind == DTokenKind.literal)
 					ok = decodeDLiteral(chunk[2].text, text);
 				if(ok) arrays[param] = splitLines(text);
+				return;
 			}
-			else
+			string name;
+			if(dottedName(chunk, name))
+			{
+				string value;
+				if(lookupString(name, value)) { strings[param] = value; return; }
+				if(name in arrays) { arrays[param] = arrays[name]; return; }
+			}
+			if(isDefault)
+			{
+				string content;
+				if(extractMixinString(chunk, strings, constants, content))
+					strings[param] = content;
+			}
+		}
+		foreach(idx, param; body.params)
+		{
+			if(idx < body.variadic.length && body.variadic[idx])
+			{
+				string[] values;
+				for(size_t j = idx; j < chunks.length; j++)
+				{
+					string value;
+					if(chunks[j].length == 1
+						&& chunks[j][0].kind == DTokenKind.literal
+						&& decodeDLiteral(chunks[j][0].text, value))
+						values ~= value;
+					else
+					{
+						string name;
+						if(dottedName(chunks[j], name)
+							&& lookupString(name, value))
+							values ~= value;
+					}
+				}
+				if(values.length) arrays[param] = values;
+				break;
+			}
+			DToken[] chunk = idx < chunks.length ? chunks[idx] : null;
+			bool isDefault;
+			if(chunk.length == 0 && idx < body.defaults.length)
+			{
+				chunk = body.defaults[idx];
+				isDefault = true;
+			}
+			if(idx < body.aliasParams.length && body.aliasParams[idx])
 			{
 				string name;
 				if(dottedName(chunk, name))
 				{
-					string value;
-					if(lookupString(name, value)) strings[param] = value;
-					else if(name in arrays) arrays[param] = arrays[name];
+					import std.string : lastIndexOf;
+					auto dot = name.lastIndexOf('.');
+					if(dot >= 0) name = name[dot + 1 .. $];
+					templateAliases[param] = name;
 				}
+				continue;
 			}
+			bind(chunk, param, isDefault);
 		}
 	}
 
@@ -2527,6 +2609,8 @@ private struct DImportParser
 		if(!templateInstantiationAt(tokens, i, args, end)) return false;
 		string name = tokens[i].text;
 		string templateName = (name in aliases) ? aliases[name] : name;
+		if(templateName in templateAliasParams)
+			templateName = templateAliasParams[templateName];
 		if(!(templateName in resolvedTemplates)) return false;
 		MixinTemplateBody* body = templateName in templates;
 		if(body is null || !body.mayEmitImports) return false;
@@ -2538,6 +2622,8 @@ private struct DImportParser
 	void expandTemplateMixin(string name, DToken[] args)
 	{
 		string templateName = (name in aliases) ? aliases[name] : name;
+		if(templateName in templateAliasParams)
+			templateName = templateAliasParams[templateName];
 		MixinTemplateBody* body = templateName in templates;
 		if(body is null)
 		{
@@ -2558,9 +2644,11 @@ private struct DImportParser
 		scope(exit) expandingTemplates.remove(templateName);
 		string[string] strings = stringParams.dup;
 		string[][string] arrays = arrayParams.dup;
-		applyTemplateArgs(body, args, strings, arrays);
+		string[string] templateAliases = templateAliasParams.dup;
+		applyTemplateArgs(body, args, strings, arrays, templateAliases);
 		DImportParser sub = DImportParser(body.tokens, ctx, templates);
 		sub.inheritForExpansion(this);
+		sub.templateAliasParams = templateAliases;
 		sub.stringParams = strings;
 		sub.arrayParams = arrays;
 		sub.parseAll();
@@ -2630,6 +2718,7 @@ private struct DImportParser
 	void inheritFrom(ref DImportParser other)
 	{
 		aliases = other.aliases;
+		templateAliasParams = other.templateAliasParams;
 		resolvedTemplates = other.resolvedTemplates;
 		usedTemplates = other.usedTemplates;
 		expandingTemplates = other.expandingTemplates;
@@ -3047,21 +3136,43 @@ private size_t depthZeroEquals(DToken[] chunk)
 	return size_t.max;
 }
 
-private string[] templateParamNames(DToken[] tokens)
+private void templateParams(DToken[] tokens, out string[] names,
+	out DToken[][] defaults, out bool[] variadic, out bool[] aliasParams)
 {
-	string[] ret;
+	names = null;
+	defaults = null;
+	variadic = null;
+	aliasParams = null;
 	foreach(chunk; splitTopLevelCommas(tokens))
 	{
 		size_t eq = depthZeroEquals(chunk);
-		if(eq == size_t.max) eq = chunk.length;
+		size_t stop = eq == size_t.max ? chunk.length : eq;
 		string name;
-		for(size_t j = 0; j < eq; j++)
+		for(size_t j = 0; j < stop; j++)
 			if(chunk[j].kind == DTokenKind.ident)
 				name = chunk[j].text;
-		if(name.length) ret ~= name;
+		if(name.length)
+		{
+			bool isVariadic;
+			for(size_t j = 0; j < chunk.length; j++)
+				if(chunk[j].text == "..."
+					|| (chunk[j].text == ".." && j + 1 < chunk.length
+						&& chunk[j + 1].text == "."))
+				{
+					isVariadic = true;
+					break;
+				}
+			bool isAlias;
+			for(size_t j = 0; j < stop; j++)
+				if(chunk[j].text == "alias") { isAlias = true; break; }
+			names ~= name;
+			defaults ~= (eq == size_t.max ? DToken[].init : chunk[eq + 1 .. $]);
+			variadic ~= isVariadic;
+			aliasParams ~= isAlias;
+		}
 	}
-	return ret;
 }
+
 
 private bool skipUnittestRange(const size_t[2][] ranges, ref size_t rangeIdx,
 	ref size_t j)
@@ -3112,10 +3223,15 @@ private bool tokenParenEnd(DToken[] tokens, size_t openIndex, out size_t closeIn
 ///shortcut: attributes and constraints are skipped, and `in`/`out` contracts
 ///are skipped by brace block; upgrade if contract-local imports matter.
 private bool functionTemplateDeclaration(DToken[] tokens, size_t nameIndex,
-	out string name, out string[] params, out size_t bodyStart, out size_t bodyEnd)
+	out string name, out string[] params, out DToken[][] defaults,
+	out bool[] variadic, out bool[] aliasParams,
+	out size_t bodyStart, out size_t bodyEnd)
 {
 	name = null;
 	params = null;
+	defaults = null;
+	variadic = null;
+	aliasParams = null;
 	bodyStart = size_t.max;
 	bodyEnd = size_t.max;
 	if(nameIndex == 0 || nameIndex + 1 >= tokens.length) return false;
@@ -3174,7 +3290,8 @@ private bool functionTemplateDeclaration(DToken[] tokens, size_t nameIndex,
 	bodyEnd = end - 1;
 	if(!tokens[bodyEnd].isChar('}')) return false;
 	name = tokens[nameIndex].text;
-	params = templateParamNames(tokens[nameIndex + 2 .. closeTemplate]);
+	templateParams(tokens[nameIndex + 2 .. closeTemplate], params, defaults,
+		variadic, aliasParams);
 	return true;
 }
 
@@ -3182,9 +3299,12 @@ private bool functionTemplateDeclarationAt(DToken[] tokens, size_t nameIndex)
 {
 	string name;
 	string[] params;
+	DToken[][] defaults;
+	bool[] variadic;
+	bool[] aliasParams;
 	size_t bodyStart, bodyEnd;
-	return functionTemplateDeclaration(tokens, nameIndex, name, params,
-		bodyStart, bodyEnd);
+	return functionTemplateDeclaration(tokens, nameIndex, name, params, defaults,
+		variadic, aliasParams, bodyStart, bodyEnd);
 }
 
 ///Only looks at the current declaration prefix. `private:` sections and
@@ -3232,14 +3352,20 @@ private void collectMixinTemplates(DToken[] tokens, string source,
 		{
 			string fname;
 			string[] fparams;
+			DToken[][] fdefaults;
+			bool[] fvariadic;
+			bool[] falias;
 			size_t bodyStart, bodyEnd;
-			if(functionTemplateDeclaration(tokens, j, fname, fparams,
-				bodyStart, bodyEnd))
+			if(functionTemplateDeclaration(tokens, j, fname, fparams, fdefaults,
+				fvariadic, falias, bodyStart, bodyEnd))
 			{
 				MixinTemplateBody body;
 				body.tokens = tokens[bodyStart + 1 .. bodyEnd];
 				body.source = source;
 				body.params = fparams;
+				body.defaults = fdefaults;
+				body.variadic = fvariadic;
+				body.aliasParams = falias;
 				body.isFunctionTemplate = true;
 				body.isPrivate = declarationIsPrivate(tokens, j);
 				body.mayEmitImports = bodyMayEmitImports(body.tokens);
@@ -3251,13 +3377,17 @@ private void collectMixinTemplates(DToken[] tokens, string source,
 		if(nameIndex >= tokens.length || tokens[nameIndex].kind != DTokenKind.ident) continue;
 		string name = tokens[nameIndex].text;
 		string[] params;
+		DToken[][] defaults;
+		bool[] variadic;
+		bool[] aliasParams;
 		size_t k = nameIndex + 1;
 		if(k < tokens.length && tokens[k].text == "(")
 		{
 			size_t close;
 			if(tokenParenEnd(tokens, k, close))
 			{
-				params = templateParamNames(tokens[k + 1 .. close]);
+				templateParams(tokens[k + 1 .. close], params, defaults, variadic,
+					aliasParams);
 				k = close + 1;
 			}
 		}
@@ -3277,6 +3407,9 @@ private void collectMixinTemplates(DToken[] tokens, string source,
 		body.tokens = tokens[start .. k];
 		body.source = source;
 		body.params = params;
+		body.defaults = defaults;
+		body.variadic = variadic;
+		body.aliasParams = aliasParams;
 		body.isPrivate = declarationIsPrivate(tokens, nameIndex);
 		body.mayEmitImports = bodyMayEmitImports(body.tokens);
 		templates[name] = body;
@@ -4287,6 +4420,72 @@ unittest
 unittest
 {
 	import std.conv : to;
+	///Template default string arguments are bound when omitted.
+	ImportScanInfo info = scanDImportInfo(q{
+		module template.default;
+		template T(string s = "std.traits") { mixin("import " ~ s ~ ";"); }
+		alias X = T!();
+	}, ImportScanContext.init);
+	assert(info.imports == ["std.traits"], info.imports.to!string);
+	assert(!info.hasUnresolvedStringMixins, info.doubts.to!string);
+}
+
+unittest
+{
+	import std.conv : to;
+	///A default can refer to an earlier bound parameter.
+	ImportScanInfo info = scanDImportInfo(q{
+		module template.default_ref;
+		template T(string a, string b = a ~ ".traits") { mixin("import " ~ b ~ ";"); }
+		alias X = T!"std";
+	}, ImportScanContext.init);
+	assert(info.imports == ["std.traits"], info.imports.to!string);
+	assert(!info.hasUnresolvedStringMixins, info.doubts.to!string);
+}
+
+unittest
+{
+	import std.conv : to;
+	///Variadic string parameters feed static foreach.
+	ImportScanInfo info = scanDImportInfo(q{
+		module template.variadic;
+		mixin template M(string[] mods...) { static foreach (m; mods) mixin("import " ~ m ~ ";"); }
+		mixin M!("std.traits", "core.thread");
+	}, ImportScanContext.init);
+	assert(info.imports == ["std.traits", "core.thread"], info.imports.to!string);
+	assert(!info.hasUnresolvedStringMixins, info.doubts.to!string);
+}
+
+unittest
+{
+	import std.conv : to;
+	///An alias template parameter can be mixed in by name.
+	ImportScanInfo info = scanDImportInfo(q{
+		module template.alias_param;
+		mixin template N() { import std.traits; }
+		mixin template M(alias T) { mixin T; }
+		mixin M!N;
+	}, ImportScanContext.init);
+	assert(info.imports == ["std.traits"], info.imports.to!string);
+	assert(!info.hasUnresolvedMixins, info.doubts.to!string);
+}
+
+unittest
+{
+	import std.conv : to;
+	///String parameters make static if decidable.
+	ImportScanInfo info = scanDImportInfo(q{
+		module template.string_if;
+		template T(string s) { static if (s == "a") import std.traits; else import core.thread; }
+		alias X = T!"a";
+	}, ImportScanContext.init);
+	assert(info.imports == ["std.traits"], info.imports.to!string);
+	assert(!info.hasUnknownConditionals, info.doubts.to!string);
+}
+
+unittest
+{
+	import std.conv : to;
 	///An opaque function template use keeps its body scan.
 	ImportScanInfo info = scanDImportInfo(q{
 		module function.opaque;
@@ -4394,6 +4593,25 @@ unittest
 	}, ImportScanContext.init);
 	assert(info.imports.canFind("kept.import"), info.imports.to!string);
 	assert(info.hasUnresolvedMixins);
+}
+
+unittest
+{
+	import std.conv : to;
+	///Compiler-specific version identifiers follow the target compiler.
+	ImportScanInfo ldcInfo = scanDImportInfo(q{
+		module version.ldc;
+		version(LDC) import ldc.target;
+		version(DigitalMars) import dmd.target;
+	}, importScanContextFor(OS.linux, ISA.x86_64, "ldc2"));
+	assert(ldcInfo.imports == ["ldc.target"], ldcInfo.imports.to!string);
+
+	ImportScanInfo dmdInfo = scanDImportInfo(q{
+		module version.dmd;
+		version(LDC) import ldc.target;
+		version(DigitalMars) import dmd.target;
+	}, importScanContextFor(OS.linux, ISA.x86_64, "dmd"));
+	assert(dmdInfo.imports == ["dmd.target"], dmdInfo.imports.to!string);
 }
 
 unittest
