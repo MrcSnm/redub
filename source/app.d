@@ -62,6 +62,7 @@ int main(string[] args)
         import redub.extensions.watcher;
         import redub.extensions.imports;
         version(RedubCLI) import redub.extensions.serve;
+        version(RedubCLI) import redub.extensions.android_run;
 
 
         int function(string[])[string] entryPoints = [
@@ -85,7 +86,10 @@ int main(string[] args)
         version(RedubWatcher)
             entryPoints["watch"] = &watchMain;
         version(RedubCLI)
+        {
             entryPoints["serve"] = &serveMain;
+            entryPoints["android-run"] = &androidRunMain;
+        }
 
 
         bool strictDispatch = isStrictDispatch(args);
@@ -430,6 +434,11 @@ Targets:
       Installs the Emscripten SDK (latest when omitted). Use 'help' to list
       versions. No system Python is required.
 
+  android-ndk [<version>|help]
+      Installs an official Android NDK (default: r27c, ~660 MB). Accepts
+      r27c, 27c or android-ndk-r27c. Redub also finds NDKs installed by
+      Android Studio/SDK.
+
 Addon shortcut:
   redub install --addon=<group> [<version>]
       Installs LDC with the given addon group. '--addon=emsdk' is a
@@ -473,7 +482,7 @@ private bool isInstallTarget(string target)
     import std.string : startsWith;
     return target.startsWith("opend") || target.startsWith("ldc")
         || target == "dmd" || target == "emsdk" || target == "emscripten"
-        || target == "wasi-sdk" || target == "wasi";
+        || target == "wasi-sdk" || target == "wasi" || target == "android-ndk";
 }
 
 int installMain(string[] args)
@@ -740,6 +749,22 @@ int installMain(string[] args)
         if(!installWasiSdk(wasiVer))
         {
             error("Could not install WASI SDK");
+            return 1;
+        }
+    }
+    else if(compiler == "android-ndk")
+    {
+        import redub.misc.android_install : DefaultAndroidNdkVersion,
+            installAndroidNdk, listAndroidNdkVersions;
+        if(ver == "help")
+        {
+            listAndroidNdkVersions();
+            return 0;
+        }
+        string ndkVer = ver is null || ver.length == 0 ? DefaultAndroidNdkVersion : ver;
+        if(!installAndroidNdk(ndkVer))
+        {
+            error("Could not install Android NDK ", ndkVer);
             return 1;
         }
     }

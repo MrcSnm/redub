@@ -71,6 +71,16 @@ private bool getBuiltinTarget(string target, out JSONValue value)
     value = JSONValue.emptyObject;
     value["compiler"] = JSONValue("ldc2");
     value["arch"] = JSONValue(arch);
+    import std.string : startsWith;
+    if(target.startsWith("android"))
+    {
+        value["dflags"] = JSONValue([JSONValue("--Xcc=--target=" ~ arch)]);
+        value["runCommand"] = JSONValue([
+            JSONValue("${REDUB}"),
+            JSONValue("android-run"),
+            JSONValue("${BUILD_ARTIFACT}"),
+        ]);
+    }
     if(target == "wasm" || target == "web")
         value["dflags"] = JSONValue([
             JSONValue("-L--no-entry"),
@@ -136,6 +146,8 @@ unittest
     assert(v["arch"].str == "arm64-apple-darwin");
     assert(getBuiltinTarget("macos-x86_64", v));
     assert(v["arch"].str == "x86_64-apple-darwin");
+    assert(getBuiltinTarget("android", v));
+    assert(v["runCommand"].array.length == 3);
     assert(getBuiltinTarget("android-armv7a", v));
     assert(v["arch"].str == "armv7a-linux-androideabi29");
     assert(getBuiltinTarget("wasi-p2", v));

@@ -1109,12 +1109,16 @@ ProjectDetails resolveDependencies(
     setupWasiSdkEnvironment(cDetails.arch);
     import redub.misc.emscripten_install : setupEmscriptenEnvironment;
     setupEmscriptenEnvironment(cDetails.arch);
+    import redub.misc.android_install : setupAndroidEnvironment;
+    setupAndroidEnvironment(cDetails.arch);
 
     CompilerBinary cBin = res.mainRequirement.cfg.getCompiler(compiler);
     import redub.misc.wasi_sdk_install : checkLdcWasiAddon;
     checkLdcWasiAddon(cDetails.arch, cBin.bin);
     import redub.misc.emscripten_install : checkLdcEmscriptenAddon;
     checkLdcEmscriptenAddon(cDetails.arch, cBin.bin);
+    import redub.misc.ldc_install : checkLdcAndroidAddon;
+    checkLdcAndroidAddon(cDetails.arch, cBin.bin);
     if(cDetails.includeEnvironmentVariables)
         res.mainRequirement.cfg = res.mainRequirement.cfg.merge(redub.parsers.environment.parse());
 
@@ -1440,7 +1444,7 @@ install
     Usage: redub install <target> [<version>|help] [options]
     Description:
         Installs compilers and SDKs into the redub workspace.
-        Targets: ldc, dmd, opend, wasi-sdk, emsdk.
+        Targets: ldc, dmd, opend, wasi-sdk, emsdk, android-ndk.
         Run 'redub install --help' for versions, addons and examples.
 
 use

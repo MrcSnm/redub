@@ -170,6 +170,39 @@ bool installLdcAddon(string ldcVersion, string target,
     return installLdcAddonTo(ldcVersion, installRoot, target);
 }
 
+///Maps an Android target triple to its LDC addon library directory.
+private string androidAddonLibName(string arch)
+{
+    import std.string : indexOf, toLower;
+    string lower = arch.toLower;
+    if(lower.indexOf("android") == -1)
+        return null;
+    if(lower.indexOf("aarch64") != -1) return "lib-android-aarch64";
+    if(lower.indexOf("armv7a") != -1 || lower.indexOf("armv7") != -1) return "lib-android-armv7a";
+    if(lower.indexOf("x86_64") != -1) return "lib-android-x86_64";
+    if(lower.indexOf("i686") != -1) return "lib-android-i686";
+    return null;
+}
+
+///Warns when the selected LDC lacks the Android platform libraries addon.
+void checkLdcAndroidAddon(string arch, string ldcBinary)
+{
+    import redub.logging : warn;
+    import redub.misc.path : buildNormalizedPath;
+    import std.file : exists;
+    import std.path : dirName;
+
+    if(arch.length == 0 || ldcBinary.length == 0)
+        return;
+    string libName = androidAddonLibName(arch);
+    if(libName is null)
+        return;
+    string root = dirName(dirName(ldcBinary));
+    if(!exists(buildNormalizedPath(root, libName)))
+        warn("LDC Android addon not found under '", root,
+            "'. Run 'redub install ldc --addon=android' for this LDC installation.");
+}
+
 unittest
 {
     assert(getLdcAddonGroup("windows") == "windows");
@@ -179,6 +212,11 @@ unittest
     assert(getLdcAddonGroup("wasm32-unknown-wasip2") == "wasi");
     assert(getLdcAddonGroup("wasm32-unknown-emscripten") == "emscripten");
     assert(getLdcAddonGroup("linux-x86_64") is null);
+    assert(androidAddonLibName("aarch64-linux-android30") == "lib-android-aarch64");
+    assert(androidAddonLibName("armv7a-linux-androideabi29") == "lib-android-armv7a");
+    assert(androidAddonLibName("x86_64-linux-android29") == "lib-android-x86_64");
+    assert(androidAddonLibName("i686-linux-android29") == "lib-android-i686");
+    assert(androidAddonLibName("x86_64-linux-gnu") is null);
     assert(getLdcAddonDownloadLink("v1.43.0", "wasi") ==
         "https://github.com/ldc-developers/ldc/releases/download/v1.43.0/ldc2-1.43.0-addon-wasi.tar.xz");
 }

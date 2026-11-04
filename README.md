@@ -209,6 +209,8 @@ macOS presets compile everywhere, but linking needs Apple tooling. Use `--build=
 
 The web presets start a local server after `redub build`/`redub run`. Or run `redub serve [<artifact|dir>] [--port=8080] [--host=127.0.0.1] [--no-open]`: it serves the build directory, opens the default browser (`--no-open` disables), and generates `index.html`/`redub.js` (WASI preview1 shim) when missing. Emscripten uses its own `.js` glue. WASI preview2 outputs are components; transpile them with `jco` before serving.
 
+Android presets default to an `adb` run command: `redub run --target=android` pushes the artifact to `/data/local/tmp`, marks it executable and runs it on the connected device. If `adb` is not installed, redub downloads the standalone Android platform-tools. Set `ANDROID_SERIAL` when several devices are connected. Compiling needs the LDC Android addon (`redub install ldc --addon=android`) and the NDK; redub finds it via `ANDROID_NDK_HOME`/`ANDROID_NDK_ROOT`, Android Studio/SDK default locations, or the redub workspace (`redub install android-ndk [<version>]`, ~660 MB), sets `CC`/`PATH`, and warns when the addon is missing.
+
 Wasm/WASI builds create an editable `env.js` template in the project root and copy it to the output on every build; if your recipe already provides an `env.js` via `copyFiles`, that one is used instead. Use it to provide JS functions for `extern(C)` imports from D. Bare `wasm`/`web` link with `--allow-undefined`, so undefined functions become `env` imports.
 
 ## Multi language
