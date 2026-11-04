@@ -390,65 +390,192 @@ int buildMain(string[] args)
     return d.getReturnCode();
 }
 
+private void printInstallHelp()
+{
+    import redub.misc.dmd_install : DefaultDMDVersion;
+    import std.format : format;
+    import std.stdio : write;
+
+    enum helpText = q"EOS
+Redub install
+
+Usage:
+  redub install <target> [<version>|help] [options]
+  redub install --addon=<group> [<version>]
+  redub install --help
+
+Targets:
+  ldc [<version>|help] [--addon=<group>]...
+      Installs LDC (latest when <version> is omitted). Use 'help' to list
+      available versions. Addons require LDC 1.43+ and accept:
+      windows, android, wasi, emscripten (or a target triple).
+      Examples:
+        redub install ldc
+        redub install ldc 1.43.0
+        redub install ldc 1.43.0 --addon=wasi --addon=windows
+
+  dmd [<version>]
+      Installs DMD (default: %s). Use a release version
+      from https://downloads.dlang.org/releases/2.x, e.g. 2.112.0.
+
+  opend
+      Installs the latest OpenD. OpenD has a single version.
+
+  wasi-sdk [<version>|help]
+      Installs a prebuilt WASI SDK (latest when omitted). Use 'help' to list
+      versions. Redub exposes it automatically to wasip1/wasip2 targets.
+      Accepts '25', 'v25' or 'wasi-sdk-25'.
+
+  emsdk [<version>|help]
+      Installs the Emscripten SDK (latest when omitted). Use 'help' to list
+      versions. No system Python is required.
+
+Addon shortcut:
+  redub install --addon=<group> [<version>]
+      Installs LDC with the given addon group. '--addon=emsdk' is a
+      shortcut for 'redub install emsdk'.
+
+Notes:
+  * Versions may be written with or without a leading 'v'.
+  * LDC addons may be repeated or comma-separated via --addons.
+  * Use 'redub use' to select an installed compiler.
+EOS";
+    write(format(helpText, DefaultDMDVersion));
+}
+
+private struct InstallArgs
+{
+    @("Installs a cross-compilation addon (repeatable)")
+    @("addon")
+    string[] addon;
+
+    @("Comma-separated cross-compilation addons")
+    @("addons")
+    string[] addons;
+}
+
+private string[] collectAddons(const ref InstallArgs parsed)
+{
+    import std.array : split;
+    string[] ret;
+    foreach(addon; parsed.addon)
+        if(addon.length)
+            ret ~= addon;
+    foreach(groups; parsed.addons)
+        foreach(addon; groups.split(","))
+            if(addon.length)
+                ret ~= addon;
+    return ret;
+}
+
+private bool isInstallTarget(string target)
+{
+    import std.string : startsWith;
+    return target.startsWith("opend") || target.startsWith("ldc")
+        || target == "dmd" || target == "emsdk" || target == "emscripten"
+        || target == "wasi-sdk" || target == "wasi";
+}
+
 int installMain(string[] args)
 {
     import std.string;
+    import std.getopt : GetOptException;
     import redub.cli.dub;
     import redub.logging;
     import redub.misc.dmd_install;
     setLogLevel(LogLevel.info);
-    if(args.length == 1)
+
+    bool addonFirst = args.length > 1
+        && (args[1] == "--addon" || args[1].startsWith("--addon=")
+            || args[1] == "--addons" || args[1].startsWith("--addons="));
+    InstallArgs parsed;
+    try
     {
-        error("redub install requires 1 additional argument: ",
-        "\n\topend: installs opend",
-        "\n\tldc <version?|help> [--addon=<target>]...: installs ldc latest if version is unspecified.",
-        "\n\t\thelp: Lists available ldc versions",
-        "\n\t\t--addon: installs a cross-compilation addon (windows, android, wasi, emscripten or a target triple)",
-        "\n\twasi-sdk <version?|help>: installs the WASI SDK (latest if unspecified)",
-        "\n\temsdk <version?|help>: installs the Emscripten SDK (latest if unspecified)",
-        "\n\tdmd <version?>: installs the dmd with the version "~DefaultDMDVersion~" if version is unspecified"
-        );
+        auto res = betterGetopt(args, parsed);
+        if(res.helpWanted)
+        {
+            printInstallHelp();
+            return 0;
+        }
+    }
+    catch(GetOptException e)
+    {
+        error("Argument Error: ", e.msg);
+        printInstallHelp();
         return 1;
     }
-    string compiler = args[1];
-    if(compiler == "--addon" || compiler.startsWith("--addon="))
+
+    string[] addons = collectAddons(parsed);
+    if(addonFirst && addons.length == 0)
     {
-        string addon;
-        string[] rest;
-        if(compiler == "--addon")
-        {
-            if(args.length < 3)
-            {
-                error("--addon requires a value");
-                return 1;
-            }
-            addon = args[2];
-            rest = args.length > 3 ? args[3 .. $] : [];
-        }
-        else
-        {
-            addon = compiler["--addon=".length .. $];
-            rest = args.length > 2 ? args[2 .. $] : [];
-        }
-        if(addon.length == 0)
-        {
-            error("--addon requires a value");
-            return 1;
-        }
-        if(addon == "emsdk" || addon == "emscripten-sdk")
-        {
-            compiler = "emsdk";
-            args = ["install", "emsdk"] ~ rest;
-        }
-        else
-        {
-            compiler = "ldc";
-            args = ["install", "ldc", "--addon=" ~ addon] ~ rest;
-        }
+        error("--addon requires a value");
+        return 1;
     }
+    string[] positional = args[1 .. $];
+    string compiler;
+    string ver;
+    string[] extra;
+
+    if(positional.length && positional[0] == "help")
+    {
+        printInstallHelp();
+        return 0;
+    }
+    if(positional.length && isInstallTarget(positional[0]))
+    {
+        compiler = positional[0];
+        ver = positional.length > 1 ? positional[1] : null;
+        extra = positional.length > 2 ? positional[2 .. $] : [];
+    }
+    else if(addonFirst && addons.length)
+    {
+        compiler = "ldc";
+        foreach(addon; addons)
+            if(addon == "emsdk" || addon == "emscripten-sdk")
+            {
+                compiler = "emsdk";
+                addons = null;
+                break;
+            }
+        ver = positional.length ? positional[0] : null;
+        extra = positional.length > 1 ? positional[1 .. $] : [];
+    }
+    else if(positional.length)
+    {
+        error("Unknown install target: ", positional[0],
+            "\nAvailable targets: opend, ldc, dmd, wasi-sdk, emsdk");
+        return 1;
+    }
+    else
+    {
+        printInstallHelp();
+        return 1;
+    }
+
+    if(extra.length)
+    {
+        error("Unexpected argument: ", extra[0]);
+        return 1;
+    }
+    if(compiler != "ldc" && addons.length)
+    {
+        error("Addons only apply to ldc. Use 'redub install ldc ... --addon=<group>'.");
+        return 1;
+    }
+
     if(compiler.startsWith("opend"))
     {
         import redub.misc.opend_install;
+        if(ver == "help")
+        {
+            info("OpenD has a single version. Install with 'redub install opend'.");
+            return 0;
+        }
+        if(ver !is null)
+        {
+            error("opend has a single version; unexpected argument: ", ver);
+            return 1;
+        }
         if(!installOpend())
         {
             error("Could not install OpenD");
@@ -465,45 +592,15 @@ int installMain(string[] args)
             AcceptedCompiler, searchCompiler;
         import std.path : dirName;
         enum ldcRepo = "ldc-developers/ldc";
-        string ldcVer;
-        string[] addons;
-        for(size_t i = 2; i < args.length; i++)
-        {
-            string arg = args[i];
-            if(arg.startsWith("--addon="))
-                addons ~= arg["--addon=".length .. $];
-            else if(arg == "--addon")
+        string ldcVer = ver;
+        string[] requestedAddons = addons;
+        foreach(addon; requestedAddons)
+            if(addon == "help")
             {
-                if(i + 1 >= args.length)
-                {
-                    error("--addon requires a value");
-                    return 1;
-                }
-                addons ~= args[++i];
+                info("Addon groups: windows, android, wasi, emscripten");
+                info("Use 'redub install ldc <version> --addon=<group>' or 'redub install --addon=<group>'.");
+                return 0;
             }
-            else if(arg.startsWith("--addons="))
-                addons ~= arg["--addons=".length .. $].split(",");
-            else if(arg == "--addons")
-            {
-                if(i + 1 >= args.length)
-                {
-                    error("--addons requires a value");
-                    return 1;
-                }
-                addons ~= args[++i].split(",");
-            }
-            else if(ldcVer is null)
-                ldcVer = arg;
-            else
-            {
-                error("Unexpected argument: ", arg);
-                return 1;
-            }
-        }
-        string[] requestedAddons;
-        foreach(addon; addons)
-            if(addon.length)
-                requestedAddons ~= addon;
 
         string currentRoot;
         if(!ldcVer && requestedAddons.length)
@@ -528,6 +625,11 @@ int installMain(string[] args)
         {
             import hip.data.json;
             JSONValue gitTags = getGithubRepoAPI(ldcRepo);
+            if(gitTags.type != JSONType.array || gitTags.array.length == 0)
+            {
+                error("Could not fetch LDC versions. See https://github.com/ldc-developers/ldc/releases");
+                return 1;
+            }
             info("Listing available LDC versions:");
             int limit = 25;
             foreach(entry; gitTags.array)
@@ -536,6 +638,7 @@ int installMain(string[] args)
                 if(--limit == 0)
                     break;
             }
+            info("Install with 'redub install ldc <version>'.");
             info("Addon targets: windows, android, wasi, emscripten");
             return 0;
         }
@@ -568,10 +671,36 @@ int installMain(string[] args)
     else if(compiler == "emsdk" || compiler == "emscripten")
     {
         import redub.misc.emscripten_install;
-        string emsdkVer = args.length > 2 ? args[2] : "latest";
+        string emsdkVer = ver is null || ver.length == 0 ? "latest" : ver;
         if(emsdkVer == "help")
         {
-            info("Use 'latest' or an Emscripten SDK version, e.g. 4.0.15.");
+            import d_downloader : downloadToBuffer;
+            import hip.data.json;
+            import redub.libs.semver : SemVer;
+            import std.algorithm.sorting : sort;
+            import std.string : endsWith;
+            try
+            {
+                auto raw = downloadToBuffer(
+                    "https://raw.githubusercontent.com/emscripten-core/emsdk/main/emscripten-releases-tags.json");
+                JSONValue tags = parseJSON(cast(char[]) raw, true);
+                if(auto releases = "releases" in tags)
+                {
+                    string[] versions;
+                    foreach(string releaseVer, JSONValue _; (*releases).object)
+                        if(!releaseVer.endsWith("-asserts"))
+                            versions ~= releaseVer;
+                    versions.sort!((a, b) => SemVer(a) > SemVer(b));
+                    info("Listing available Emscripten SDK versions:");
+                    size_t limit = versions.length < 25 ? versions.length : 25;
+                    foreach(releaseVer; versions[0 .. limit])
+                        info("\t", releaseVer);
+                    info("Install with 'redub install emsdk <version>'.");
+                    return 0;
+                }
+            }
+            catch(Exception) {}
+            info("Use 'latest' or a version from https://github.com/emscripten-core/emsdk.");
             return 0;
         }
         if(!installEmscriptenSdk(emsdkVer))
@@ -583,20 +712,29 @@ int installMain(string[] args)
     else if(compiler == "wasi-sdk" || compiler == "wasi")
     {
         import redub.misc.wasi_sdk_install;
-        string wasiVer = args.length > 2 ? args[2] : null;
+        string wasiVer = ver;
         if(wasiVer == "help")
         {
             import redub.misc.github_tag_check : getGithubRepoAPI;
             import hip.data.json;
             JSONValue tags = getGithubRepoAPI("WebAssembly/wasi-sdk");
+            if(tags.type != JSONType.array || tags.array.length == 0)
+            {
+                error("Could not fetch WASI SDK versions. See https://github.com/WebAssembly/wasi-sdk/releases");
+                return 1;
+            }
             info("Listing available WASI SDK versions:");
             int limit = 25;
             foreach(entry; tags.array)
             {
-                info("\t", entry["name"].str);
+                string name = entry["name"].str;
+                if(name.indexOf("-rc") != -1)
+                    continue;
+                info("\t", name);
                 if(--limit == 0)
                     break;
             }
+            info("Install with 'redub install wasi-sdk <version>' (e.g. '25', 'v25' or 'wasi-sdk-25').");
             return 0;
         }
         if(!installWasiSdk(wasiVer))
@@ -608,7 +746,29 @@ int installMain(string[] args)
     else if(compiler == "dmd")
     {
         import redub.misc.dmd_install;
-        string dmdVer = args.length > 2 ? args[2] : DefaultDMDVersion;
+        if(ver == "help")
+        {
+            import hip.data.json;
+            import redub.misc.github_tag_check : getGithubRepoAPI;
+            JSONValue tags = getGithubRepoAPI("dlang/dmd");
+            if(tags.type == JSONType.array && tags.array.length)
+            {
+                info("Listing available DMD versions:");
+                int limit = 25;
+                foreach(entry; tags.array)
+                {
+                    info("\t", entry["name"].str);
+                    if(--limit == 0)
+                        break;
+                }
+            }
+            else
+                info("Could not fetch DMD versions. See https://downloads.dlang.org/releases/2.x");
+            info("Default version: ", DefaultDMDVersion,
+                ". Install with 'redub install dmd <version>'.");
+            return 0;
+        }
+        string dmdVer = ver is null || ver.length == 0 ? DefaultDMDVersion : ver;
         if(!installDmd(dmdVer))
         {
             error("Could not install DMD ", dmdVer);;
@@ -619,6 +779,7 @@ int installMain(string[] args)
     {
         error("Unknown install target: ", compiler,
             "\nAvailable targets: opend, ldc, dmd, wasi-sdk, emsdk");
+        info("Run 'redub install --help' for usage, versions and examples.");
         return 1;
     }
     return 0;

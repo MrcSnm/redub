@@ -38,22 +38,26 @@ Those are the additions I've made over dub
 
 
 ## Compiler Management
-- Installing new compilers, use `redub install`:
+- Install with `redub install` (run `redub install --help` for targets, versions, addons and examples):
   ```
-  redub install requires 1 additional argument:
-          opend: installs opend
-          ldc <version?|help>: installs ldc latest if version is unspecified.
-                  help: Lists available ldc versions
-          dmd <version?>: installs the dmd with the version 2.111.0 if version is unspecified
+  redub install <target> [<version>|help] [options]
+
+  Targets: ldc, dmd, opend, wasi-sdk, emsdk
   ```
-- Using the new compilers, use `redub use` - Redub use will also install if you don't already have it:
+  Examples:
   ```
-  redub use requires 1 additional argument:
-        opend <dmd|ldc>: uses the wanted opend compiler as the default
-        ldc <version?>: uses the latest ldc latest if version is unspecified.
-        dmd <version?>: uses the 2.111.0 dmd if the version is unspecified.
-        reset: removes the default compiler and redub will set it again by the first one found in the PATH environment variable
+  redub install ldc
+  redub install ldc 1.43.0 --addon=wasi
+  redub install dmd 2.112.0
+  redub install wasi-sdk
+  redub install emsdk
   ```
+  Use `<target> help` to list available versions where supported.
+- Select an installed compiler with `redub use` (it installs if needed):
+  ```
+  redub use <dmd|ldc|opend|reset> <version?|help>
+  ```
+  `reset` makes redub use the first compiler found in `PATH` again.
 
 
 ## Redub Plugins

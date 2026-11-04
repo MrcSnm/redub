@@ -1437,11 +1437,11 @@ serve
         Serves a build directory for testing wasm/web builds. Generates a minimal index.html and redub.js loader when index.html is absent.
         The default browser is opened automatically unless --no-open is given.
 install
-    Usage: redub install <dmd|ldc|opend|wasi-sdk> <version?|help> [--addon=<target>]...
+    Usage: redub install <target> [<version>|help] [options]
     Description:
-        Install the specified version for dmd or ldc (opend only has a single version) in the redub workspace folder.
-        For LDC 1.43+, --addon installs a cross-compilation addon (windows, android, wasi, emscripten or a target triple).
-        wasi-sdk installs a prebuilt WASI SDK, exposed automatically to wasip1/wasip2 targets.
+        Installs compilers and SDKs into the redub workspace.
+        Targets: ldc, dmd, opend, wasi-sdk, emsdk.
+        Run 'redub install --help' for versions, addons and examples.
 
 use
     Usage: redub use <dmd|ldc|opend|reset> <version?|help>
