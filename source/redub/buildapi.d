@@ -4,10 +4,11 @@ public import redub.tooling.compiler_identification: Compiler, CompilerBinary, A
 public import redub.plugin.api;
 import redub.logging;
 import redub.package_searching.api;
+import d_dependencies;
 
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.35.1";
+enum RedubVersionOnly = "v1.35.2";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -30,6 +31,16 @@ enum OSExtension
 enum ISAExtension
 {
     wasm64 = ISA.unknown + 1
+}
+
+///Readable name for OS values, including OSExtension values.
+string osName(OS os)
+{
+    import std.conv : to;
+    auto ext = cast(OSExtension)os;
+    if(ext == OSExtension.webAssembly) return "webassembly";
+    if(ext == OSExtension.visionOS) return "visionos";
+    return os == OS.unknown ? "unknown" : os.to!string;
 }
 
 /**
@@ -334,6 +345,24 @@ string[] trustedNoImportMixinsFor(string workingDir)
     if(auto p = workingDir in trustedNoImportMixinsByProject)
         return *p;
     return null;
+}
+
+///Builds the import scan context for the target compiler, not the compiler
+///that built redub. Keeps `version(LDC)` / `version(DigitalMars)` correct.
+ImportScanContext makeImportScanContext(CompilingSession s, BuildConfiguration cfg)
+{
+    ImportScanContext ctx = importScanContextFor(s.os, s.isa,
+        s.compiler.d.getCompilerString());
+    foreach(version_; cfg.versions)
+        ctx.addVersion(version_);
+    foreach(version_; cfg.debugVersions)
+        ctx.addDebugVersion(version_);
+    ctx.debugMode = cfg.isDebug;
+    ctx.unittestMode = cfg.isUnittest;
+    ctx.stringImportPaths = cfg.stringImportPaths;
+    foreach(name; trustedNoImportMixinsFor(cfg.workingDir))
+        ctx.addTrustedNoImportMixin(name);
+    return ctx;
 }
 
 struct BuildConfiguration

@@ -102,7 +102,7 @@ RootParseResult parseProject(
     redub.parsers.environment.setupEnvironmentVariablesForRootPackage(result.mainRequirement);
     //Post process for target must be after setting up env variables for root as it may access them.
     if(target.length)
-        result.targetRequirement = postProcessBuildRequirements(targetInfo.targetRequirement, targetInfo.pending, cInfo, false);
+        result.targetRequirement = postProcessBuildRequirements(targetInfo.targetRequirement, targetInfo.pending, cInfo, true);
 
 
     return result;

@@ -232,16 +232,7 @@ string[] getChangedBuildFiles(ProjectNode root, CompilingSession s)
         return null;
 
     BuildConfiguration cfg = root.requirements.cfg;
-    ImportScanContext ctx = defaultImportScanContext(s.os, s.isa);
-    foreach(version_; cfg.versions)
-        ctx.addVersion(version_);
-    foreach(version_; cfg.debugVersions)
-        ctx.addDebugVersion(version_);
-    ctx.debugMode = cfg.isDebug;
-    ctx.unittestMode = cfg.isUnittest;
-    ctx.stringImportPaths = cfg.stringImportPaths;
-    foreach(name; trustedNoImportMixinsFor(cfg.workingDir))
-        ctx.addTrustedNoImportMixin(name);
+    ImportScanContext ctx = makeImportScanContext(s, cfg);
 
     SourceImportGraph graph = parseSourceImportGraph(cfg.sourcePaths, cfg.sourceFiles,
         cfg.excludeSourceFiles, ctx);
@@ -530,16 +521,7 @@ private bool autoPrefersObjects(BuildConfiguration cfg, Compiler compiler, Compi
         return false;
     try
     {
-        ImportScanContext ctx = defaultImportScanContext(session.os, session.isa);
-        foreach(version_; cfg.versions)
-            ctx.addVersion(version_);
-        foreach(version_; cfg.debugVersions)
-            ctx.addDebugVersion(version_);
-        ctx.debugMode = cfg.isDebug;
-        ctx.unittestMode = cfg.isUnittest;
-        ctx.stringImportPaths = cfg.stringImportPaths;
-        foreach(name; trustedNoImportMixinsFor(cfg.workingDir))
-            ctx.addTrustedNoImportMixin(name);
+        ImportScanContext ctx = makeImportScanContext(session, cfg);
         string[] sourceDirs = cfg.sourceFiles.length ? null : cfg.sourcePaths;
         SourceImportGraph graph = parseSourceImportGraph(sourceDirs, cfg.sourceFiles,
             cfg.excludeSourceFiles, ctx, true);
@@ -1155,7 +1137,7 @@ ProjectDetails resolveDependencies(
     infos(
         "Resolved:", " - ", (st.peek.total!"msecs"), " ms \"",
         color(buildType, fg.magenta),"\" using ", cBin.bin," v", cBin.version_,
-        color(" ["~ res.targetCompilationInfo.targetOS.to!string~ "-"~res.targetCompilationInfo.isa.to!string~ "]", fg.light_cyan),
+        color(" ["~ osName(res.targetCompilationInfo.targetOS) ~ "-"~res.targetCompilationInfo.isa.to!string~ "]", fg.light_cyan),
         " - ", color(inferParallel(ret).to!string~" parallel", fg.light_green)
     );
     return ret;
@@ -1430,9 +1412,10 @@ watch
         Starts watching the folders which dub.json references. If anything changes, it builds its dependents.
         You may also specify --run if you wish to run the program every time you have one change.
 install
-    Usage: redub install <dmd|ldc|opend> <version?|help>
+    Usage: redub install <dmd|ldc|opend> <version?|help> [--addon=<target>]...
     Description:
-        Install the specified version for dmd or ldc (opend only has a single version) in the redub workspace folder
+        Install the specified version for dmd or ldc (opend only has a single version) in the redub workspace folder.
+        For LDC 1.43+, --addon installs a cross-compilation addon (windows, android, wasi, emscripten or a target triple).
 
 use
     Usage: redub use <dmd|ldc|opend|reset> <version?|help>

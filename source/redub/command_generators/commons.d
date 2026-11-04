@@ -23,6 +23,8 @@ OS osFromArch(string arch)
 
     if(contains(arch, "x86_64-windows")) return OS.win64;
     else if(contains(arch, "i686-windows")) return OS.win32;
+    else if(contains(arch, "aarch64-windows")|| contains(arch, "arm64-windows")) return OS.win64;
+    else if(contains(arch, "windows")) return OS.win64;
     else if(contains(arch, "android")) return OS.android;
     else if(contains(arch, "linux")) return OS.linux;
     else if(contains(arch, "macos") || contains(arch, "osx") || contains(arch, "darwin")) return OS.osx;
@@ -33,6 +35,8 @@ OS osFromArch(string arch)
     else if(contains(arch, "netbsd")) return OS.netBSD;
     else if(contains(arch, "openbsd")) return OS.openBSD;
     else if(contains(arch, "solaris")) return OS.solaris;
+    else if(contains(arch, "emscripten")) return cast(OS)OSExtension.emscripten;
+    else if(contains(arch, "wasi")) return cast(OS)OSExtension.webAssembly;
     else if(contains(arch, "posix")) return OS.otherPosix;
     else if(contains(arch, "unknown") || contains(arch, "elf")) return OS.unknown;
 
@@ -44,7 +48,8 @@ ISA isaFromArch(string arch)
     with(ISA)
     {
         if(contains(arch, "x86_64"))       return x86_64;
-        else if(contains(arch, "aarch64")) return aarch64;
+        else if(contains(arch, "i686") || contains(arch, "i386") || contains(arch, "i586"))     return x86;
+        else if(contains(arch, "aarch64") || contains(arch, "arm64")) return aarch64;
         else if(contains(arch, "wasm64"))  return cast(ISA)ISAExtension.wasm64;
         else if(contains(arch, "wasm"))    return webAssembly;
         else if(contains(arch, "arm"))     return arm;

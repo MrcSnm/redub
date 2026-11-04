@@ -24,6 +24,7 @@ Those are the additions I've made over dub
 - [**Redub Executable Icons**](#redub-executable-icons) - Adds inside the recipe file a way to define how your program icon will look
 - [**Linker Diagnostics**](#redub-linker-diagnostics) - Experimental support to improve linker message errors.
 - [**Cross Compilation Targets**](#redub-cross-compile) - Adds support to build targets, selecting a compiler, architecture and other configuration by just calling `redub --target=PSVita`
+- [**LDC Addon**](#redub-ldc-addon) - Since `v1.35.2`: Adds support to installing LDC addon, together with target presets
 - **Auto PATH setup** - Since `v1.32.0`: Adds a way to auto setup redub paths in your system. Call `redub setup` and it will install redub, redub's ldc and redub's dmd in the PATH.
 - **Cache Sharing** - Since `v1.33.2`: Whenever you build a library which has the same versions and flags between parallel projects, the built library will be reused.
 - [**Incremental Compilation**](#redub-incremental-compilation) - Since `v1.34.0`: Redub is able to parse your root project and detect whether it is better to use a single compilation unit vs per module in parallel
@@ -183,6 +184,16 @@ Ever wanted to configure a default compiler/arch based on the configuration? Now
 }
 ```
 Now you can just call `redub --target=wasm` or `redub --target=PSVita` and every dependency will inherit this configuration.
+
+### Built-in LDC addon targets
+If you installed an LDC 1.43+ addon (`redub install ldc --addon=<group>`), redub ships built-in target presets:
+
+- Windows: `windows`, `windows-i686`, `windows-arm64`
+- Android: `android`, `android-armv7a`, `android-x86_64`, `android-i686`
+- WASI: `wasi`, `wasi-p2`
+- Emscripten: `emscripten`
+
+Use them directly, e.g. `redub --target=wasi`. A target with the same name in your recipe overrides the preset.
 
 ## Multi language
 

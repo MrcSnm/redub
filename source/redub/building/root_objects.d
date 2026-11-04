@@ -121,16 +121,7 @@ RootObjectResult buildRootObjects(ProjectNode root, CompilingSession s, string m
     string objDir = getObjectDir(cacheDir);
     mkdirRecurse(cacheDir);
 
-    ImportScanContext ctx = defaultImportScanContext(s.os, s.isa);
-    foreach(version_; cfg.versions)
-        ctx.addVersion(version_);
-    foreach(version_; cfg.debugVersions)
-        ctx.addDebugVersion(version_);
-    ctx.debugMode = cfg.isDebug;
-    ctx.unittestMode = cfg.isUnittest;
-    ctx.stringImportPaths = cfg.stringImportPaths;
-    foreach(name; trustedNoImportMixinsFor(cfg.workingDir))
-        ctx.addTrustedNoImportMixin(name);
+    ImportScanContext ctx = makeImportScanContext(s, cfg);
 
     ///When sourceFiles is explicit, redub compiles only those files; do not
     ///pull test/example sources from sourcePaths into the object graph.

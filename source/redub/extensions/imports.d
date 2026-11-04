@@ -75,16 +75,9 @@ int importsMain(string[] args)
 
         BuildConfiguration cfg = d.tree.requirements.cfg;
         CompilingSession session = CompilingSession(d.compiler, d.cDetails.targetOS, d.cDetails.isa);
-        ctx = defaultImportScanContext(session.os, session.isa);
-        foreach(version_; cfg.versions)
-            ctx.addVersion(version_);
-        foreach(version_; cfg.debugVersions)
-            ctx.addDebugVersion(version_);
-        ctx.debugMode = cfg.isDebug;
-        ctx.unittestMode = forceUnittest || cfg.isUnittest;
-        ctx.stringImportPaths = cfg.stringImportPaths;
-        foreach(name; trustedNoImportMixinsFor(cfg.workingDir))
-            ctx.addTrustedNoImportMixin(name);
+        ctx = makeImportScanContext(session, cfg);
+        if(forceUnittest)
+            ctx.unittestMode = true;
 
         packageName = d.tree.name;
         scanSources = cfg.sourcePaths;

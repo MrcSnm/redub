@@ -46,19 +46,51 @@ struct TargetInfo
  *   cfg = Base ParseConfig containing compiler/arch. Might be unused
  * Returns: TargetInfo with the pending buildconfiguration, a new valid parseConfig to use instead of the `cfg` argument and the targetRequirement
  */
+///LDC 1.43+ cross-compilation presets. Recipe targets take precedence.
+private bool getBuiltinTarget(string target, out JSONValue value)
+{
+    string arch;
+    switch(target)
+    {
+        case "windows": arch = "x86_64-windows-msvc"; break;
+        case "windows-i686", "windows-x86": arch = "i686-windows-msvc"; break;
+        case "windows-arm64", "windows-aarch64": arch = "aarch64-windows-msvc"; break;
+        case "android": arch = "aarch64-linux-android30"; break;
+        case "android-armv7a": arch = "armv7a-linux-androideabi29"; break;
+        case "android-x86_64": arch = "x86_64-linux-android29"; break;
+        case "android-i686": arch = "i686-linux-android29"; break;
+        case "wasi", "wasi-p1", "wasip1": arch = "wasm32-unknown-wasip1"; break;
+        case "wasi-p2", "wasip2": arch = "wasm32-unknown-wasip2"; break;
+        case "emscripten": arch = "wasm32-unknown-emscripten"; break;
+        default: return false;
+    }
+    value = JSONValue.emptyObject;
+    value["compiler"] = JSONValue("ldc2");
+    value["arch"] = JSONValue(arch);
+    return true;
+}
+
+private immutable string builtinTargetList =
+    "windows, windows-i686, windows-arm64, android, android-armv7a, "
+    ~ "android-x86_64, android-i686, wasi, wasi-p2, emscripten";
+
 TargetInfo getTarget(JSONValue value, string target, ParseConfig cfg)
 {
     JSONValue* targets = "targets" in value;
-    if(targets is null)
-        throw new Exception("Target '"~target~"' was specified but no \"targets\" property was present at JSON "~cfg.workingDir);
-
-    JSONValue* actualTarget = target in *targets;
-    if(!actualTarget)
+    JSONValue* actualTarget = targets is null ? null : target in *targets;
+    JSONValue builtin;
+    if(actualTarget is null)
     {
-        string availableTargets = "Target "~target~" not found. Available Targets:";
-        foreach(string key, JSONValue targetValue; targets.object)
-            availableTargets~= "\n\t"~key;
-        throw new Exception(availableTargets);
+        if(!getBuiltinTarget(target, builtin))
+        {
+            string availableTargets = "Target "~target~" not found. Available targets:";
+            if(targets !is null)
+                foreach(string key, JSONValue targetValue; targets.object)
+                    availableTargets~= "\n\t"~key;
+            availableTargets ~= "\nBuilt-in LDC addon targets: " ~ builtinTargetList;
+            throw new Exception(availableTargets);
+        }
+        actualTarget = &builtin;
     }
     TargetInfo ret;
     ret.parseConfig = cfg;
@@ -73,6 +105,21 @@ TargetInfo getTarget(JSONValue value, string target, ParseConfig cfg)
     cfg.extra.isTarget = true;
     ret.targetRequirement = parse(*actualTarget, cfg, ret.pending, false);
     return ret;
+}
+
+unittest
+{
+    JSONValue v;
+    assert(getBuiltinTarget("windows", v));
+    assert(v["compiler"].str == "ldc2");
+    assert(v["arch"].str == "x86_64-windows-msvc");
+    assert(getBuiltinTarget("android-armv7a", v));
+    assert(v["arch"].str == "armv7a-linux-androideabi29");
+    assert(getBuiltinTarget("wasi-p2", v));
+    assert(v["arch"].str == "wasm32-unknown-wasip2");
+    assert(getBuiltinTarget("emscripten", v));
+    assert(v["arch"].str == "wasm32-unknown-emscripten");
+    assert(!getBuiltinTarget("nope", v));
 }
 
 

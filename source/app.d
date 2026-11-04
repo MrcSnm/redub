@@ -391,8 +391,9 @@ int installMain(string[] args)
     {
         error("redub install requires 1 additional argument: ",
         "\n\topend: installs opend",
-        "\n\tldc <version?|help>: installs ldc latest if version is unspecified.",
+        "\n\tldc <version?|help> [--addon=<target>]...: installs ldc latest if version is unspecified.",
         "\n\t\thelp: Lists available ldc versions",
+        "\n\t\t--addon: installs a cross-compilation addon (windows, android, wasi, emscripten or a target triple)",
         "\n\tdmd <version?>: installs the dmd with the version "~DefaultDMDVersion~" if version is unspecified"
         );
         return 1;
@@ -412,8 +413,68 @@ int installMain(string[] args)
         import redub.api;
         import redub.misc.ldc_install;
         import redub.misc.github_tag_check;
+        import redub.libs.semver : SemVer;
+        import redub.tooling.compiler_identification : CompilerBinary,
+            AcceptedCompiler, searchCompiler;
+        import std.path : dirName;
         enum ldcRepo = "ldc-developers/ldc";
-        string ldcVer = args.length > 2 ? args[2] : null;
+        string ldcVer;
+        string[] addons;
+        for(size_t i = 2; i < args.length; i++)
+        {
+            string arg = args[i];
+            if(arg.startsWith("--addon="))
+                addons ~= arg["--addon=".length .. $];
+            else if(arg == "--addon")
+            {
+                if(i + 1 >= args.length)
+                {
+                    error("--addon requires a value");
+                    return 1;
+                }
+                addons ~= args[++i];
+            }
+            else if(arg.startsWith("--addons="))
+                addons ~= arg["--addons=".length .. $].split(",");
+            else if(arg == "--addons")
+            {
+                if(i + 1 >= args.length)
+                {
+                    error("--addons requires a value");
+                    return 1;
+                }
+                addons ~= args[++i].split(",");
+            }
+            else if(ldcVer is null)
+                ldcVer = arg;
+            else
+            {
+                error("Unexpected argument: ", arg);
+                return 1;
+            }
+        }
+        string[] requestedAddons;
+        foreach(addon; addons)
+            if(addon.length)
+                requestedAddons ~= addon;
+
+        string currentRoot;
+        if(!ldcVer && requestedAddons.length)
+        {
+            CompilerBinary current = searchCompiler("ldc2", false);
+            if(current.compiler == AcceptedCompiler.ldc2 && current.bin.length)
+            {
+                if(current.version_ >= SemVer("1.43.0"))
+                {
+                    ldcVer = current.version_.toString;
+                    currentRoot = dirName(dirName(current.bin));
+                }
+                else
+                    info("Installed LDC ", current.version_.toString,
+                        " does not support addons; using the latest release.");
+            }
+        }
+
         if(!ldcVer)
             ldcVer = getLatestGitRepositoryTag(ldcRepo);
         else if(ldcVer == "help")
@@ -428,12 +489,33 @@ int installMain(string[] args)
                 if(--limit == 0)
                     break;
             }
+            info("Addon targets: windows, android, wasi, emscripten");
+            return 0;
+        }
+        if(currentRoot.length)
+        {
+            foreach(addon; requestedAddons)
+            {
+                if(!installLdcAddonTo(ldcVer, currentRoot, addon))
+                {
+                    error("Could not install LDC addon '", addon, "'");
+                    return 1;
+                }
+            }
             return 0;
         }
         if(!installLdc(ldcVer))
         {
             error("Could not install LDC ", ldcVer);
             return 1;
+        }
+        foreach(addon; requestedAddons)
+        {
+            if(!installLdcAddon(ldcVer, addon))
+            {
+                error("Could not install LDC addon '", addon, "'");
+                return 1;
+            }
         }
     }
     else if(compiler == "dmd")

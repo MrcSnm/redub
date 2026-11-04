@@ -86,3 +86,99 @@ string getLdcDownloadLink(string ver, OS os = std.system.os, ISA isa = instructi
         throw new RedubException("Redub has no support to LDC for the OS '"~os.to!string~"'");
     return i"https://github.com/ldc-developers/ldc/releases/download/v$(ver)/ldc2-$(ver)-$(sys)".text;
 }
+
+///Maps an addon group or target triple to the LDC addon asset group.
+private string getLdcAddonGroup(string target)
+{
+    import std.string : toLower, indexOf;
+    string t = target.toLower;
+    if(t == "windows" || t.indexOf("windows") != -1) return "windows";
+    if(t == "android" || t.indexOf("android") != -1) return "android";
+    if(t == "wasi" || t.indexOf("wasi") != -1) return "wasi";
+    if(t == "emscripten" || t.indexOf("emscripten") != -1) return "emscripten";
+    return null;
+}
+
+///URL of an LDC 1.43+ prebuilt cross-compilation addon.
+private string getLdcAddonDownloadLink(string ver, string addon)
+{
+    import std.string : startsWith;
+    import std.conv:to,text;
+    if(ver.startsWith("v"))
+        ver = ver[1 .. $];
+    return i"https://github.com/ldc-developers/ldc/releases/download/v$(ver)/ldc2-$(ver)-addon-$(addon).tar.xz".text;
+}
+
+private bool validateLdcAddon(string ldcVersion, string target, out string addon)
+{
+    import redub.libs.semver : SemVer;
+    import redub.logging : error;
+    import std.string : startsWith;
+
+    addon = getLdcAddonGroup(target);
+    if(addon is null)
+    {
+        error("Unknown LDC addon '", target,
+            "'. Use windows, android, wasi, emscripten or a target triple.");
+        return false;
+    }
+
+    string ver = ldcVersion.startsWith("v") ? ldcVersion[1 .. $] : ldcVersion;
+    if(SemVer(ver) < SemVer("1.43.0"))
+    {
+        error("LDC addons require LDC 1.43.0 or newer (requested ", ldcVersion,
+            "). Omit the version to install the latest.");
+        return false;
+    }
+    return true;
+}
+
+///Installs an addon into an explicitly selected LDC installation directory.
+bool installLdcAddonTo(string ldcVersion, string installRoot, string target)
+{
+    import redub.logging : error, info;
+    import redub.misc.unzip : downloadAndExtract;
+    import std.file : exists;
+    import std.string : startsWith;
+
+    string addon;
+    if(!validateLdcAddon(ldcVersion, target, addon))
+        return false;
+    if(!exists(installRoot))
+    {
+        error("LDC installation directory not found: ", installRoot);
+        return false;
+    }
+
+    string ver = ldcVersion.startsWith("v") ? ldcVersion[1 .. $] : ldcVersion;
+    string link = getLdcAddonDownloadLink(ver, addon);
+    info("Installing LDC addon '", addon, "' for ", target, " into ",
+        installRoot, " from ", link);
+    return downloadAndExtract(link, installRoot);
+}
+
+///Installs a prebuilt LDC addon into the redub-managed LDC installation.
+bool installLdcAddon(string ldcVersion, string target,
+    OS os = std.system.os, ISA isa = std.system.instructionSetArchitecture)
+{
+    import std.file : exists;
+    import std.path : dirName;
+
+    string installRoot = dirName(getLdcFolder(ldcVersion, os, isa));
+    if(!exists(installRoot) && !installLdc(ldcVersion, os, isa))
+        return false;
+    return installLdcAddonTo(ldcVersion, installRoot, target);
+}
+
+unittest
+{
+    assert(getLdcAddonGroup("windows") == "windows");
+    assert(getLdcAddonGroup("x86_64-windows-msvc") == "windows");
+    assert(getLdcAddonGroup("aarch64-linux-android30") == "android");
+    assert(getLdcAddonGroup("wasm32-unknown-wasip1") == "wasi");
+    assert(getLdcAddonGroup("wasm32-unknown-wasip2") == "wasi");
+    assert(getLdcAddonGroup("wasm32-unknown-emscripten") == "emscripten");
+    assert(getLdcAddonGroup("linux-x86_64") is null);
+    assert(getLdcAddonDownloadLink("v1.43.0", "wasi") ==
+        "https://github.com/ldc-developers/ldc/releases/download/v1.43.0/ldc2-1.43.0-addon-wasi.tar.xz");
+}
