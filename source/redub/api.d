@@ -1107,10 +1107,14 @@ ProjectDetails resolveDependencies(
 
     import redub.misc.wasi_sdk_install : setupWasiSdkEnvironment;
     setupWasiSdkEnvironment(cDetails.arch);
+    import redub.misc.emscripten_install : setupEmscriptenEnvironment;
+    setupEmscriptenEnvironment(cDetails.arch);
 
     CompilerBinary cBin = res.mainRequirement.cfg.getCompiler(compiler);
     import redub.misc.wasi_sdk_install : checkLdcWasiAddon;
     checkLdcWasiAddon(cDetails.arch, cBin.bin);
+    import redub.misc.emscripten_install : checkLdcEmscriptenAddon;
+    checkLdcEmscriptenAddon(cDetails.arch, cBin.bin);
     if(cDetails.includeEnvironmentVariables)
         res.mainRequirement.cfg = res.mainRequirement.cfg.merge(redub.parsers.environment.parse());
 

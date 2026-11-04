@@ -216,8 +216,40 @@ private string loaderScript(string wasmName)
         ~ "}\n";
 }
 
-private string indexHtml()
+private string htmlEscape(string value)
 {
+    import std.string : replace;
+    return value.replace("&", "&amp;").replace("\"", "&quot;")
+        .replace("<", "&lt;").replace(">", "&gt;");
+}
+
+private string indexHtml(string scriptName = null)
+{
+    if(scriptName.length)
+    {
+        string script = htmlEscape(scriptName);
+        return
+            "<!doctype html>\n"
+            ~ "<meta charset=\"utf-8\">\n"
+            ~ "<title>redub web</title>\n"
+            ~ "<body style=\"font-family:monospace;background:#111;color:#ddd\">\n"
+            ~ "<h1>redub web</h1>\n"
+            ~ "<p id=\"redub-status\">loading…</p>\n"
+            ~ "<pre id=\"redub-output\" style=\"white-space:pre-wrap\"></pre>\n"
+            ~ "<canvas id=\"redub-canvas\" width=\"640\" height=\"360\"></canvas>\n"
+            ~ "<script>\n"
+            ~ "var redubStatus = document.getElementById('redub-status');\n"
+            ~ "var redubOutput = document.getElementById('redub-output');\n"
+            ~ "var Module = {\n"
+            ~ "  print: function(t) { if (redubStatus) redubStatus.textContent = 'wasm loaded'; if (redubOutput) redubOutput.textContent += t + '\\n'; },\n"
+            ~ "  printErr: function(t) { console.error(t); if (redubOutput) redubOutput.textContent += t + '\\n'; },\n"
+            ~ "  onRuntimeInitialized: function() { if (redubStatus) redubStatus.textContent = 'wasm loaded'; },\n"
+            ~ "  onExit: function(code) { if (redubStatus) redubStatus.textContent = code ? 'wasm exited with code ' + code : 'wasm loaded'; }\n"
+            ~ "};\n"
+            ~ "</script>\n"
+            ~ "<script src=\"/" ~ script ~ "\"></script>\n"
+            ~ "</body>\n";
+    }
     return
         "<!doctype html>\n"
         ~ "<meta charset=\"utf-8\">\n"
@@ -245,7 +277,7 @@ private void sendResponse(Socket conn, int status, string statusText,
         conn.send(cast(const(void)[]) body);
 }
 
-private void serveConnection(Socket conn, string root, string wasmName)
+private void serveConnection(Socket conn, string root, string wasmName, string scriptName)
 {
     import std.array : split;
     import std.file : exists, isDir, read;
@@ -288,7 +320,7 @@ private void serveConnection(Socket conn, string root, string wasmName)
             sendResponse(conn, 200, "OK", "text/html; charset=utf-8", body, headOnly);
             return;
         }
-        auto body = cast(const(ubyte)[]) indexHtml();
+        auto body = cast(const(ubyte)[]) indexHtml(scriptName);
         sendResponse(conn, 200, "OK", "text/html; charset=utf-8", body, headOnly);
         return;
     }
@@ -332,7 +364,7 @@ private void serveConnection(Socket conn, string root, string wasmName)
 int serveMain(string[] args)
 {
     import std.file : dirEntries, exists, isDir, SpanMode;
-    import std.path : absolutePath, dirName, extension, relativePath;
+    import std.path : absolutePath, baseName, dirName, extension, relativePath;
     import std.socket;
     import std.string : replace;
 
@@ -351,6 +383,7 @@ int serveMain(string[] args)
     root = absolutePath(root);
 
     string wasmPath;
+    string scriptName;
     if(isDir(root))
     {
         foreach(entry; dirEntries(root, SpanMode.depth))
@@ -359,11 +392,30 @@ int serveMain(string[] args)
                 wasmPath = entry.name;
                 break;
             }
+        if(wasmPath.length)
+        {
+            string sibling = wasmPath[0 .. $ - ".wasm".length] ~ ".js";
+            if(exists(sibling))
+                scriptName = baseName(sibling);
+        }
     }
     else
     {
-        wasmPath = root;
+        string artifact = root;
         root = dirName(root);
+        string ext = extension(artifact);
+        if(ext == ".js" || ext == ".mjs")
+            scriptName = baseName(artifact);
+        else if(ext == ".wasm")
+        {
+            string sibling = artifact[0 .. $ - ".wasm".length] ~ ".js";
+            if(exists(sibling))
+                scriptName = baseName(sibling);
+            else
+                wasmPath = artifact;
+        }
+        else
+            wasmPath = artifact;
     }
     string wasmName;
     if(wasmPath.length)
@@ -375,6 +427,8 @@ int serveMain(string[] args)
     info("Serving ", root, " at http://", opts.host, ":", opts.port, "/");
     if(wasmName.length)
         info("Wasm: /", wasmName);
+    if(scriptName.length)
+        info("Script: /", scriptName);
     flush();
 
     while(true)
@@ -382,7 +436,7 @@ int serveMain(string[] args)
         Socket conn = listener.accept();
         scope(exit) conn.close();
         try
-            serveConnection(conn, root, wasmName);
+            serveConnection(conn, root, wasmName, scriptName);
         catch(Exception e)
             error("HTTP error: ", e.msg);
     }

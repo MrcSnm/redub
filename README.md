@@ -196,13 +196,13 @@ If you installed an LDC 1.43+ addon (`redub install ldc --addon=<group>`), redub
 
 Use them directly, e.g. `redub --target=wasi`. A target with the same name in your recipe overrides the preset.
 
-WASI targets need a WASI SDK. Redub can install the prebuilt SDK with `redub install wasi-sdk`; it is picked up automatically for `wasip1`/`wasip2` targets (sets `WASI_SDK_PATH`, `PATH`, and `CC`). The bare `wasm` preset does not need a WASI/Emscripten SDK; it links with `-L--no-entry`, so use `-betterC` or provide your own runtime/entry point as needed.
+WASI targets need a WASI SDK. Redub can install the prebuilt SDK with `redub install wasi-sdk`; it is picked up automatically for `wasip1`/`wasip2` targets (sets `WASI_SDK_PATH`, `PATH`, and `CC`). Emscripten targets need an Emscripten SDK; install it with `redub install emsdk` (sets `EMSDK` and the `emsdk` `PATH`). The bare `wasm` preset does not need a WASI/Emscripten SDK; it links with `-L--no-entry`, so use `-betterC` or provide your own runtime/entry point as needed.
 
-The `web`/`wasm` presets use bare `wasm32-unknown-unknown` (no SDK required) and start a minimal local web server after a successful build (`redub build --target=web`) or with `redub run --target=web`. The `wasi`, `wasi-p2`, and `emscripten` presets do the same: build and serve their `.wasm` output. `redub serve [<artifact|dir>] [--port=8080] [--host=127.0.0.1]` can also be run directly.
+The `web`/`wasm` presets use bare `wasm32-unknown-unknown` (no SDK required) and start a minimal local web server after a successful build (`redub build --target=web`) or with `redub run --target=web`. The `wasi`, `wasi-p2`, and `emscripten` presets do the same. `redub serve [<artifact|dir>] [--port=8080] [--host=127.0.0.1]` can also be run directly.
 
-The server serves the build directory on `http://127.0.0.1:8080/` and generates a minimal `index.html` and `redub.js` loader when no `index.html` is present.
+The server serves the build directory on `http://127.0.0.1:8080/` and generates a minimal `index.html` when no `index.html` is present. For bare wasm, it also generates a `redub.js` loader with a minimal WASI preview1 shim. Emscripten builds produce their own `.js` glue; the generated page loads that glue instead.
 
-The generated loader uses `WebAssembly.instantiateStreaming` with an empty import object. For Emscripten projects that need the Emscripten JS runtime, use `--target=emscripten` (requires the Emscripten SDK/`emcc`). For WASI browser polyfills, use `--target=wasi-p2` with the WASI SDK.
+WASI preview2 outputs are components, which browsers cannot instantiate directly; transpile them with `jco` before serving.
 
 ## Multi language
 

@@ -357,6 +357,9 @@ string getOutputName(TargetType t, string name, OS os, ISA isa = std.system.inst
 string getOutputName(const BuildConfiguration cfg, OS os, ISA isa = std.system.instructionSetArchitecture)
 {
     import std.string;
+    if(cfg.arch.indexOf("emscripten") != -1
+        && cfg.targetType == TargetType.executable)
+        return cfg.targetName~".js";
     if(cfg.arch.indexOf("wasm") != -1)
         return cfg.targetName~".wasm";
     return getOutputName(cfg.targetType, cfg.targetName, os, isa);

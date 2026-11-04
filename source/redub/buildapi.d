@@ -8,7 +8,7 @@ import d_dependencies;
 
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.36.0";
+enum RedubVersionOnly = "v1.36.1";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description

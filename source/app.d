@@ -404,11 +404,48 @@ int installMain(string[] args)
         "\n\tldc <version?|help> [--addon=<target>]...: installs ldc latest if version is unspecified.",
         "\n\t\thelp: Lists available ldc versions",
         "\n\t\t--addon: installs a cross-compilation addon (windows, android, wasi, emscripten or a target triple)",
+        "\n\twasi-sdk <version?|help>: installs the WASI SDK (latest if unspecified)",
+        "\n\temsdk <version?|help>: installs the Emscripten SDK (latest if unspecified)",
         "\n\tdmd <version?>: installs the dmd with the version "~DefaultDMDVersion~" if version is unspecified"
         );
         return 1;
     }
     string compiler = args[1];
+    if(compiler == "--addon" || compiler.startsWith("--addon="))
+    {
+        string addon;
+        string[] rest;
+        if(compiler == "--addon")
+        {
+            if(args.length < 3)
+            {
+                error("--addon requires a value");
+                return 1;
+            }
+            addon = args[2];
+            rest = args.length > 3 ? args[3 .. $] : [];
+        }
+        else
+        {
+            addon = compiler["--addon=".length .. $];
+            rest = args.length > 2 ? args[2 .. $] : [];
+        }
+        if(addon.length == 0)
+        {
+            error("--addon requires a value");
+            return 1;
+        }
+        if(addon == "emsdk" || addon == "emscripten-sdk")
+        {
+            compiler = "emsdk";
+            args = ["install", "emsdk"] ~ rest;
+        }
+        else
+        {
+            compiler = "ldc";
+            args = ["install", "ldc", "--addon=" ~ addon] ~ rest;
+        }
+    }
     if(compiler.startsWith("opend"))
     {
         import redub.misc.opend_install;
@@ -528,6 +565,21 @@ int installMain(string[] args)
             }
         }
     }
+    else if(compiler == "emsdk" || compiler == "emscripten")
+    {
+        import redub.misc.emscripten_install;
+        string emsdkVer = args.length > 2 ? args[2] : "latest";
+        if(emsdkVer == "help")
+        {
+            info("Use 'latest' or an Emscripten SDK version, e.g. 4.0.15.");
+            return 0;
+        }
+        if(!installEmscriptenSdk(emsdkVer))
+        {
+            error("Could not install the Emscripten SDK");
+            return 1;
+        }
+    }
     else if(compiler == "wasi-sdk" || compiler == "wasi")
     {
         import redub.misc.wasi_sdk_install;
@@ -562,6 +614,12 @@ int installMain(string[] args)
             error("Could not install DMD ", dmdVer);;
             return 1;
         }
+    }
+    else
+    {
+        error("Unknown install target: ", compiler,
+            "\nAvailable targets: opend, ldc, dmd, wasi-sdk, emsdk");
+        return 1;
     }
     return 0;
 }
