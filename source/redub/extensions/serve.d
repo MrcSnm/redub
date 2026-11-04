@@ -4,59 +4,48 @@ version(RedubCLI):
 
 import redub.logging;
 import std.socket : Socket;
-import std.stdio;
 
 private struct ServeOptions
 {
-    string path;
+    @("Port to listen on")
     ushort port = 8080;
+
+    @("Host to bind")
     string host = "127.0.0.1";
+
+    @("Do not open the default browser")
+    @("no-open")
+    bool noOpen;
 }
 
-private void serveUsage()
+private void openBrowser(string url)
 {
-    writeln("redub serve [<artifact|dir>] [--port=8080] [--host=127.0.0.1]");
-    writeln("Serves a build directory for testing wasm/web builds.");
-    writeln("If <artifact> is a .wasm file, its directory is served and a minimal");
-    writeln("index.html + redub.js loader is generated when index.html is absent.");
-}
+    import redub.misc.find_executable : findExecutable;
+    import std.process : spawnProcess;
 
-private int parseServeOptions(string[] args, ref ServeOptions opts)
-{
-    import std.conv : to;
-    import std.string : startsWith;
-
-    for(size_t i = 1; i < args.length; i++)
+    version(Windows)
     {
-        string arg = args[i];
-        if(arg == "--help" || arg == "-h")
-        {
-            serveUsage();
-            return 2;
-        }
-        if(arg.startsWith("--port="))
-            opts.port = arg["--port=".length .. $].to!ushort;
-        else if(arg == "--port")
-        {
-            if(i + 1 >= args.length) { error("--port requires a value"); return 1; }
-            opts.port = args[++i].to!ushort;
-        }
-        else if(arg.startsWith("--host="))
-            opts.host = arg["--host=".length .. $];
-        else if(arg == "--host")
-        {
-            if(i + 1 >= args.length) { error("--host requires a value"); return 1; }
-            opts.host = args[++i];
-        }
-        else if(opts.path is null)
-            opts.path = arg;
-        else
-        {
-            error("Unexpected argument: ", arg);
-            return 1;
-        }
+        try
+            spawnProcess(["cmd", "/c", "start", "", url]);
+        catch(Exception e)
+            warn("Could not open the browser: ", e.msg);
     }
-    return 0;
+    else
+    {
+        version(OSX)
+            string opener = "open";
+        else version(Posix)
+            string opener = "xdg-open";  
+        if(!findExecutable(opener).length)
+        {
+            warn("Could not open the browser: '", opener, "' was not found. Open ", url, " manually.");
+            return;
+        }
+        try
+            spawnProcess([opener, url]);
+        catch(Exception e)
+            warn("Could not open the browser: ", e.msg);
+    } 
 }
 
 private int hexValue(char c) pure nothrow @safe
@@ -111,81 +100,66 @@ private string jsString(string value)
     return "\"" ~ value.replace("\\", "\\\\").replace("\"", "\\\"") ~ "\"";
 }
 
-private immutable string wasiShim = q"WASI_SHIM
-const wasi = {};
-const wasiNoop = () => 0;
-for (const name of [
-    "args_get", "args_sizes_get", "environ_get", "environ_sizes_get",
-    "clock_res_get", "clock_time_get", "fd_advise", "fd_allocate", "fd_close",
-    "fd_datasync", "fd_fdstat_get", "fd_fdstat_set_flags", "fd_fdstat_set_rights",
-    "fd_filestat_get", "fd_filestat_set_size", "fd_filestat_set_times", "fd_pread",
-    "fd_prestat_get", "fd_prestat_dir_name", "fd_pwrite", "fd_read", "fd_readdir",
-    "fd_renumber", "fd_seek", "fd_sync", "fd_tell", "fd_write",
-    "path_create_directory", "path_filestat_get", "path_filestat_set_times",
-    "path_link", "path_open", "path_readlink", "path_remove_directory", "path_rename",
-    "path_symlink", "path_unlink_file", "poll_oneoff", "proc_exit", "proc_raise",
-    "sched_yield", "random_get", "sock_accept", "sock_recv", "sock_send", "sock_shutdown"
-]) wasi[name] = wasiNoop;
-let wasiMemory = null;
-wasi.fd_write = (fd, iovs, iovsLen, nwritten) => {
-    if (!wasiMemory) return 0;
-    const view = new DataView(wasiMemory.buffer);
-    const decoder = new TextDecoder();
-    let written = 0;
-    let text = "";
-    for (let i = 0; i < iovsLen; i++) {
-        const ptr = view.getUint32(iovs + i * 8, true);
-        const len = view.getUint32(iovs + i * 8 + 4, true);
-        text += decoder.decode(new Uint8Array(wasiMemory.buffer, ptr, len));
-        written += len;
+///Whether to use the sibling Emscripten glue instead of redub's WASI loader.
+///The build exports the resolved target, so scanning the wasm is only needed
+///for manually invoked `redub serve`.
+private bool usesEmscriptenGlue(string wasmPath)
+{
+    import redub.parsers.environment : getEnvVariable;
+    import std.string : indexOf;
+
+    string arch = getEnvVariable("REDUB_TARGET_ARCH");
+    if(arch.length)
+        return arch.indexOf("emscripten") != -1;
+    return wasmImportsEnv(wasmPath);
+}
+
+///Whether the wasm module imports Emscripten's `env` module.
+private bool wasmImportsEnv(string wasmPath)
+{
+    import std.file : exists, read;
+
+    if(!exists(wasmPath))
+        return false;
+    auto data = cast(const(ubyte)[]) read(wasmPath);
+    if(data.length < 8 || data[0] != 0x00 || data[1] != 0x61
+        || data[2] != 0x73 || data[3] != 0x6d)
+        return false;
+
+    size_t pos = 8;
+    while(pos < data.length)
+    {
+        ubyte id = data[pos++];
+        size_t size, shift;
+        while(pos < data.length)
+        {
+            ubyte b = data[pos++];
+            size |= (cast(size_t)(b & 0x7f)) << shift;
+            if(!(b & 0x80))
+                break;
+            shift += 7;
+        }
+        if(pos + size > data.length)
+            return false;
+        if(id == 2)
+        {
+            ///shortcut: scans the import section for the "env" module name;
+            ///upgrade to a full wasm parser if field-name collisions matter.
+            auto payload = data[pos .. pos + size];
+            if(payload.length >= 4)
+                foreach(i; 0 .. payload.length - 3)
+                    if(payload[i] == 3 && payload[i + 1] == 'e'
+                        && payload[i + 2] == 'n' && payload[i + 3] == 'v')
+                        return true;
+            return false;
+        }
+        pos += size;
     }
-    if (fd === 1 || fd === 2) {
-        if (output) output.textContent += text;
-        console.log(text);
-    }
-    view.setUint32(nwritten, written, true);
-    return 0;
-};
-wasi.fd_prestat_get = () => 8;
-wasi.clock_res_get = (id, ptr) => {
-    if (wasiMemory) new DataView(wasiMemory.buffer).setBigUint64(ptr, 1n, true);
-    return 0;
-};
-wasi.fd_fdstat_get = (fd, ptr) => {
-    if (wasiMemory) {
-        const view = new DataView(wasiMemory.buffer);
-        view.setUint8(ptr, 2);
-        view.setBigUint64(ptr + 8, 0xffffffffffffffffn, true);
-        view.setBigUint64(ptr + 16, 0xffffffffffffffffn, true);
-    }
-    return 0;
-};
-wasi.args_sizes_get = (argc, argv) => {
-    if (wasiMemory) {
-        const view = new DataView(wasiMemory.buffer);
-        view.setUint32(argc, 0, true);
-        view.setUint32(argv, 0, true);
-    }
-    return 0;
-};
-wasi.environ_sizes_get = (count, size) => {
-    if (wasiMemory) {
-        const view = new DataView(wasiMemory.buffer);
-        view.setUint32(count, 0, true);
-        view.setUint32(size, 0, true);
-    }
-    return 0;
-};
-wasi.clock_time_get = (id, precision, ptr) => {
-    if (wasiMemory) new DataView(wasiMemory.buffer).setBigUint64(ptr, 0n, true);
-    return 0;
-};
-wasi.random_get = (ptr, len) => {
-    if (wasiMemory) new Uint8Array(wasiMemory.buffer, ptr, len).fill(0);
-    return 0;
-};
-wasi.proc_exit = (code) => { throw { wasiExit: code }; };
-WASI_SHIM";
+    return false;
+}
+
+private immutable string wasiShim = import("redub/extensions/wasi_shim.js");
+private immutable string redubIcon = import("redub/extensions/redub.png");
 
 private string loaderScript(string wasmName)
 {
@@ -194,12 +168,13 @@ private string loaderScript(string wasmName)
         "const status = document.getElementById('redub-status');\n"
         ~ "const output = document.getElementById('redub-output');\n"
         ~ "const wasmUrl = " ~ target ~ ";\n"
+        ~ "const env = await import('/env.js').catch(() => ({}));\n"
         ~ wasiShim ~ "\n"
         ~ "try {\n"
         ~ "  if (!wasmUrl) throw new Error('No .wasm file found in the served directory');\n"
         ~ "  const response = await fetch(wasmUrl);\n"
         ~ "  if (!response.ok) throw new Error(response.status + ' ' + response.statusText);\n"
-        ~ "  const { instance } = await WebAssembly.instantiateStreaming(response, { wasi_snapshot_preview1: wasi });\n"
+        ~ "  const { instance } = await WebAssembly.instantiateStreaming(response, { env, wasi_snapshot_preview1: wasi });\n"
         ~ "  wasiMemory = instance.exports.memory;\n"
         ~ "  window.redubWasm = instance;\n"
         ~ "  const exports = instance.exports;\n"
@@ -232,6 +207,7 @@ private string indexHtml(string scriptName = null)
             "<!doctype html>\n"
             ~ "<meta charset=\"utf-8\">\n"
             ~ "<title>redub web</title>\n"
+            ~ "<link rel=\"icon\" type=\"image/png\" href=\"/favicon.png\">\n"
             ~ "<body style=\"font-family:monospace;background:#111;color:#ddd\">\n"
             ~ "<h1>redub web</h1>\n"
             ~ "<p id=\"redub-status\">loading…</p>\n"
@@ -254,6 +230,7 @@ private string indexHtml(string scriptName = null)
         "<!doctype html>\n"
         ~ "<meta charset=\"utf-8\">\n"
         ~ "<title>redub web</title>\n"
+        ~ "<link rel=\"icon\" type=\"image/png\" href=\"/favicon.png\">\n"
         ~ "<body style=\"font-family:monospace;background:#111;color:#ddd\">\n"
         ~ "<h1>redub web</h1>\n"
         ~ "<p id=\"redub-status\">loading…</p>\n"
@@ -330,6 +307,12 @@ private void serveConnection(Socket conn, string root, string wasmName, string s
         sendResponse(conn, 200, "OK", "text/javascript", body, headOnly);
         return;
     }
+    if(path == "/favicon.png" || path == "/favicon.ico")
+    {
+        auto body = cast(const(ubyte)[]) redubIcon;
+        sendResponse(conn, 200, "OK", "image/png", body, headOnly);
+        return;
+    }
 
     if(path.length == 0)
     {
@@ -364,17 +347,32 @@ private void serveConnection(Socket conn, string root, string wasmName, string s
 int serveMain(string[] args)
 {
     import std.file : dirEntries, exists, isDir, SpanMode;
+    import redub.buildapi : RedubVersionShort;
+    import redub.cli.dub : betterGetopt;
+    import std.getopt : defaultGetoptPrinter;
     import std.path : absolutePath, baseName, dirName, extension, relativePath;
     import std.socket;
     import std.string : replace;
 
     setLogLevel(LogLevel.info);
     ServeOptions opts;
-    int parseResult = parseServeOptions(args, opts);
-    if(parseResult != 0)
-        return parseResult == 2 ? 0 : parseResult;
+    auto res = betterGetopt(args, opts);
+    if(res.helpWanted)
+    {
+        defaultGetoptPrinter(RedubVersionShort~" serve information:\n\t"
+            ~ "Serves a build directory for testing wasm/web builds.\n\t"
+            ~ "Generates index.html and redub.js when index.html is absent.\n"
+            ~ "The default browser is opened automatically unless --no-open is given.\n\t"
+            ~ "Arguments:\n", res.options);
+        return 0;
+    }
 
-    string root = opts.path is null ? "." : opts.path;
+    if(args.length > 2)
+    {
+        error("Unexpected argument: ", args[2]);
+        return 1;
+    }
+    string root = args.length > 1 ? args[1] : ".";
     if(!exists(root))
     {
         error("Path does not exist: ", root);
@@ -395,7 +393,7 @@ int serveMain(string[] args)
         if(wasmPath.length)
         {
             string sibling = wasmPath[0 .. $ - ".wasm".length] ~ ".js";
-            if(exists(sibling))
+            if(usesEmscriptenGlue(wasmPath) && exists(sibling))
                 scriptName = baseName(sibling);
         }
     }
@@ -409,7 +407,7 @@ int serveMain(string[] args)
         else if(ext == ".wasm")
         {
             string sibling = artifact[0 .. $ - ".wasm".length] ~ ".js";
-            if(exists(sibling))
+            if(usesEmscriptenGlue(artifact) && exists(sibling))
                 scriptName = baseName(sibling);
             else
                 wasmPath = artifact;
@@ -430,6 +428,14 @@ int serveMain(string[] args)
     if(scriptName.length)
         info("Script: /", scriptName);
     flush();
+
+    if(!opts.noOpen)
+    {
+        import std.conv : to;
+        string browserHost = opts.host == "0.0.0.0" || opts.host == "::"
+            ? "127.0.0.1" : opts.host;
+        openBrowser("http://" ~ browserHost ~ ":" ~ opts.port.to!string ~ "/");
+    }
 
     while(true)
     {

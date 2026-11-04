@@ -11,6 +11,8 @@ import redub.command_generators.automatic;
 import std.process:Pid;
 import std.concurrency:Tid;
 
+private immutable string defaultEnvJs = import("redub/extensions/env_template.js");
+
 /**
  * When using redub as a library, one may spawn multiple times the same package, having a bug on it.
  * The problem is that although it returns to execution, the threads aren't actually killed!
@@ -826,6 +828,41 @@ private bool copyFiles(ProjectNode root)
                     return false;
                 }
             }
+        }
+    }
+
+    import std.string : indexOf;
+    const cfg = root.requirements.cfg;
+    if(cfg.arch.indexOf("wasm") != -1 && cfg.arch.indexOf("emscripten") == -1)
+    {
+        import std.file : exists, mkdirRecurse, read, write;
+        import std.path : baseName;
+        bool providedByRecipe;
+        foreach(f; cfg.filesToCopy)
+            if(baseName(f) == "env.js")
+            {
+                providedByRecipe = true;
+                break;
+            }
+        if(!providedByRecipe)
+        {
+            string srcEnv = buildNormalizedPath(cfg.workingDir, "env.js");
+            string outEnv = buildNormalizedPath(outputDir, "env.js");
+            if(!exists(srcEnv))
+            {
+                if(exists(outEnv))
+                {
+                    write(srcEnv, read(outEnv));
+                    info("\tKept ", outEnv, " in the project as ", srcEnv);
+                }
+                else
+                {
+                    write(srcEnv, defaultEnvJs);
+                    info("\tCreated ", srcEnv, " with the JS import template");
+                }
+            }
+            mkdirRecurse(outputDir);
+            write(outEnv, read(srcEnv));
         }
     }
     return true;

@@ -185,24 +185,27 @@ Ever wanted to configure a default compiler/arch based on the configuration? Now
 ```
 Now you can just call `redub --target=wasm` or `redub --target=PSVita` and every dependency will inherit this configuration.
 
-### Built-in LDC addon targets
-If you installed an LDC 1.43+ addon (`redub install ldc --addon=<group>`), redub ships built-in target presets:
+### Built-in targets
+Since `v1.36.1`: Most presets use LDC 1.43+ addons (`redub install ldc --addon=<group>`):
 
-- Windows: `windows`, `windows-i686`, `windows-arm64`
-- Android: `android`, `android-armv7a`, `android-x86_64`, `android-i686`
-- WASI: `wasi`, `wasi-p2`
-- Emscripten: `emscripten`
-- Bare WebAssembly: `wasm` (`wasm32-unknown-unknown`, no SDK required)
+| Group | Targets |
+| --- | --- |
+| Windows | `windows`, `windows-i686`, `windows-arm64` |
+| macOS | `macos`, `macos-arm64` |
+| Android | `android`, `android-armv7a`, `android-x86_64`, `android-i686` |
+| WASI | `wasi`, `wasi-p2` |
+| Emscripten | `emscripten` |
+| Bare wasm | `wasm`, `web` (`wasm32-unknown-unknown`) |
 
-Use them directly, e.g. `redub --target=wasi`. A target with the same name in your recipe overrides the preset.
+Use them with `redub --target=<name>`; a recipe target with the same name overrides the preset.
 
-WASI targets need a WASI SDK. Redub can install the prebuilt SDK with `redub install wasi-sdk`; it is picked up automatically for `wasip1`/`wasip2` targets (sets `WASI_SDK_PATH`, `PATH`, and `CC`). Emscripten targets need an Emscripten SDK; install it with `redub install emsdk` (sets `EMSDK` and the `emsdk` `PATH`). The bare `wasm` preset does not need a WASI/Emscripten SDK; it links with `-L--no-entry`, so use `-betterC` or provide your own runtime/entry point as needed.
+macOS presets compile everywhere, but linking needs Apple tooling. Use `--build=syntax` for a pure syntax check.
 
-The `web`/`wasm` presets use bare `wasm32-unknown-unknown` (no SDK required) and start a minimal local web server after a successful build (`redub build --target=web`) or with `redub run --target=web`. The `wasi`, `wasi-p2`, and `emscripten` presets do the same. `redub serve [<artifact|dir>] [--port=8080] [--host=127.0.0.1]` can also be run directly.
+**SDKs:** `redub install wasi-sdk` sets `WASI_SDK_PATH`, `PATH` and `CC`. `redub install emsdk` sets `EMSDK`/`PATH` and downloads a standalone Python, so no system Python is needed. Bare `wasm`/`web` need no SDK: they link with `-L--no-entry`, so use `-betterC` or supply your own entry point/runtime.
 
-The server serves the build directory on `http://127.0.0.1:8080/` and generates a minimal `index.html` when no `index.html` is present. For bare wasm, it also generates a `redub.js` loader with a minimal WASI preview1 shim. Emscripten builds produce their own `.js` glue; the generated page loads that glue instead.
+The web presets start a local server after `redub build`/`redub run`. Or run `redub serve [<artifact|dir>] [--port=8080] [--host=127.0.0.1] [--no-open]`: it serves the build directory, opens the default browser (`--no-open` disables), and generates `index.html`/`redub.js` (WASI preview1 shim) when missing. Emscripten uses its own `.js` glue. WASI preview2 outputs are components; transpile them with `jco` before serving.
 
-WASI preview2 outputs are components, which browsers cannot instantiate directly; transpile them with `jco` before serving.
+Wasm/WASI builds create an editable `env.js` template in the project root and copy it to the output on every build; if your recipe already provides an `env.js` via `copyFiles`, that one is used instead. Use it to provide JS functions for `extern(C)` imports from D. Bare `wasm`/`web` link with `--allow-undefined`, so undefined functions become `env` imports.
 
 ## Multi language
 

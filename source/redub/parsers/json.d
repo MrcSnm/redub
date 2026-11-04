@@ -56,6 +56,8 @@ private bool getBuiltinTarget(string target, out JSONValue value)
         case "windows": arch = "x86_64-windows-msvc"; break;
         case "windows-i686", "windows-x86": arch = "i686-windows-msvc"; break;
         case "windows-arm64", "windows-aarch64": arch = "aarch64-windows-msvc"; break;
+        case "macos-x86_64": arch = "x86_64-apple-darwin"; break;
+        case "macos", "macos-arm64", "macos-aarch64": arch = "arm64-apple-darwin"; break;
         case "android": arch = "aarch64-linux-android30"; break;
         case "android-armv7a": arch = "armv7a-linux-androideabi29"; break;
         case "android-x86_64": arch = "x86_64-linux-android29"; break;
@@ -70,7 +72,10 @@ private bool getBuiltinTarget(string target, out JSONValue value)
     value["compiler"] = JSONValue("ldc2");
     value["arch"] = JSONValue(arch);
     if(target == "wasm" || target == "web")
-        value["dflags"] = JSONValue([JSONValue("-L--no-entry")]);
+        value["dflags"] = JSONValue([
+            JSONValue("-L--no-entry"),
+            JSONValue("-L--allow-undefined"),
+        ]);
     if(webOutput)
     {
         value["serveAfterBuild"] = JSONValue(true);
@@ -84,8 +89,9 @@ private bool getBuiltinTarget(string target, out JSONValue value)
 }
 
 private immutable string builtinTargetList =
-    "windows, windows-i686, windows-arm64, android, android-armv7a, "
-    ~ "android-x86_64, android-i686, wasi, wasi-p2, emscripten, web, wasm";
+    "windows, windows-i686, windows-arm64, macos, macos-x86_64, "
+    ~ "android, android-armv7a, android-x86_64, android-i686, "
+    ~ "wasi, wasi-p2, emscripten, web, wasm";
 
 TargetInfo getTarget(JSONValue value, string target, ParseConfig cfg)
 {
@@ -126,6 +132,10 @@ unittest
     assert(getBuiltinTarget("windows", v));
     assert(v["compiler"].str == "ldc2");
     assert(v["arch"].str == "x86_64-windows-msvc");
+    assert(getBuiltinTarget("macos", v));
+    assert(v["arch"].str == "arm64-apple-darwin");
+    assert(getBuiltinTarget("macos-x86_64", v));
+    assert(v["arch"].str == "x86_64-apple-darwin");
     assert(getBuiltinTarget("android-armv7a", v));
     assert(v["arch"].str == "armv7a-linux-androideabi29");
     assert(getBuiltinTarget("wasi-p2", v));

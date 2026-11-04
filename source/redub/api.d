@@ -1261,6 +1261,8 @@ int executeProgram(ProjectDetails details, string[] args)
     int ret;
 
     ProjectNode tree = details.tree;
+    if(tree.requirements.cfg.arch.length)
+        setEnvVariable("REDUB_TARGET_ARCH", tree.requirements.cfg.arch);
     foreach(string cmd; tree.requirements.cfg.preRunCommands)
     {
         if(hasLogLevel(LogLevel.verbose))
@@ -1430,9 +1432,10 @@ watch
         Starts watching the folders which dub.json references. If anything changes, it builds its dependents.
         You may also specify --run if you wish to run the program every time you have one change.
 serve
-    Usage: redub serve [<artifact|dir>] [--port=8080] [--host=127.0.0.1]
+    Usage: redub serve [<artifact|dir>] [--port=8080] [--host=127.0.0.1] [--no-open]
     Description:
         Serves a build directory for testing wasm/web builds. Generates a minimal index.html and redub.js loader when index.html is absent.
+        The default browser is opened automatically unless --no-open is given.
 install
     Usage: redub install <dmd|ldc|opend|wasi-sdk> <version?|help> [--addon=<target>]...
     Description:

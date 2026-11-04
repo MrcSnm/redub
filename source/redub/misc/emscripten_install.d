@@ -2,20 +2,106 @@ module redub.misc.emscripten_install;
 
 private immutable emsdkRepoArchive =
     "https://github.com/emscripten-core/emsdk/archive/refs/heads/main.tar.gz";
+private immutable pythonStandaloneRepo = "astral-sh/python-build-standalone";
 
-private bool runEmsdk(string root, string[] args)
+private string managedPythonPath()
+{
+    import redub.api : getDubWorkspacePath;
+    import redub.misc.path : buildNormalizedPath;
+
+    version(Windows)
+        return buildNormalizedPath(getDubWorkspacePath, "redub-python", "python", "python.exe");
+    else
+        return buildNormalizedPath(getDubWorkspacePath, "redub-python", "python", "bin", "python3");
+}
+
+///Returns the redub-managed Python, downloading it on first use.
+private string ensureManagedPython()
+{
+    import hip.data.json;
+    import redub.api : getDubWorkspacePath;
+    import redub.logging : error, info;
+    import redub.misc.github_tag_check : getGithubReleaseAPI, getLatestGitRepositoryTag;
+    import redub.misc.path : buildNormalizedPath;
+    import redub.misc.unzip : downloadAndExtract;
+    import std.file : exists, mkdirRecurse;
+    import std.string : endsWith, indexOf;
+
+    string python = managedPythonPath();
+    if(exists(python))
+        return python;
+
+    import std.system : ISA, instructionSetArchitecture;
+    if(instructionSetArchitecture != ISA.x86_64 && instructionSetArchitecture != ISA.aarch64)
+    {
+        error("No prebuilt Python available for this architecture.");
+        return null;
+    }
+    string arch = instructionSetArchitecture == ISA.aarch64 ? "aarch64" : "x86_64";
+    string triple;
+    version(Windows)
+        triple = arch ~ "-pc-windows-msvc";
+    else version(OSX)
+        triple = arch ~ "-apple-darwin";
+    else version(linux)
+        triple = arch ~ "-unknown-linux-gnu";
+    else
+    {
+        error("No prebuilt Python available for this OS.");
+        return null;
+    }
+    string suffix = "-" ~ triple ~ "-install_only_stripped.tar.gz";
+
+    string tag = getLatestGitRepositoryTag(pythonStandaloneRepo);
+    JSONValue release = tag ? getGithubReleaseAPI(pythonStandaloneRepo, tag) : JSONValue(null);
+    string url;
+    if(!release.isNull)
+        if(auto assets = "assets" in release)
+            foreach(asset; (*assets).array)
+            {
+                auto name = "name" in asset;
+                if(name is null || name.type != JSONType.string_
+                    || !name.str.endsWith(suffix) || name.str.indexOf("freethreaded") != -1)
+                    continue;
+                if(auto dl = "browser_download_url" in asset)
+                    url = dl.str;
+                break;
+            }
+    if(!url.length)
+    {
+        error("Could not find a prebuilt Python package for this OS/ISA.");
+        return null;
+    }
+
+    string workspace = buildNormalizedPath(getDubWorkspacePath, "redub-python");
+    if(!exists(workspace))
+        mkdirRecurse(workspace);
+    info("Downloading a minimal Python from ", url);
+    if(!downloadAndExtract(url, workspace) || !exists(python))
+    {
+        error("Could not set up a minimal Python for emsdk.");
+        return null;
+    }
+    return python;
+}
+
+///Returns the redub-managed Python if it is already installed.
+private string findManagedPython()
+{
+    import std.file : exists;
+
+    string python = managedPythonPath();
+    return exists(python) ? python : null;
+}
+
+private bool runEmsdk(string python, string root, string[] args)
 {
     import redub.logging : error, info;
     import redub.misc.path : buildNormalizedPath;
     import std.process : execute;
 
     string script = buildNormalizedPath(root, "emsdk.py");
-    version(Windows)
-        string[] command = ["cmd", "/c", buildNormalizedPath(root, "emsdk.bat")] ~ args;
-    else
-        string[] command = ["python3", script] ~ args;
-
-    auto result = execute(command);
+    auto result = execute([python, script] ~ args);
     if(result.status != 0)
     {
         error("emsdk ", args.length ? args[0] : "", " failed:\n", result.output);
@@ -55,9 +141,12 @@ bool installEmscriptenSdk(string sdkVersion = "latest")
         error("emsdk was not extracted to ", root);
         return false;
     }
-    if(!runEmsdk(root, ["install", sdkVersion]))
+    string python = ensureManagedPython();
+    if(!python.length)
         return false;
-    if(!runEmsdk(root, ["activate", sdkVersion]))
+    if(!runEmsdk(python, root, ["install", sdkVersion]))
+        return false;
+    if(!runEmsdk(python, root, ["activate", sdkVersion]))
         return false;
 
     JSONValue meta = getRedubMeta();
@@ -99,7 +188,7 @@ void setupEmscriptenEnvironment(string arch)
     import redub.misc.path : buildNormalizedPath;
     import redub.parsers.environment : getEnvVariable, setEnvVariable;
     import std.file : exists, isDir, dirEntries, SpanMode;
-    import std.path : pathSeparator;
+    import std.path : dirName, pathSeparator;
     import std.string : indexOf, toLower;
 
     if(arch.length == 0)
@@ -120,6 +209,13 @@ void setupEmscriptenEnvironment(string arch)
         setEnvVariable("EMSDK", root);
 
     string[] dirs = [root, buildNormalizedPath(root, "upstream", "emscripten")];
+    string managedPython = findManagedPython();
+    if(managedPython.length)
+    {
+        dirs ~= dirName(managedPython);
+        if(!getEnvVariable("EMSDK_PYTHON").length)
+            setEnvVariable("EMSDK_PYTHON", managedPython);
+    }
     string nodeRoot = buildNormalizedPath(root, "node");
     if(exists(nodeRoot))
         foreach(entry; dirEntries(nodeRoot, SpanMode.shallow))
