@@ -262,6 +262,7 @@ private void partiallyFinishBuildRequirements(ref BuildRequirements req, BuildCo
 {
     import std.path;
     import std.algorithm.searching:startsWith;
+    import std.string : indexOf;
     import redub.misc.path;
     req.cfg = req.cfg.merge(pending);
     if(!isAbsolute(req.cfg.outputDirectory))
@@ -271,6 +272,9 @@ private void partiallyFinishBuildRequirements(ref BuildRequirements req, BuildCo
     bool excludeEntryPoint = req.cfg.targetType == TargetType.autodetect
         ? !req.extra.isRoot
         : req.cfg.targetType != TargetType.executable;
+    // Android app shared libraries keep their entry point (android_main).
+    if(req.cfg.arch.indexOf("android") != -1)
+        excludeEntryPoint = false;
     if(excludeEntryPoint)
     {
         import std.string : lastIndexOf;

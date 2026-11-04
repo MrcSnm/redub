@@ -190,28 +190,24 @@ Ever wanted to configure a default compiler/arch based on the configuration? Now
 Now you can just call `redub --target=wasm` or `redub --target=PSVita` and every dependency will inherit this configuration.
 
 ### Built-in targets
-Since `v1.36.1`: Most presets use LDC 1.43+ addons (`redub install ldc --addon=<group>`):
+Since `v1.36.1`: use `redub --target=<name>`; a recipe target with the same name overrides the preset. Addons require LDC 1.43+ (`redub install ldc --addon=<group>`).
 
-| Group | Targets |
-| --- | --- |
-| Windows | `windows`, `windows-i686`, `windows-arm64` |
-| macOS | `macos`, `macos-arm64` |
-| Android | `android`, `android-armv7a`, `android-x86_64`, `android-i686` |
-| WASI | `wasi`, `wasi-p2` |
-| Emscripten | `emscripten` |
-| Bare wasm | `wasm`, `web` (`wasm32-unknown-unknown`) |
+| Target | Addon | SDK | Environment | Run |
+| --- | --- | --- | --- | --- |
+| `windows`, `windows-i686`, `windows-arm64` | `windows` | — | — | native |
+| `macos`, `macos-arm64` | — | Apple tooling to link | — | native |
+| `android`, `android-armv7a`, `android-x86_64`, `android-i686` | `android` | NDK + SDK build-tools/platform | `ANDROID_NDK_HOME`, `CC`, `PATH` | `adb` push/run; APK via `--bundle=android` |
+| `wasi`, `wasi-p2` | `wasi` | WASI SDK | `WASI_SDK_PATH`, `CC`, `PATH` | `redub serve` (p2 needs `jco`) |
+| `emscripten` | `emscripten` | Emscripten SDK | `EMSDK`, `PATH`, `EMSDK_NODE`, `EMSDK_PYTHON` | `redub serve` with its `.js` glue |
+| `wasm`, `web` | — | — | — | `redub serve` |
 
-Use them with `redub --target=<name>`; a recipe target with the same name overrides the preset.
-
-macOS presets compile everywhere, but linking needs Apple tooling. Use `--build=syntax` for a pure syntax check.
-
-**SDKs:** `redub install wasi-sdk` sets `WASI_SDK_PATH`, `PATH` and `CC`. `redub install emsdk` sets `EMSDK`/`PATH` and downloads a standalone Python, so no system Python is needed. Bare `wasm`/`web` need no SDK: they link with `-L--no-entry`, so use `-betterC` or supply your own entry point/runtime.
-
-The web presets start a local server after `redub build`/`redub run`. Or run `redub serve [<artifact|dir>] [--port=8080] [--host=127.0.0.1] [--no-open]`: it serves the build directory, opens the default browser (`--no-open` disables), and generates `index.html`/`redub.js` (WASI preview1 shim) when missing. Emscripten uses its own `.js` glue. WASI preview2 outputs are components; transpile them with `jco` before serving.
-
-Android presets default to an `adb` run command: `redub run --target=android` pushes the artifact to `/data/local/tmp`, marks it executable and runs it on the connected device. If `adb` is not installed, redub downloads the standalone Android platform-tools. Set `ANDROID_SERIAL` when several devices are connected. Compiling needs the LDC Android addon (`redub install ldc --addon=android`) and the NDK; redub finds it via `ANDROID_NDK_HOME`/`ANDROID_NDK_ROOT`, Android Studio/SDK default locations, or the redub workspace (`redub install android-ndk [<version>]`, ~660 MB), sets `CC`/`PATH`, and warns when the addon is missing.
-
-Wasm/WASI builds create an editable `env.js` template in the project root and copy it to the output on every build; if your recipe already provides an `env.js` via `copyFiles`, that one is used instead. Use it to provide JS functions for `extern(C)` imports from D. Bare `wasm`/`web` link with `--allow-undefined`, so undefined functions become `env` imports.
+**Remarks**
+- **macOS:** compiles everywhere; linking needs Apple tooling. Use `--build=syntax` for a pure syntax check.
+- **Android:** redub finds the NDK via env/Android Studio paths or `redub install android-ndk`; `adb` (platform-tools) is auto-downloaded and `ANDROID_SERIAL` selects a device. APK requires `extern(C) void android_main(void*)`; `redub run --target=android --bundle=android` builds, installs, starts and streams `logcat`. The APK uses the redub icon; permissions go in `"bundleConfiguration": { "permissions": ["INTERNET"] }`. See `tests/android`.
+- **WASI:** install the SDK with `redub install wasi-sdk`; p1 runs in the browser via `redub serve`; p2 outputs are components, transpile with `jco`.
+- **Emscripten:** install with `redub install emsdk`; no system Python needed.
+- **wasm/web:** no SDK; links with `-L--no-entry`, so use `-betterC` or provide an entry point/runtime. `env.js` can provide JS imports for `extern(C)`; builds create a template in the project root.
+- **serve:** `redub serve [<artifact|dir>] [--port=8080] [--host=127.0.0.1] [--no-open]` serves the build directory, opens the browser (unless `--no-open`), and generates `index.html`/`redub.js` when missing.
 
 ## Multi language
 

@@ -290,6 +290,14 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
                 enforce(terminal.type == JSONType.bool_, `"terminal" in "bundleConfiguration" must be a boolean, not `~terminal.type.to!string);
                 req.cfg.bundleConfig.usesTerminal = terminal.get!bool;
             }
+            JSONValue* permissions = "permissions" in v;
+            if(permissions)
+            {
+                enforce(permissions.type == JSONType.array, `"permissions" in "bundleConfiguration" must be an array of strings, not `~permissions.type.to!string);
+                foreach(string permission; (*permissions).strArr)
+                    if(permission.length)
+                        req.cfg.bundleConfig.permissions ~= permission;
+            }
         },
         "workingDirectory": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){setTargetRuntimeWorkingDir(req, v.str, c);},
         "targetName": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _){setTargetName(req, v.str, c);},

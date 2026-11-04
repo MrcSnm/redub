@@ -181,20 +181,81 @@ private string selectDevice(string adb)
     return null;
 }
 
+private int runApk(string adb, string apk, string[] runArgs)
+{
+    import core.thread : Thread;
+    import core.time : msecs;
+    import redub.logging : error, info;
+    import redub.parsers.environment : getEnvVariable;
+    import std.process : execute, spawnProcess, wait;
+    import std.string : split, strip;
+
+    string serial = selectDevice(adb);
+    if(!serial.length)
+        return 1;
+    string[] adbCmd = [adb, "-s", serial];
+
+    info("Installing ", apk, "...");
+    auto install = execute(adbCmd ~ ["install", "-r", apk]);
+    if(install.status != 0)
+    {
+        error("adb install failed:\n", install.output);
+        return install.status;
+    }
+
+    string packageName = getEnvVariable("REDUB_ANDROID_PACKAGE");
+    string activity = getEnvVariable("REDUB_ANDROID_ACTIVITY");
+    if(!packageName.length || !activity.length)
+    {
+        error("Could not determine the Android package/activity for ", apk, ".");
+        return 1;
+    }
+
+    auto start = execute(adbCmd ~ ["shell", "am", "start", "-n", activity]);
+    if(start.status != 0)
+    {
+        error("Could not start ", activity, ":\n", start.output);
+        return start.status;
+    }
+    info(start.output);
+
+    string pid;
+    foreach(_; 0 .. 20)
+    {
+        auto res = execute(adbCmd ~ ["shell", "pidof", packageName]);
+        pid = res.output.strip;
+        if(pid.length)
+            break;
+        Thread.sleep(100.msecs);
+    }
+    if(pid.length)
+    {
+        pid = pid.split()[0];
+        info("Streaming logcat for ", packageName, " (", pid, "). Ctrl+C to stop.");
+        return wait(spawnProcess(adbCmd ~ ["logcat", "--pid=" ~ pid]));
+    }
+    info("Streaming logcat. Ctrl+C to stop.");
+    return wait(spawnProcess(adbCmd ~ ["logcat"]));
+}
+
 int androidRunMain(string[] args)
 {
     import redub.logging : error, info, LogLevel, setLogLevel;
     import std.file : exists;
     import std.path : baseName;
     import std.process : execute, spawnProcess, wait;
-    import std.stdio : writeln;
+    import std.string : endsWith;
+    import std.stdio : write;
 
     setLogLevel(LogLevel.info);
     if(args.length < 2 || args[1] == "--help" || args[1] == "-h")
     {
-        writeln("redub android-run <artifact> [args...]");
-        writeln("Pushes the artifact to the connected Android device via adb and runs it.");
-        writeln("Set ANDROID_SERIAL to choose a device when several are connected.");
+        write(q"EOS
+redub android-run <artifact> [args...]
+For a .so, it pushes the artifact to the connected device and runs it.
+For a .apk, it installs it, starts the launcher activity and streams logcat.
+Set ANDROID_SERIAL to choose a device when several are connected.
+EOS");
         return args.length < 2 ? 1 : 0;
     }
 
@@ -211,6 +272,9 @@ int androidRunMain(string[] args)
         error("Could not locate or install adb. Install Android platform-tools or put adb in PATH.");
         return 1;
     }
+
+    if(artifact.endsWith(".apk"))
+        return runApk(adb, artifact, args[2 .. $]);
 
     string serial = selectDevice(adb);
     if(!serial.length)

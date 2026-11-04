@@ -49,22 +49,10 @@ private string findManagedNdk()
     return roots.length ? roots[$ - 1] : null;
 }
 
-private string findAndroidNdk()
+private string[] androidSdkRoots()
 {
     import redub.misc.path : buildNormalizedPath;
     import redub.parsers.environment : getEnvVariable;
-    import std.file : exists;
-
-    foreach(var; ["ANDROID_NDK_HOME", "ANDROID_NDK_ROOT", "ANDROID_NDK"])
-    {
-        string p = getEnvVariable(var);
-        if(p.length && exists(buildNormalizedPath(p, "toolchains")))
-            return p;
-    }
-
-    string managed = findManagedNdk();
-    if(managed.length)
-        return managed;
 
     string[] sdks;
     foreach(var; ["ANDROID_HOME", "ANDROID_SDK_ROOT"])
@@ -97,11 +85,65 @@ private string findAndroidNdk()
             sdks ~= buildNormalizedPath(home, "Android", "sdk");
         }
     }
+    return sdks;
+}
 
-    foreach(sdk; sdks)
+string findAndroidSdk()
+{
+    import redub.misc.path : buildNormalizedPath;
+    import std.file : exists;
+    import std.path : baseName, dirName;
+
+    string ndk = findAndroidNdk();
+    if(ndk.length)
+    {
+        string ndkDir = dirName(ndk);
+        if(baseName(ndkDir) == "ndk")
+            return dirName(ndkDir);
+    }
+    foreach(sdk; androidSdkRoots())
+        if(exists(sdk))
+            return sdk;
+    return null;
+}
+
+string findAndroidNdk()
+{
+    import redub.misc.path : buildNormalizedPath;
+    import redub.parsers.environment : getEnvVariable;
+    import std.file : exists;
+
+    foreach(var; ["ANDROID_NDK_HOME", "ANDROID_NDK_ROOT", "ANDROID_NDK"])
+    {
+        string p = getEnvVariable(var);
+        if(p.length && exists(buildNormalizedPath(p, "toolchains")))
+            return p;
+    }
+
+    string managed = findManagedNdk();
+    if(managed.length)
+        return managed;
+
+    foreach(sdk; androidSdkRoots())
         foreach(candidate; androidNdkCandidatesFrom(sdk))
             if(exists(buildNormalizedPath(candidate, "toolchains")))
                 return candidate;
+    return null;
+}
+
+string findAndroidNdkBin(string ndk)
+{
+    import redub.misc.path : buildNormalizedPath;
+    import std.file : exists, isDir, dirEntries, SpanMode;
+
+    if(!ndk.length)
+        return null;
+    string prebuilt = buildNormalizedPath(ndk, "toolchains", "llvm", "prebuilt");
+    if(!exists(prebuilt))
+        return null;
+    foreach(entry; dirEntries(prebuilt, SpanMode.shallow))
+        if(entry.isDir && exists(buildNormalizedPath(entry.name, "bin")))
+            return buildNormalizedPath(entry.name, "bin");
     return null;
 }
 

@@ -24,6 +24,7 @@ struct ProjectDetails
     bool bCreateSelections = true;
     BundleType bundle = BundleType.none;
     bool bundleGenerated = false;
+    string androidApk;
     bool cleanAll;
     int cleanOlderThanDays = -1;
 
@@ -619,6 +620,32 @@ ProjectDetails buildProject(ProjectDetails d)
 
     if(d.cDetails.outputDeps)
         d.tree.requirements.cfg.flags |= BuildConfigurationFlags.outputsDeps;
+
+    // Bundle preparation must happen before cache invalidation, so the cache
+    // hash reflects the final target type/output directory and flags.
+    string appImageBundleFolder;
+    string androidBundleFolder;
+    if(d.bundle != BundleType.none)
+    {
+        import redub.extensions.bundle;
+        import redub.extensions.android_bundle;
+        switch(d.bundle)
+        {
+            case BundleType.macos: 
+                string folder = prepareForMacOSBundleGen(d);
+                if(!d.bundleGenerated)
+                    generateMacOSBundle(folder, d);
+                break;
+            case BundleType.linux: 
+                appImageBundleFolder = prepareForAppImageBundle(d);
+                break;
+            case BundleType.android:
+                androidBundleFolder = prepareForAndroidBundleGen(d);
+                break;
+            default: throw new RedubException("Unknown bug occurred.");
+        }
+    }
+
     CompilingSession session = CompilingSession(d.compiler, d.cDetails.arch);
     const ResolvedBuildStrategy resolved = resolveBuildStrategy(
         d.tree.requirements.cfg, d.compiler, session,
@@ -663,23 +690,6 @@ ProjectDetails buildProject(ProjectDetails d)
         warn("Parallel build strategies ignored: target has no buildable output.");
     if(d.bCreateSelections)
         createSelectionsFile(tree);
-    string appImageBundleFolder;
-    if(d.bundle != BundleType.none)
-    {
-        import redub.extensions.bundle;
-        switch(d.bundle)
-        {
-            case BundleType.macos: 
-                string folder = prepareForMacOSBundleGen(d);
-                if(!d.bundleGenerated)
-                    generateMacOSBundle(folder, d);
-                break;
-            case BundleType.linux: 
-                appImageBundleFolder = prepareForAppImageBundle(d);
-                break;
-            default: throw new RedubException("Unknown bug occurred.");
-        }
-    }
     ///TODO: Might be reactivated if that issue shows again.
     // int uses = tree.isUsingGnuLinker();
     // if(uses != -1)
@@ -715,6 +725,11 @@ ProjectDetails buildProject(ProjectDetails d)
     {
         import redub.extensions.bundle;
         generateAppImageBundle(appImageBundleFolder, d);
+    }
+    if(d.bundle == BundleType.android && !d.bundleGenerated && androidBundleFolder.length)
+    {
+        import redub.extensions.android_bundle;
+        generateAndroidBundle(androidBundleFolder, d);
     }
 
     import redub.misc.file_size_format;
@@ -1278,8 +1293,10 @@ int executeProgram(ProjectDetails details, string[] args)
 
     if(tree.requirements.cfg.runCommand.length)
     {
-        string artifact = getOutputPath(tree.requirements.cfg,
-            details.cDetails.targetOS, details.cDetails.isa);
+        string artifact = details.bundle == BundleType.android && details.androidApk.length
+            ? details.androidApk
+            : getOutputPath(tree.requirements.cfg,
+                details.cDetails.targetOS, details.cDetails.isa);
         setEnvVariable("BUILD_ARTIFACT", artifact);
         import std.file : thisExePath;
         import std.algorithm.iteration : map;

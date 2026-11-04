@@ -8,7 +8,7 @@ import d_dependencies;
 
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.36.1";
+enum RedubVersionOnly = "v1.36.2";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -138,10 +138,11 @@ struct BundleConfiguration
 {
     BundleCategories[] categories;
     bool usesTerminal = true;
+    string[] permissions;
 
     immutable(BundleConfiguration) idup() const
     {
-        return BundleConfiguration(categories.dup, usesTerminal);
+        return BundleConfiguration(categories.dup, usesTerminal, permissions.dup);
     }
 }
 
@@ -677,6 +678,9 @@ struct BuildConfiguration
         ret.bundleConfig.categories = cast(BundleCategories[])categories;
         if(!other.bundleConfig.usesTerminal)
             ret.bundleConfig.usesTerminal = false;
+        string[] permissions = cast(string[])ret.bundleConfig.permissions;
+        exclusiveMerge(permissions, cast(string[])other.bundleConfig.permissions);
+        ret.bundleConfig.permissions = cast(string[])permissions;
         return ret;
     }
 

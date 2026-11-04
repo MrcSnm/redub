@@ -230,7 +230,8 @@ int runMain(string[] args, string[] runArgs)
     d = buildProject(d);
     if(!d.tree || d.usesExternalErrorCode)
         return d.getReturnCode;
-    if(d.tree.requirements.cfg.targetType != TargetType.executable)
+    if(d.tree.requirements.cfg.targetType != TargetType.executable
+        && !(d.bundle == BundleType.android && d.androidApk.length))
     {
         warnTitle("Warning: Unexpected Run", "Built target is an '", d.tree.requirements.cfg.targetType, "'not an executable. Build with 'redub build' to not get this warning message.'");
         return 1;

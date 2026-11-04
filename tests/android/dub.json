@@ -1,0 +1,8 @@
+{
+    "name": "androidhello",
+    "targetType": "dynamicLibrary",
+    "targetPath": "build",
+    "bundleConfiguration": {
+        "permissions": ["INTERNET", "android.permission.ACCESS_NETWORK_STATE"]
+    }
+}

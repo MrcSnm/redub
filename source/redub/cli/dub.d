@@ -44,7 +44,8 @@ enum BundleType
 {
     none,
     macos,
-    linux
+    linux,
+    android
 }
 
 struct DubCommonArguments
@@ -219,7 +220,7 @@ struct DubArguments
     @("[Experimental] Filter version identifiers and debug version identifiers to improve build cache efficiency.")
     string[] filterVersions;
 
-    @("Generates a bundle. Supported bundle types: none|macos|linux")
+    @("Generates a bundle. Supported bundle types: none|macos|linux|android")
     @("bundle")
     BundleType bundle = BundleType.none;
 
