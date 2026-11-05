@@ -1536,7 +1536,7 @@ install
     Usage: redub install <target> [<version>|help] [options]
     Description:
         Installs compilers and SDKs into the redub workspace.
-        Targets: ldc, dmd, opend, wasi-sdk, emsdk, android-ndk.
+        Targets: ldc, dmd, opend, wasi-sdk, emsdk, android-ndk, android-sdk.
         Run 'redub install --help' for versions, addons and examples.
 
 use

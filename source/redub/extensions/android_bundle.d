@@ -191,9 +191,10 @@ private string debugKeystore()
 private int runTool(string[] args, string what)
 {
     import redub.logging : error;
+    import redub.parsers.environment : getRedubEnv;
     import std.process : execute;
 
-    auto res = execute(args);
+    auto res = execute(args, getRedubEnv);
     if(res.status != 0)
     {
         error(what, " failed:\n", res.output);
@@ -207,9 +208,10 @@ private int runBat(string bat, string[] args, string what)
     version(Windows)
     {
         import redub.logging : error;
+        import redub.parsers.environment : getRedubEnv;
         import std.process : escapeShellCommand, executeShell;
 
-        auto res = executeShell(escapeShellCommand([bat] ~ args));
+        auto res = executeShell(escapeShellCommand([bat] ~ args), getRedubEnv);
         if(res.status != 0)
         {
             error(what, " failed:\n", res.output);
@@ -388,7 +390,7 @@ void generateAndroidBundle(string outputFolder, ref ProjectDetails d)
     string sdk = findAndroidSdk();
     if(!sdk.length)
     {
-        error("Android SDK not found; cannot package the APK. Set ANDROID_HOME/ANDROID_SDK_ROOT.");
+        error("Android SDK not found; cannot package the APK. Set ANDROID_HOME/ANDROID_SDK_ROOT or run 'redub install android-sdk'.");
         return;
     }
     string buildTools = findBuildTools(sdk);

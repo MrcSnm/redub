@@ -195,16 +195,16 @@ Since `v1.36.1`: use `redub --target=<name>`; a recipe target with the same name
 
 | Target | Addon | SDK | Environment | Run |
 | --- | --- | --- | --- | --- |
-| `windows`, `windows-i686`, `windows-arm64` | `windows` | — | — | native |
-| `macos`, `macos-arm64` | — | Apple tooling to link | — | native |
+| `windows`, `windows-i686`, `windows-arm64` | `windows` | N/A | N/A | native |
+| `macos`, `macos-arm64` | N/A | Apple tooling to link | N/A | native |
 | `android`, `android-armv7a`, `android-x86_64`, `android-i686` | `android` | NDK + SDK build-tools/platform | `ANDROID_NDK_HOME`, `CC`, `PATH` | `adb` push/run; APK via `--bundle=android` |
 | `wasi`, `wasi-p2` | `wasi` | WASI SDK | `WASI_SDK_PATH`, `CC`, `PATH` | `redub serve` (p2 needs `jco`) |
 | `emscripten` | `emscripten` | Emscripten SDK | `EMSDK`, `PATH`, `EMSDK_NODE`, `EMSDK_PYTHON` | `redub serve` with its `.js` glue |
-| `wasm`, `web` | — | — | — | `redub serve` |
+| `wasm`, `web` | N/A | N/A | N/A | `redub serve` |
 
 **Remarks**
 - **macOS:** compiles everywhere; linking needs Apple tooling. Use `--build=syntax` for a pure syntax check.
-- **Android:** redub finds the NDK via env/Android Studio paths or `redub install android-ndk`; `adb` (platform-tools) is auto-downloaded and `ANDROID_SERIAL` selects a device. APK requires `extern(C) void android_d_main(void*)`; `redub run --target=android --bundle=android` builds, installs, starts and streams `logcat`. The APK uses the redub icon; permissions go in `"bundleConfiguration": { "permissions": ["INTERNET"] }`. `redub init --android <dir>` creates an OpenGL ES + touch template (`bundleConfiguration.opengl = true`, callbacks `redub_android_init/draw/touch/destroy`). The selected bridge lives in `android/glue/source/redub_{minimal,opengl}_bridge.c`, next to the glue sources; the glue C project is created in `android/glue` (edit its `dub.json` flags or add sources under `source/`); redub builds it only for Android bundles and caches the result. See `tests/android`.
+- **Android:** redub finds the NDK via env/Android Studio paths or `redub install android-ndk`; `redub install android-sdk` installs platform-tools, build-tools, a platform and a JDK 17 when none is found (all in the workspace and found automatically); `adb` (platform-tools) is auto-downloaded and `ANDROID_SERIAL` selects a device. APK requires `extern(C) void android_d_main(void*)`; `redub run --target=android --bundle=android` builds, installs, starts and streams `logcat`. The APK uses the redub icon; permissions go in `"bundleConfiguration": { "permissions": ["INTERNET"] }`. `redub init --android <dir>` creates an OpenGL ES + touch template (`bundleConfiguration.opengl = true`, callbacks `redub_android_init/draw/touch/destroy`). The selected bridge lives in `android/glue/source/redub_{minimal,opengl}_bridge.c`, next to the glue sources; the glue C project is created in `android/glue` (edit its `dub.json` flags or add sources under `source/`); redub builds it only for Android bundles and caches the result. See `tests/android`.
 - **WASI:** install the SDK with `redub install wasi-sdk`; p1 runs in the browser via `redub serve`; p2 outputs are components, transpile with `jco`.
 - **Emscripten:** install with `redub install emsdk`; no system Python needed.
 - **wasm/web:** no SDK; links with `--no-entry` and `--allow-undefined`, so use `-betterC` or provide an entry point/runtime. `env.js` can provide JS imports for `extern(C)`; builds create a template in the project root.

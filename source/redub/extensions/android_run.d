@@ -4,6 +4,7 @@ version(RedubCLI):
 
 private string findAdb()
 {
+    import redub.api : getDubWorkspacePath;
     import redub.misc.find_executable : findExecutable;
     import redub.misc.path : buildNormalizedPath;
     import redub.parsers.environment : getEnvVariable;
@@ -20,6 +21,7 @@ private string findAdb()
         if(base.length)
             sdks ~= base;
     }
+    sdks ~= buildNormalizedPath(getDubWorkspacePath, "redub-android", "android-sdk");
     version(Windows)
     {
         string local = getEnvVariable("LOCALAPPDATA");
