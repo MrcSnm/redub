@@ -214,6 +214,23 @@ void setupAndroidEnvironment(string arch)
     string path = getEnvVariable("PATH");
     if(path.indexOf(bin) == -1)
         setEnvVariable("PATH", bin ~ pathSeparator ~ path);
+
+    // Windows resolves executables from the process PATH, not from the
+    // environment block passed to the child. Persist the absolute NDK
+    // archiver so C builds work with or without an Android bundle.
+    version(Windows)
+        string arName = "llvm-ar.exe";
+    else
+        string arName = "llvm-ar";
+    string ar = buildNormalizedPath(bin, arName);
+    if(exists(ar))
+    {
+        import redub.meta : getRedubMeta;
+        import redub.tooling.archiver_identification : AcceptedArchiver, Archiver, saveArchiver;
+        auto meta = getRedubMeta();
+        saveArchiver(meta, Archiver(AcceptedArchiver.llvmAr, ar));
+    }
+
     vlog("Android NDK: ", ndk, " (CC=", compiler, ")");
 }
 
@@ -243,9 +260,9 @@ private void makeToolchainExecutable(string installRoot)
 ///Installs an official Android NDK into the redub workspace.
 bool installAndroidNdk(string ndkVersion = DefaultAndroidNdkVersion)
 {
-    import d_downloader : downloadToFile;
     import redub.api : getDubWorkspacePath;
     import redub.logging : error, info, infos;
+    import redub.misc.download : downloadWithProgress;
     import redub.misc.find_executable : findExecutable;
     import redub.misc.path : buildNormalizedPath;
     import std.file : exists, mkdirRecurse, remove, tempDir;
@@ -285,7 +302,7 @@ bool installAndroidNdk(string ndkVersion = DefaultAndroidNdkVersion)
         mkdirRecurse(workspace);
     info("Downloading Android NDK ", v, " from ", url);
     try
-        downloadToFile(url, archive);
+        downloadWithProgress(url, archive);
     catch(Exception e)
     {
         error("Could not download Android NDK: ", e.msg);

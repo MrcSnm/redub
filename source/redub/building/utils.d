@@ -128,7 +128,7 @@ auto executeArchiver(const ThreadBuildData data, CompilingSession s, string main
 
     string cacheDir = getCacheOutputDir(mainPackHash, data.cfg, s, data.extra.isRoot);
 
-    putSourceFiles(cmd, null, [cacheDir], data.cfg.sourceFiles, data.cfg.excludeSourceFiles, ".o", ".obj");
+    putSourceFiles(cmd, null, [cacheDir], null, data.cfg.excludeSourceFiles, ".o", ".obj");
 
     return execute(cmd, data.env);
 }

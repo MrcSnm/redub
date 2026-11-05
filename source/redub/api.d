@@ -346,6 +346,9 @@ private int createAndroidProject(string path, string projectName, string userNam
     string sourceDir = buildNormalizedPath(path, "source");
     mkdirRecurse(sourceDir);
     write(buildNormalizedPath(sourceDir, "android_app.d"), source);
+    import redub.extensions.android_bundle : createAndroidGlueProject;
+    import redub.misc.android_install : findAndroidNdk;
+    createAndroidGlueProject(path, true, findAndroidNdk());
     if(!exists(gitIgnorePath))
         write(gitIgnorePath, gitIgnore);
     write(targetDub, json);
@@ -688,7 +691,6 @@ ProjectDetails buildProject(ProjectDetails d)
             default: throw new RedubException("Unknown bug occurred.");
         }
     }
-
     CompilingSession session = CompilingSession(d.compiler, d.cDetails.arch);
     const ResolvedBuildStrategy resolved = resolveBuildStrategy(
         d.tree.requirements.cfg, d.compiler, session,
@@ -1181,6 +1183,36 @@ ProjectDetails resolveDependencies(
         res.mainRequirement.cfg = res.mainRequirement.cfg.merge(redub.parsers.environment.parse());
 
     res.mainRequirement.cfg = res.mainRequirement.cfg.merge(redub.parsers.build_type.parse(buildType, cBin));
+
+    if(resolveInfo.bundle == BundleType.android && res.targetCompilationInfo.targetOS == OS.android)
+    {
+        import redub.extensions.android_bundle : createAndroidGlueProject;
+        import redub.misc.android_install : findAndroidNdk;
+        import redub.misc.path : buildNormalizedPath;
+
+        string ndk = findAndroidNdk();
+        string glueDir = buildNormalizedPath(proj.workingDir, "android", "glue");
+        bool alreadyAdded;
+        foreach(dep; res.mainRequirement.dependencies)
+            if(dep.name == "redub_android_glue")
+            {
+                alreadyAdded = true;
+                break;
+            }
+        if(ndk.length && !alreadyAdded)
+        {
+            createAndroidGlueProject(proj.workingDir, res.mainRequirement.cfg.bundleConfig.opengl, ndk);
+            import redub.parsers.environment : setEnvVariable;
+            setEnvVariable("DUB_ARCH", res.mainRequirement.cfg.arch);
+            import redub.package_searching.cache : findPackage;
+            Dependency glue;
+            glue.name = "redub_android_glue";
+            glue.path = glueDir;
+            glue.version_ = null;
+            glue.pkgInfo = findPackage("redub_android_glue", null, null, res.mainRequirement.name, glueDir);
+            res.mainRequirement.dependencies ~= glue;
+        }
+    }
 
     ProjectNode tree = getProjectTree(res);
 

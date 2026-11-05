@@ -11,9 +11,10 @@ import redub.command_generators.automatic;
 import redub.command_generators.commons;
 import redub.tooling.compiler_identification;
 import std.parallelism : TaskPool, totalCPUs;
-import std.file : exists, mkdirRecurse, readText, remove;
+import std.file : exists, mkdirRecurse, readText, remove, rmdirRecurse, write;
 import std.path : buildNormalizedPath, baseName, stripExtension;
-import std.string : endsWith, splitLines, split, startsWith;
+import std.string : endsWith, splitLines, split, startsWith, strip;
+import std.algorithm.searching : canFind;
 import std.array : join;
 import std.datetime.stopwatch : StopWatch, AutoStart;
 import std.conv : to;
@@ -120,6 +121,7 @@ RootObjectResult buildRootObjects(ProjectNode root, CompilingSession s, string m
     string cacheDir = getCacheOutputDir(mainPackHash, root.requirements, s);
     string objDir = getObjectDir(cacheDir);
     mkdirRecurse(cacheDir);
+    mkdirRecurse(objDir);
 
     ImportScanContext ctx = makeImportScanContext(s, cfg);
 
@@ -130,6 +132,40 @@ RootObjectResult buildRootObjects(ProjectNode root, CompilingSession s, string m
         cfg.excludeSourceFiles, ctx, true);
     if(graph.modules.length == 0)
         throw new RedubException("No D modules found for object build in " ~ cfg.workingDir);
+
+    ///A test build needs exactly one module with `-main`. Keep the selected
+    ///module stable and drop the previous one if the module set changes.
+    string mainModule;
+    string mainMarker;
+    bool hasMain = cfg.isUnittest() && cfg.dFlags.canFind("-main");
+    if(hasMain)
+    {
+        import std.algorithm.sorting : sort;
+        string[] names = graph.compileOrder;
+        names.sort;
+        mainModule = names[0];
+        mainMarker = buildNormalizedPath(objDir, ".redub-main-module");
+        string previousMain = exists(mainMarker) ? strip(readText(mainMarker)) : null;
+        if(previousMain != mainModule)
+        {
+            if(previousMain.length)
+            {
+                string oldObject = objectPath(objDir, previousMain, s.os);
+                if(exists(oldObject))
+                    remove(oldObject);
+            }
+            else
+            {
+                ///A missing marker cannot tell which old object owns `-main`.
+                rmdirRecurse(objDir);
+                mkdirRecurse(objDir);
+            }
+            string newObject = objectPath(objDir, mainModule, s.os);
+            if(exists(newObject))
+                remove(newObject);
+        }
+    }
+
     bool[string] changed;
     const(string[]) dirtyFiles = root.getDirtyFiles();
     bool dirtyTruncated = root.isDirtyTruncated();
@@ -262,6 +298,14 @@ RootObjectResult buildRootObjects(ProjectNode root, CompilingSession s, string m
             auto mod = graph.byName[build.name];
             string[] flags = getCompilationFlags(cfg, s, mainPackHash, true, false,
                 build.objectPath, mod.modPath);
+            if(hasMain && build.name != mainModule)
+            {
+                string[] filtered;
+                foreach(flag; flags)
+                    if(flag != "-main")
+                        filtered ~= flag;
+                flags = filtered;
+            }
             build.status = runCompiler(cfg, s.compiler, flags, env, build.command, build.output);
         }
     }
@@ -325,6 +369,8 @@ RootObjectResult buildRootObjects(ProjectNode root, CompilingSession s, string m
         }
     }
     copyDir(cacheDir, cfg.outputDirectory);
+    if(mainMarker.length)
+        write(mainMarker, mainModule);
     result.msNeeded = sw.peek.total!"msecs";
     if(cfg.buildStats)
         recordBuildTiming(mainPackHash,

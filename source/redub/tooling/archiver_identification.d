@@ -71,6 +71,10 @@ Archiver getArchiver(AcceptedArchiver archiver, const string[string] env)
         }
     }
     catch(ProcessException) {}
+    ///Some NDK clang distributions ship llvm-lib but its help probe fails.
+    ///The same toolchain always has llvm-ar, so fall back to it.
+    if(archiver == AcceptedArchiver.llvmLib)
+        return getArchiver(AcceptedArchiver.llvmAr, env);
     return Archiver(AcceptedArchiver.none);
 }
 

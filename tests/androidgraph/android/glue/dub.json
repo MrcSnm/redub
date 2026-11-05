@@ -1,0 +1,11 @@
+{
+    "name": "redub_android_glue",
+    "language": "C",
+    "targetType": "staticLibrary",
+    "targetName": "redub_android_glue",
+    "targetPath": "build",
+    "sourcePaths": ["source"],
+    "dflags": ["--target=$DUB_ARCH", "-fPIC"],
+    "libs": ["android", "log"],
+    "lflags": ["--undefined=ANativeActivity_onCreate"]
+}

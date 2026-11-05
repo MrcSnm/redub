@@ -1,4 +1,4 @@
-#include <android_native_app_glue.h>
+#include "android_native_app_glue.h"
 #include <android/input.h>
 #include <EGL/egl.h>
 #include <GLES2/gl2.h>
@@ -126,7 +126,7 @@ static void engine_draw_frame(struct redub_engine* state)
     eglSwapBuffers(state->display, state->surface);
 }
 
-void redub_android_main(struct android_app* app)
+void android_main(struct android_app* app)
 {
     rt_init();
     app->userData = &engine;

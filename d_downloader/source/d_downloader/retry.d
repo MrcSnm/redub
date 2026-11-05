@@ -8,7 +8,7 @@ class NonRetryableException : Exception
     }
 }
 
-ubyte[] downloadWithRetries(ubyte[] delegate() download)
+void downloadWithRetries(scope void delegate() download)
 {
     import core.thread : Thread;
     import core.time : dur;
@@ -20,18 +20,19 @@ ubyte[] downloadWithRetries(ubyte[] delegate() download)
             Thread.sleep(dur!"seconds"(retryDelays[attempt - 1]));
         try
         {
-            ubyte[] content = download();
-            if(content.length)
-                return content;
+            download();
+            return;
+        }
+        catch(NonRetryableException e)
+        {
+            throw e;
         }
         catch(Exception e)
         {
-            if(cast(NonRetryableException)e !is null)
-                throw e;
             lastError = e;
         }
     }
     if(lastError !is null)
         throw lastError;
-    throw new Exception("Empty response received after retries.");
+    throw new Exception("Download failed.");
 }

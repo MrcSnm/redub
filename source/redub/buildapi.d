@@ -8,7 +8,7 @@ import d_dependencies;
 
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.36.2";
+enum RedubVersionOnly = "v1.36.3";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -609,11 +609,15 @@ struct BuildConfiguration
             ret.extraDependencyFiles.exclusiveMergePaths(other.extraDependencyFiles);
         }
         ret.excludeSourceFiles.exclusiveMerge(other.excludeSourceFiles);
-        ret.stringImportPaths.exclusiveMergePaths(other.stringImportPaths);
-        ret.importDirectories.exclusiveMergePaths(other.importDirectories);
+        ///D flags/imports are not valid for C/C++ dependencies and vice versa.
+        if(ret.language == other.language)
+        {
+            ret.stringImportPaths.exclusiveMergePaths(other.stringImportPaths);
+            ret.importDirectories.exclusiveMergePaths(other.importDirectories);
+            ret.dFlags.exclusiveMerge(other.dFlags);
+        }
         ret.versions.exclusiveMerge(other.versions);
         ret.debugVersions.exclusiveMerge(other.debugVersions);
-        ret.dFlags.exclusiveMerge(other.dFlags);
         ret.libraries.exclusiveMerge(other.libraries);
         ret.frameworks.exclusiveMerge(other.frameworks);
         ret.libraryPaths.exclusiveMergePaths(other.libraryPaths);
@@ -1290,10 +1294,13 @@ class ProjectNode
                 dfs.pop();
                 foreach(dep; node.dependencies)
                 {
-                    dep.requirements.cfg = dep.requirements.cfg.mergeDFlags(node.requirements.cfg)
+                    dep.requirements.cfg = dep.requirements.cfg
                         .mergeVersions(node.requirements.cfg)
                         .mergeDebugVersions(node.requirements.cfg)
                         .mergeFlags(node.requirements.cfg);
+                    ///D flags are not valid for C/C++ dependencies (and vice versa).
+                    if(dep.requirements.cfg.language == node.requirements.cfg.language)
+                        dep.requirements.cfg = dep.requirements.cfg.mergeDFlags(node.requirements.cfg);
                 }
                 foreach_reverse(dep; node.dependencies)
                     dfs.push(dep);
@@ -1418,10 +1425,14 @@ class ProjectNode
         {
             import redub.misc.path;
             vvlog("Merge ", input.name, " ---> ", target.name);
-            target.requirements.cfg = target.requirements.cfg.mergeImport(input.requirements.cfg);
-            target.requirements.cfg = target.requirements.cfg.mergeStringImport(input.requirements.cfg);
             target.requirements.cfg = target.requirements.cfg.mergeVersions(input.requirements.cfg);
-            target.requirements.cfg = target.requirements.cfg.mergeFilteredDflags(input.requirements.cfg);
+            ///Do not leak import dirs/flags between C/C++ and D.
+            if(target.requirements.cfg.language == input.requirements.cfg.language)
+            {
+                target.requirements.cfg = target.requirements.cfg.mergeImport(input.requirements.cfg);
+                target.requirements.cfg = target.requirements.cfg.mergeStringImport(input.requirements.cfg);
+                target.requirements.cfg = target.requirements.cfg.mergeFilteredDflags(input.requirements.cfg);
+            }
             if(input !in linkPropagated)
             {
                 linkPropagated[input] = true;
@@ -1801,7 +1812,7 @@ enum ProjectType
     CPP
 }
 
-private TargetType inferTargetType(const ProjectNode node)
+TargetType inferTargetType(const ProjectNode node)
 {
     static immutable string[] filesThatInfersExecutable = ["app.d", "main.d", "app.c", "main.c"];
     import redub.misc.path;

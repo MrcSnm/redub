@@ -330,7 +330,9 @@ int testMain(string[] args, string[] runArgs)
         return d.getReturnCode();
     import redub.parsers.build_type;
     d.tree.requirements.cfg = d.tree.requirements.cfg.merge(parse(BuildType.unittest_, d.tree.requirements.cfg.getCompiler(d.compiler)));
-    d.tree.requirements.cfg.dFlags~= "-main";
+    TargetType testTarget = d.tree.requirements.cfg.targetType == TargetType.autodetect
+        ? inferTargetType(d.tree) : d.tree.requirements.cfg.targetType;
+    bool needsMain = testTarget != TargetType.executable;
     d.tree.requirements.cfg.targetType = TargetType.executable;
     d.tree.requirements.cfg.targetName~= "-test-";
 
@@ -338,6 +340,9 @@ int testMain(string[] args, string[] runArgs)
         d.tree.requirements.cfg.targetName~= d.tree.requirements.configuration.name;
     else
         d.tree.requirements.cfg.targetName~= "library";
+
+    if(needsMain)
+        d.tree.requirements.cfg.dFlags ~= "-main";
 
     d = buildProject(d);
     if(d.error)

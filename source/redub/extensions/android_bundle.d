@@ -1,7 +1,7 @@
 module redub.extensions.android_bundle;
 
 import redub.api;
-import std.string : indexOf;
+import std.string : indexOf, replace;
 
 private immutable string redubAppIcon = import("redub_program.png");
 
@@ -14,6 +14,12 @@ private string androidExeSuffix()
 {
     version(Windows) return ".exe";
     else return "";
+}
+
+private string escapeJson(string value)
+{
+    import std.string : replace;
+    return value.replace(`\`, `\\`).replace(`"`, `\"`);
 }
 
 private string androidAbi(string arch)
@@ -248,13 +254,57 @@ private int createDebugKeystore(string keystore)
     ], "keytool");
 }
 
+void createAndroidGlueProject(string projectRoot, bool opengl, string ndk = null)
+{
+    import redub.misc.path : buildNormalizedPath;
+    import std.conv : text;
+    import std.file : copy, exists, mkdirRecurse, write;
+
+    string mode = opengl ? "opengl" : "minimal";
+    string androidDir = buildNormalizedPath(projectRoot, "android");
+    string glueDir = buildNormalizedPath(androidDir, "glue");
+    string sourceDir = buildNormalizedPath(glueDir, "source");
+    string bridgePath = buildNormalizedPath(sourceDir, "redub_" ~ mode ~ "_bridge.c");
+    if(!exists(androidDir))
+        mkdirRecurse(androidDir);
+    if(!exists(sourceDir))
+        mkdirRecurse(sourceDir);
+    if(!exists(bridgePath))
+        write(bridgePath, opengl ? androidOpenGlBridgeSource : androidBridgeSource);
+
+    string recipePath = buildNormalizedPath(glueDir, "dub.json");
+    if(!exists(recipePath))
+        write(recipePath, i`{
+    "name": "redub_android_glue",
+    "language": "C",
+    "targetType": "staticLibrary",
+    "targetName": "redub_android_glue",
+    "targetPath": "build",
+    "sourcePaths": ["source"],
+    "dflags": ["--target=$DUB_ARCH", "-fPIC"],
+    "libs": ["android", "log"],
+    "lflags": ["--undefined=ANativeActivity_onCreate"]
+}`.text);
+
+    if(ndk.length)
+    {
+        string ndkGlueDir = buildNormalizedPath(ndk, "sources", "android", "native_app_glue");
+        foreach(file; ["android_native_app_glue.c", "android_native_app_glue.h"])
+        {
+            string from = buildNormalizedPath(ndkGlueDir, file);
+            string to = buildNormalizedPath(sourceDir, file);
+            if(exists(from) && !exists(to))
+                copy(from, to);
+        }
+    }
+}
+
 string prepareForAndroidBundleGen(ref ProjectDetails d)
 {
-    import redub.logging : error, info, vlog;
     import redub.misc.android_install : findAndroidNdk, findAndroidNdkBin;
     import redub.misc.path : buildNormalizedPath;
-    import std.file : exists, getSize, mkdirRecurse, remove, write;
-    import std.process : execute;
+    import redub.tooling.compiler_identification : getCompiler;
+    import std.file : exists, mkdirRecurse;
     import std.string : indexOf;
 
     ref cfg = d.tree.requirements.cfg;
@@ -268,10 +318,11 @@ string prepareForAndroidBundleGen(ref ProjectDetails d)
     string bin = findAndroidNdkBin(ndk);
     if(!bin.length)
         throw new RedubException("Could not find the LLVM toolchain inside the Android NDK at '"~ndk~"'.");
-    string glueDir = buildNormalizedPath(ndk, "sources", "android", "native_app_glue");
-    string glueC = buildNormalizedPath(glueDir, "android_native_app_glue.c");
-    if(!exists(glueC))
-        throw new RedubException("Could not find android_native_app_glue.c in '"~glueDir~"'.");
+    string clang = buildNormalizedPath(bin, "clang" ~ androidExeSuffix);
+    Compiler ndkCompiler = getCompiler(d.compiler.d.bin, clang, d.cDetails.assumption, arch);
+    d.compiler.c = ndkCompiler.c;
+    d.cDetails.arch = arch;
+    d.cDetails.cCompilerOrPath = clang;
 
     string originalOutput = d.tree.getOutputPath();
     string staging = buildNormalizedPath(originalOutput, "android");
@@ -282,71 +333,12 @@ string prepareForAndroidBundleGen(ref ProjectDetails d)
     if(!exists(soDir))
         mkdirRecurse(soDir);
 
-    import redub.building.cache : getCacheFolder;
-    import std.file : readText, timeLastModified;
-    import std.path : baseName;
-
-    string clang = buildNormalizedPath(bin, "clang" ~ androidExeSuffix);
-    string ar = buildNormalizedPath(bin, "llvm-ar" ~ androidExeSuffix);
-    string glueCache = buildNormalizedPath(getCacheFolder(), "android-glue",
-        baseName(ndk) ~ "-" ~ arch ~ "-" ~ (cfg.bundleConfig.opengl ? "gl" : "plain") ~ "-v1");
-    if(!exists(glueCache))
-        mkdirRecurse(glueCache);
-    string obj = buildNormalizedPath(glueCache, "android_native_app_glue.o");
-    string bridgeC = buildNormalizedPath(glueCache, "redub_android_bridge.c");
-    string bridgeObj = buildNormalizedPath(glueCache, "redub_android_bridge.o");
-    string glueLib = buildNormalizedPath(glueCache, "libredub_android_glue.a");
-
-    string bridgeSource = cfg.bundleConfig.opengl
-        ? androidOpenGlBridgeSource : androidBridgeSource;
-    bool bridgeChanged = true;
-    if(exists(bridgeC))
-        try
-            bridgeChanged = readText(bridgeC) != bridgeSource;
-        catch(Exception) {}
-    if(bridgeChanged)
-        write(bridgeC, bridgeSource);
-
-    bool upToDate = exists(glueLib)
-        && timeLastModified(glueLib) >= timeLastModified(glueC)
-        && timeLastModified(glueLib) >= timeLastModified(bridgeC);
-    if(upToDate)
-        vlog("Android glue is up to date.");
-    else
-    {
-        info("Compiling android_native_app_glue.c...");
-        auto compile = execute([clang, "--target=" ~ arch, "-fPIC", "-c",
-            "-Dandroid_main=redub_android_main",
-            "-I" ~ glueDir, "-o", obj, glueC]);
-        if(compile.status != 0)
-            throw new RedubException("Could not compile android_native_app_glue.c:\n" ~ compile.output);
-        if(!exists(obj) || getSize(obj) == 0)
-            throw new RedubException("android_native_app_glue.c did not produce an object file.");
-        auto bridgeCompile = execute([clang, "--target=" ~ arch, "-fPIC", "-c",
-            "-I" ~ glueDir, "-o", bridgeObj, bridgeC]);
-        if(bridgeCompile.status != 0)
-            throw new RedubException("Could not compile the Android runtime bridge:\n" ~ bridgeCompile.output);
-        if(!exists(bridgeObj) || getSize(bridgeObj) == 0)
-            throw new RedubException("The Android runtime bridge did not produce an object file.");
-        if(exists(glueLib))
-            remove(glueLib);
-        if(runTool([ar, "rcs", glueLib, obj, bridgeObj], "llvm-ar") != 0)
-            throw new RedubException("Could not create the Android glue static library.");
-        if(!exists(glueLib) || getSize(glueLib) == 0)
-            throw new RedubException("The Android glue static library was not created.");
-    }
-
     cfg.targetType = TargetType.dynamicLibrary;
     cfg.targetName = "main";
     cfg.outputDirectory = soDir;
     // Package the D runtime inside libmain.so; the APK does not ship the
     // phobos/druntime shared objects.
     cfg.dFlags ~= "-link-defaultlib-shared=false";
-    cfg.libraryPaths ~= glueCache;
-    cfg.libraries ~= ["redub_android_glue", "android", "log"];
-    // The glue object is only pulled from the static archive when its entry
-    // point is explicitly requested by the linker.
-    cfg.linkFlags ~= "--undefined=ANativeActivity_onCreate";
     return originalOutput;
 }
 

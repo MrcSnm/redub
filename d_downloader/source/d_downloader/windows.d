@@ -2,50 +2,49 @@ module d_downloader.windows;
 version(Windows):
 import core.sys.windows.winhttp;
 
-bool download(string link, scope ubyte[] delegate(size_t incomingBytes, bool isIncomingContentLength) bufferSink, scope void delegate(ubyte[] buffer) onDataReceived = null)
+private void downloadStream(string link,
+    scope void delegate(ubyte[] data) onData,
+    scope void delegate(size_t received, size_t total) onProgress = null)
 {
-    import std.utf:toUTF16z;
+    import std.utf : toUTF16z;
     import core.sys.windows.windef;
+    import core.sys.windows.winhttp;
     import d_downloader.retry : NonRetryableException;
+
     HINTERNET hSession = WinHttpOpen("D-Downloader/1.0",
         WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
         WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
-
-    if (!hSession)
-        return false;
+    if(!hSession)
+        throw new Exception("Could not initialize the WinHTTP session.");
+    scope(exit) WinHttpCloseHandle(hSession);
     WinHttpSetTimeouts(hSession, 10_000, 10_000, 30_000, 30_000);
-    scope(exit)
-        WinHttpCloseHandle(hSession);
 
-    NetURL url = NetURL(link);
-
+    NetURL parsed = NetURL(link);
     uint[1] protocols = [WINHTTP_FLAG_SECURE_PROTOCOL_TLS1_2];
-    WinHttpSetOption(hSession, WINHTTP_OPTION_SECURE_PROTOCOLS, protocols.ptr, protocols.length);
-    HINTERNET hConnect = WinHttpConnect(hSession, url.domain.toUTF16z,
+    WinHttpSetOption(hSession, WINHTTP_OPTION_SECURE_PROTOCOLS,
+        protocols.ptr, protocols.length);
+
+    HINTERNET hConnect = WinHttpConnect(hSession, parsed.domain.toUTF16z,
         INTERNET_DEFAULT_HTTPS_PORT, 0);
-    scope(exit)
-        WinHttpCloseHandle(hConnect);
-
-    HINTERNET hRequest = WinHttpOpenRequest(hConnect, "GET", url.object.toUTF16z,
-        null, WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES,
-        WINHTTP_FLAG_SECURE);
-
+    scope(exit) WinHttpCloseHandle(hConnect);
+    HINTERNET hRequest = WinHttpOpenRequest(hConnect, "GET", parsed.object.toUTF16z,
+        null, WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES, WINHTTP_FLAG_SECURE);
     if(hRequest is null)
         throwWindowsError();
-
-    scope(exit)
-        WinHttpCloseHandle(hRequest);
+    scope(exit) WinHttpCloseHandle(hRequest);
 
     if(!WinHttpSendRequest(hRequest, WINHTTP_NO_ADDITIONAL_HEADERS, 0,
-                           WINHTTP_NO_REQUEST_DATA, 0, 0, 0))
+        WINHTTP_NO_REQUEST_DATA, 0, 0, 0))
         throwWindowsError();
     if(!WinHttpReceiveResponse(hRequest, null))
         throwWindowsError();
 
     DWORD statusCode;
     DWORD statusCodeLength = DWORD.sizeof;
-    if(WinHttpQueryHeaders(hRequest, cast(DWORD)(WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER),
-        WINHTTP_HEADER_NAME_BY_INDEX, &statusCode, &statusCodeLength, WINHTTP_NO_HEADER_INDEX))
+    if(WinHttpQueryHeaders(hRequest,
+        cast(DWORD)(WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER),
+        WINHTTP_HEADER_NAME_BY_INDEX, &statusCode, &statusCodeLength,
+        WINHTTP_NO_HEADER_INDEX))
     {
         import std.conv : to;
         if(statusCode >= 500 || statusCode == 408 || statusCode == 429)
@@ -54,53 +53,95 @@ bool download(string link, scope ubyte[] delegate(size_t incomingBytes, bool isI
             throw new NonRetryableException("HTTP " ~ statusCode.to!string);
     }
 
-    DWORD remainingDataSize = 0;
+    size_t total;
     wchar[256] headerBuffer = void;
     uint headerLength = headerBuffer.length * wchar.sizeof;
-    size_t contentLength;
-    if(WinHttpQueryHeaders(hRequest, WINHTTP_QUERY_CONTENT_LENGTH, null, headerBuffer.ptr, &headerLength, null))
+    if(WinHttpQueryHeaders(hRequest, WINHTTP_QUERY_CONTENT_LENGTH, null,
+        headerBuffer.ptr, &headerLength, null))
     {
-        import std.string;
-        import std.conv:to;
-        contentLength = strip(headerBuffer[0..headerLength/wchar.sizeof]).to!size_t;
+        import std.string : strip;
+        import std.conv : to;
+        total = strip(headerBuffer[0 .. headerLength / wchar.sizeof]).to!size_t;
     }
-    ubyte[] buffer = contentLength != 0 ? bufferSink(contentLength, true) : null;
-    uint bytesRead;
-    do {
-        if (!WinHttpQueryDataAvailable(hRequest, &remainingDataSize))
+
+    ubyte[64 * 1024] chunk;
+    size_t received;
+    while(true)
+    {
+        DWORD remaining;
+        if(!WinHttpQueryDataAvailable(hRequest, &remaining))
             throwWindowsError();
-        if (!remainingDataSize)
+        if(!remaining)
             break;
-
-        DWORD dwRead = 0;
-        ubyte[] tempBuffer;
-        if(buffer is null)
-            tempBuffer = bufferSink(remainingDataSize, false);
-        else
-        {
-            import std.exception;
-            enforce(bytesRead + remainingDataSize <= buffer.length, "Buffer set with Content-Length was not enough.");
-            tempBuffer = buffer[bytesRead..$];
-        }
-
-        assert(tempBuffer.length < DWORD.max, "Buffer sink length is too big.");
-        if (!WinHttpReadData(hRequest, tempBuffer.ptr, cast(DWORD)tempBuffer.length, &dwRead))
+        DWORD toRead = cast(DWORD)(remaining > chunk.length ? chunk.length : remaining);
+        DWORD read;
+        if(!WinHttpReadData(hRequest, chunk.ptr, toRead, &read))
             throwWindowsError();
-        bytesRead+= dwRead;
-        if(onDataReceived)
-            onDataReceived(tempBuffer[0..dwRead]);
-    } while (remainingDataSize > 0);
-
-    if(contentLength != 0 && bytesRead != contentLength)
+        if(read)
+        {
+            onData(chunk[0 .. read]);
+            received += read;
+            if(onProgress)
+                onProgress(received, total);
+        }
+    }
+    if(total && received != total)
     {
         import std.conv : to;
-        throw new Exception("Incomplete download: received " ~ bytesRead.to!string ~
-            " of " ~ contentLength.to!string ~ " bytes.");
+        throw new Exception("Incomplete download: received " ~ received.to!string ~
+            " of " ~ total.to!string ~ " bytes.");
     }
-
-    return true;
 }
 
+ubyte[] downloadToBuffer(string url)
+{
+    import d_downloader.retry : downloadWithRetries;
+
+    ubyte[] buffer;
+    size_t processed;
+    downloadWithRetries({
+        buffer.length = 0;
+        processed = 0;
+        downloadStream(url, (ubyte[] data)
+        {
+            if(buffer.length < processed + data.length)
+                buffer.length = processed + data.length;
+            buffer[processed .. processed + data.length] = data;
+            processed += data.length;
+        });
+        if(processed == 0)
+            throw new Exception("Empty response received.");
+    });
+    return buffer;
+}
+
+void downloadToFile(string url, string targetFile, bool lowMem = false)
+{
+    downloadToFile(url, targetFile, cast(void delegate(size_t, size_t)) null);
+}
+
+void downloadToFile(string url, string targetFile,
+    void delegate(size_t received, size_t total) onProgress)
+{
+    import std.stdio : File;
+    import std.file : exists, getSize, rename;
+    import d_downloader.retry : downloadWithRetries;
+
+    string newFile = targetFile;
+    if(exists(targetFile))
+        newFile ~= ".temp";
+
+    downloadWithRetries({
+        File file = File(newFile, "wb");
+        scope(exit) file.close();
+        downloadStream(url, (ubyte[] data) => file.rawWrite(data), onProgress);
+        if(getSize(newFile) == 0)
+            throw new Exception("Empty response received.");
+    });
+
+    if(newFile != targetFile)
+        rename(newFile, targetFile);
+}
 
 private void throwWindowsError()
 {
@@ -137,66 +178,6 @@ private void throwWindowsError()
     }
     throw new Exception(msg);
 
-}
-
-ubyte[] downloadToBuffer(string url)
-{
-    import d_downloader.retry : downloadWithRetries;
-    return downloadWithRetries({
-        ubyte[] buffer;
-        size_t processed = 0;
-        if(!download(url, (size_t incomingBytes, bool isIncomingContentLength)
-        {
-            if(isIncomingContentLength)
-            {
-                buffer.length = incomingBytes;
-                processed = incomingBytes;
-                return buffer[0..incomingBytes];
-            }
-            else //Grow in 75% more than what it needs
-            {
-                if(buffer.length < processed + incomingBytes)
-                    buffer.length = cast(size_t)((processed + incomingBytes) * 1.75);
-                auto ret = buffer[processed..processed+incomingBytes];
-                processed+= incomingBytes;
-                return ret;
-            }
-        }))
-            throw new Exception("Could not initialize the WinHTTP session.");
-        buffer.length = processed;
-        return buffer;
-    });
-}
-
-void downloadToFile(string url, string targetFile, bool lowMem = false)
-{
-    import std.stdio;
-    import std.file;
-    string newFile = targetFile;
-    if(exists(targetFile))
-        newFile~= ".temp";
-
-    File f = File(newFile, "wb");
-    if(lowMem)
-    {
-        ubyte[4096] buffer;
-        if(!download(url, (size_t incomingBytes, bool isIncomingContentLength)
-        {
-            return incomingBytes > buffer.length ? buffer[0..$] : buffer[0..incomingBytes];
-        }, (ubyte[] b)
-        {
-            f.rawWrite(b);
-        }))
-            throw new Exception("Could not initialize the WinHTTP session.");
-    }
-    else
-    {
-        ubyte[] buffer = downloadToBuffer(url);
-        f.rawWrite(buffer);
-    }
-    f.close();
-    if(newFile != targetFile)
-        std.file.rename(newFile, targetFile);
 }
 
 private struct NetURL

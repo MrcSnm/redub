@@ -37,7 +37,7 @@ bool installAppImage()
     import redub.misc.path;
     import redub.misc.make_file_executable;
     import redub.logging;
-    import d_downloader;
+    import redub.misc.download : downloadWithProgress;
     import std.path:baseName;
     import std.file;
     string downloadLink = getAppImageDownloadLink();
@@ -46,7 +46,7 @@ bool installAppImage()
     try
     {
         info("Downloading ", downloadLink, " to ", execPath);
-        downloadToFile(downloadLink, execPath);
+        downloadWithProgress(downloadLink, execPath);
         if(!makeFileExecutable(execPath))
         {
             error("Failed in making file ",execPath, " executable.");

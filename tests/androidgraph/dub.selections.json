@@ -1,5 +1,6 @@
 {
 	"fileVersion": 1,
 	"versions": {
+		"redub_android_glue":  {"path": "android\\glue"}
 	}
 }

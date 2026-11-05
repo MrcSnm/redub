@@ -10,7 +10,7 @@ private bool install7Zip(out string _7zpath)
     import redub.api;
     import redub.meta;
     import redub.misc.path;
-    import d_downloader;
+    import redub.misc.download : downloadWithProgress;
     import redub.libs.package_suppliers.utils;
     string workspace = getDubWorkspacePath;
     _7zpath = buildNormalizedPath(workspace, "7z.exe");
@@ -20,7 +20,7 @@ private bool install7Zip(out string _7zpath)
         return true;
 
     try
-        downloadToFile(installLink, _7zpath);
+        downloadWithProgress(installLink, _7zpath);
     catch (Exception e)
         throw new NetworkException("Could not download "~installLink~": "~e.msg);
 	return true;
@@ -55,7 +55,7 @@ bool extract7ZipToFolder(string zPath, string outputDirectory)
 
 private bool install7za(out string _7zaPath)
 {
-    import d_downloader;
+    import redub.misc.download : downloadWithProgress;
     import redub.api;
     import redub.misc.github_tag_check;
     import redub.misc.path;
@@ -78,7 +78,7 @@ private bool install7za(out string _7zaPath)
         "/7z"~compact~"-extra.7z";
     string extra = buildNormalizedPath(tempDir, "7z-extra.7z");
     try
-        downloadToFile(url, extra);
+        downloadWithProgress(url, extra);
     catch(Exception e)
     {
         error("Could not download ", url, ": ", e.msg);

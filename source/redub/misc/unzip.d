@@ -5,7 +5,7 @@ import redub.libs.package_suppliers.utils;
 bool downloadAndExtract(string downloadLink, string outputDirectory)
 {
     import redub.logging;
-    import d_downloader;
+    import redub.misc.download : downloadWithProgress;
     import std.file;
     import std.path:baseName;
     import redub.misc.path;
@@ -14,7 +14,7 @@ bool downloadAndExtract(string downloadLink, string outputDirectory)
     try
     {
         info("Downloading ", downloadLink, " to ", tempPath);
-        downloadToFile(downloadLink, tempPath);
+        downloadWithProgress(downloadLink, tempPath);
     }
     catch (Exception e)
         throw new NetworkException("Could not download '"~downloadLink~"' to path '"~outputDirectory~"': "~e.msg);
