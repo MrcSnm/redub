@@ -94,7 +94,7 @@ private ExecutionResult executeCommands(const BuildConfiguration cfg, RedubComma
     return ExecutionResult(0, "Success");
 }
 
-void execCompilationThread(immutable ThreadBuildData data, shared ProjectNode pack, CompilingSession info, HashPair hash, size_t id)
+void execCompilationThread(immutable ThreadBuildData data, shared ProjectNode pack, CompilationInfo info, HashPair hash, size_t id)
 {
     import std.concurrency;
     Tid owner = ownerTid;
@@ -120,7 +120,7 @@ private bool hasDirtyDependency(const ProjectNode node)
 
 ///Guards the per-module object strategy. Unlike canBuildInSingleCall this is
 ///compatible with reuseObjects: both modes share the same object dir.
-private bool canUseRootObjectStrategy(const ProjectNode node, CompilingSession s)
+private bool canUseRootObjectStrategy(const ProjectNode node, CompilationInfo s)
 {
     if(!node.isRoot)
         return false;
@@ -132,7 +132,7 @@ private bool canUseRootObjectStrategy(const ProjectNode node, CompilingSession s
     return isDCompiler(cfg.getCompiler(s.compiler));
 }
 
-private bool canBuildInSingleCall(const ProjectNode node, CompilingSession s)
+private bool canBuildInSingleCall(const ProjectNode node, CompilationInfo s)
 {
     if(!node.isRoot)
         return false;
@@ -146,14 +146,14 @@ private bool canBuildInSingleCall(const ProjectNode node, CompilingSession s)
     return isDCompiler(cfg.getCompiler(s.compiler));
 }
 
-private string[] getSingleCallFlags(const ThreadBuildData data, CompilingSession s, string mainPackHash)
+private string[] getSingleCallFlags(const ThreadBuildData data, CompilationInfo s, string mainPackHash)
 {
     string[] flags = getCompilationFlags(data.cfg, s, mainPackHash, data.extra.isRoot, true);
     flags ~= getLinkFlags(data, s, mainPackHash, false, false);
     return flags;
 }
 
-CompilationResult execCompilation(immutable ThreadBuildData data, shared ProjectNode pack, CompilingSession info, HashPair hash, Tid owner, size_t id)
+CompilationResult execCompilation(immutable ThreadBuildData data, shared ProjectNode pack, CompilationInfo info, HashPair hash, Tid owner, size_t id)
 {
     import std.file;
     import std.process;
@@ -175,7 +175,7 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
         BuildConfiguration cfg = data.cfg.clone;
         Compiler compiler = info.compiler;
         CompilerBinary c = data.cfg.getCompiler(compiler);
-        OS os = info.os;
+        OS os = info.targetOS;
         ISA isa = info.isa;
         //Remove existing binary, since it won't be replaced by simply executing commands
         string outDir = getConfigurationOutputPath(cfg, os);
@@ -263,8 +263,8 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
                     import redub.command_generators.commons;
                     import redub.misc.make_file_executable;
                     import redub.misc.path;
-                    string cacheExe = buildNormalizedPath(inDir, getOutputName(cfg, info.os));
-                    string outputExe = buildNormalizedPath(dirName(outDir), getOutputName(cfg, info.os));
+                    string cacheExe = buildNormalizedPath(inDir, getOutputName(cfg, info.targetOS));
+                    string outputExe = buildNormalizedPath(dirName(outDir), getOutputName(cfg, info.targetOS));
                     if(!makeFileExecutable(cacheExe) || !makeFileExecutable(outputExe))
                     {
                         ret.status = 1;
@@ -301,15 +301,15 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
 }
 
 
-CompilationResult link(ProjectNode root, string rootHash, const ThreadBuildData data, CompilingSession info)
+CompilationResult link(ProjectNode root, string rootHash, const ThreadBuildData data, CompilationInfo info)
 {
     import std.process;
     import std.file;
     import redub.command_generators.commons;
-    OS os = info.os;
+    OS os = info.targetOS;
     CompilationResult ret;
 
-    if(root.requirements.cfg.targetIcon && root.requirements.cfg.targetType == TargetType.executable && info.os.isWindows)
+    if(root.requirements.cfg.targetIcon && root.requirements.cfg.targetType == TargetType.executable && info.targetOS.isWindows)
     {
         import redub.misc.win_icon;
         string err;
@@ -373,7 +373,7 @@ private bool canPersistCacheNow(const ProjectNode node)
     return !node.requirements.cfg.targetType.isLinkedSeparately || !node.isRoot;
 }
 
-bool buildProjectParallelSimple(ProjectDetails details, CompilingSession s, const(AdvCacheFormula)* existingSharedFormula, AdvCacheFormula* preprocessed)
+bool buildProjectParallelSimple(ProjectDetails details, CompilationInfo s, const(AdvCacheFormula)* existingSharedFormula, AdvCacheFormula* preprocessed)
 {
     import std.concurrency;
     ProjectNode root = details.tree;
@@ -493,7 +493,7 @@ private void killRunningProcesses()
     }
     runningProcesses.clear();
 }
-bool buildProjectFullyParallelized(ProjectDetails details, CompilingSession s, const(AdvCacheFormula)* existingSharedFormula, AdvCacheFormula* preprocessed)
+bool buildProjectFullyParallelized(ProjectDetails details, CompilationInfo s, const(AdvCacheFormula)* existingSharedFormula, AdvCacheFormula* preprocessed)
 {
     import std.concurrency;
     ProjectNode[] finishedBuilds;
@@ -625,7 +625,7 @@ bool buildProjectFullyParallelized(ProjectDetails details, CompilingSession s, c
  *   existingSharedFormula = Reuses the hash of existing calculations if files haven't changed
  * Returns: Has succeeded
  */
-bool buildProjectSingleThread(ProjectDetails details, CompilingSession s, const(AdvCacheFormula)* existingSharedFormula, AdvCacheFormula* preprocessed)
+bool buildProjectSingleThread(ProjectDetails details, CompilationInfo s, const(AdvCacheFormula)* existingSharedFormula, AdvCacheFormula* preprocessed)
 {
     ProjectNode root = details.tree;
     ProjectNode[] dependencyFreePackages = root.findLeavesNodes();
@@ -761,7 +761,7 @@ private void buildSucceeded(ProjectNode node, CompilationResult res)
     }
 
 }
-private void buildFailed(const ProjectNode node, CompilationResult res, CompilingSession s,
+private void buildFailed(const ProjectNode node, CompilationResult res, CompilationInfo s,
     ProjectNode[] finishedPackages, string mainPackHash, AdvCacheFormula* formulaCache,
     const(AdvCacheFormula)* existingSharedFormula
 )
@@ -887,13 +887,13 @@ immutable(string[string]) getEnvForProject(const ProjectNode node, const string[
 }
 
 ///Saves what was built without ever saving the root, whose artifact can't be trusted after a failure.
-private void saveBuiltPackages(Range)(Range builtPackages, string mainPackHash, CompilingSession s, AdvCacheFormula* formulaCache, const(AdvCacheFormula)* existingSharedFormula)
+private void saveBuiltPackages(Range)(Range builtPackages, string mainPackHash, CompilationInfo s, AdvCacheFormula* formulaCache, const(AdvCacheFormula)* existingSharedFormula)
 {
     import std.algorithm.iteration : filter;
     saveFinishedBuilds(filter!((ProjectNode n) => !n.isRoot)(builtPackages), mainPackHash, s, formulaCache, existingSharedFormula);
 }
 
-private void saveFinishedBuilds(ProjNodeRange)(ProjNodeRange finishedProjects, string mainPackHash, CompilingSession s, AdvCacheFormula* formulaCache, const(AdvCacheFormula)* existingSharedFormula)
+private void saveFinishedBuilds(ProjNodeRange)(ProjNodeRange finishedProjects, string mainPackHash, CompilationInfo s, AdvCacheFormula* formulaCache, const(AdvCacheFormula)* existingSharedFormula)
 {
     import std.datetime.stopwatch;
     AdvCacheFormula cache;
@@ -917,7 +917,7 @@ private void saveFinishedBuilds(ProjNodeRange)(ProjNodeRange finishedProjects, s
     ///TODO: Start comparing current build time with the last one
 }
 
-private bool doLink(ProjectDetails details, CompilingSession info, string mainPackHash,
+private bool doLink(ProjectDetails details, CompilationInfo info, string mainPackHash,
     AdvCacheFormula* formulaCache = null, const string[string] env = null,
     const(AdvCacheFormula)* existingSharedFormula, bool linkedAlready = false)
 {

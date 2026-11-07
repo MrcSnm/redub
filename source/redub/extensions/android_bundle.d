@@ -321,10 +321,10 @@ string prepareForAndroidBundleGen(ref ProjectDetails d)
     if(!bin.length)
         throw new RedubException("Could not find the LLVM toolchain inside the Android NDK at '"~ndk~"'.");
     string clang = buildNormalizedPath(bin, "clang" ~ androidExeSuffix);
-    Compiler ndkCompiler = getCompiler(d.compiler.d.bin, clang, d.cDetails.assumption, arch);
+    Compiler ndkCompiler = getCompiler(d.compiler.d.bin, clang);
     d.compiler.c = ndkCompiler.c;
-    d.cDetails.arch = arch;
-    d.cDetails.cCompilerOrPath = clang;
+    d.cDetails.info.arch = arch;
+    d.cDetails.info.compiler.c.setBinary(AcceptedCompiler.clang, clang);
 
     string originalOutput = d.tree.getOutputPath();
     string staging = buildNormalizedPath(originalOutput, "android");

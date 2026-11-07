@@ -5,7 +5,7 @@ import redub.tooling.compiler_identification;
 import redub.command_generators.ldc;
 import redub.building.cache;
 
-string[] parseBuildConfiguration(const BuildConfiguration b, CompilingSession s, string mainPackhash, bool isRoot,
+string[] parseBuildConfiguration(const BuildConfiguration b, CompilationInfo s, string mainPackhash, bool isRoot,
     bool singleCall = false, string moduleObject = null, string moduleSource = null)
 {
     import redub.misc.path;
@@ -56,7 +56,7 @@ string[] parseBuildConfiguration(const BuildConfiguration b, CompilingSession s,
         ///not safe under concurrency, so only use it single-process. Sibling
         ///sub-packages share the package directory, so each configuration gets
         ///its own cache directory keyed by its requirements hash.
-        if(comp.isLDCBased && !s.os.isApple && !b.syntaxOnly && moduleObject.length == 0)
+        if(comp.isLDCBased && !s.targetOS.isApple && !b.syntaxOnly && moduleObject.length == 0)
         {
             import std.path : baseName;
             string cacheRoot = comp == AcceptedCompiler.ldc2 ? "ldc_cache" : "nmc_cache";
@@ -102,7 +102,7 @@ string[] parseBuildConfiguration(const BuildConfiguration b, CompilingSession s,
             //Output path for libs must still be specified
             else if(!b.reuseObjects || targetType.isStaticLibrary)
             {
-                string outputName = singleCall ? getOutputName(b, s.os) : getConfigurationOutputName(b, s.os);
+                string outputName = singleCall ? getOutputName(b, s.targetOS) : getConfigurationOutputName(b, s.targetOS);
                 cmds~= mapper(ValidDFlags.outputFile) ~ buildNormalizedPath(cacheDir, outputName).escapePath;
             }
         }

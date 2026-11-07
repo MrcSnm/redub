@@ -38,7 +38,7 @@ private struct ModuleObject
 }
 
 ///Object builds need enough workers to beat a single compiler invocation.
-bool canUseRootObjects(const ProjectNode root, CompilingSession s)
+bool canUseRootObjects(const ProjectNode root, CompilationInfo s)
 {
     const BuildConfiguration cfg = root.requirements.cfg;
     if(cfg.buildStrategy == BuildStrategy.incrementalOnce || cfg.buildStrategy == BuildStrategy.fullOnce)
@@ -109,7 +109,7 @@ private int runCompiler(const BuildConfiguration cfg, Compiler compiler, string[
 
 ///Builds the root package one object per module, recompiling only changed
 ///modules and their dependents, then links the cached objects.
-RootObjectResult buildRootObjects(ProjectNode root, CompilingSession s, string mainPackHash,
+RootObjectResult buildRootObjects(ProjectNode root, CompilationInfo s, string mainPackHash,
     const string[string] env)
 {
     RootObjectResult result;
@@ -150,7 +150,7 @@ RootObjectResult buildRootObjects(ProjectNode root, CompilingSession s, string m
         {
             if(previousMain.length)
             {
-                string oldObject = objectPath(objDir, previousMain, s.os);
+                string oldObject = objectPath(objDir, previousMain, s.targetOS);
                 if(exists(oldObject))
                     remove(oldObject);
             }
@@ -160,7 +160,7 @@ RootObjectResult buildRootObjects(ProjectNode root, CompilingSession s, string m
                 rmdirRecurse(objDir);
                 mkdirRecurse(objDir);
             }
-            string newObject = objectPath(objDir, mainModule, s.os);
+            string newObject = objectPath(objDir, mainModule, s.targetOS);
             if(exists(newObject))
                 remove(newObject);
         }
@@ -173,7 +173,7 @@ RootObjectResult buildRootObjects(ProjectNode root, CompilingSession s, string m
     foreach(name; graph.compileOrder)
     {
         auto mod = graph.byName[name];
-        bool objectExists = exists(objectPath(objDir, name, s.os));
+        bool objectExists = exists(objectPath(objDir, name, s.targetOS));
         anyCachedObject = anyCachedObject || objectExists;
         if(dirtyTruncated || !objectExists)
         {
@@ -218,7 +218,7 @@ RootObjectResult buildRootObjects(ProjectNode root, CompilingSession s, string m
     ModuleObject[] builds;
     foreach(name; graph.compileOrder)
         if(name in affected)
-            builds ~= ModuleObject(name, objectPath(objDir, name, s.os));
+            builds ~= ModuleObject(name, objectPath(objDir, name, s.targetOS));
 
     size_t rootWeight;
     bool conservativeWeight;
@@ -324,7 +324,7 @@ RootObjectResult buildRootObjects(ProjectNode root, CompilingSession s, string m
         }
     }
 
-    if(cfg.targetIcon.length && cfg.targetType == TargetType.executable && s.os.isWindows)
+    if(cfg.targetIcon.length && cfg.targetType == TargetType.executable && s.targetOS.isWindows)
     {
         import redub.misc.win_icon;
         string iconError;
@@ -339,7 +339,7 @@ RootObjectResult buildRootObjects(ProjectNode root, CompilingSession s, string m
     auto data = root.requirements.buildData(true, s, env);
     string[] objects;
     foreach(name; graph.compileOrder)
-        objects ~= objectPath(objDir, name, s.os);
+        objects ~= objectPath(objDir, name, s.targetOS);
     string[] linkFlags = objects ~ withoutObjectFiles(getLinkFlags(data, s, mainPackHash));
     string linkCommand;
     string linkOutput;
@@ -354,7 +354,7 @@ RootObjectResult buildRootObjects(ProjectNode root, CompilingSession s, string m
         return result;
     }
 
-    string cacheExe = buildNormalizedPath(cacheDir, getOutputName(cfg, s.os));
+    string cacheExe = buildNormalizedPath(cacheDir, getOutputName(cfg, s.targetOS));
     if(cfg.targetType == TargetType.executable)
     {
         version(Posix)

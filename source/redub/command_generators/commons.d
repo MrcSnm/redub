@@ -57,6 +57,11 @@ ISA isaFromArch(string arch)
     }
     return std.system.instructionSetArchitecture;
 }
+bool isSimulatorFromArch(string arch)
+{
+    return arch.contains("simulator");
+}
+
 private bool contains(string a, string b)
 {
     import std.string:indexOf;
@@ -134,7 +139,7 @@ string getConfigurationOutputName(const BuildConfiguration conf, OS os)
  */
 string getObjectOutputName(const BuildConfiguration conf, OS os){ return conf.targetName~getObjectExtension(os);}
 
-string getDepsFilePath(ProjectNode root, CompilingSession s)
+string getDepsFilePath(ProjectNode root, CompilationInfo s)
 {
     import redub.building.cache;
     string packHash = hashFrom(root.requirements, s);
@@ -319,7 +324,7 @@ void copyDir(string fromDir, string toDir, bool shallow = true)
 
     foreach(DirEntry e; dirEntries(fromDir, shallow ? SpanMode.shallow : SpanMode.depth))
     {
-        if(!hardLinkFile(e.name, buildNormalizedPath(toDir, baseName(e.name)), true))
+        if(!hardLink(e.name, buildNormalizedPath(toDir, baseName(e.name)), true))
             throw new RedubException("Could not copy file "~e.name);
     }
 }

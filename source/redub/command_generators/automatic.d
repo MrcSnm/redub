@@ -24,7 +24,7 @@ string escapeCompilationCommands(string compilerBin, string[] flags)
  *   isRoot = Whether this is the root package
  * Returns: The compilation commands those arguments generates
  */
-string[] getCompilationFlags(const BuildConfiguration cfg, CompilingSession s, string mainPackHash, bool isRoot, bool singleCall = false,
+string[] getCompilationFlags(const BuildConfiguration cfg, CompilationInfo s, string mainPackHash, bool isRoot, bool singleCall = false,
     string moduleObject = null, string moduleSource = null)
 {
     import redub.command_generators.commons;
@@ -52,12 +52,12 @@ string[] getCompilationFlags(const BuildConfiguration cfg, CompilingSession s, s
     }
 }
 
-string[] getLinkFlags(const ThreadBuildData data, CompilingSession s, string mainPackHash, bool includeOutput = true, bool includeDFlags = true)
+string[] getLinkFlags(const ThreadBuildData data, CompilationInfo s, string mainPackHash, bool includeOutput = true, bool includeDFlags = true)
 {
     import redub.command_generators.commons;
     import redub.command_generators.linkers;
     CompilerBinary c = data.cfg.getCompiler(s.compiler);
-    if(isWindows(s.os))
+    if(isWindows(s.targetOS))
     {
         if(c.isDCompiler)
             return parseLinkConfigurationMSVC(data, s, mainPackHash, includeOutput, includeDFlags);
@@ -69,7 +69,7 @@ string[] getLinkFlags(const ThreadBuildData data, CompilingSession s, string mai
 }
 
 
-string getLinkCommands(const ThreadBuildData data, CompilingSession s, string mainPackHash)
+string getLinkCommands(const ThreadBuildData data, CompilationInfo s, string mainPackHash)
 {
     import std.process;
     string[] flags = getLinkFlags(data, s, mainPackHash);

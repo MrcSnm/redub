@@ -74,8 +74,7 @@ int importsMain(string[] args)
             return d.getReturnCode();
 
         BuildConfiguration cfg = d.tree.requirements.cfg;
-        CompilingSession session = CompilingSession(d.compiler, d.cDetails.targetOS, d.cDetails.isa);
-        ctx = makeImportScanContext(session, cfg);
+        ctx = makeImportScanContext(d.cDetails.info, cfg);
         if(forceUnittest)
             ctx.unittestMode = true;
 

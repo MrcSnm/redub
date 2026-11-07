@@ -47,7 +47,7 @@ struct ProjectDetails
     }
     void getSourceFiles(out string[] output) const {putSourceFiles(tree, output);}
 
-    string getCacheOutputDir(CompilingSession s) const
+    string getCacheOutputDir(CompilationInfo s) const
     {
         import redub.building.cache;
         import redub.misc.path;
@@ -74,32 +74,17 @@ struct ProjectDetails
  */
 struct CompilationDetails
 {
-    OS targetOS()
-    {
-        import redub.command_generators.commons;
-        return osFromArch(arch);
-    }
-    ISA isa()
-    {
-        import redub.command_generators.commons;
-        return isaFromArch(arch);
-    }
-
-    void setFromCompilationInfo(CompilationInfo info)
-    {
-        compilerOrPath = info.compiler;
-        cCompilerOrPath = info.c_compiler;
-        arch = info.arch;
-    }
+    CompilationInfo info;
+    OS targetOS() const{return info.targetOS;}
+    ISA isa() const{ return info.isa;}
+    bool isSimulator() const{return info.isSimulator;}
 
     ///This is the only required member of this struct. Must be a path to compiler or a compiler in the global context, i.e: `dmd`
-    string compilerOrPath;
+    string compilerOrPath() const { return info.compilerStr(); }
     ///Must be a path to compiler or a compiler in the global context, i.e: `gcc`
-    string cCompilerOrPath;
+    string cCompilerOrPath() const { return info.c_compilerStr();}
     ///Arch is only being used for LDC2 compilers. If arch is used, ldc2 is automatically inferred
-    string arch;
-    ///Assumption to make dependency resolution slightly faster
-    string assumption;
+    string arch() const { return info.arch; }
     ///Allows the MSVC linker to do incremental linking. Unrelated to the build strategy.
     Inference linkIncremental;
     ///Obsolete: writes a compiler .deps file instead of using redub's parser.
@@ -217,7 +202,7 @@ class BuildException : Exception
     }
 }
 
-string[] getChangedBuildFiles(ProjectNode root, CompilingSession s)
+string[] getChangedBuildFiles(ProjectNode root, CompilationInfo s)
 {
     import d_dependencies;
     import redub.building.cache;
@@ -312,7 +297,7 @@ ModuleParsing getModulesDependencies(ProjectDetails d)
 		BuildType.depsCheck
 	);
     depsOnly = buildProject(depsOnly);
-    string depsPath = getDepsFilePath(depsOnly.tree, CompilingSession(d.compiler, d.cDetails.targetOS, d.cDetails.isa));
+    string depsPath = getDepsFilePath(depsOnly.tree, d.cDetails.info);
     
     if(!exists(depsPath))
         return null;
@@ -531,7 +516,7 @@ bool isProjectUpToDate(ProjectDetails d)
     import redub.building.cache;
     AdvCacheFormula sharedFormula;
     AdvCacheFormula preprocessed;
-    invalidateCaches(d.tree, CompilingSession(d.compiler, d.cDetails.arch), sharedFormula, preprocessed);
+    invalidateCaches(d.tree, d.cDetails.info, sharedFormula, preprocessed);
     return d.tree.isUpToDate;
 }
 
@@ -561,7 +546,7 @@ private BuildStrategy guardCombinedBuildStrategy(BuildStrategy strategy, bool co
     return BuildStrategy.fullOnce;
 }
 
-private bool autoPrefersObjects(BuildConfiguration cfg, Compiler compiler, CompilingSession session)
+private bool autoPrefersObjects(BuildConfiguration cfg, Compiler compiler, CompilationInfo session)
 {
     CompilerBinary rootCompiler = cfg.getCompiler(compiler);
     if(!isDCompiler(rootCompiler) || cfg.syntaxOnly || !cfg.targetType.hasBuildableOutput)
@@ -597,7 +582,7 @@ private bool autoPrefersObjects(BuildConfiguration cfg, Compiler compiler, Compi
     return false;
 }
 
-private BuildStrategy resolveAutoStrategy(BuildConfiguration cfg, Compiler compiler, CompilingSession session)
+private BuildStrategy resolveAutoStrategy(BuildConfiguration cfg, Compiler compiler, CompilationInfo session)
 {
     import std.parallelism : totalCPUs;
     if(totalCPUs < MIN_OBJECT_BUILD_CPUS)
@@ -638,7 +623,7 @@ private ResolvedBuildStrategy validateIncrementalOnce(
 ///a concrete mode here: a one-shot fallback would otherwise update the object
 ///cache key without writing objects.
 private ResolvedBuildStrategy resolveBuildStrategy(
-    BuildConfiguration cfg, Compiler compiler, CompilingSession session,
+    BuildConfiguration cfg, Compiler compiler, CompilationInfo session,
     string overrideStrategy, bool combinedBuild)
 {
     BuildStrategy strategy = overrideStrategy.length
@@ -691,9 +676,8 @@ ProjectDetails buildProject(ProjectDetails d)
             default: throw new RedubException("Unknown bug occurred.");
         }
     }
-    CompilingSession session = CompilingSession(d.compiler, d.cDetails.arch);
     const ResolvedBuildStrategy resolved = resolveBuildStrategy(
-        d.tree.requirements.cfg, d.compiler, session,
+        d.tree.requirements.cfg, d.compiler, d.cDetails.info,
         d.cDetails.buildStrategyOverride, d.cDetails.combinedBuild);
     d.tree.requirements.cfg.buildStrategy = resolved.strategy;
     if(resolved.reuseObjects)
@@ -703,13 +687,13 @@ ProjectDetails buildProject(ProjectDetails d)
     AdvCacheFormula preprocessed;
     if(d.forceRebuild)
     {
-        sharedFormula = loadExistingSharedFormula(d.tree, session);
+        sharedFormula = loadExistingSharedFormula(d.tree, d.cDetails.info);
         if(!cleanProject(d, false))
             throw new RedubException("Could not clean project ", d.tree.name);
         d.tree.invalidateCacheOnTree();
     }
     else
-        invalidateCaches(d.tree,session, sharedFormula, preprocessed);
+        invalidateCaches(d.tree,d.cDetails.info, sharedFormula, preprocessed);
     ///Top-level files and output artifacts may change during the build, so only
     ///the already scanned source/import directories are reused.
     preprocessed.files = null;
@@ -718,13 +702,13 @@ ProjectDetails buildProject(ProjectDetails d)
         tree.requirements.cfg.buildStats = false;
     if(tree.requirements.cfg.reuseObjects && !tree.isUpToDate)
     {
-        tree.requirements.cfg.changedBuildFiles = getChangedBuildFiles(tree, session);
+        tree.requirements.cfg.changedBuildFiles = getChangedBuildFiles(tree, d.cDetails.info);
         ///A full rebuild must not link objects left by removed sources or old flags.
         if(tree.requirements.cfg.changedBuildFiles.length == 0)
         {
             import std.file : exists, rmdirRecurse;
-            string objDir = getObjectDir(getCacheOutputDir(hashFrom(tree.requirements, session),
-                tree.requirements.cfg, session, tree.isRoot));
+            string objDir = getObjectDir(getCacheOutputDir(hashFrom(tree.requirements, d.cDetails.info),
+                tree.requirements.cfg, d.cDetails.info, tree.isRoot));
             if(exists(objDir))
                 rmdirRecurse(objDir);
         }
@@ -749,11 +733,11 @@ ProjectDetails buildProject(ProjectDetails d)
         switch(parallel)
         {
             case ParallelType.full:
-                return buildProjectFullyParallelized(d, session, &sharedFormula, &preprocessed);
+                return buildProjectFullyParallelized(d, d.cDetails.info, &sharedFormula, &preprocessed);
             case ParallelType.leaves:
-                return buildProjectParallelSimple(d, session, &sharedFormula, &preprocessed);
+                return buildProjectParallelSimple(d, d.cDetails.info, &sharedFormula, &preprocessed);
             case ParallelType.no:
-                return buildProjectSingleThread(d, session, &sharedFormula, &preprocessed);
+                return buildProjectSingleThread(d, d.cDetails.info, &sharedFormula, &preprocessed);
             default:
                 throw new RedubException(`Unsupported parallel type in this step.`);
         }
@@ -810,7 +794,7 @@ ProjectDetails[] buildProjectUniversal(ArgsDetails args)
 
         foreach(arch; archs)
         {
-            other.cDetails.arch = arch;
+            other.cDetails.info.arch = arch;
             ProjectDetails d = resolveDependencies(args.resolveInfo(), other.cDetails, other.proj, other.dubVars, other.buildType);
             d.bundleGenerated = bundleGenerated;
 
@@ -880,7 +864,6 @@ bool cleanProject(ProjectDetails d, bool showMessages, bool cleanAll = false, in
         if(showMessages)
             info("Cleaning project ", d.tree.name);
         import redub.building.cache;
-        CompilingSession session = CompilingSession(d.compiler, osFromArch(d.cDetails.arch), isaFromArch(d.cDetails.arch));
         foreach(ProjectNode node; d.tree.collapse)
         {
             import redub.misc.path;
@@ -919,7 +902,7 @@ bool cleanProject(ProjectDetails d, bool showMessages, bool cleanAll = false, in
             {
                 auto cfg = node.requirements.cfg;
                 cfg.buildStrategy = strategy;
-                string reqHash = hashFrom(cfg, session, node.isRoot);
+                string reqHash = hashFrom(cfg, d.cDetails.info, node.isRoot);
                 foreach(cacheRoot; ["ldc_cache", "nmc_cache"])
                     removeFile(redub.misc.path.buildNormalizedPath(getCacheFolder(), cacheRoot, reqHash),
                         showMessages, "Removing "~cacheRoot);
@@ -936,7 +919,7 @@ bool cleanProject(ProjectDetails d, bool showMessages, bool cleanAll = false, in
         {
             auto cfg = d.tree.requirements.cfg;
             cfg.buildStrategy = strategy;
-            string rootHash = hashFrom(cfg, session, d.tree.isRoot);
+            string rootHash = hashFrom(cfg, d.cDetails.info, d.tree.isRoot);
             string cacheOutput = redub.misc.path.buildNormalizedPath(getCacheFolder(), rootHash);
             string cacheFile = getCacheFilePath(rootHash);
             removeFile(cacheOutput, showMessages, "Removing cache output dir "~cacheOutput);
@@ -1076,7 +1059,7 @@ ArgsDetails resolveArguments(string[] args, bool isDescribeOnly = false)
     string bt = either(bArgs.buildType, BuildType.debug_);
     return ArgsDetails(
         bArgs,
-        CompilationDetails(bArgs.compiler, bArgs.cCompiler, bArgs.arch, bArgs.compilerAssumption, bArgs.build.linkIncremental, bArgs.build.outputDeps, bArgs.build.combined, bArgs.build.parallel, bArgs.build.buildStrategy, !bArgs.build.noBuildStats),
+        CompilationDetails(CompilationInfo(getCompiler(bArgs.compiler, bArgs.cCompiler , bArgs.compilerAssumption), bArgs.arch), bArgs.build.linkIncremental, bArgs.build.outputDeps, bArgs.build.combined, bArgs.build.parallel, bArgs.build.buildStrategy, !bArgs.build.noBuildStats),
         ProjectToParse(bArgs.config, workingDir, subPackage, recipe, bArgs.single.length != 0, isDescribeOnly),
         getInitialDubVariablesFromArguments(bArgs, DubBuildArguments.init, os, args),
         bt, bArgs.target
@@ -1113,7 +1096,7 @@ ProjectDetails resolveDependencies(
     static import redub.parsers.build_type;
 
     StopWatch st = StopWatch(AutoStart.yes);
-    Compiler compiler = getCompiler(cDetails.compilerOrPath, cDetails.cCompilerOrPath, cDetails.assumption, cDetails.arch);
+    Compiler compiler = cDetails.info.compiler;
 
     with(dubVars)
     {
@@ -1138,12 +1121,10 @@ ProjectDetails resolveDependencies(
     }
     RootParseResult res;
     {
-        CompilationInfo cInfo = CompilationInfo(compiler, cDetails.arch);
-
         if(proj.isSingle)
             res = redub.parsers.single.parseProject(
                 proj.workingDir,
-                cInfo,
+                cDetails.info,
                 BuildRequirements.Configuration(proj.configuration, false),
                 proj.subPackage,
                 proj.recipe,
@@ -1152,7 +1133,7 @@ ProjectDetails resolveDependencies(
         else
             res = redub.parsers.automatic.parseProject(
                 proj.workingDir,
-                cInfo,
+                cDetails.info,
                 BuildRequirements.Configuration(proj.configuration, false),
                 proj.subPackage,
                 proj.recipe,
@@ -1162,8 +1143,8 @@ ProjectDetails resolveDependencies(
     }
     
     ///Change the compiler to use the possibly new cInfo.compiler
-    compiler = res.targetCompilationInfo.compilers;
-    cDetails.setFromCompilationInfo(res.targetCompilationInfo);
+    compiler = res.targetCompilationInfo.compiler;
+    cDetails.info = res.targetCompilationInfo;
 
     import redub.misc.wasi_sdk_install : setupWasiSdkEnvironment;
     setupWasiSdkEnvironment(cDetails.arch);

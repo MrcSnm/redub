@@ -6,7 +6,7 @@ import redub.logging;
 import redub.building.cache;
 
 /// Parse Clang configuration
-string[] parseBuildConfiguration(const BuildConfiguration b, CompilingSession s, string mainPackhash, bool isRoot, const string[] extensions...)
+string[] parseBuildConfiguration(const BuildConfiguration b, CompilationInfo s, string mainPackhash, bool isRoot, const string[] extensions...)
 {
     import std.algorithm.iteration:map;
     import std.file;
@@ -16,6 +16,14 @@ string[] parseBuildConfiguration(const BuildConfiguration b, CompilingSession s,
 
     with(b)
     {
+        version(Apple)
+        {
+            if(s.targetOS.isApple)
+            {
+                cmds~= "-isysroot";
+                cmds~= s.macosSysroot;
+            }   
+        }
         if(isDebug) cmds~= "-g";
         if(targetType.isLinkedSeparately || targetType.isStaticLibrary)
             cmds~= "-r";
@@ -35,7 +43,7 @@ string[] parseBuildConfiguration(const BuildConfiguration b, CompilingSession s,
             cmds~= outFlag;
         cmds~= "-o";
         if(outFlag)
-            cmds ~= buildNormalizedPath(cacheDir, getConfigurationOutputName(b, s.os)).escapePath;
+            cmds ~= buildNormalizedPath(cacheDir, getConfigurationOutputName(b, s.targetOS)).escapePath;
         else
             cmds ~= buildNormalizedPath(cacheDir, getObjectOutputName(b, os)).escapePath;
     }

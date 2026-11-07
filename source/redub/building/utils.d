@@ -56,6 +56,7 @@ ProcessExec2 execCompiler(const BuildConfiguration cfg, Compiler compiler, strin
 auto finishCompilerExec(const BuildConfiguration cfg, Compiler compiler, string inputDir, string outDir, ProcessExec2 p)
 {
     import std.file;
+    import redub.misc.hard_link;
     import std.datetime.stopwatch;
     import redub.api;
     import redub.logging;
@@ -74,7 +75,7 @@ auto finishCompilerExec(const BuildConfiguration cfg, Compiler compiler, string 
 
         vvlog("Copying ", inputDir, " to ", outDir, "...");
 
-        copyDir(inputDir, outDir);
+        hardLinkDir(inputDir, outDir, true, true);
         vvlog("Copy cache->output took ", sw.peek.total!"msecs", "ms");
     }
     return ret;
@@ -83,7 +84,7 @@ auto finishCompilerExec(const BuildConfiguration cfg, Compiler compiler, string 
 
 
 
-ProcessExec2 linkBase(const ThreadBuildData data, CompilingSession session, string rootHash, out string compilationCommand, out string cmdFile)
+ProcessExec2 linkBase(const ThreadBuildData data, CompilationInfo session, string rootHash, out string compilationCommand, out string cmdFile)
 {
     import redub.command_generators.automatic;
     return execCompiler(
@@ -103,7 +104,7 @@ ProcessExec2 linkBase(const ThreadBuildData data, CompilingSession session, stri
  *   s = Compiling Session
  *   command = Command for being able to print it later
  */
-auto executeArchiver(const ThreadBuildData data, CompilingSession s, string mainPackHash, out string command)
+auto executeArchiver(const ThreadBuildData data, CompilationInfo s, string mainPackHash, out string command)
 {
     import std.process;
     import std.array;
@@ -122,9 +123,9 @@ auto executeArchiver(const ThreadBuildData data, CompilingSession s, string main
         case none: throw new Exception("No archiver registered."); break;
     }
     if(data.archiver.type == AcceptedArchiver.llvmLib || data.archiver.type == AcceptedArchiver.lib)
-        cmd~= "/out:"~buildNormalizedPath(data.cfg.outputDirectory, getOutputName(data.cfg, s.os, s.isa));
+        cmd~= "/out:"~buildNormalizedPath(data.cfg.outputDirectory, getOutputName(data.cfg, s.targetOS, s.isa));
     else
-        cmd~= buildNormalizedPath(data.cfg.outputDirectory, getOutputName(data.cfg, s.os, s.isa));
+        cmd~= buildNormalizedPath(data.cfg.outputDirectory, getOutputName(data.cfg, s.targetOS, s.isa));
 
     string cacheDir = getCacheOutputDir(mainPackHash, data.cfg, s, data.extra.isRoot);
 

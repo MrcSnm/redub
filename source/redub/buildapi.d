@@ -8,7 +8,7 @@ import d_dependencies;
 
 
 ///vX.X.X
-enum RedubVersionOnly = "v1.36.4";
+enum RedubVersionOnly = "v1.37.0";
 ///Redub vX.X.X
 enum RedubVersionShort = "Redub "~RedubVersionOnly;
 ///Redub vX.X.X - Description
@@ -24,7 +24,7 @@ private string getDFrontendVersion()
 enum OSExtension
 {
     webAssembly = OS.unknown + 1,
-    emscripten = webAssembly,
+    emscripten,
     visionOS
 }
 
@@ -38,62 +38,89 @@ string osName(OS os)
 {
     import std.conv : to;
     auto ext = cast(OSExtension)os;
-    if(ext == OSExtension.webAssembly) return "webassembly";
-    if(ext == OSExtension.visionOS) return "visionos";
-    return os == OS.unknown ? "unknown" : os.to!string;
+    switch(ext)
+    {
+        case OSExtension.webAssembly: return "webassembly";
+        case OSExtension.emscripten: return "emscripten";
+        case OSExtension.visionOS: return "visionos";
+        default:
+            return os == OS.unknown ? "unknown" : os.to!string;
+    }
 }
 
 /**
- * CompilingSession is important for the hash calculation and thus is passed all around while building.
+ * CompilationInfo is important for the hash calculation and thus is passed all around while building.
  * This guarantees that if any of its configuration changes, a build can be retriggered or recovered
  */
-struct CompilingSession
+struct CompilationInfo
 {
     Compiler compiler;
-    OS os;
+    string arch;
+    OS targetOS;
     ISA isa;
-
-    this(Compiler compiler, OS os, ISA isa)
-    {
-        this.compiler = compiler;
-        this.os = os;
-        this.isa = isa;
-    }
+    bool isSimulator;
+    string macosSysroot;
 
     this(Compiler compiler, string arch)
     {
+        import std.process;
+        import std.string:chomp;
         import redub.command_generators.commons;
         this.compiler = compiler;
-        this.os = osFromArch(arch);
+        this.arch = arch;
+        this.targetOS = osFromArch(arch);
         this.isa = isaFromArch(arch);
+        this.isSimulator = isSimulatorFromArch(arch);
+        version(Apple)
+        {
+            import redub.command_generators.commons;
+            if(targetOS.isApple)
+            {
+                auto result = macosSysrootCommand(targetOS, isSimulator);
+                if(result.status == 0)
+                    this.macosSysroot = result.output.chomp;
+            }
+        }
     }
-
+    
+    string compilerStr() const {return compiler.d.getCompilerString; }
+    string c_compilerStr() const {return compiler.c.getCompilerString; }
+    ///Where the actual compiler is. Used for plugin building
+    string binPath() const {return compiler.d.bin; }
+    
+    private static auto macosSysrootCommand(OS o, bool isSimulator)
+    {
+        import std.process;
+        import std.typecons;
+        switch(o)
+        {
+            case OS.osx: return execute(["xcrun", "--show-sdk-path"]);
+            case OS.iOS: 
+                if(isSimulator)
+                    return execute(["xcrun", "--sdk", "iphonesimulator", "--show-sdk-path"]);
+                return execute(["xcrun", "--sdk", "iphoneos", "--show-sdk-path"]);
+            case OS.tvOS: 
+                if(isSimulator)
+                    return execute(["xcrun", "--sdk", "appletvsimulator", "--show-sdk-path"]);
+                return execute(["xcrun", "--sdk", "appletvos", "--show-sdk-path"]);
+            case OS.watchOS: 
+                if(isSimulator)
+                    return execute(["xcrun", "--sdk", "watchsimulator", "--show-sdk-path"]);
+                return execute(["xcrun", "--sdk", "watchos", "--show-sdk-path"]);
+            default:
+                OSExtension ext = cast(OSExtension)o;
+                switch(ext)
+                {
+                    case OSExtension.visionOS: return execute(["xcrun", "--sdk", "xros", "--show-sdk-path"]);
+                    default: 
+                        return Tuple!(int, "status", string, "output")(1, "Target not found");
+                }
+        }
+    }
     AcceptedArchiver getArchiverType(const ref BuildConfiguration cfg) const
     {
         import redub.tooling.archiver_identification;
-        return defaultArchiverFromCompiler(cfg.getCompiler(compiler).compiler, os);
-    }
-}
-
-struct CompilationInfo
-{
-    Compiler compilers;
-    string compiler() const {return compilers.d.getCompilerString; }
-    string c_compiler() const {return compilers.c.getCompilerString; }
-    string binPath() const {return compilers.d.bin; }
-    ///Where the actual compiler is. Used for plugin building
-    string arch;
-
-    OS targetOS() const
-    {
-        import redub.command_generators.commons;
-        return osFromArch(arch); 
-    }
-    ///Target Instruction Set Architecture
-    ISA isa() const
-    {
-        import redub.command_generators.commons;
-        return isaFromArch(arch); 
+        return defaultArchiverFromCompiler(cfg.getCompiler(compiler).compiler, targetOS);
     }
 }
 
@@ -351,9 +378,9 @@ string[] trustedNoImportMixinsFor(string workingDir)
 
 ///Builds the import scan context for the target compiler, not the compiler
 ///that built redub. Keeps `version(LDC)` / `version(DigitalMars)` correct.
-ImportScanContext makeImportScanContext(CompilingSession s, BuildConfiguration cfg)
+ImportScanContext makeImportScanContext(CompilationInfo s, BuildConfiguration cfg)
 {
-    ImportScanContext ctx = importScanContextFor(s.os, s.isa,
+    ImportScanContext ctx = importScanContextFor(s.targetOS, s.isa,
         s.compiler.d.getCompilerString());
     foreach(version_; cfg.versions)
         ctx.addVersion(version_);
@@ -1046,7 +1073,7 @@ struct BuildRequirements
         return output;
     }
 
-    immutable(ThreadBuildData) buildData(bool isLeaf, CompilingSession s, const string[string] env) inout
+    immutable(ThreadBuildData) buildData(bool isLeaf, CompilationInfo s, const string[string] env) inout
     {
         import redub.tooling.archiver_identification;
         return immutable ThreadBuildData(
@@ -1057,13 +1084,6 @@ struct BuildRequirements
             isLeaf,
             cast(immutable)env
         );
-    }
-
-    static BuildRequirements defaultInit(string workingDir, RedubLanguages l)
-    {
-        BuildRequirements req;
-        req.cfg = BuildConfiguration.defaultInit(workingDir, l);
-        return req;
     }
 
     /**

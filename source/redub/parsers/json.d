@@ -150,7 +150,7 @@ TargetInfo getTarget(JSONValue value, string target, ParseConfig cfg)
 
     string compiler = tryGetStr(*actualTarget, "compiler");
     string arch = tryGetStr(*actualTarget, "arch");
-    if(compiler) ret.parseConfig.cInfo.compilers = getCompiler(compiler);
+    if(compiler) ret.parseConfig.cInfo.compiler = getCompiler(compiler);
     if(arch) ret.parseConfig.cInfo.arch = arch;
 
     ///This line is necessary as it errors if no requiredBy is pressent and no name is present.
@@ -395,7 +395,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
                         enforce(platforms.type == JSONType.array,
                             "'platforms' on configuration "~name.str~" at project "~req.name ~ " must be an array"
                         );
-                        if(!platformMatches(platforms.array, c.cInfo.targetOS, c.cInfo.isa, c.cInfo.compiler))
+                        if(!platformMatches(platforms.array, c.cInfo.targetOS, c.cInfo.isa, c.cInfo.compilerStr))
                             continue;
                     }
                     ///A config may only be platform-compatible through its subConfigurations.
@@ -440,7 +440,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
                     foreach(JSONValue conf; v.array)
                     {
                         JSONValue* plats = "platforms" in conf;
-                        if(!plats || platformMatches(plats.array, os, c.cInfo.isa, c.cInfo.compiler))
+                        if(!plats || platformMatches(plats.array, os, c.cInfo.isa, c.cInfo.compilerStr))
                             availableConfigs~= conf["name"].str;
                         else
                             availableConfigs~= conf["name"].str ~ " [OS-ISA Incompatible]";
@@ -694,7 +694,7 @@ private void runHandlers(
             ///If the command is inside the host filters, it will use host OS instead.
             if(commandsWithHostFilters.indexOf(filtered.command) != -1) osToMatch = std.system.os;
 
-            mustExecuteHandler = fn && filtered.matchesPlatform(osToMatch, cfg.cInfo.isa, cfg.cInfo.compiler);
+            mustExecuteHandler = fn && filtered.matchesPlatform(osToMatch, cfg.cInfo.isa, cfg.cInfo.compilerStr);
         }
         if(mustExecuteHandler)
         {
@@ -1031,7 +1031,7 @@ private bool subConfigurationsMatchPlatform(JSONValue projectConfiguration, ref 
                 if(!name || name.str != configName.str)
                     continue;
                 JSONValue* platforms = "platforms" in conf;
-                if(platforms && !platformMatches(platforms.array, c.cInfo.targetOS, c.cInfo.isa, c.cInfo.compiler))
+                if(platforms && !platformMatches(platforms.array, c.cInfo.targetOS, c.cInfo.isa, c.cInfo.compilerStr))
                 {
                     vvlog("Rejected configuration because ", depName, ":", configName.str, " is incompatible");
                     return false;
@@ -1053,7 +1053,8 @@ BuildRequirements getDefaultBuildRequirement(ParseConfig cfg, JSONValue json)
 
     RedubLanguages l = tryStr(json, "language", "D").redubLanguage;
     ///defaultPackageName is only ever sent whenever --single is being used.
-    if(cfg.firstRun && !cfg.defaultPackageName) req = BuildRequirements.defaultInit(cfg.workingDir, l);
+    if(cfg.firstRun && !cfg.defaultPackageName) 
+        req.cfg = BuildConfiguration.defaultInit(cfg.workingDir, l);
     req.version_ = cfg.version_;
     req.configuration = cfg.subConfiguration;
     req.cfg.workingDir = cfg.workingDir;

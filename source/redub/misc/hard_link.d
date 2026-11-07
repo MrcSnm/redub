@@ -148,14 +148,14 @@ bool hardLinkFile(string from, string to, bool overwrite = false)
     return true;
 }
 
-bool hardLinkDir(string dir, string to, bool overwrite = false)
+bool hardLinkDir(string dir, string to, bool overwrite = false, bool shallow = false)
 {
     import std.exception;
     import redub.misc.path;
     import std.path;
     import std.file;
 
-    foreach(DirEntry e; dirEntries(dir, SpanMode.depth))
+    foreach(DirEntry e; dirEntries(dir, shallow ? SpanMode.shallow : SpanMode.depth))
     {
         if(e.isDir)
             continue;

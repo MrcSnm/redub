@@ -6,7 +6,7 @@ import redub.logging;
 import redub.building.cache;
 
 /// Parse CL configuration
-string[] parseBuildConfiguration(const BuildConfiguration b, CompilingSession s, string mainPackhash, bool isRoot, const string[] extensions...)
+string[] parseBuildConfiguration(const BuildConfiguration b, CompilationInfo s, string mainPackhash, bool isRoot, const string[] extensions...)
 {
     import std.algorithm.iteration:map;
     import std.file;

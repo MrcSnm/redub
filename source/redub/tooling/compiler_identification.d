@@ -2,7 +2,7 @@ module redub.tooling.compiler_identification;
 public import redub.libs.semver;
 public import redub.tooling.archiver_identification;
 public import redub.tooling.linker_identification;
-public import redub.tooling.compilers_inference : saveGlobalCompiler, tryGetCompilerOnCwd;
+public import redub.tooling.compiler_inference : saveGlobalCompiler, tryGetCompilerOnCwd;
 import hip.data.json;
 import std.algorithm.setops;
 
@@ -47,6 +47,12 @@ struct CompilerBinary
     SemVer frontendVersion;
     ///Contents of executing binOrPath --version
     string versionString;
+
+    void setBinary(AcceptedCompiler type, string binPath)
+    {
+        this.compiler = type;
+        this.bin = binPath;
+    }
 
 
 
@@ -229,7 +235,7 @@ CompilerBinary searchCompiler(string compilerOrPath, bool isC)
 private CompilerBinary searchCompiler(string compilerOrPath, JSONValue compilersInfo, bool isDefault, bool isC, string compilerAssumption = null, bool useGlobalPath = true)
 {
     import redub.misc.find_executable;
-    import redub.tooling.compilers_inference;
+    import redub.tooling.compiler_inference;
     import std.path;
     import std.file;
     bool isGlobal = false;

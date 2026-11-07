@@ -89,7 +89,7 @@ void buildPlugin(string pluginName, string inputFile, CompilationInfo cInfo)
     b.outputDirectory = dirName(inputFile);
 
 
-    CompilingSession s = CompilingSession(getCompiler(DefaultCompiler), os, instructionSetArchitecture);
+    CompilationInfo s = CompilationInfo(getCompiler(DefaultCompiler), null);
     import std.stdio;
     writeln("Building Plugin with compiler ", s.compiler.d.bin, " ", s.compiler.d.version_);
 
@@ -141,7 +141,7 @@ void buildPluginProject(string pluginDir, CompilationInfo cInfo)
     else
         enum preferredCompiler = "dmd";
 
-    ProjectDetails pluginDetails = resolveDependencies(ResolveInfo.init, CompilationDetails(preferredCompiler, includeEnvironmentVariables: false), ProjectToParse(null, pluginDir));
+    ProjectDetails pluginDetails = resolveDependencies(ResolveInfo.init, CompilationDetails(CompilationInfo(getCompiler(preferredCompiler), null), includeEnvironmentVariables: false), ProjectToParse(null, pluginDir));
     if(!pluginDetails.tree)
         throw new Exception("Could not build plugin at path "~pluginDir);
 

@@ -20,13 +20,13 @@ bool canEmitStartGroup(OS os, ISA isa, AcceptedLinker linker)
 }
 
 
-string[] parseLinkConfiguration(const ThreadBuildData data, CompilingSession s, string requirementCache, bool includeOutput = true, bool includeDFlags = true)
+string[] parseLinkConfiguration(const ThreadBuildData data, CompilationInfo s, string requirementCache, bool includeOutput = true, bool includeDFlags = true)
 {
     import redub.misc.path;
     import redub.building.cache;
     string[] cmds;
     AcceptedLinker linker = s.compiler.linker;
-    bool emitStartGroup = canEmitStartGroup(s.os, s.isa, linker);
+    bool emitStartGroup = canEmitStartGroup(s.targetOS, s.isa, linker);
 
     const BuildConfiguration b = data.cfg;
     CompilerBinary c = b.getCompiler(s.compiler);
@@ -38,13 +38,13 @@ string[] parseLinkConfiguration(const ThreadBuildData data, CompilingSession s, 
             if (includeOutput && targetType.hasBuildableOutput)
             {
                 string cacheDir = getCacheOutputDir(requirementCache, b, s, data.extra.isRoot);
-                string objExtension = getObjectExtension(s.os);
+                string objExtension = getObjectExtension(s.targetOS);
                 if(c.isDCompiler)
-                    cmds~= "-of="~buildNormalizedPath(cacheDir, getOutputName(b, s.os)).escapePath;
+                    cmds~= "-of="~buildNormalizedPath(cacheDir, getOutputName(b, s.targetOS)).escapePath;
                 else
                 {
                     cmds~= "-o";
-                    cmds~= buildNormalizedPath(cacheDir, getOutputName(b, s.os)).escapePath;
+                    cmds~= buildNormalizedPath(cacheDir, getOutputName(b, s.targetOS)).escapePath;
                 }
                 if(b.reuseObjects)
                     putSourceFiles(cmds, null, [getObjectDir(cacheDir)], null, null, objExtension);
@@ -82,13 +82,13 @@ string[] parseLinkConfiguration(const ThreadBuildData data, CompilingSession s, 
             ///Use library full path for the base file
             cmds = mapAppendReverse(cmds, data.extra.librariesFullPath, (string l)
             {
-                string libPath = getOutputName(TargetType.staticLibrary, l, s.os);
+                string libPath = getOutputName(TargetType.staticLibrary, l, s.targetOS);
                 return c.isDCompiler ? "-L"~libPath : libPath;
             });
             if(emitStartGroup)
                 cmds~= c.isDCompiler ? "-L--end-group" : "-Wl,--end-group";
 
-            if(s.os.isApple)
+            if(s.targetOS.isApple)
             {
                 foreach(framework; frameworks)
                 {
@@ -115,7 +115,7 @@ string[] parseLinkConfiguration(const ThreadBuildData data, CompilingSession s, 
     return cmds;
 }
 
-string[] parseLinkConfigurationCL(const ThreadBuildData data, CompilingSession s, string requirementCache, bool includeOutput = true, bool includeDFlags = true)
+string[] parseLinkConfigurationCL(const ThreadBuildData data, CompilationInfo s, string requirementCache, bool includeOutput = true, bool includeDFlags = true)
 {
     import redub.misc.path;
     import redub.building.cache;
@@ -126,14 +126,14 @@ string[] parseLinkConfigurationCL(const ThreadBuildData data, CompilingSession s
     {
         string cacheDir = getCacheOutputDir(requirementCache, b, s, data.extra.isRoot);
         if(includeOutput)
-            cmds~= "/OUT:"~buildNormalizedPath(cacheDir, getOutputName(b, s.os)).escapePath;
+            cmds~= "/OUT:"~buildNormalizedPath(cacheDir, getOutputName(b, s.targetOS)).escapePath;
         if(!s.compiler.linkIncremental)
             cmds~= "/INCREMENTAL:NO";
         if(targetType == TargetType.dynamicLibrary)
             cmds~= "/DLL";
 
         cmds = mapAppendReverse(cmds, data.extra.librariesFullPath,
-            (string l) => (l~getLibraryExtension(s.os)).escapePath);
+            (string l) => (l~getLibraryExtension(s.targetOS)).escapePath);
         cmds = mapAppendPrefix(cmds, libraryPaths, "/LIBPATH:", true);
         if(includeOutput)
             putSourceFiles(cmds, null, [cacheDir], null, null, ".obj");
@@ -144,7 +144,7 @@ string[] parseLinkConfigurationCL(const ThreadBuildData data, CompilingSession s
     return cmds;
 }
 
-string[] parseLinkConfigurationMSVC(const ThreadBuildData data, CompilingSession s, string requirementCache, bool includeOutput = true, bool includeDFlags = true)
+string[] parseLinkConfigurationMSVC(const ThreadBuildData data, CompilationInfo s, string requirementCache, bool includeOutput = true, bool includeDFlags = true)
 {
     import std.algorithm.iteration;
     import redub.misc.path;
@@ -159,8 +159,8 @@ string[] parseLinkConfigurationMSVC(const ThreadBuildData data, CompilingSession
         string cacheDir = getCacheOutputDir(requirementCache, b, s, data.extra.isRoot);
         if(includeOutput)
         {
-            cmds~= "-of"~buildNormalizedPath(cacheDir, getOutputName(b, s.os)).escapePath;
-            string objExtension = getObjectExtension(s.os);
+            cmds~= "-of"~buildNormalizedPath(cacheDir, getOutputName(b, s.targetOS)).escapePath;
+            string objExtension = getObjectExtension(s.targetOS);
             if(b.reuseObjects)
                 putSourceFiles(cmds, null, [getObjectDir(cacheDir)], null, null, objExtension);
             else
@@ -187,7 +187,7 @@ string[] parseLinkConfigurationMSVC(const ThreadBuildData data, CompilingSession
         if(targetType.isAnyLibrary)
             cmds~= getTargetTypeFlag(targetType, c);
 
-        cmds = mapAppendReverse(cmds, data.extra.librariesFullPath, (string l) => (l~getLibraryExtension(s.os)).escapePath);
+        cmds = mapAppendReverse(cmds, data.extra.librariesFullPath, (string l) => (l~getLibraryExtension(s.targetOS)).escapePath);
 
         cmds = mapAppendPrefix(cmds, linkFlags, "-L", false);
 

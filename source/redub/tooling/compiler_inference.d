@@ -1,4 +1,4 @@
-module redub.tooling.compilers_inference;
+module redub.tooling.compiler_inference;
 import redub.libs.semver;
 import redub.tooling.compiler_identification;
 import hip.data.json;
