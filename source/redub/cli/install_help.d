@@ -113,7 +113,7 @@ private string[] installedInstallTargets()
             foreach(entry; dirEntries(platforms, SpanMode.shallow))
                 if(entry.isDir && baseName(entry.name).startsWith("android-"))
                     apis ~= baseName(entry.name)["android-".length .. $];
-        apis.sort!((a, b) => to!int(a) > to!int(b));
+        apis.sort!((a, b) => SemVer(a) > SemVer(b));
         ret ~= "android-sdk" ~ (apis.length ? " API " ~ apis.join(", ") : "")
             ~ externalMark(sdk, buildNormalizedPath(androidWorkspace, "android-sdk"));
     }
