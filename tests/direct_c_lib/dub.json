@@ -1,0 +1,16 @@
+{
+	"authors": [
+		"hipreme"
+	],
+	"dependencies": {
+		"mathlib": { "path": "mathlib" }
+	},
+	"description": "C static library compiled directly by Redub, without Makefile or CMake.",
+	"license": "MIT",
+	"language": "C",
+	"name": "direct_c_lib",
+	"sourcePaths": [
+		"source"
+	],
+	"targetType": "executable"
+}

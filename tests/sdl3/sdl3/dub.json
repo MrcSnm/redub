@@ -1,0 +1,37 @@
+{
+	"name": "sdl3",
+	"targetType": "external",
+	"language": "C",
+	"plugins": {
+		"cmake": "redub:cmake"
+	},
+	"postGeneratePlugins": {
+		"cmake": ["cmake.json"]
+	},
+	"importPaths": ["vendor/include"],
+	"libPaths": ["vendor/lib"],
+	"libs": ["SDL3"],
+	"frameworks": [
+		"Cocoa",
+		"CoreMedia",
+		"CoreVideo",
+		"IOKit",
+		"ForceFeedback",
+		"Carbon",
+		"CoreAudio",
+		"AudioToolbox",
+		"AVFoundation",
+		"CoreBluetooth",
+		"CoreGraphics",
+		"CoreMotion",
+		"Foundation",
+		"GameController",
+		"Metal",
+		"OpenGL",
+		"QuartzCore"
+	],
+	"lflags": [
+		"-Wl,-weak_framework,UniformTypeIdentifiers",
+		"-Wl,-weak_framework,CoreHaptics"
+	]
+}

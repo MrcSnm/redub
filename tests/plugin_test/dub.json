@@ -5,7 +5,7 @@
 	"plugins": {
 		"getmodules": "../../plugins/getmodules"
 	},
-	"preBuildPlugins": {
+	"postGeneratePlugins": {
 		"getmodules": ["source/imports.txt"]
 	},
 

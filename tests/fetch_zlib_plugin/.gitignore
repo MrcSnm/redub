@@ -1,0 +1,7 @@
+.dub
+dub.selections.json
+/fetch_zlib_plugin
+*.o
+zlib/.dub
+zlib/dub.selections.json
+zlib/libzlib.a

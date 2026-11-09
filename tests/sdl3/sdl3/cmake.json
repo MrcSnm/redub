@@ -1,0 +1,12 @@
+{
+	"url": "https://github.com/libsdl-org/SDL.git",
+	"tag": "release-3.2.0",
+	"cmakeArgs": [
+		"-DSDL_STATIC=ON",
+		"-DSDL_SHARED=OFF",
+		"-DSDL_TESTS=OFF",
+		"-DSDL_EXAMPLES=OFF",
+		"-DCMAKE_BUILD_TYPE=Release"
+	],
+	"destination": "vendor"
+}

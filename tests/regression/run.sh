@@ -758,6 +758,233 @@ test_project_without_name()
     fi
 }
 
+test_direct_c_lib_example()
+{
+    if ! command -v gcc >/dev/null 2>&1; then
+        skip direct_c_lib_example "gcc not found"
+        return
+    fi
+    local d="$WORK/directc"
+    local log="$WORK/directc.log"
+    cp -R "$ROOT/tests/direct_c_lib" "$d"
+
+    redub_in "$d" 120 "$log" build --force --c-compiler=gcc
+    if [ $? -ne 0 ]; then
+        fail direct_c_lib_example "build failed ($(detail "$log"))"
+        return
+    fi
+    local exe="$d/direct_c_lib$EXE"
+    if [ ! -f "$exe" ]; then
+        fail direct_c_lib_example "build succeeded but produced no artifact"
+        return
+    fi
+    local out
+    out="$("$exe" 2>&1)"
+    if [ "$out" != "22" ]; then
+        fail direct_c_lib_example "unexpected output '$out'"
+    else
+        pass direct_c_lib_example
+    fi
+}
+
+test_external_target_commands()
+{
+    if [ "$WINDOWS" -eq 1 ]; then
+        skip external_target_commands "requires a POSIX host"
+        return
+    fi
+    if ! command -v gcc >/dev/null 2>&1; then
+        skip external_target_commands "gcc not found"
+        return
+    fi
+    local name="external_cmd$SUFFIX"
+    local d="$WORK/external_cmd"
+    local log="$WORK/external_cmd.log"
+    mkdir -p "$d/source" "$d/external"
+    printf '%s\n' '{"name":"'"$name"'","targetType":"executable","language":"C","sourcePaths":["source"],"targetPath":"build","dependencies":{"external_cmd":{"path":"external"}}}' > "$d/dub.json"
+    printf '%s\n' '#include <stdio.h>' 'int main(void){ puts("external ok"); return 0; }' > "$d/source/main.c"
+    printf '%s\n' '{"name":"external_cmd","targetType":"external","preBuildCommands":["mkdir -p generated","printf pre > generated/pre.txt"],"postBuildCommands":["printf post > generated/post.txt"]}' > "$d/external/dub.json"
+
+    if ! redub_in "$d" 120 "$log" build --force --parallel=no --c-compiler=gcc; then
+        fail external_target_commands "build failed ($(detail "$log"))"
+        return
+    fi
+    if [ ! -f "$d/external/generated/pre.txt" ]; then
+        fail external_target_commands "preBuildCommands did not run"
+        return
+    fi
+    if [ ! -f "$d/external/generated/post.txt" ]; then
+        fail external_target_commands "postBuildCommands did not run"
+        return
+    fi
+    if ! redub_in "$d/external" 120 "$WORK/external_root.log" build --force; then
+        fail external_target_commands "external root build failed ($(detail "$WORK/external_root.log"))"
+        return
+    fi
+    local exe out
+    exe="$(artifact "$d" "$name")"
+    if [ -z "$exe" ]; then
+        fail external_target_commands "root artifact not found"
+        return
+    fi
+    out="$("$exe" 2>&1)"
+    if [ "$out" != "external ok" ]; then
+        fail external_target_commands "unexpected output '$out'"
+        return
+    fi
+    pass external_target_commands
+}
+
+ZLIB_TAG="v1.3.1"
+ZLIB_CACHE="$ROOT/build/regression-cache/zlib-$ZLIB_TAG"
+
+fetch_zlib()
+{
+    if [ -n "${ZLIB_SRC:-}" ]; then
+        ZLIB_CACHE="$ZLIB_SRC"
+    fi
+    if [ -f "$ZLIB_CACHE/zlib.h" ] && [ -f "$ZLIB_CACHE/adler32.c" ]; then
+        return 0
+    fi
+    [ -z "${ZLIB_SRC:-}" ] || return 1
+    command -v git >/dev/null 2>&1 || return 1
+    mkdir -p "$(dirname "$ZLIB_CACHE")"
+    rm -rf "$ZLIB_CACHE" "$ZLIB_CACHE.tmp"
+    if ! git clone --depth 1 --branch "$ZLIB_TAG" https://github.com/madler/zlib.git "$ZLIB_CACHE.tmp" >/dev/null 2>&1; then
+        rm -rf "$ZLIB_CACHE.tmp"
+        return 1
+    fi
+    mv "$ZLIB_CACHE.tmp" "$ZLIB_CACHE"
+}
+
+test_makefile_lib_zlib()
+{
+    if [ "$WINDOWS" -eq 1 ]; then
+        skip makefile_lib_zlib "requires a POSIX host"
+        return
+    fi
+    if ! command -v gcc >/dev/null 2>&1; then
+        skip makefile_lib_zlib "gcc not found"
+        return
+    fi
+    if ! fetch_zlib; then
+        skip makefile_lib_zlib "could not fetch zlib $ZLIB_TAG (network/git)"
+        return
+    fi
+    if [ ! -f "$ZLIB_CACHE/Makefile" ] || [ ! -f "$ZLIB_CACHE/CMakeLists.txt" ]; then
+        fail makefile_lib_zlib "zlib checkout is missing Makefile/CMakeLists.txt"
+        return
+    fi
+
+    local pkg="$WORK/zlibpkg"
+    local app="$WORK/zlibapp"
+    local log="$WORK/zlib.log"
+    mkdir -p "$pkg" "$app/source"
+
+    local sources=""
+    local f
+    for f in adler32.c compress.c crc32.c deflate.c gzclose.c gzlib.c gzread.c gzwrite.c infback.c inffast.c inflate.c inftrees.c trees.c uncompr.c zutil.c; do
+        if [ ! -f "$ZLIB_CACHE/$f" ]; then
+            fail makefile_lib_zlib "missing zlib source $f"
+            return
+        fi
+        sources="$sources${sources:+, }\"$ZLIB_CACHE/$f\""
+    done
+
+    cat > "$pkg/dub.json" <<EOF
+{
+	"name": "zlib",
+	"targetType": "staticLibrary",
+	"language": "C",
+	"importPaths": ["$ZLIB_CACHE"],
+	"versions": ["HAVE_UNISTD_H"],
+	"sourceFiles": [$sources]
+}
+EOF
+
+    cat > "$app/dub.json" <<'EOF'
+{
+	"name": "zlibapp",
+	"targetType": "executable",
+	"language": "C",
+	"sourcePaths": ["source"],
+	"dependencies": { "zlib": { "path": "../zlibpkg" } }
+}
+EOF
+
+    cat > "$app/source/main.c" <<'EOF'
+#include <zlib.h>
+#include <stdio.h>
+#include <string.h>
+
+int main(void)
+{
+	const char *src = "hello hello hello";
+	unsigned char packed[128], out[128];
+	uLongf packedLen = sizeof(packed), outLen = sizeof(out);
+	if(compress(packed, &packedLen, (const Bytef*)src, (uLong)strlen(src) + 1) != Z_OK)
+		return 1;
+	if(uncompress(out, &outLen, packed, packedLen) != Z_OK)
+		return 2;
+	printf("%s (%s)\n", (char*)out, zlibVersion());
+	return 0;
+}
+EOF
+
+    redub_in "$app" 180 "$log" build --force --c-compiler=gcc
+    if [ $? -ne 0 ]; then
+        fail makefile_lib_zlib "build failed ($(detail "$log"))"
+        return
+    fi
+    if [ ! -f "$pkg/libzlib.a" ]; then
+        fail makefile_lib_zlib "build succeeded but libzlib.a was not produced"
+        return
+    fi
+    local out
+    out="$("$app/zlibapp$EXE" 2>&1)"
+    case "$out" in
+        "hello hello hello"*) pass makefile_lib_zlib ;;
+        *) fail makefile_lib_zlib "unexpected output '$out'" ;;
+    esac
+}
+
+test_plugin_fetch_zlib()
+{
+    if [ "$WINDOWS" -eq 1 ]; then
+        skip plugin_fetch_zlib "requires a POSIX host"
+        return
+    fi
+    if ! command -v gcc >/dev/null 2>&1; then
+        skip plugin_fetch_zlib "gcc not found"
+        return
+    fi
+    if ! fetch_zlib; then
+        skip plugin_fetch_zlib "could not fetch zlib $ZLIB_TAG (network/git)"
+        return
+    fi
+
+    local proj="$WORK/tests/fetch_zlib_plugin"
+    local log="$WORK/plugin_zlib.log"
+    mkdir -p "$WORK/tests"
+    cp -R "$ROOT/tests/fetch_zlib_plugin" "$proj"
+
+    ( cd "$proj" && export FETCHLIB_SRC="$ZLIB_CACHE" && run_limited 300 "$REDUB" build --force --c-compiler=gcc ) >"$log" 2>&1
+    if [ $? -ne 0 ]; then
+        fail plugin_fetch_zlib "build failed ($(detail "$log"))"
+        return
+    fi
+    if [ ! -f "$proj/zlib/libzlib.a" ]; then
+        fail plugin_fetch_zlib "build succeeded but the plugin did not produce libzlib.a"
+        return
+    fi
+    local out
+    out="$("$proj/fetch_zlib_plugin$EXE" 2>&1)"
+    case "$out" in
+        "hello hello hello"*) pass plugin_fetch_zlib ;;
+        *) fail plugin_fetch_zlib "unexpected output '$out'" ;;
+    esac
+}
+
 test_posix_c_dynamic_library()
 {
     if [ "$WINDOWS" -eq 1 ] || [ "$(uname -s 2>/dev/null)" != "Linux" ]; then
@@ -1486,6 +1713,10 @@ test_source_paths_prefix_collision
 test_source_paths_nested
 test_amd64_platform_filter
 test_project_without_name
+test_direct_c_lib_example
+test_external_target_commands
+test_makefile_lib_zlib
+test_plugin_fetch_zlib
 test_posix_c_dynamic_library
 test_path_with_spaces
 test_mini_regex_matches

@@ -1,0 +1,9 @@
+{
+	"name": "fetch_zlib_plugin",
+	"targetType": "executable",
+	"language": "C",
+	"sourcePaths": ["source"],
+	"dependencies": {
+		"zlib": { "path": "zlib" }
+	}
+}

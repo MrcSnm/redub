@@ -1,0 +1,11 @@
+{
+	"name": "zlib",
+	"targetType": "staticLibrary",
+	"language": "C",
+	"plugins": {
+		"fetchlib": "redub:fetchlib"
+	},
+	"preGeneratePlugins": {
+		"fetchlib": ["zlib/fetch.json"]
+	}
+}

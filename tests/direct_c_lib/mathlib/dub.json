@@ -1,0 +1,19 @@
+{
+	"authors": [
+		"hipreme"
+	],
+	"description": "Static C library built by Redub from its own sources.",
+	"license": "MIT",
+	"language": "C",
+	"name": "mathlib",
+	"sourcePaths": [
+		"source"
+	],
+	"importPaths": [
+		"include"
+	],
+	"targetType": "staticLibrary",
+	"versions": [
+		"MATHLIB_ENABLE_SCALE"
+	]
+}

@@ -1,0 +1,8 @@
+.dub
+/direct_c_lib
+/direct_c_lib.exe
+/mathlib/libmathlib.a
+/mathlib/libmathlib.lib
+dub.selections.json
+*.o
+*.obj

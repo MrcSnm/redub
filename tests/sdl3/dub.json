@@ -1,0 +1,9 @@
+{
+	"name": "sdl3_example",
+	"targetType": "executable",
+	"language": "C",
+	"sourcePaths": ["source"],
+	"dependencies": {
+		"sdl3": { "path": "sdl3" }
+	}
+}
