@@ -131,5 +131,6 @@ auto executeArchiver(const ThreadBuildData data, CompilationInfo s, string mainP
 
     putSourceFiles(cmd, null, [cacheDir], null, data.cfg.excludeSourceFiles, ".o", ".obj");
 
+    command = cmd.join(" ");
     return execute(cmd, data.env);
 }

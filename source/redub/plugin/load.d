@@ -11,6 +11,73 @@ private struct RegisteredPlugin
 }
 
 __gshared RegisteredPlugin[string] registeredPlugins;
+
+private struct BuiltinPlugin
+{
+    string name;
+    string description;
+    RedubPlugin function() factory;
+}
+
+private RedubPlugin createCmakePlugin()
+{
+    import redub.plugins.cmake : CmakePlugin;
+    return new CmakePlugin();
+}
+
+private RedubPlugin createFetchlibPlugin()
+{
+    import redub.plugins.fetchlib : FetchLibPlugin;
+    return new FetchLibPlugin();
+}
+
+private immutable BuiltinPlugin[] builtinPlugins = [
+    BuiltinPlugin("cmake", "Fetches a source tree and builds/installs it through CMake", &createCmakePlugin),
+    BuiltinPlugin("fetchlib", "Fetches a git source tree and injects its sources into the build", &createFetchlibPlugin),
+];
+
+string[] getBuiltinPluginNames()
+{
+    string[] names;
+    foreach(ref plugin; builtinPlugins)
+        names ~= plugin.name;
+    return names;
+}
+
+string getBuiltinPluginDescription(string name)
+{
+    foreach(ref plugin; builtinPlugins)
+        if(plugin.name == name)
+            return plugin.description;
+    return null;
+}
+
+private RedubPlugin createBuiltinPlugin(string name)
+{
+    foreach(ref plugin; builtinPlugins)
+        if(plugin.name == name)
+            return plugin.factory();
+    import std.array : join;
+    throw new Exception("Unknown built-in plugin '"~name~"'. Available built-in plugins: "~getBuiltinPluginNames.join(", "));
+}
+
+void loadBuiltinPlugin(string pluginName, string builtinName)
+{
+    import redub.logging : infos;
+    string displayPath = "redub:"~builtinName;
+    synchronized
+    {
+        if(auto reg = pluginName in registeredPlugins)
+        {
+            if(reg.path != displayPath)
+                throw new Exception("Attempt to register plugin with same name '"~pluginName~"' with different paths: '"~reg.path~"' vs '"~displayPath~"'");
+            return;
+        }
+        registeredPlugins[pluginName] = RegisteredPlugin(createBuiltinPlugin(builtinName), displayPath);
+    }
+    infos("Plugin Loaded: ", pluginName, " [builtin:", builtinName, "]");
+}
+
 void loadPlugin(string pluginName, string pluginPath, CompilationInfo cInfo)
 {
     import redub.plugin.build;
@@ -54,7 +121,13 @@ void loadPlugin(string pluginName, string pluginPath, CompilationInfo cInfo)
     }
 }
 
-BuildConfiguration executePlugin(string pluginName, BuildConfiguration cfg, string[] args)
+enum PluginPhase : ubyte
+{
+    preGenerate,
+    postGenerate,
+}
+
+BuildConfiguration executePlugin(PluginPhase phase, string pluginName, BuildConfiguration cfg, string[] args)
 {
     import redub.logging;
     RegisteredPlugin* reg;
@@ -69,11 +142,19 @@ BuildConfiguration executePlugin(string pluginName, BuildConfiguration cfg, stri
     }
 
     RedubPlugin plugin = reg.plugin;
-    RedubPluginData preBuildResult;
+    RedubPluginData pluginResult;
     RedubPluginStatus status;
     try
     {
-        status = plugin.preBuild(cfg.toRedubPluginData, preBuildResult, args, status);
+        final switch(phase)
+        {
+            case PluginPhase.preGenerate:
+                status = plugin.preGenerate(cfg.toRedubPluginData, pluginResult, args, status);
+                break;
+            case PluginPhase.postGenerate:
+                status = plugin.postGenerate(cfg.toRedubPluginData, pluginResult, args, status);
+                break;
+        }
         if(status.message)
         {
             if(status.code == RedubPluginExitCode.success)
@@ -89,13 +170,19 @@ BuildConfiguration executePlugin(string pluginName, BuildConfiguration cfg, stri
     }
     if(status.code != RedubPluginExitCode.success)
         throw new Exception("Execute Plugin process Failed for "~cfg.name);
-    if(preBuildResult != RedubPluginData.init)
-        return cfg.mergeRedubPlugin(preBuildResult);
-
+    if(pluginResult != RedubPluginData.init)
+        return cfg.mergeRedubPlugin(pluginResult);
 
     return cfg;
-
 }
+
+BuildConfiguration executePlugins(PluginPhase phase, BuildConfiguration cfg, PluginExecution[] plugins)
+{
+    foreach(plugin; plugins)
+        cfg = executePlugin(phase, plugin.name, cfg, plugin.args);
+    return cfg;
+}
+
 
 private {
     version(Windows)

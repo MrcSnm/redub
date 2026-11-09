@@ -74,6 +74,7 @@ int main(string[] args)
             "clean": &cleanMain,
             "describe": &describeMain,
             "deps": &depsMain,
+            "plugins": &pluginsMain,
             "imports": &importsMain,
             "init": &initMain,
             "install": &installMain,
@@ -314,6 +315,27 @@ int describeMain(string[] args)
     return 0;
 }
 
+
+int pluginsMain(string[] args)
+{
+    import std.stdio : writeln;
+    import redub.plugin.load : getBuiltinPluginNames, getBuiltinPluginDescription;
+
+    if(args.length >= 2 && (args[1] == "--help" || args[1] == "-h"))
+    {
+        writeln("Usage: redub plugins");
+        writeln();
+        writeln("Lists the built-in plugins available through redub:<name>.");
+        return 0;
+    }
+
+    writeln("Built-in plugins:");
+    foreach(name; getBuiltinPluginNames())
+        writeln("  redub:", name, " - ", getBuiltinPluginDescription(name));
+    writeln();
+    writeln("Use them from dub.json: \"plugins\": { \"<name>\": \"redub:<name>\" }");
+    return 0;
+}
 
 int depsMain(string[] args)
 {

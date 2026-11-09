@@ -120,7 +120,7 @@ string getTargetTypeFlag(TargetType t, CompilerBinary c)
     auto mapper = getFlagMapper(c);
     switch(t) with(TargetType)
     {
-        case executable, autodetect: return null;
+        case executable, autodetect, external: return null;
         case library, staticLibrary: return mapper(ValidDFlags.buildAsLibrary);
         case dynamicLibrary: return mapper(ValidDFlags.buildAsShared);
         default: throw new Exception("Unsupported target type");

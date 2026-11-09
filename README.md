@@ -74,11 +74,11 @@ For using it, on the JSON, you **must** specify first the plugins that are usabl
 
 That line will both build that project and load it inside the registered plugins (That means the same name can't be specified twice)
 
-The path may be either a .d module or a dub project
+The path may be either a .d module or a dub project. Built-in plugins are referenced with the `redub:` prefix, for example `"cmake": "redub:cmake"` or `"fetchlib": "redub:fetchlib"`. Run `redub plugins` to list them.
 > WARNING: This may be a subject of change and may also only support redub projects in the future, since that may only complicate code with a really low gain
 
-Redub will start distributing some build plugins in the future. Currently, getmodules plugins is inside this repo as an example only but may be better used.
-Only preBuild is currently supported since I haven't found situations yet to other cases.
+Redub ships some build plugins as built-ins. Currently, `redub:cmake` is available for libraries that build with CMake, and `redub:fetchlib` fetches sources from git and injects them into the build. The getmodules plugin inside this repo is an example of an external plugin.
+Plugins can run in two phases: `preGenerate` while a package is being parsed (before its dependencies are resolved, ideal for injecting sources) and `postGenerate` after the project tree is resolved but before cache validation and compilation (ideal for generating headers or libraries). `postGenerate` plugins run once per build, before Redub checks which packages are up to date.
 For it to be considered a redub plugin to be built, that is the minimal code:
 
 ```d
@@ -89,9 +89,9 @@ class GetModulePlugin : RedubPlugin {}
 mixin PluginEntrypoint!(GetModulePlugin);
 ```
 
-For using it on prebuild, you simply specify the module and its arguments:
+For using it, specify the module and its arguments in the phase you need:
 ```json
-"preBuildPlugins": {
+"postGeneratePlugins": {
   "getmodules": ["source/imports.txt"]
 }
 ```
@@ -293,6 +293,14 @@ With that, you'll be able to specify that your dependency is a C/C++ dependency.
 specify both D and C at the same time `redub --cc=gcc --dc=dmd`. Which will use DMD to build D and GCC to C.
 
 You can see that in the example project: [**Multi Language Redub Project**](./tests/multi_lang/dub.json)
+
+A C library can also be compiled directly from its own sources, without a Makefile or CMake: [**Direct C Library Example**](./tests/direct_c_lib/dub.json)
+
+Source-less wrappers can use `"targetType": "external"`. Redub keeps the package in the build, runs its build commands and plugins, and propagates its libraries, library paths, frameworks and link flags to dependents without producing an artifact of its own. This lets you wrap CMake/Make builds without a stub source file.
+
+If a dependency only ships Makefile/CMake files, the built-in [**fetchlib plugin**](./source/redub/plugins/fetchlib.d) (`redub:fetchlib`) fetches it from git and injects its sources in `preGenerate` based on a JSON config (URL, ref, source globs, include paths and defines). The [**Fetch Zlib Example**](./tests/fetch_zlib_plugin/zlib/fetch.json) builds zlib this way through `plugins`/`preGeneratePlugins`, using `FETCHLIB_SRC` for an existing checkout or a plain `git clone` fallback. Packages without source files are kept when they declare any plugin phase, so the plugin can inject the sources without a stub file.
+
+For libraries that need their own CMake build, the built-in [**cmake plugin**](./source/redub/plugins/cmake.d) (`redub:cmake`) clones the repository, runs `cmake` out-of-tree, installs it into the package's `vendor` directory, and reuses the cached build on later runs. The [**SDL3 Example**](./tests/sdl3/sdl3/cmake.json) declares SDL3 as an `external` target and links it into a small C app. Its `postGeneratePlugins` entry runs CMake before any compilation starts, so the normal parallel build can use the generated headers. Build it with [`tests/sdl3/build.sh`](./tests/sdl3/build.sh), which uses `--force` when the generated `vendor` directory is missing.
 
 
 [**Project Meta**](META.md)

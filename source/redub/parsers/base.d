@@ -71,7 +71,13 @@ void baseLoadPlugin(string pluginName, string pluginPath, string workingDir, Com
     import redub.plugin.load;
     import std.file;
     import std.path;
+    import std.string : startsWith;
     import redub.misc.path;
+    if(pluginPath.startsWith("redub:"))
+    {
+        loadBuiltinPlugin(pluginName, pluginPath[6..$]);
+        return;
+    }
     if(!isAbsolute(pluginPath))
         pluginPath = redub.misc.path.buildNormalizedPath(workingDir, pluginPath);
     loadPlugin(pluginName, pluginPath, cInfo);
@@ -140,10 +146,10 @@ void addFilesToCopy(ref BuildRequirements req, JSONStringArray files, ParseConfi
 void runPreGenerateCommands(ParseConfig c, ref BuildRequirements req)
 {
     import redub.parsers.environment;
-    import redub.parsers.environment;
-    if(c.preGenerateRun && req.cfg.preGenerateCommands.length)
+    import redub.plugin.load : PluginPhase, executePlugins;
+    if(c.preGenerateRun && (req.cfg.preGenerateCommands.length || req.cfg.preGeneratePlugins.length))
     {
-        infos("Pre-gen ", "Running commands for ", c.extra.requiredBy);
+        infos("Pre-gen ", "Running hooks for ", c.extra.requiredBy);
         string[string] outRedubEnv;
         req.cfg = parseEnvironmentForPreGenerate(req.cfg, outRedubEnv);
         foreach(string cmd; req.cfg.preGenerateCommands)
@@ -159,13 +165,14 @@ void runPreGenerateCommands(ParseConfig c, ref BuildRequirements req)
             if(status)
                 throw new Exception("preGenerateCommand '"~cmd~"' exited with code "~status.to!string);
         }
+        req.cfg = executePlugins(PluginPhase.preGenerate, req.cfg, req.cfg.preGeneratePlugins);
     }
 }
 
-void addPreBuildPlugins(ref BuildRequirements req, string pluginName, JSONStringArray cmds, ParseConfig c)
+void addPlugins(ref PluginExecution[] target, string pluginName, JSONStringArray cmds)
 {
     string[] output;
-    req.cfg.preBuildPlugins~= PluginExecution(pluginName, append(output, cmds));
+    target~= PluginExecution(pluginName, append(output, cmds));
 }
 void addCommands(ref BuildRequirements req, JSONStringArray cmds, ParseConfig c, RedubCommands redubCommand)
 {

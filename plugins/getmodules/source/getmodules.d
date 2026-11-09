@@ -5,20 +5,16 @@ import redub.plugin.api;
 class GetModulePlugin : RedubPlugin
 {
 
-    void preGenerate()
+    extern(C) ref RedubPluginStatus preGenerate(RedubPluginData input, out RedubPluginData output, const ref string[] args, ref return RedubPluginStatus status)
     {
-
+        return status = RedubPluginStatus.success();
     }
 
-    void postGenerate()
-    {
-
-    }
 	/**
 	* Simple utility file to get the source files used for a game project in Hipreme Engine.
 	* This utility may be replaced in the future to prefer dub describe --data=source-files
 	*/
-    extern(C) ref RedubPluginStatus preBuild(RedubPluginData input, out RedubPluginData output, const ref string[] args, ref return RedubPluginStatus status)
+    extern(C) ref RedubPluginStatus postGenerate(RedubPluginData input, out RedubPluginData output, const ref string[] args, ref return RedubPluginStatus status)
     {
 		import std.file;
 		import std.path;

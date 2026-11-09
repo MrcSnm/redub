@@ -57,17 +57,17 @@ string[] getCompilationFlags(const BuildConfiguration cfg, CompilationInfo s, st
  * Returns: null when the compiler does not support per-source compilation, so
  * the caller falls back to the batch (single command) strategy.
  */
-string[][] getPerSourceCompilationFlags(const BuildConfiguration cfg, CompilationInfo s, string mainPackHash, bool isRoot)
+string[][] getPerSourceCompilationFlags(const BuildConfiguration cfg, CompilationInfo s, string cacheDir)
 {
     import redub.command_generators.commons;
     switch(cfg.getCompiler(s.compiler).compiler) with(AcceptedCompiler)
     {
         case clang:
-            return redub.command_generators.clang.parsePerSourceBuildConfiguration(cfg, s, mainPackHash, isRoot, cppExt);
+            return redub.command_generators.clang.parsePerSourceBuildConfiguration(cfg, s, cacheDir, cppExt);
         case gxx:
-            return redub.command_generators.gnu_based.parsePerSourceBuildConfiguration(cfg, s, mainPackHash, isRoot, cppExt);
+            return redub.command_generators.gnu_based.parsePerSourceBuildConfiguration(cfg, s, cacheDir, cppExt);
         case gcc:
-            return redub.command_generators.gnu_based.parsePerSourceBuildConfiguration(cfg, s, mainPackHash, isRoot, cExt);
+            return redub.command_generators.gnu_based.parsePerSourceBuildConfiguration(cfg, s, cacheDir, cExt);
         default:
             return null;
     }

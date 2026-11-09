@@ -44,6 +44,7 @@ string getTargetTypeFlag(TargetType o)
     {
         case invalid, none: throw new Exception("Invalid targetType");
         case autodetect, executable, sourceLibrary, staticLibrary, library: return null;
+        case external: return null;
         case dynamicLibrary: return "/LD";
     }
 }

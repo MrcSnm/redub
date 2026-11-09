@@ -23,10 +23,9 @@ extern(C) struct RedubPluginStatus
  */
 interface RedubPlugin
 {
-    void preGenerate();
-    void postGenerate();
-
     /**
+     * Runs while the package is being parsed, before its dependencies are
+     * resolved into the project tree. Use this phase to fetch or inject sources.
      *
      * Params:
      *   input = Receives the build information on the input
@@ -35,7 +34,21 @@ interface RedubPlugin
      *   status = The return value
      * Returns: The status for managing redub state.
      */
-    extern(C) ref RedubPluginStatus preBuild(RedubPluginData input, out RedubPluginData output, const ref string[] args, return ref RedubPluginStatus status);
+    extern(C) ref RedubPluginStatus preGenerate(RedubPluginData input, out RedubPluginData output, const ref string[] args, return ref RedubPluginStatus status);
+
+    /**
+     * Runs after the project tree is resolved and before compilation starts.
+     * Use this phase to generate headers, libraries or other build inputs.
+     *
+     * Params:
+     *   input = Receives the build information on the input
+     *   out = The modified input. If RedubPluginData is the same as the .init value, it will be completely ignored in the modification process
+     *   args = Arguments that may be sent or not from the redub configuration file.
+     *   status = The return value
+     * Returns: The status for managing redub state.
+     */
+    extern(C) ref RedubPluginStatus postGenerate(RedubPluginData input, out RedubPluginData output, const ref string[] args, return ref RedubPluginStatus status);
+
     void postBuild();
 }
 

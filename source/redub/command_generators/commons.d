@@ -347,7 +347,7 @@ string getExtension(TargetType t, OS target, ISA isa)
     {
         case TargetType.invalid: throw new Exception("Can't use invalid targetType.");
         case TargetType.none: return null;
-        case TargetType.autodetect, TargetType.sourceLibrary: return null;
+        case TargetType.autodetect, TargetType.sourceLibrary, TargetType.external: return null;
         case TargetType.executable: return target.getExecutableExtension(isa);
         case TargetType.library, TargetType.staticLibrary: return target.getLibraryExtension;
         case TargetType.dynamicLibrary: return target.getDynamicLibraryExtension;
@@ -454,6 +454,9 @@ string getOutputPath(const BuildConfiguration cfg, OS os, ISA isa = std.system.i
 string[] getExpectedArtifacts(const BuildRequirements req, OS targetOS, ISA isa)
 {
     import redub.command_generators.commons;
+    ///External targets are built by commands or plugins and have no artifact of their own.
+    if(req.cfg.targetType.isExternal)
+        return null;
     ///Adds the output to the expectedArtifact. Those files will be considered on the cache formula.
     string[] ret = [getOutputPath(req.cfg, targetOS, isa)];
     ///When windows builds shared libraries and they aren't root, it also generates a static library (import library)

@@ -67,13 +67,12 @@ string[] parseBuildConfiguration(const BuildConfiguration b, CompilationInfo s, 
  * its own object file instead of a single relocatable (-r) object. This avoids
  * embedding the C runtime/library objects into the intermediate objects.
  */
-string[][] parsePerSourceBuildConfiguration(const BuildConfiguration b, CompilationInfo s, string mainPackhash, bool isRoot, const string[] extensions...)
+string[][] parsePerSourceBuildConfiguration(const BuildConfiguration b, CompilationInfo s, string cacheDir, const string[] extensions...)
 {
     import std.file : mkdirRecurse;
     import std.path : dirName;
 
     string[][] commands;
-    string cacheDir = getCacheOutputDir(mainPackhash, b, s, isRoot);
     mkdirRecurse(cacheDir);
 
     foreach(source; getSourceFileList(b, extensions))
@@ -97,6 +96,7 @@ string getTargetTypeFlag(TargetType o)
     {
         case invalid, none: throw new Exception("Invalid targetType");
         case autodetect, executable, sourceLibrary, staticLibrary, library: return null;
+        case external: return null;
         case dynamicLibrary: return "-shared";
     }
 }

@@ -291,15 +291,7 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
         if(executeCommands(data.cfg, RedubCommands.preBuild, res, data.env).status)
             return res;
 
-        import redub.plugin.load;
-
-        foreach(plugin; cfg.preBuildPlugins)
-        {
-            cfg = executePlugin(plugin.name, cfg, plugin.args);
-        }
-
-
-        if(pack.requirements.cfg.targetType != TargetType.none)
+        if(pack.requirements.cfg.targetType.hasBuildableOutput)
         {
             import std.path;
             string inDir = getCacheOutputDir(hash.rootHash, cast()pack.requirements, info);
@@ -317,7 +309,7 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
                 ///its own object file, avoiding a relocatable (-r) link that
                 ///would embed the C runtime inside the object.
                 string[][] perSourceFlags = isDCompiler(c) ? null
-                    : getPerSourceCompilationFlags(cfg, info, hash.rootHash, data.extra.isRoot);
+                    : getPerSourceCompilationFlags(cfg, info, inDir);
 
                 if(perSourceFlags !is null)
                 {
@@ -411,6 +403,10 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
         }
 
 
+        ///Targets without an artifact succeed once their commands/plugins ran.
+        if(!pack.requirements.cfg.targetType.hasBuildableOutput)
+            res.status = 0;
+
         if(res.status == 0)
         {
             if(!cfg.targetType.isLinkedSeparately && executeCommands(cfg, RedubCommands.postBuild, res, data.env).status)
@@ -489,6 +485,42 @@ bool executeCommandsAndPrint(BuildRequirements req, RedubCommands phase, const s
     }
     else if(res.message.length)
         info(res.message);
+    return true;
+}
+
+private bool pluginDataChanged(RedubPluginData a, RedubPluginData b)
+{
+    import std.algorithm.comparison : equal;
+    static foreach(member; __traits(allMembers, RedubPluginData))
+    {
+        if(!equal(__traits(getMember, a, member), __traits(getMember, b, member)))
+            return true;
+    }
+    return false;
+}
+
+bool executePostGeneratePlugins(ProjectNode root)
+{
+    import redub.plugin.load : PluginPhase, executePlugins;
+
+    foreach(node; root.collapse)
+    {
+        BuildConfiguration before = node.requirements.cfg;
+        if(!before.postGeneratePlugins.length)
+            continue;
+
+        try
+        {
+            BuildConfiguration after = executePlugins(PluginPhase.postGenerate, before, before.postGeneratePlugins);
+            if(pluginDataChanged(before.toRedubPluginData, after.toRedubPluginData))
+                node.requirements.cfg = after;
+        }
+        catch(Throwable e)
+        {
+            errorTitle("postGenerate Plugin Error ", "for ", node.name, ": ", e.msg);
+            return false;
+        }
+    }
     return true;
 }
 
@@ -623,7 +655,6 @@ bool buildProjectFullyParallelized(ProjectDetails details, CompilationInfo s, co
     import std.concurrency;
     ProjectNode[] finishedBuilds;
     ProjectNode root = details.tree;
-    string mainPackHash = hashFrom(root.requirements, s);
     string[string] env = getCurrentEnv();
 
     size_t i = 0;
@@ -638,6 +669,7 @@ bool buildProjectFullyParallelized(ProjectDetails details, CompilationInfo s, co
         if(!executeCommandsAndPrint(pack.requirements, RedubCommands.postGenerate, env))
             return false;
     }
+    string mainPackHash = hashFrom(root.requirements, s);
     foreach(ProjectNode pack; root.collapse)
     {
         if(pack.shouldEnterCompilationThread)

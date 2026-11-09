@@ -54,13 +54,12 @@ string[] parseBuildConfiguration(const BuildConfiguration b, CompilationInfo s, 
  * Generates one compilation command per source file, so each source produces
  * its own object file.
  */
-string[][] parsePerSourceBuildConfiguration(const BuildConfiguration b, CompilationInfo s, string mainPackhash, bool isRoot, const string[] extensions...)
+string[][] parsePerSourceBuildConfiguration(const BuildConfiguration b, CompilationInfo s, string cacheDir, const string[] extensions...)
 {
     import std.file : mkdirRecurse;
     import std.path : dirName;
 
     string[][] commands;
-    string cacheDir = getCacheOutputDir(mainPackhash, b, s, isRoot);
     mkdirRecurse(cacheDir);
 
     foreach(source; getSourceFileList(b, extensions))
@@ -84,6 +83,7 @@ string getTargetTypeFlag(TargetType o)
     {
         case invalid, none: throw new Exception("Invalid targetType");
         case autodetect, executable, sourceLibrary, staticLibrary, library: return null;
+        case external: return null;
         case dynamicLibrary: return "-shared";
     }
 }

@@ -190,7 +190,8 @@ enum TargetType : ubyte
     library,
     staticLibrary,
     dynamicLibrary,
-    sourceLibrary
+    sourceLibrary,
+    external
 }
 
 enum BuildType : string
@@ -237,6 +238,18 @@ bool hasBuildableOutput(TargetType t)
 bool isLinkedSeparately(TargetType t)
 {
     return t == TargetType.executable || t == TargetType.dynamicLibrary;
+}
+
+///Whether the target is built entirely by commands or plugins and has no artifact of its own.
+bool isExternal(TargetType t)
+{
+    return t == TargetType.external;
+}
+
+///Whether the configuration declares a plugin that may generate build inputs.
+bool hasPlugins(const ref BuildConfiguration cfg)
+{
+    return cfg.preGeneratePlugins.length || cfg.postGeneratePlugins.length;
 }
 
 TargetType targetFrom(string s)
@@ -421,7 +434,8 @@ struct BuildConfiguration
     string[][] commands;
     ///When having those files, the build will use them instead of sourcePaths + sourceFiles
     @cacheExclude string[] changedBuildFiles;
-    PluginExecution[] preBuildPlugins;
+    PluginExecution[] preGeneratePlugins;
+    PluginExecution[] postGeneratePlugins;
     string workingDir;
     string arch;
     string targetName;
@@ -664,7 +678,8 @@ struct BuildConfiguration
     BuildConfiguration mergeCommands(const ref BuildConfiguration other) const
     {
         BuildConfiguration ret = clone;
-        ret.preBuildPlugins~= cast(PluginExecution[])other.preBuildPlugins;
+        ret.preGeneratePlugins~= cast(PluginExecution[])other.preGeneratePlugins;
+        ret.postGeneratePlugins~= cast(PluginExecution[])other.postGeneratePlugins;
         if(other.commands.length > ret.commands.length)
             ret.commands.length = other.commands.length;
         foreach(i, list; other.commands)
@@ -1376,7 +1391,9 @@ class ProjectNode
                     ///init-exec is a special case that redub will filter.
                     if(child.isOptional ||
                         child.name.endsWith("init-exec") ||
-                        (noSource && !transfersDependencies))
+                        (noSource && !transfersDependencies
+                            && !child.requirements.cfg.targetType.isExternal
+                            && !child.requirements.cfg.hasPlugins))
                     {
                         if(child.isOptional && hasLogLevel(LogLevel.warn))
                             removedOptionals~= child.name;
@@ -1491,6 +1508,11 @@ class ProjectNode
                     target.requirements.cfg = target.requirements.cfg.mergeSourcePaths(input.requirements.cfg);
                     target.requirements.cfg = target.requirements.cfg.mergeSourceFiles(input.requirements.cfg);
                     target.requirements.cfg = target.requirements.cfg.mergeExcludedSourceFiles(input.requirements.cfg);
+                    break;
+                case external:
+                    target.requirements.cfg = target.requirements.cfg.mergeFrameworks(input.requirements.cfg);
+                    target.requirements.cfg = target.requirements.cfg.mergeLibraries(input.requirements.cfg);
+                    target.requirements.cfg = target.requirements.cfg.mergeLibPaths(input.requirements.cfg);
                     break;
                 case executable: break;
                 case none: throw new Exception("TargetType: none as a root project: nothing to do");

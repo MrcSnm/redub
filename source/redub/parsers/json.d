@@ -251,10 +251,15 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
                 baseLoadPlugin(key, value.str, c.workingDir, c.cInfo);
             }
         },
-        "preBuildPlugins": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _)
+        "preGeneratePlugins": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _)
         {
             foreach(key, value; v.object)
-                addPreBuildPlugins(req, key, value.strArr, c);
+                addPlugins(req.cfg.preGeneratePlugins, key, value.strArr);
+        },
+        "postGeneratePlugins": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _)
+        {
+            foreach(key, value; v.object)
+                addPlugins(req.cfg.postGeneratePlugins, key, value.strArr);
         },
         "redub": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _)
         {

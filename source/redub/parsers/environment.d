@@ -348,6 +348,7 @@ BuildConfiguration parseEnvironmentForPreGenerate(BuildConfiguration cfg, out st
     {
         if(cfg.commands.length > RedubCommands.preGenerate)
             cfg.commands[RedubCommands.preGenerate] = arrParseEnv(cfg.commands[RedubCommands.preGenerate]);
+        parsePluginExecutionsWithEnvironment(cfg.preGeneratePlugins);
     }
     return cfg;
 }
@@ -382,7 +383,8 @@ BuildConfiguration parseEnvironment(BuildConfiguration cfg)
                 __traits(getMember, cfg, mem) = arrParseEnv(__traits(getMember, cfg, mem));
         }
 
-        parsePluginExecutionsWithEnvironment(cfg.preBuildPlugins);
+        parsePluginExecutionsWithEnvironment(cfg.preGeneratePlugins);
+        parsePluginExecutionsWithEnvironment(cfg.postGeneratePlugins);
 
         if(cfg.targetName.length) cfg.targetName = parseStringWithEnvironment(cfg.targetName);
         if(cfg.commands.length > RedubCommands.postGenerate)
