@@ -48,8 +48,12 @@ string[] parseLinkConfiguration(const ThreadBuildData data, CompilationInfo s, s
                 }
                 if(b.reuseObjects)
                     putSourceFiles(cmds, null, [getObjectDir(cacheDir)], null, null, objExtension);
-                else
+                else if(c.isDCompiler)
                     cmds~= buildNormalizedPath(outputDirectory, targetName~objExtension).escapePath;
+                else
+                    ///C/C++ sources are compiled to individual objects in the
+                    ///cache directory, so link all of them.
+                    putSourceFiles(cmds, null, [cacheDir], null, null, objExtension);
             }
             if(c.isDCompiler && includeOutput)
             {

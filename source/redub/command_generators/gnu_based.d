@@ -6,6 +6,15 @@ import redub.command_generators.commons;
 import redub.logging;
 import redub.building.cache;
 
+///Flags shared by the batch and per-source compilation strategies.
+private void putBaseCompilationFlags(ref string[] cmds, const BuildConfiguration b)
+{
+    if(b.isDebug) cmds~= "-g";
+    cmds = mapAppendPrefix(cmds, b.versions, "-D", false);
+    cmds~= b.dFlags;
+    cmds = mapAppendPrefix(cmds, b.importDirectories, "-I", true);
+}
+
 /// Parse G++ configuration
 string[] parseBuildConfiguration(const BuildConfiguration b, CompilationInfo s, string mainPackhash, bool isRoot, const string[] extensions...)
 {
@@ -17,12 +26,9 @@ string[] parseBuildConfiguration(const BuildConfiguration b, CompilationInfo s, 
 
     with(b)
     {
-        if(isDebug) cmds~= "-g";
+        putBaseCompilationFlags(cmds, b);
         cmds~= "-r";
 
-        cmds = mapAppendPrefix(cmds, versions, "-D", false);
-        cmds~= dFlags;
-        cmds = mapAppendPrefix(cmds, importDirectories, "-I", true);
         putSourceFiles(cmds, workingDir, sourcePaths, sourceFiles, excludeSourceFiles, extensions);
 
 
@@ -42,6 +48,34 @@ string[] parseBuildConfiguration(const BuildConfiguration b, CompilationInfo s, 
     }
 
     return cmds;
+}
+
+/**
+ * Generates one compilation command per source file, so each source produces
+ * its own object file.
+ */
+string[][] parsePerSourceBuildConfiguration(const BuildConfiguration b, CompilationInfo s, string mainPackhash, bool isRoot, const string[] extensions...)
+{
+    import std.file : mkdirRecurse;
+    import std.path : dirName;
+
+    string[][] commands;
+    string cacheDir = getCacheOutputDir(mainPackhash, b, s, isRoot);
+    mkdirRecurse(cacheDir);
+
+    foreach(source; getSourceFileList(b, extensions))
+    {
+        string[] cmds;
+        putBaseCompilationFlags(cmds, b);
+        cmds~= "-c";
+        cmds~= source;
+        cmds~= "-o";
+        string objectPath = getPerSourceObjectPath(cacheDir, source, b.workingDir, s.targetOS);
+        mkdirRecurse(dirName(objectPath));
+        cmds~= objectPath.escapePath;
+        commands~= cmds;
+    }
+    return commands;
 }
 
 string getTargetTypeFlag(TargetType o)

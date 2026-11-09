@@ -52,6 +52,27 @@ string[] getCompilationFlags(const BuildConfiguration cfg, CompilationInfo s, st
     }
 }
 
+/**
+ * Builds one compilation command per source file for C/C++ compilers.
+ * Returns: null when the compiler does not support per-source compilation, so
+ * the caller falls back to the batch (single command) strategy.
+ */
+string[][] getPerSourceCompilationFlags(const BuildConfiguration cfg, CompilationInfo s, string mainPackHash, bool isRoot)
+{
+    import redub.command_generators.commons;
+    switch(cfg.getCompiler(s.compiler).compiler) with(AcceptedCompiler)
+    {
+        case clang:
+            return redub.command_generators.clang.parsePerSourceBuildConfiguration(cfg, s, mainPackHash, isRoot, cppExt);
+        case gxx:
+            return redub.command_generators.gnu_based.parsePerSourceBuildConfiguration(cfg, s, mainPackHash, isRoot, cppExt);
+        case gcc:
+            return redub.command_generators.gnu_based.parsePerSourceBuildConfiguration(cfg, s, mainPackHash, isRoot, cExt);
+        default:
+            return null;
+    }
+}
+
 string[] getLinkFlags(const ThreadBuildData data, CompilationInfo s, string mainPackHash, bool includeOutput = true, bool includeDFlags = true)
 {
     import redub.command_generators.commons;

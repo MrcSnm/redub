@@ -20,7 +20,13 @@ private immutable string defaultEnvJs = import("env.js");
  */
 size_t buildExecutions;
 /**
- * Saves which PIDs are currently running. Used whenever some process fails and kills all of them.
+ * PIDs currently running. When a package fails, `killRunningProcesses` kills
+ * every entry marked `true` so the build stops instead of waiting for the
+ * remaining compilers. Finished PIDs must be cleared, otherwise they could be
+ * recycled by the OS and killed by mistake.
+ *
+ * This is only accessed by the coordinator thread (module variables are
+ * thread-local in D); workers report their PIDs through `ProcessInfo`.
  */
 bool[shared Pid] runningProcesses;
 
@@ -40,9 +46,29 @@ struct CompilationID
     size_t id;
 }
 
+/**
+ * Sent by a worker to tell the coordinator about a compiler process it spawned.
+ *
+ * `running` is true while the process is alive and false once it exited, so
+ * the coordinator can forget it. This exists because per-source compilation
+ * spawns several processes per package, while `CompilationResult.pid` can only
+ * carry the last one: without the explicit `false`, the earlier PIDs would stay
+ * marked as running forever and a later failure could kill a recycled PID.
+ */
 struct ProcessInfo
 {
     shared Pid pid;
+    bool running = true;
+}
+
+///Notifies the coordinator about a process state. No-op when unowned.
+private void reportProcess(Tid owner, size_t id, shared Pid pid, bool running)
+{
+    import std.concurrency : send;
+
+    if(owner == Tid.init)
+        return;
+    send(owner, CompilationID(id), ProcessInfo(pid, running), CompilationResult.init);
 }
 
 struct HashPair
@@ -153,6 +179,86 @@ private string[] getSingleCallFlags(const ThreadBuildData data, CompilationInfo 
     return flags;
 }
 
+///Removes previously generated object files so stale sources are not archived
+///or linked after the per-source compilation strategy runs.
+private void removeObjectFiles(string dir)
+{
+    import std.file : dirEntries, exists, isDir, remove, SpanMode;
+    import std.string : endsWith;
+
+    if(!exists(dir))
+        return;
+    foreach(entry; dirEntries(dir, SpanMode.depth))
+        if(!entry.isDir && (entry.name.endsWith(".o") || entry.name.endsWith(".obj")))
+            remove(entry.name);
+}
+
+/**
+ * Compiles every source in its own process, concurrently, writing one object
+ * file per source into `inDir` (the cache output directory).
+ */
+private ExecutionResult compilePerSource(
+    const BuildConfiguration cfg,
+    Compiler compiler,
+    immutable ThreadBuildData data,
+    string[][] perSourceFlags,
+    string inDir,
+    Tid owner,
+    size_t id,
+    ref CompilationResult res)
+{
+    import std.algorithm.comparison:clamp;
+    import std.file : remove;
+    import std.parallelism : TaskPool, totalCPUs;
+
+    struct PerSourceOutcome
+    {
+        string command;
+        string output;
+        int status;
+        shared Pid pid;
+    }
+
+    ExecutionResult ret;
+    PerSourceOutcome[] outcomes;
+    outcomes.length = perSourceFlags.length;
+
+    ///Spawning one process per source only pays off when they run
+    ///concurrently, so use one worker per source up to the core count.
+    uint workers = clamp(cast(uint)perSourceFlags.length, 1, totalCPUs);
+
+    if(perSourceFlags.length)
+    {
+        auto pool = new TaskPool(workers);
+        scope(exit) pool.stop();
+        foreach(i, ref outcome; pool.parallel(outcomes, 1))
+        {
+            string cmdFile;
+            ProcessExec2 ex = execCompiler(cfg, compiler, perSourceFlags[i],
+                outcome.command, data.isLeaf, cmdFile, data.env);
+            outcome.pid = cast(shared)ex.pipe.pid;
+            reportProcess(owner, id, outcome.pid, true);
+            auto one = waitProcessExec(ex);
+            if(cmdFile)
+                remove(cmdFile);
+            reportProcess(owner, id, outcome.pid, false);
+            outcome.status = one.status;
+            outcome.output = one.output;
+        }
+    }
+
+    foreach(i, ref outcome; outcomes)
+    {
+        res.compilationCommand ~= (i == 0 ? "" : "\n\n") ~ outcome.command;
+        ret.output ~= outcome.output;
+        if(outcome.status && !ret.status)
+            ret.status = outcome.status;
+    }
+    if(outcomes.length)
+        res.pid = outcomes[$ - 1].pid;
+    return ret;
+}
+
 CompilationResult execCompilation(immutable ThreadBuildData data, shared ProjectNode pack, CompilationInfo info, HashPair hash, Tid owner, size_t id)
 {
     import std.file;
@@ -205,43 +311,62 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
             if(!pack.isCopyEnough)
             {
                 import std.concurrency;
-                singleCall = canBuildInSingleCall(cast()pack, info);
-                res.linkedInCompilation = singleCall;
-                string[] compilationFlags;
-                if(singleCall)
+                import redub.command_generators.automatic : getPerSourceCompilationFlags;
+
+                ///C/C++ sources are compiled individually so each one produces
+                ///its own object file, avoiding a relocatable (-r) link that
+                ///would embed the C runtime inside the object.
+                string[][] perSourceFlags = isDCompiler(c) ? null
+                    : getPerSourceCompilationFlags(cfg, info, hash.rootHash, data.extra.isRoot);
+
+                if(perSourceFlags !is null)
                 {
-                    ThreadBuildData singleCallData = ThreadBuildData(cfg, cast()data.extra, data.archiver, data.isRoot, data.isLeaf, data.env);
-                    compilationFlags = getSingleCallFlags(singleCallData, info, hash.rootHash);
+                    import redub.misc.hard_link : hardLinkDir;
+
+                    removeObjectFiles(inDir);
+                    ret = compilePerSource(cfg, compiler, data, perSourceFlags, inDir, owner, id, res);
+                    if(!ret.status)
+                        hardLinkDir(inDir, dirName(outDir), true, true);
                 }
                 else
-                    compilationFlags = getCompilationFlags(cfg, info, hash.rootHash, data.extra.isRoot);
-
-                if(singleCall && cfg.targetIcon.length)
                 {
-                    version(Windows)
+                    singleCall = canBuildInSingleCall(cast()pack, info);
+                    res.linkedInCompilation = singleCall;
+                    string[] compilationFlags;
+                    if(singleCall)
                     {
-                        import redub.misc.win_icon;
-                        string iconError;
-                        if(processIcon(cfg.targetIcon, iconError) is null)
+                        ThreadBuildData singleCallData = ThreadBuildData(cfg, cast()data.extra, data.archiver, data.isRoot, data.isLeaf, data.env);
+                        compilationFlags = getSingleCallFlags(singleCallData, info, hash.rootHash);
+                    }
+                    else
+                        compilationFlags = getCompilationFlags(cfg, info, hash.rootHash, data.extra.isRoot);
+
+                    if(singleCall && cfg.targetIcon.length)
+                    {
+                        version(Windows)
                         {
-                            res.status = 1;
-                            res.message = iconError;
-                            return res;
+                            import redub.misc.win_icon;
+                            string iconError;
+                            if(processIcon(cfg.targetIcon, iconError) is null)
+                            {
+                                res.status = 1;
+                                res.message = iconError;
+                                return res;
+                            }
                         }
                     }
-                }
 
-                string cmdFile;
-                ProcessExec2 ex = execCompiler(cfg, compiler, compilationFlags, res.compilationCommand, data.isLeaf, cmdFile, data.env);
-                scope(exit)
-                {
-                    if(cmdFile)
-                        std.file.remove(cmdFile);
+                    string cmdFile;
+                    ProcessExec2 ex = execCompiler(cfg, compiler, compilationFlags, res.compilationCommand, data.isLeaf, cmdFile, data.env);
+                    scope(exit)
+                    {
+                        if(cmdFile)
+                            std.file.remove(cmdFile);
+                    }
+                    res.pid = cast(shared)ex.pipe.pid;
+                    reportProcess(owner, id, res.pid, true);
+                    ret = cast(ExecutionResult)finishCompilerExec(cfg, compiler, inDir, dirName(outDir), ex);
                 }
-                res.pid = cast(shared)ex.pipe.pid;
-                if(owner != Tid.init)
-                    owner.send(CompilationID(id), ProcessInfo(res.pid), CompilationResult.init);
-                ret = cast(ExecutionResult)finishCompilerExec(cfg, compiler, inDir, dirName(outDir), ex);
             }
 
             if(!ret.status && !isDCompiler(c) && isStaticLibrary(data.cfg.targetType)) //Must call archiver when
@@ -430,7 +555,7 @@ bool buildProjectParallelSimple(ProjectDetails details, CompilationInfo s, const
             continue;
         if(info[1] != ProcessInfo.init)
         {
-            runningProcesses[info[1].pid] = true;
+            runningProcesses[info[1].pid] = info[1].running;
             continue;
         }
         auto res = info[2];
@@ -545,7 +670,7 @@ bool buildProjectFullyParallelized(ProjectDetails details, CompilationInfo s, co
         }
         if(info[1] != ProcessInfo.init)
         {
-            runningProcesses[info[1].pid] = true;
+            runningProcesses[info[1].pid] = info[1].running;
             _--;
             continue;
         }

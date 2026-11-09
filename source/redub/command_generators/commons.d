@@ -139,6 +139,52 @@ string getConfigurationOutputName(const BuildConfiguration conf, OS os)
  */
 string getObjectOutputName(const BuildConfiguration conf, OS os){ return conf.targetName~getObjectExtension(os);}
 
+/**
+ * Lists the source files that would be passed to the compiler for the given
+ * configuration and file extensions.
+ * Returns: Escaped source file paths.
+ */
+string[] getSourceFileList(const BuildConfiguration conf, const string[] extensions...)
+{
+    string[] ret;
+    putSourceFiles(ret, conf.workingDir, conf.sourcePaths, conf.sourceFiles,
+        conf.excludeSourceFiles, extensions);
+    return ret;
+}
+
+/**
+ * Object file path for a source compiled individually.
+ *
+ * Mirrors the source tree under `cacheDir` (e.g. `source/a.c` becomes
+ * `<cacheDir>/source/a.o`) so the verbose command output and the archiver /
+ * linker invocations stay readable. Sources outside `workingDir` cannot be
+ * mirrored safely, so they fall back to `basename-<path CRC>.o`, which also
+ * keeps the name unique when different sources share a basename.
+ */
+string getPerSourceObjectPath(string cacheDir, string sourcePath, string workingDir, OS os)
+{
+    import std.conv : to;
+    import std.digest.crc : crc32Of;
+    import std.digest : toHexString;
+    import std.path : absolutePath, baseName, isAbsolute, relativePath, setExtension, stripExtension;
+    import std.string : representation, startsWith;
+    import redub.misc.path : buildNormalizedPath;
+
+    string source = unescapePath(sourcePath);
+    string wd = isAbsolute(workingDir) ? workingDir : absolutePath(workingDir);
+    string rel = relativePath(source, wd);
+    bool escapes = rel == ".." || rel.startsWith("../") || rel.startsWith(`..\`);
+
+    if(rel.length && !isAbsolute(rel) && !escapes)
+        return buildNormalizedPath(cacheDir, setExtension(rel, getObjectExtension(os)));
+
+    string base = stripExtension(baseName(source));
+    if(!base.length)
+        base = "source";
+    string unique = base ~ "-" ~ toHexString(crc32Of(source.representation)).to!string;
+    return buildNormalizedPath(cacheDir, unique ~ getObjectExtension(os));
+}
+
 string getDepsFilePath(ProjectNode root, CompilationInfo s)
 {
     import redub.building.cache;
@@ -324,7 +370,15 @@ void copyDir(string fromDir, string toDir, bool shallow = true)
 
     foreach(DirEntry e; dirEntries(fromDir, shallow ? SpanMode.shallow : SpanMode.depth))
     {
-        if(!hardLink(e.name, buildNormalizedPath(toDir, baseName(e.name)), true))
+        ///Directories are skipped: `shallow` must not descend into them, and
+        ///with `depth` their files are yielded individually below.
+        if(e.isDir)
+            continue;
+        string rel = shallow ? baseName(e.name) : e.name[fromDir.length+1..$];
+        string dest = buildNormalizedPath(toDir, rel);
+        if(!exists(dirName(dest)))
+            mkdirRecurse(dirName(dest));
+        if(!hardLink(e.name, dest, true))
             throw new RedubException("Could not copy file "~e.name);
     }
 }

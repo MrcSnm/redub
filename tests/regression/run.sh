@@ -91,6 +91,16 @@ redub_with_dub_home() {
     fi
 }
 
+# redub appends the platform folder to DUB_HOME (dub on Windows, .dub on POSIX).
+dub_workspace()
+{
+    if [ "$WINDOWS" -eq 1 ]; then
+        printf '%s\n' "$1/dub"
+    else
+        printf '%s\n' "$1/.dub"
+    fi
+}
+
 have_dmd()
 {
     if command -v dmd >/dev/null 2>&1; then return 0; fi
@@ -176,16 +186,24 @@ test_config_platform_crash()
     local name="cfgtest$SUFFIX"
     local d="$WORK/config"
     local log="$WORK/config.log"
+    local otherPlatform
+    if [ "$WINDOWS" -eq 1 ]; then
+        otherPlatform=osx
+    elif [ "$(uname -s 2>/dev/null)" = "Darwin" ]; then
+        otherPlatform=linux
+    else
+        otherPlatform=osx
+    fi
     mkdir -p "$d/source"
     cat > "$d/dub.json" <<JSON
 {"name":"$name","targetPath":"build","configurations":[
-  {"name":"mac","platforms":["osx"],"sourcePaths":["source"]},
+  {"name":"other","platforms":["$otherPlatform"],"sourcePaths":["source"]},
   {"name":"unittest","sourcePaths":["source"]}
 ]}
 JSON
     printf '%s\n' 'void main(){}' > "$d/source/app.d"
 
-    redub_in "$d" 120 "$log" build --config mac
+    redub_in "$d" 120 "$log" build --config other
     local status=$?
     if grep -qE 'ArrayIndexError|out of bounds' "$log"; then
         fail config_platform_crash "crashed instead of reporting an incompatible configuration ($(detail "$log"))"
@@ -872,7 +890,9 @@ test_dependency_upgrade_deep_diamond()
     local rootname="diamondroot$SUFFIX"
     local d="$WORK/diamond"
     local log="$WORK/diamond.log"
-    mkdir -p "$d/home/dub/packages" "$d/root/source" "$d/A/source" "$d/B/source" "$d/C/source" \
+    local workspace
+    workspace="$(dub_workspace "$d/home")"
+    mkdir -p "$workspace/packages" "$d/root/source" "$d/A/source" "$d/B/source" "$d/C/source" \
         "$d/x10/source" "$d/x12/source" "$d/olddep/source" "$d/newdep/source"
 
     printf '%s\n' '{"name":"'"$rootname"'","targetPath":"build","dependencies":{"dia":{"path":"../A"},"dib":{"path":"../B"}}}' > "$d/root/dub.json"
@@ -902,7 +922,7 @@ test_dependency_upgrade_deep_diamond()
         x10="$d/x10"
         x12="$d/x12"
     fi
-    printf '%s\n' '[{"name":"diamondx","version":"1.0.0","path":"'"$x10"'"},{"name":"diamondx","version":"1.2.0","path":"'"$x12"'"}]' > "$d/home/dub/packages/local-packages.json"
+    printf '%s\n' '[{"name":"diamondx","version":"1.0.0","path":"'"$x10"'"},{"name":"diamondx","version":"1.2.0","path":"'"$x12"'"}]' > "$workspace/packages/local-packages.json"
 
     redub_with_dub_home "$d/root" "$d/home" "$log" build --force
     if [ "$?" -eq 0 ]; then
@@ -1294,6 +1314,8 @@ test_clean_all()
     local buildlog="$WORK/cleanall_build.log"
     local cleanlog="$WORK/cleanall_clean.log"
     local rebuildlog="$WORK/cleanall_rebuild.log"
+    local workspace
+    workspace="$(dub_workspace "$home")"
     make_shared_cache_dep "$base"
     make_shared_cache_project "$base" p1 p1
 
@@ -1301,7 +1323,7 @@ test_clean_all()
         fail clean_all "setup build failed: $(detail "$buildlog")"
         return
     fi
-    if [ ! -d "$home/dub/.redub" ]; then
+    if [ ! -d "$workspace/.redub" ]; then
         fail clean_all "cache folder was not created"
         return
     fi
@@ -1309,7 +1331,7 @@ test_clean_all()
         fail clean_all "clean --all failed: $(detail "$cleanlog")"
         return
     fi
-    if [ -e "$home/dub/.redub" ]; then
+    if [ -e "$workspace/.redub" ]; then
         fail clean_all "clean --all left the cache folder behind"
         return
     fi
@@ -1332,6 +1354,8 @@ test_clean_orphan_tmp()
     local buildlog="$WORK/cleantmp_build.log"
     local cleanlog="$WORK/cleantmp_clean.log"
     local p2log="$WORK/cleantmp_p2.log"
+    local workspace
+    workspace="$(dub_workspace "$home")"
     make_shared_cache_dep "$base"
     make_shared_cache_project "$base" p1 p1
     make_shared_cache_project "$base" p2 p2
@@ -1340,16 +1364,16 @@ test_clean_orphan_tmp()
         fail clean_orphan_tmp "setup build failed: $(detail "$buildlog")"
         return
     fi
-    printf 'orphan' > "$home/dub/.redub/orphan.tmp"
+    printf 'orphan' > "$workspace/.redub/orphan.tmp"
     if ! redub_with_dub_home "$base/p1" "$home" "$cleanlog" clean; then
         fail clean_orphan_tmp "clean failed: $(detail "$cleanlog")"
         return
     fi
-    if [ -e "$home/dub/.redub/orphan.tmp" ]; then
+    if [ -e "$workspace/.redub/orphan.tmp" ]; then
         fail clean_orphan_tmp "clean left orphan .tmp behind"
         return
     fi
-    if [ "$(find "$home/dub/.redub" -maxdepth 1 -name '*.bin' 2>/dev/null | wc -l)" -lt 1 ]; then
+    if [ "$(find "$workspace/.redub" -maxdepth 1 -name '*.bin' 2>/dev/null | wc -l)" -lt 1 ]; then
         fail clean_orphan_tmp "clean removed the shared dependency cache"
         return
     fi
@@ -1373,6 +1397,8 @@ test_clean_old_cache()
     local home="$WORK/cleanold_home"
     local buildlog="$WORK/cleanold_build.log"
     local cleanlog="$WORK/cleanold_clean.log"
+    local workspace
+    workspace="$(dub_workspace "$home")"
     make_shared_cache_dep "$base"
     make_shared_cache_project "$base" p1 p1
 
@@ -1380,12 +1406,12 @@ test_clean_old_cache()
         fail clean_old_cache "setup build failed: $(detail "$buildlog")"
         return
     fi
-    touch -d '40 days ago' "$home/dub/.redub"/*.bin
+    touch -d '40 days ago' "$workspace/.redub"/*.bin
     if ! redub_with_dub_home "$base/p1" "$home" "$cleanlog" clean; then
         fail clean_old_cache "clean failed: $(detail "$cleanlog")"
         return
     fi
-    if [ "$(find "$home/dub/.redub" -maxdepth 1 -name '*.bin' 2>/dev/null | wc -l)" -eq 0 ]; then
+    if [ "$(find "$workspace/.redub" -maxdepth 1 -name '*.bin' 2>/dev/null | wc -l)" -eq 0 ]; then
         pass clean_old_cache
     else
         fail clean_old_cache "clean did not remove old cache entries"

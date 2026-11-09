@@ -62,20 +62,27 @@ Archiver getArchiver(AcceptedArchiver archiver, const string[string] env)
     if(archiver == AcceptedArchiver.llvmLib || archiver == AcceptedArchiver.lib) help = "/help";
     try
     {
-        auto res = execute([archiver, help], env);
-        if(res.status == 0)
-        {
-            Archiver arch = Archiver(archiver, findExecutable(archiver));
-            saveArchiver(compilersInfo, arch);
-            return arch;
-        }
+        ///A successful spawn is the only portable check: some archivers (BSD
+        ///`ar` on macOS, for instance) exit non-zero for `--help` even though
+        ///they work fine.
+        execute([archiver, help], env);
     }
-    catch(ProcessException) {}
-    ///Some NDK clang distributions ship llvm-lib but its help probe fails.
-    ///The same toolchain always has llvm-ar, so fall back to it.
-    if(archiver == AcceptedArchiver.llvmLib)
-        return getArchiver(AcceptedArchiver.llvmAr, env);
-    return Archiver(AcceptedArchiver.none);
+    catch(ProcessException)
+    {
+        ///Some NDK clang distributions ship llvm-lib outside PATH. The same
+        ///toolchain always has llvm-ar, so fall back to it.
+        if(archiver == AcceptedArchiver.llvmLib)
+            return getArchiver(AcceptedArchiver.llvmAr, env);
+        return Archiver(AcceptedArchiver.none);
+    }
+    string bin = findExecutable(archiver);
+    ///It ran with `env`, so it exists even if the global PATH lookup misses
+    ///it; invoking it by name later will still work.
+    if(!bin.length)
+        bin = archiver;
+    Archiver arch = Archiver(archiver, bin);
+    saveArchiver(compilersInfo, arch);
+    return arch;
 }
 
 void saveArchiver(ref JSONValue v, Archiver arch)
