@@ -323,7 +323,7 @@ string prepareForAndroidBundleGen(ref ProjectDetails d)
     string clang = buildNormalizedPath(bin, "clang" ~ androidExeSuffix);
     Compiler ndkCompiler = getCompiler(d.compiler.d.bin, clang);
     d.compiler.c = ndkCompiler.c;
-    d.cDetails.info.arch = arch;
+    d.cDetails.info.setArch(arch);
     d.cDetails.info.compiler.c.setBinary(AcceptedCompiler.clang, clang);
 
     string originalOutput = d.tree.getOutputPath();
@@ -476,7 +476,7 @@ void generateAndroidBundle(string outputFolder, ref ProjectDetails d)
     if(!keystore.length)
     {
         keystore = buildNormalizedPath(outputFolder, "debug.keystore");
-        if(createDebugKeystore(keystore) != 0)
+        if(!exists(keystore) && createDebugKeystore(keystore) != 0)
             return;
     }
     if(runBat(apksigner, ["sign", "--ks", keystore,

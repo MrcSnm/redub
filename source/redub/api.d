@@ -794,7 +794,7 @@ ProjectDetails[] buildProjectUniversal(ArgsDetails args)
 
         foreach(arch; archs)
         {
-            other.cDetails.info.arch = arch;
+            other.cDetails.info.setArch(arch);
             ProjectDetails d = resolveDependencies(args.resolveInfo(), other.cDetails, other.proj, other.dubVars, other.buildType);
             d.bundleGenerated = bundleGenerated;
 

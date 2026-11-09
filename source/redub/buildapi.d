@@ -55,7 +55,7 @@ string osName(OS os)
 struct CompilationInfo
 {
     Compiler compiler;
-    string arch;
+    private string _arch;
     OS targetOS;
     ISA isa;
     bool isSimulator;
@@ -67,7 +67,7 @@ struct CompilationInfo
         import std.string:chomp;
         import redub.command_generators.commons;
         this.compiler = compiler;
-        this.arch = arch;
+        this._arch = arch;
         this.targetOS = osFromArch(arch);
         this.isa = isaFromArch(arch);
         this.isSimulator = isSimulatorFromArch(arch);
@@ -82,6 +82,13 @@ struct CompilationInfo
             }
         }
     }
+    ///Recomputes the derived fields (targetOS, isa, simulator and sysroot)
+    ///after the architecture was changed.
+    void setArch(string newArch)
+    {
+        this = CompilationInfo(compiler, newArch);
+    }
+    string arch() const { return _arch; }
     
     string compilerStr() const {return compiler.d.getCompilerString; }
     string c_compilerStr() const {return compiler.c.getCompilerString; }

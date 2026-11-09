@@ -151,7 +151,7 @@ TargetInfo getTarget(JSONValue value, string target, ParseConfig cfg)
     string compiler = tryGetStr(*actualTarget, "compiler");
     string arch = tryGetStr(*actualTarget, "arch");
     if(compiler) ret.parseConfig.cInfo.compiler = getCompiler(compiler);
-    if(arch) ret.parseConfig.cInfo.arch = arch;
+    if(arch) ret.parseConfig.cInfo.setArch(arch);
 
     ///This line is necessary as it errors if no requiredBy is pressent and no name is present.
     cfg.extra.requiredBy = target;
