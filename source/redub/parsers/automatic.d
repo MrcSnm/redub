@@ -89,11 +89,26 @@ RootParseResult parseProject(
 
     ParseConfig cfg = getParseConfig(projectWorkingDir, cInfo, defaultPackageName, null, subConfiguration, subPackage, null, isDescribeOnly);
     TargetInfo targetInfo;
+    CompilationInfo originalInfo = cInfo;
     if(target.length)
     {
         targetInfo = redub.parsers.json.getTarget(projectJSON, target, cfg);
         cfg = targetInfo.parseConfig;
         cInfo = cfg.cInfo;
+    }
+    ///Targets may pick the compiler; when they don't, toolchainRequirements decides.
+    if(!targetInfo.hasCompiler)
+    {
+        import redub.tooling.compiler_identification : applyToolchainRequirements;
+        applyToolchainRequirements(projectJSON, cfg.cInfo.compiler);
+        cInfo = cfg.cInfo;
+    }
+    ///preGenerate commands run during parsing, so refresh $DC before that.
+    if(cfg.cInfo.compiler.d.bin != originalInfo.compiler.d.bin)
+    {
+        import redub.parsers.environment : setEnvVariable;
+        setEnvVariable("DC", cfg.cInfo.compiler.d.bin);
+        setEnvVariable("DC_BASE", cfg.cInfo.compiler.d.getCompilerString);
     }
     result.targetCompilationInfo = cInfo;
     BuildConfiguration pending;

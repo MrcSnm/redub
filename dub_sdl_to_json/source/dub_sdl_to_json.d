@@ -73,6 +73,8 @@ JSONValue sdlToJSON(SDLNode[] sdl)
 	JSONValue subConfigurations = JSONValue.emptyObject;
 	JSONValue buildTypes = JSONValue.emptyObject;
 	JSONValue plugins = JSONValue.emptyObject;
+	JSONValue preGeneratePlugins = JSONValue.emptyObject;
+	JSONValue postGeneratePlugins = JSONValue.emptyObject;
 	JSONValue preBuildPlugins = JSONValue.emptyObject;
 
 	JSONValue configurations = JSONValue.emptyArray;
@@ -126,16 +128,21 @@ JSONValue sdlToJSON(SDLNode[] sdl)
 				configSdl["name"] = v.values[0].textValue;
 				configurations.jsonArray ~= configSdl;
 				break;
+			case "preGeneratePlugin":
+			case "postGeneratePlugin":
 			case "preBuildPlugin":
-				enforce(v.values.length >= 2, "A prebuild plugin must specify a plugin and arguments.");
-				enforce(v.values[0].isText, "The first preBuildPlugin value must be the name of a plugin.");
+				enforce(v.values.length >= 2, "A "~v.name~" must specify a plugin and arguments.");
+				enforce(v.values[0].isText, "The first "~v.name~" value must be the name of a plugin.");
 				string pluginName = v.values[0].textValue;
 
 				JSONValue configSdl = JSONValue.emptyArray;
 				foreach(arg; v.values[1..$]) {
 					configSdl.jsonArray ~= toJSONValue(arg);
 				}
-				preBuildPlugins[pluginName] = configSdl;
+				JSONValue* targetPlugins = v.name == "preGeneratePlugin" ? &preGeneratePlugins
+					: v.name == "postGeneratePlugin" ? &postGeneratePlugins
+					: &preBuildPlugins;
+				(*targetPlugins)[pluginName] = configSdl;
 				break;
 			case "buildType":
 				enforce(v.values.length == 1, "A buildType can only have a single value, which is the buildType name");
@@ -235,6 +242,10 @@ JSONValue sdlToJSON(SDLNode[] sdl)
 		ret["buildTypes"] = buildTypes;
 	if(plugins.data.object !is null)
 		ret["plugins"] = plugins;
+	if(preGeneratePlugins.data.object !is null)
+		ret["preGeneratePlugins"] = preGeneratePlugins;
+	if(postGeneratePlugins.data.object !is null)
+		ret["postGeneratePlugins"] = postGeneratePlugins;
 	if(preBuildPlugins.data.object !is null)
 		ret["preBuildPlugins"] = preBuildPlugins;
 
@@ -456,6 +467,22 @@ dependency "yyjson-d" path="../yyjson-d"
 `;
 	JSONValue v = sdlToJSON(parseSDL(null, testSdl));
 	assert("dependencies" in v);
+}
+
+unittest
+{
+	enum testSdl =
+`
+plugin cmake="redub:cmake"
+preGeneratePlugin "fetchlib" "fetch.json"
+postGeneratePlugin "cmake" "cmake.json"
+preBuildPlugin "legacy" "arg"
+`;
+	JSONValue v = sdlToJSON(parseSDL(null, testSdl));
+	assert("plugins" in v);
+	assert("preGeneratePlugins" in v);
+	assert("postGeneratePlugins" in v);
+	assert("preBuildPlugins" in v);
 }
 
 

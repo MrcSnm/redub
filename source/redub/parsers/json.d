@@ -36,6 +36,8 @@ struct TargetInfo
     ParseConfig parseConfig;
     BuildConfiguration pending;
     BuildRequirements targetRequirement;
+    ///Whether the target itself selected the compiler. Targets take priority over toolchainRequirements.
+    bool hasCompiler;
 }
 
 /** 
@@ -152,6 +154,7 @@ TargetInfo getTarget(JSONValue value, string target, ParseConfig cfg)
     string arch = tryGetStr(*actualTarget, "arch");
     if(compiler) ret.parseConfig.cInfo.compiler = getCompiler(compiler);
     if(arch) ret.parseConfig.cInfo.setArch(arch);
+    ret.hasCompiler = compiler.length != 0;
 
     ///This line is necessary as it errors if no requiredBy is pressent and no name is present.
     cfg.extra.requiredBy = target;
@@ -250,6 +253,13 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
                 enforce(value.type == JSONType.string, "\"plugins\" entry key '"~key~"' must be a string to a path being either a .d file or a dub project.");
                 baseLoadPlugin(key, value.str, c.workingDir, c.cInfo);
             }
+        },
+        "toolchainRequirements": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _)
+        {
+            import redub.tooling.compiler_identification : satisfiesToolchainRequirements;
+            string failure;
+            enforce(satisfiesToolchainRequirements(v, c.cInfo.compiler.d, failure),
+                "Package '"~c.extra.requiredBy~"' toolchain requirements are not satisfied: "~failure);
         },
         "preGeneratePlugins": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _)
         {

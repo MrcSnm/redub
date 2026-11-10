@@ -291,6 +291,217 @@ private CompilerBinary searchCompiler(string compilerOrPath, JSONValue compilers
 
 
 
+private bool satisfiesVersion(string ver, string requirement)
+{
+    SemVer req = SemVer(requirement);
+    return !req.isInvalid && SemVer(ver).satisfies(req);
+}
+
+private struct ToolchainConstraints
+{
+    bool hasDmd;
+    bool hasLdc;
+    string dmd;
+    string ldc;
+
+    bool positiveDmd() const { return hasDmd && dmd != "no"; }
+    bool positiveLdc() const { return hasLdc && ldc != "no"; }
+    bool restricted() const { return positiveDmd || positiveLdc; }
+
+    bool allows(AcceptedCompiler c) const
+    {
+        if(c == AcceptedCompiler.dmd)
+            return (!hasDmd || positiveDmd) && (!restricted || positiveDmd);
+        if(c == AcceptedCompiler.ldc2)
+            return (!hasLdc || positiveLdc) && (!restricted || positiveLdc);
+        return !restricted;
+    }
+}
+
+private bool parseToolchainConstraints(JSONValue requirements, out ToolchainConstraints constraints, out string failure)
+{
+    import std.string : strip;
+    if(requirements.type != JSONType.object)
+    {
+        failure = "'toolchainRequirements' must be an object.";
+        return false;
+    }
+    foreach(key, value; requirements.object)
+    {
+        if(value.type != JSONType.string)
+        {
+            failure = "'toolchainRequirements."~key~"' must be a string.";
+            return false;
+        }
+        string requirement = value.str.strip;
+        switch(key)
+        {
+            case "dmd":
+                constraints.hasDmd = true;
+                constraints.dmd = requirement;
+                break;
+            case "ldc":
+                constraints.hasLdc = true;
+                constraints.ldc = requirement;
+                break;
+            default: break;
+        }
+    }
+    return true;
+}
+
+private string allowedCompilerNames(const ref ToolchainConstraints constraints)
+{
+    import std.array : join;
+    string[] names;
+    if(constraints.allows(AcceptedCompiler.dmd))
+        names ~= "dmd";
+    if(constraints.allows(AcceptedCompiler.ldc2))
+        names ~= "ldc";
+    if(constraints.allows(AcceptedCompiler.nmc))
+        names ~= "nmc";
+    return names.join(", ");
+}
+
+/**
+ * Checks a package's `toolchainRequirements` object against a D compiler.
+ * A positive `dmd`/`ldc` requirement restricts the build to those compilers;
+ * `frontend` alone accepts any D compiler that matches it.
+ * Params:
+ *   requirements = The `toolchainRequirements` object from the recipe.
+ *   d = The D compiler being considered.
+ *   failure = Human readable description of the first unsatisfied requirement.
+ * Returns: Whether the compiler satisfies every requirement.
+ */
+bool satisfiesToolchainRequirements(JSONValue requirements, const ref CompilerBinary d, out string failure)
+{
+    import redub.buildapi : RedubVersionOnly;
+    ToolchainConstraints constraints;
+    if(!parseToolchainConstraints(requirements, constraints, failure))
+        return false;
+    if(!constraints.allows(d.compiler))
+    {
+        failure = "The recipe only allows "~allowedCompilerNames(constraints)~".";
+        return false;
+    }
+    foreach(key, value; requirements.object)
+    {
+        string requirement = value.str;
+        bool disallowed = requirement == "no";
+        switch(key)
+        {
+            case "dub":
+                if(disallowed)
+                {
+                    failure = "The recipe disallows using dub.";
+                    return false;
+                }
+                if(!satisfiesVersion(RedubVersionOnly[1..$], requirement))
+                {
+                    failure = "Requires dub "~requirement~", but redub is "~RedubVersionOnly[1..$]~".";
+                    return false;
+                }
+                break;
+            case "frontend":
+                if(disallowed)
+                {
+                    failure = "The recipe disallows the D frontend.";
+                    return false;
+                }
+                if(!isDCompiler(d.compiler))
+                {
+                    failure = "Requires D frontend "~requirement~", but the selected compiler is not a D compiler.";
+                    return false;
+                }
+                if(!satisfiesVersion(d.frontendVersion.toString, requirement))
+                {
+                    failure = "Requires D frontend "~requirement~", but "~d.getCompilerString~" provides "~d.frontendVersion.toString~".";
+                    return false;
+                }
+                break;
+            case "dmd":
+                if(d.compiler == AcceptedCompiler.dmd && !satisfiesVersion(d.version_.toString, requirement))
+                {
+                    failure = "Requires DMD "~requirement~", but the selected DMD is "~d.version_.toString~".";
+                    return false;
+                }
+                break;
+            case "ldc":
+                if(d.compiler == AcceptedCompiler.ldc2 && !satisfiesVersion(d.version_.toString, requirement))
+                {
+                    failure = "Requires LDC "~requirement~", but the selected LDC is "~d.version_.toString~".";
+                    return false;
+                }
+                break;
+            case "gdc":
+                if(!disallowed)
+                {
+                    failure = "Requires GDC "~requirement~", which redub does not support.";
+                    return false;
+                }
+                break;
+            default: break;
+        }
+    }
+    return true;
+}
+
+private CompilerBinary findInstalledCompiler(JSONValue requirements, const ref ToolchainConstraints constraints, out string failure)
+{
+    foreach(name; supportedDCompilers)
+    {
+        AcceptedCompiler c = name == "dmd" ? AcceptedCompiler.dmd
+            : name == "ldc2" ? AcceptedCompiler.ldc2
+            : AcceptedCompiler.nmc;
+        if(!constraints.allows(c))
+            continue;
+        string requirement = c == AcceptedCompiler.dmd ? constraints.dmd
+            : c == AcceptedCompiler.ldc2 ? constraints.ldc
+            : null;
+        string compilerId = requirement.length && requirement != "no" ? name~"@"~requirement : name;
+        CompilerBinary candidate;
+        try
+            candidate = getCompiler(compilerId).d;
+        catch(Exception)
+            continue;
+        if(candidate.compiler == AcceptedCompiler.invalid)
+            continue;
+        if(satisfiesToolchainRequirements(requirements, candidate, failure))
+            return candidate;
+    }
+    return CompilerBinary.init;
+}
+
+/**
+ * Replaces `compiler.d` with an installed compiler that satisfies the recipe's
+ * `toolchainRequirements`, when the current one does not.
+ * Params:
+ *   recipe = The parsed recipe JSON.
+ *   compiler = The compiler to update.
+ */
+void applyToolchainRequirements(JSONValue recipe, ref Compiler compiler)
+{
+    import redub.api : BuildException;
+    import redub.logging : warn;
+
+    JSONValue* requirements = "toolchainRequirements" in recipe;
+    if(requirements is null)
+        return;
+    string failure;
+    if(satisfiesToolchainRequirements(*requirements, compiler.d, failure))
+        return;
+
+    ToolchainConstraints constraints;
+    if(!parseToolchainConstraints(*requirements, constraints, failure))
+        throw new BuildException("Invalid toolchain requirements: "~failure);
+    CompilerBinary found = findInstalledCompiler(*requirements, constraints, failure);
+    if(found == CompilerBinary.init)
+        throw new BuildException("Toolchain requirements are not satisfied: "~failure~
+            "\nInstall a matching compiler (for example with 'redub install ldc <version>') and try again.");
+    warn("Switching compiler to ", found.getCompilerWithVersion, " to satisfy toolchain requirements.");
+    compiler.d = found;
+}
+
 private CompilerBinary getCompilerFromGlobalPath(string compilerIdentifier, JSONValue compilersInfo, string compilerVersion)
 {
     if(!compilerVersion.length)
@@ -389,7 +600,100 @@ private CompilerBinary getCompilerFromCacheByVersion(JSONValue allCompilersInfo,
             break;
         }
     }
+    ///Compilers installed by `redub install` may not be present in the meta cache yet.
+    if(ret == CompilerBinary.init)
+        ret = getManagedCompilerByVersion(compiler, compilerVersion, allCompilersInfo);
     return ret;
+}
+
+private CompilerBinary getManagedCompilerByVersion(string compiler, string requirement, JSONValue allCompilersInfo)
+{
+    import redub.api : getDubWorkspacePath;
+    import redub.misc.path : buildNormalizedPath;
+    import std.file : exists, dirEntries, SpanMode;
+    import std.path : baseName;
+    import std.string : startsWith, endsWith, chompPrefix;
+    import std.algorithm.sorting : sort;
+
+    string root;
+    string[] versions;
+    if(compiler == "dmd")
+    {
+        root = buildNormalizedPath(getDubWorkspacePath, "redub-dmd");
+        if(!exists(root))
+            return CompilerBinary.init;
+        foreach(entry; dirEntries(root, SpanMode.shallow))
+        {
+            if(!entry.isDir)
+                continue;
+            string folder = baseName(entry.name);
+            if(!folder.startsWith("dmd-"))
+                continue;
+            string name = folder["dmd-".length .. $];
+            if(SemVer(name).satisfies(SemVer(requirement)))
+                versions ~= name;
+        }
+    }
+    else if(compiler == "ldc2" || compiler == "ldc")
+    {
+        root = buildNormalizedPath(getDubWorkspacePath, "redub-ldc");
+        if(!exists(root))
+            return CompilerBinary.init;
+        static immutable ldcSuffixes = [
+            "-windows-multilib", "-osx-universal", "-linux-x86_64",
+            "-linux-aarch64", "-freebsd-x86_64",
+        ];
+        foreach(entry; dirEntries(root, SpanMode.shallow))
+        {
+            if(!entry.isDir)
+                continue;
+            string name = baseName(entry.name).chompPrefix("ldc2-");
+            if(name == baseName(entry.name))
+                continue;
+            foreach(suffix; ldcSuffixes)
+            {
+                if(name.endsWith(suffix))
+                {
+                    name = name[0 .. $ - suffix.length];
+                    break;
+                }
+            }
+            if(SemVer(name).satisfies(SemVer(requirement)))
+                versions ~= name;
+        }
+    }
+    else
+        return CompilerBinary.init;
+
+    versions.sort!((a, b) => SemVer(a) > SemVer(b));
+    foreach(ver; versions)
+    {
+        string bin;
+        if(compiler == "dmd")
+        {
+            import redub.misc.dmd_install : getDmdFolder;
+            version(Windows) enum dmdName = "dmd.exe";
+            else enum dmdName = "dmd";
+            bin = buildNormalizedPath(getDmdFolder(ver), dmdName);
+        }
+        else
+        {
+            import redub.misc.ldc_install : getLdcFolder;
+            version(Windows) enum ldcName = "ldc2.exe";
+            else enum ldcName = "ldc2";
+            bin = buildNormalizedPath(getLdcFolder(ver), ldcName);
+        }
+        if(!exists(bin))
+            continue;
+        try
+        {
+            CompilerBinary ret = getCompiler(bin).d;
+            if(ret.compiler != AcceptedCompiler.invalid)
+                return ret;
+        }
+        catch(Exception) {}
+    }
+    return CompilerBinary.init;
 }
 
 
@@ -445,5 +749,39 @@ void saveCompilerInfo(JSONValue allCompilersInfo, ref CompilerBinary compiler, b
     ]);
 
     saveRedubMeta(allCompilersInfo);
+}
+
+unittest
+{
+    JSONValue reqs = JSONValue.emptyObject;
+    reqs["frontend"] = JSONValue(">=2.106");
+    string failure;
+    CompilerBinary ldc = CompilerBinary(AcceptedCompiler.ldc2, "ldc2", SemVer("1.43.0"), SemVer("2.113.0"), null);
+    CompilerBinary oldLdc = CompilerBinary(AcceptedCompiler.ldc2, "ldc2", SemVer("1.30.0"), SemVer("2.100.0"), null);
+    CompilerBinary dmd = CompilerBinary(AcceptedCompiler.dmd, "dmd", SemVer("2.113.0"), SemVer("2.113.0"), null);
+    assert(satisfiesToolchainRequirements(reqs, ldc, failure));
+    assert(satisfiesToolchainRequirements(reqs, dmd, failure));
+    assert(!satisfiesToolchainRequirements(reqs, oldLdc, failure));
+
+    reqs["dmd"] = JSONValue("no");
+    assert(satisfiesToolchainRequirements(reqs, ldc, failure));
+    assert(!satisfiesToolchainRequirements(reqs, dmd, failure));
+
+    reqs = JSONValue.emptyObject;
+    reqs["ldc"] = JSONValue(">=1.40.0");
+    assert(satisfiesToolchainRequirements(reqs, ldc, failure));
+    assert(!satisfiesToolchainRequirements(reqs, oldLdc, failure));
+    assert(!satisfiesToolchainRequirements(reqs, dmd, failure));
+
+    reqs = JSONValue.emptyObject;
+    reqs["dmd"] = JSONValue(">=2.106");
+    assert(satisfiesToolchainRequirements(reqs, dmd, failure));
+    assert(!satisfiesToolchainRequirements(reqs, ldc, failure));
+
+    reqs = JSONValue.emptyObject;
+    reqs["gdc"] = JSONValue(">=9.0.0");
+    assert(!satisfiesToolchainRequirements(reqs, ldc, failure));
+    reqs["gdc"] = JSONValue("no");
+    assert(satisfiesToolchainRequirements(reqs, ldc, failure));
 }
 

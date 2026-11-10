@@ -14,6 +14,8 @@
 Those are the additions I've made over dub
 - **Self Update**: `redub update` will either sync to the latest repo (and build it) or replace it with latest release
 - [**Compiler Management**](#compiler-management) - Support to change default compiler and install on command line
+- [**Toolchain Requirements**](#toolchain-requirements) - Since `v1.38.0`: Declare the required compiler/frontend versions in the recipe and let Redub pick an installed compiler that matches.
+- [**Source-less External Targets**](#multi-language) - Since `v1.38.0`: `"targetType": "external"` wraps CMake/Make builds and forwards their libraries to dependents without generating an artifact.
 - [**Redub Plugins**](#redub-plugins) - Alternative to rdmd. Execute arbitrary D code in the build steps.
 - [**Multi Language**](#multi-language) - Compile a C project together and include it on the linking step
 - [**Executable Icons**](#redub-executable-icons) - Include an icon in your .exe by simply defining the images on your recipe. 
@@ -60,6 +62,24 @@ Those are the additions I've made over dub
   ```
   `reset` makes redub use the first compiler found in `PATH` again.
 
+
+## Toolchain Requirements
+A recipe can require specific toolchain versions with the same `toolchainRequirements` object used by dub:
+```json
+"toolchainRequirements": {
+  "frontend": ">=2.106",
+  "dmd": "no",
+  "ldc": ">=1.40.0",
+  "gdc": "no"
+}
+```
+The same works in `dub.sdl`:
+```sdl
+toolchainRequirements frontend=">=2.106" dmd="no" ldc=">=1.40.0" gdc="no"
+```
+Supported keys are `dub` (checked against the redub version), `frontend`, `dmd`, `ldc` and `gdc`. Values use the dub version range syntax, and `no` disallows that entry. Using only `frontend` accepts the first installed D compiler that matches it; a positive `dmd` or `ldc` entry restricts the build to those compilers. GDC is not supported by redub, so requiring a GDC version fails; `gdc="no"` is accepted.
+
+Before resolving dependencies, redub checks the root recipe. A target that specifies its own `compiler` takes priority; when it doesn't, redub checks the toolchain requirements. If the selected compiler does not satisfy them, redub looks for another installed compiler (`redub install`/`redub use`, the compiler cache, or `PATH`) and switches to it with a warning. If no installed compiler matches, the build stops with an error. Dependencies that declare incompatible requirements also fail the build. `$DC` is refreshed before `preGenerate` commands run, so they see the compiler that was actually selected.
 
 ## Redub Plugins
 

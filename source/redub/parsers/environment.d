@@ -83,6 +83,8 @@ struct InitialDubVariables
     string D_FRONTEND_VER ;
     ///Path to the DUB executable
     string DUB_EXE ;
+    ///Path to the redub executable
+    string REDUB ;
     ///Name of the target platform (e.g. "windows" or "linux")
     string DUB_PLATFORM ;
     ///Name of the target architecture (e.g. "x86" or "x86_64")
@@ -142,6 +144,7 @@ InitialDubVariables getInitialDubVariablesFromArguments(DubArguments args, DubBu
     import std.file;
     InitialDubVariables dubVars;
     dubVars.DUB                 = rawArgs[0];
+    dubVars.REDUB               = thisExePath;
     dubVars.DUB_BUILD_TYPE      = args.buildType;
     dubVars.DUB_CONFIG          = args.config;
     dubVars.DC_BASE             = args.compiler;
