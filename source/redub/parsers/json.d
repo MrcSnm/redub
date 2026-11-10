@@ -261,6 +261,12 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
             foreach(key, value; v.object)
                 addPlugins(req.cfg.postGeneratePlugins, key, value.strArr);
         },
+        "preBuildPlugins": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _)
+        {
+            warn("'preBuildPlugins' is deprecated and now runs as 'postGeneratePlugins'. Please rename the key.");
+            foreach(key, value; v.object)
+                addPlugins(req.cfg.postGeneratePlugins, key, value.strArr);
+        },
         "redub": (ref BuildRequirements req, JSONValue v, ParseConfig c, ref BuildConfiguration _)
         {
             import std.conv : to;

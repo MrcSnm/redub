@@ -2,7 +2,6 @@ module redub.plugins.cmake;
 import redub.plugin.api;
 import redub.plugins.common;
 
-private enum defaultCacheRoot = "~/.cache/redub/cmake";
 private enum markerName = ".redub-cmake-ok";
 
 private struct CmakeConfig
@@ -81,7 +80,7 @@ private ref RedubPluginStatus handle(RedubPluginData input, out RedubPluginData 
 	import std.algorithm.searching : startsWith;
 	import std.array : join;
 	import std.file : exists, getcwd, isDir, readText, rename, write;
-	import std.path : absolutePath, buildNormalizedPath, dirName, expandTilde, isAbsolute;
+	import std.path : buildNormalizedPath, dirName;
 
 	if(args.length != 1)
 		return status = RedubPluginStatus(RedubPluginExitCode.error, "Usage: cmake <config.json>");
@@ -91,16 +90,16 @@ private ref RedubPluginStatus handle(RedubPluginData input, out RedubPluginData 
 	string packageDir = input.outputDirectory;
 	if(!packageDir.length)
 		packageDir = getcwd();
-	packageDir = absolutePath(packageDir);
+	packageDir = asAbsolutePath(packageDir);
 
-	string configPath = expandTilde(args[0]);
-	if(!isAbsolute(configPath))
+	string configPath = expandHome(args[0]);
+	if(!isAbsolutePath(configPath))
 		configPath = buildNormalizedPath(packageDir, configPath);
 
 	CmakeConfig cfg = loadConfig(configPath);
 
-	string cacheRoot = cfg.cacheRoot.length ? cfg.cacheRoot : defaultCacheRoot;
-	cacheRoot = absolutePath(expandTilde(cacheRoot));
+	string cacheRoot = cfg.cacheRoot.length ? cfg.cacheRoot : defaultPluginCacheRoot("cmake");
+	cacheRoot = asAbsolutePath(expandHome(cacheRoot));
 
 	string revision = gitRevision(cfg.tag, cfg.branch);
 	string cacheName = repositoryCacheName(cfg.url, cfg.tag, cfg.branch, cfg.directory);
@@ -115,8 +114,8 @@ private ref RedubPluginStatus handle(RedubPluginData input, out RedubPluginData 
 		cfg.installArgs.join("\x1f"),
 	].join("\x1e"));
 
-	string localCandidate = expandTilde(cfg.url);
-	if(!isAbsolute(localCandidate))
+	string localCandidate = expandHome(cfg.url);
+	if(!isAbsolutePath(localCandidate))
 	{
 		string configRelative = buildNormalizedPath(dirName(configPath), localCandidate);
 		if(exists(configRelative))
@@ -133,21 +132,21 @@ private ref RedubPluginStatus handle(RedubPluginData input, out RedubPluginData 
 	string overrideSource = getEnvVar("CMAKE_PLUGIN_SRC");
 	if(overrideSource.length)
 	{
-		overrideSource = expandTilde(overrideSource);
-		if(!isAbsolute(overrideSource))
+		overrideSource = expandHome(overrideSource);
+		if(!isAbsolutePath(overrideSource))
 			overrideSource = buildNormalizedPath(packageDir, overrideSource);
 	}
 
 	string srcDir;
 	if(localSource)
-		srcDir = absolutePath(localCandidate);
+		srcDir = asAbsolutePath(localCandidate);
 	else if(overrideSource.length)
-		srcDir = absolutePath(overrideSource);
+		srcDir = asAbsolutePath(overrideSource);
 	else
 		srcDir = buildNormalizedPath(cacheRoot, cacheName, "src");
 
 	string destination = cfg.destination.length ? cfg.destination : "vendor";
-	if(!isAbsolute(destination))
+	if(!isAbsolutePath(destination))
 		destination = buildNormalizedPath(packageDir, destination);
 	if(destination == packageDir)
 		throw new Exception("cmake: 'destination' must be a subdirectory of the package");
@@ -180,20 +179,23 @@ private ref RedubPluginStatus handle(RedubPluginData input, out RedubPluginData 
 	string buildDir = buildNormalizedPath(cacheRoot, cacheName, "build-"~optionsKey);
 	string installDir = buildNormalizedPath(cacheRoot, cacheName, "install-"~optionsKey);
 
+	import redub.logging : info;
+	info("cmake: source ", sourceRoot, " | build ", buildDir, " | install ", installDir);
+
 	if(force || !exists(installDir))
 	{
 		string installTmp = installDir~".tmp";
 		removePath(installTmp);
 
-		runCommand(["cmake", "-S", sourceRoot, "-B", buildDir] ~ cfg.cmakeArgs, "cmake configure", "cmake");
+		runCommand(["cmake", "-S", commandPath(sourceRoot), "-B", commandPath(buildDir)] ~ cfg.cmakeArgs, "cmake configure", "cmake");
 
-		string[] buildArgs = ["cmake", "--build", buildDir];
+		string[] buildArgs = ["cmake", "--build", commandPath(buildDir)];
 		if(cfg.target.length)
 			buildArgs ~= ["--target", cfg.target];
 		buildArgs ~= (cfg.buildArgs.length ? cfg.buildArgs : ["--parallel"]);
 		runCommand(buildArgs, "cmake build", "cmake");
 
-		runCommand(["cmake", "--install", buildDir, "--prefix", installTmp] ~ cfg.installArgs, "cmake install", "cmake");
+		runCommand(["cmake", "--install", commandPath(buildDir), "--prefix", commandPath(installTmp)] ~ cfg.installArgs, "cmake install", "cmake");
 
 		removePath(installDir);
 		rename(installTmp, installDir);

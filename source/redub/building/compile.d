@@ -524,6 +524,33 @@ bool executePostGeneratePlugins(ProjectNode root)
     return true;
 }
 
+///Runs the build-input generators and validates the cache exactly once per
+///ProjectDetails. The watcher calls this before deciding whether to build, and
+///buildProject calls it again without re-running the plugins or the invalidation.
+bool prepareBuild(ref ProjectDetails d, out AdvCacheFormula sharedFormula, out AdvCacheFormula preprocessed)
+{
+    sharedFormula = loadExistingSharedFormula(d.tree, d.cDetails.info);
+    if(d.forceRebuild)
+    {
+        if(!cleanProject(d, false))
+            throw new RedubException("Could not clean project ", d.tree.name);
+        d.tree.invalidateCacheOnTree();
+        d.cachesInvalidated = true;
+    }
+    if(d.forceRebuild || !d.postGeneratePluginsRan)
+    {
+        if(!executePostGeneratePlugins(d.tree))
+            return false;
+        d.postGeneratePluginsRan = true;
+    }
+    if(!d.forceRebuild && !d.cachesInvalidated)
+    {
+        invalidateCaches(d.tree, d.cDetails.info, sharedFormula, preprocessed);
+        d.cachesInvalidated = true;
+    }
+    return true;
+}
+
 
 private bool canPersistCacheNow(const ProjectNode node)
 {

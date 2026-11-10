@@ -70,6 +70,88 @@ string getEnvVar(string name)
 	return value is null ? null : value.fromStringz.idup;
 }
 
+///Cross-platform cache root for built-in plugins. `~` is a no-op on Windows,
+///so the default must not rely on it.
+string defaultPluginCacheRoot(string pluginName)
+{
+	import redub.api : getDubWorkspacePath;
+	import redub.misc.path : buildNormalizedPath;
+	return asAbsolutePath(buildNormalizedPath(getDubWorkspacePath(), "redub-plugins", pluginName));
+}
+
+///std.path.expandTilde is a no-op on Windows, so expand HOME/USERPROFILE here.
+string expandHome(string path)
+{
+	import std.path : expandTilde;
+	if(path.length == 0 || path[0] != '~')
+		return path;
+	version(Windows)
+	{
+		import redub.misc.path : buildNormalizedPath;
+		string home = getEnvVar("USERPROFILE");
+		if(!home.length)
+		{
+			string drive = getEnvVar("HOMEDRIVE");
+			string rest = getEnvVar("HOMEPATH");
+			if(drive.length)
+				home = drive ~ rest;
+		}
+		if(!home.length)
+			return path;
+		size_t start = 1;
+		if(path.length > 1 && (path[1] == '/' || path[1] == '\\'))
+			start = 2;
+		return start < path.length ? buildNormalizedPath(home, path[start .. $]) : home;
+	}
+	else
+		return expandTilde(path);
+}
+
+///Recognizes POSIX and Windows absolute paths on any host, so a Windows path
+///is never prefixed with a POSIX cwd (and vice versa).
+bool isAbsolutePath(string path)
+{
+	import std.path : isAbsolute;
+	if(path.length == 0)
+		return false;
+	if(isAbsolute(path))
+		return true;
+	if(path.length >= 2 && path[1] == ':'
+		&& ((path[0] >= 'a' && path[0] <= 'z') || (path[0] >= 'A' && path[0] <= 'Z')))
+		return true;
+	if(path.length >= 2 && path[0] == '\\' && path[1] == '\\')
+		return true;
+	return false;
+}
+
+string asAbsolutePath(string path, string baseDir = null)
+{
+	import redub.misc.path : buildNormalizedPath;
+	import std.path : absolutePath;
+	if(isAbsolutePath(path))
+		return path;
+	return baseDir.length ? buildNormalizedPath(baseDir, path) : absolutePath(path);
+}
+
+///Backslashes break POSIX-like tools (MSYS/Cygwin cmake/git) that receive a
+///native Windows path. Same-volume paths are passed relative to the process
+///cwd, which every toolchain resolves identically; otherwise use forward
+///slashes, accepted by native Windows tools too.
+string commandPath(string path)
+{
+	version(Windows)
+	{
+		import std.array : replace;
+		import std.file : getcwd;
+		import std.path : relativePath;
+		if(!isAbsolutePath(path))
+			return path.replace("\\", "/");
+		return relativePath(path, getcwd()).replace("\\", "/");
+	}
+	else
+		return path;
+}
+
 string gitRevision(string tag, string branch)
 {
 	return tag.length ? tag : branch;
@@ -118,22 +200,35 @@ void removePath(string path)
 
 string runCommand(string[] command, string what, string pluginName)
 {
+	import redub.logging : info, vlog, flush;
+	import std.array : appender;
 	import std.conv : to;
-	import std.process : Config, ProcessException, execute;
+	import std.process : Config, ProcessException, Redirect, pipeProcess, wait;
+	import std.stdio : stdout;
 
+	info(pluginName, ": ", what, "...");
+	vlog(pluginName, ": ", command);
+	flush();
+
+	auto collected = appender!(ubyte[])();
 	int status;
-	string output;
 	try
 	{
-		auto result = execute(command, null, Config.none, size_t.max);
-		status = result.status;
-		output = result.output;
+		auto pipes = pipeProcess(command, Redirect.stdout | Redirect.stderrToStdout, null, Config.none);
+		foreach(ubyte[] chunk; pipes.stdout.byChunk(4096))
+		{
+			stdout.rawWrite(chunk);
+			collected.put(chunk);
+		}
+		stdout.flush();
+		status = wait(pipes.pid);
 	}
 	catch(ProcessException e)
 	{
 		throw new Exception(pluginName~": failed to start '"~command[0]~"' for "~what~": "~e.msg);
 	}
 
+	string output = cast(string) collected.data;
 	if(status != 0)
 		throw new Exception(pluginName~": "~what~" failed with exit code "~status.to!string~":\n"~output);
 	return output;
@@ -151,10 +246,10 @@ void cloneGit(string url, string revision, string checkout, string pluginName)
 	string[] command = ["git", "clone", "--depth", "1"];
 	if(revision.length)
 		command ~= ["--branch", revision];
-	command ~= [url, tmp];
+	command ~= [commandPath(url), commandPath(tmp)];
 
 	try
-		runCommand(command, "git clone '"~url~"'", pluginName);
+		runCommand(command, "git clone '"~url~"' into '"~checkout~"'", pluginName);
 	catch(Exception e)
 	{
 		removePath(tmp);

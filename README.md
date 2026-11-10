@@ -79,6 +79,8 @@ The path may be either a .d module or a dub project. Built-in plugins are refere
 
 Redub ships some build plugins as built-ins. Currently, `redub:cmake` is available for libraries that build with CMake, and `redub:fetchlib` fetches sources from git and injects them into the build. The getmodules plugin inside this repo is an example of an external plugin.
 Plugins can run in two phases: `preGenerate` while a package is being parsed (before its dependencies are resolved, ideal for injecting sources) and `postGenerate` after the project tree is resolved but before cache validation and compilation (ideal for generating headers or libraries). `postGenerate` plugins run once per build, before Redub checks which packages are up to date.
+
+> **Migrating older plugins:** the old `preBuild` phase was renamed to `postGenerate` (same signature, receiving `RedubPluginData` and returning `RedubPluginStatus`), and the old no-argument `void preGenerate()`/`void postGenerate()` hooks were removed. Rename your `preBuild` method to `postGenerate`, drop the two no-argument methods, and keep `postBuild()`. In JSON/`dub.sdl`, the `preBuildPlugins` key still works but now runs as `postGeneratePlugins` and prints a deprecation warning.
 For it to be considered a redub plugin to be built, that is the minimal code:
 
 ```d

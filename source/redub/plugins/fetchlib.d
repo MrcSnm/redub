@@ -2,8 +2,6 @@ module redub.plugins.fetchlib;
 import redub.plugin.api;
 import redub.plugins.common;
 
-private enum defaultCacheRoot = "~/.cache/redub/fetchlib";
-
 private struct FetchConfig
 {
 	string url;
@@ -87,7 +85,7 @@ private ref RedubPluginStatus handle(RedubPluginData input, out RedubPluginData 
 	import std.algorithm.searching : canFind;
 	import std.conv : to;
 	import std.file : exists, isDir;
-	import std.path : absolutePath, buildNormalizedPath, expandTilde, isAbsolute;
+	import std.path : buildNormalizedPath;
 
 	if(args.length != 1)
 		return status = RedubPluginStatus(RedubPluginExitCode.error, "Usage: fetchlib <config.json>");
@@ -95,8 +93,7 @@ private ref RedubPluginStatus handle(RedubPluginData input, out RedubPluginData 
 		return status = RedubPluginStatus(RedubPluginExitCode.error, "fetchlib: empty config path");
 
 	string configPath = args[0];
-	if(!isAbsolute(configPath))
-		configPath = absolutePath(expandTilde(configPath));
+	configPath = asAbsolutePath(expandHome(configPath));
 
 	FetchConfig cfg = loadConfig(configPath);
 
@@ -104,20 +101,20 @@ private ref RedubPluginStatus handle(RedubPluginData input, out RedubPluginData 
 	bool overridden = false;
 	string checkout;
 	if(local)
-		checkout = absolutePath(cfg.url);
+		checkout = asAbsolutePath(cfg.url);
 	else
 	{
 		string overrideSrc = getEnvVar("FETCHLIB_SRC");
 		if(overrideSrc.length)
 		{
-			checkout = absolutePath(expandTilde(overrideSrc));
+			checkout = asAbsolutePath(expandHome(overrideSrc));
 			overridden = true;
 		}
 		else
 		{
 			string root = cfg.cacheRoot.length
-				? absolutePath(expandTilde(cfg.cacheRoot))
-				: expandTilde(defaultCacheRoot);
+				? asAbsolutePath(expandHome(cfg.cacheRoot))
+				: defaultPluginCacheRoot("fetchlib");
 			string directory = repositoryCacheName(cfg.url, cfg.tag, cfg.branch, cfg.directory);
 			checkout = buildNormalizedPath(root, directory);
 		}
@@ -149,7 +146,7 @@ private ref RedubPluginStatus handle(RedubPluginData input, out RedubPluginData 
 	string[] importPaths = cfg.importPaths.length ? cfg.importPaths : ["."];
 	foreach(importPath; importPaths)
 	{
-		string absolute = isAbsolute(importPath) ? importPath : buildNormalizedPath(checkout, importPath);
+		string absolute = isAbsolutePath(importPath) ? importPath : buildNormalizedPath(checkout, importPath);
 		if(!output.importDirectories.canFind(absolute))
 			output.importDirectories ~= absolute;
 	}

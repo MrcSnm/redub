@@ -47,6 +47,40 @@ private void writePluginImport()
     std.file.write(buildNormalizedPath(importPath, "api.d"), apiImport);
 }
 
+private enum legacyPreBuildHint =
+    "preBuild was renamed to postGenerate. Rename the method keeping its signature, "
+    ~"remove the old void preGenerate()/postGenerate(), and keep postBuild().";
+
+private bool usesLegacyPreBuild(string path)
+{
+    import std.algorithm.searching : canFind, endsWith;
+    import std.file : SpanMode, dirEntries, exists, isDir, readText;
+
+    if(!exists(path))
+        return false;
+    if(!isDir(path))
+        return readText(path).canFind("preBuild");
+    foreach(entry; dirEntries(path, SpanMode.depth))
+    {
+        if(entry.isDir || !entry.name.endsWith(".d"))
+            continue;
+        try
+        {
+            if(readText(entry.name).canFind("preBuild"))
+                return true;
+        }
+        catch(Exception) {}
+    }
+    return false;
+}
+
+private void warnLegacyPreBuild(string path)
+{
+    import redub.logging : errorTitle;
+    if(usesLegacyPreBuild(path))
+        errorTitle("Plugin migration: ", legacyPreBuildHint);
+}
+
 BuildConfiguration injectPluginCfg(BuildConfiguration base, string pluginName, CompilationInfo cInfo)
 {
     import redub.building.cache;
@@ -104,6 +138,7 @@ void buildPlugin(string pluginName, string inputFile, CompilationInfo cInfo)
     if(compileResult.status) {
         errorTitle("", compileResult.output);
         errorTitle("Plugin Flags: ", buildCmds);
+        warnLegacyPreBuild(inputFile);
         throw new Exception("Plugin compilation failed for '"~pluginName~"': "~compileResult.output);
     }
     
@@ -112,6 +147,7 @@ void buildPlugin(string pluginName, string inputFile, CompilationInfo cInfo)
     if(linkResult.status) {
         errorTitle("", linkResult.output);
         errorTitle("Plugin Flags: ", buildCmds);
+        warnLegacyPreBuild(inputFile);
         throw new Exception("Plugin link failed for '"~pluginName~"': "~linkResult.output);
     }
 
@@ -147,6 +183,13 @@ void buildPluginProject(string pluginDir, CompilationInfo cInfo)
 
     pluginDetails.bCreateSelections = false;
     pluginDetails.tree.requirements.cfg = injectPluginCfg(pluginDetails.tree.requirements.cfg, pluginDetails.tree.name, cInfo);
-    pluginDetails = buildProject(pluginDetails);
-    setLogLevel(level);
+    try
+        pluginDetails = buildProject(pluginDetails);
+    catch(Throwable e)
+    {
+        warnLegacyPreBuild(pluginDir);
+        throw e;
+    }
+    finally
+        setLogLevel(level);
 }

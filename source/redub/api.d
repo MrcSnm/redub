@@ -22,6 +22,7 @@ struct ProjectDetails
     int externalErrorCode = int.min;
     bool forceRebuild;
     bool postGeneratePluginsRan;
+    bool cachesInvalidated;
     bool bCreateSelections = true;
     BundleType bundle = BundleType.none;
     bool bundleGenerated = false;
@@ -514,17 +515,13 @@ void createSelectionsFile(ProjectNode tree)
 
 bool isProjectUpToDate(ref ProjectDetails d)
 {
-    import redub.building.cache;
-    import redub.building.compile : executePostGeneratePlugins;
-    if(!d.postGeneratePluginsRan)
-    {
-        if(!executePostGeneratePlugins(d.tree))
-            return false;
-        d.postGeneratePluginsRan = true;
-    }
+    import redub.building.cache : AdvCacheFormula;
+    import redub.building.compile : prepareBuild;
+    d.cachesInvalidated = false;
     AdvCacheFormula sharedFormula;
     AdvCacheFormula preprocessed;
-    invalidateCaches(d.tree, d.cDetails.info, sharedFormula, preprocessed);
+    if(!prepareBuild(d, sharedFormula, preprocessed))
+        return false;
     return d.tree.isUpToDate;
 }
 
@@ -693,24 +690,8 @@ ProjectDetails buildProject(ProjectDetails d)
 
     AdvCacheFormula sharedFormula;
     AdvCacheFormula preprocessed;
-    if(d.forceRebuild)
-    {
-        sharedFormula = loadExistingSharedFormula(d.tree, d.cDetails.info);
-        if(!cleanProject(d, false))
-            throw new RedubException("Could not clean project ", d.tree.name);
-        d.tree.invalidateCacheOnTree();
-    }
-    ///Run build-input generators once, after a forced clean and before validating the
-    ///cache, so the cache reflects the final configuration instead of being invalidated
-    ///again by plugin changes.
-    if(d.forceRebuild || !d.postGeneratePluginsRan)
-    {
-        if(!executePostGeneratePlugins(d.tree))
-            throw new BuildException(null);
-        d.postGeneratePluginsRan = true;
-    }
-    if(!d.forceRebuild)
-        invalidateCaches(d.tree,d.cDetails.info, sharedFormula, preprocessed);
+    if(!prepareBuild(d, sharedFormula, preprocessed))
+        throw new BuildException(null);
     ///Top-level files and output artifacts may change during the build, so only
     ///the already scanned source/import directories are reused.
     preprocessed.files = null;
