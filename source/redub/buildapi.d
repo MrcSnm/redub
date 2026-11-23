@@ -1019,11 +1019,16 @@ struct ExtraInformation
     string[] librariesFullPath;
     bool isRoot;
     bool isTarget;
+    ///The source paths and files merged in from sourceLibrary dependencies, which aren't the
+    ///package's own modules. `redub test` leaves them out of dub_test_root.
+    string[] sourceLibrarySources;
     immutable(ExtraInformation) idup() inout
     {
         return immutable ExtraInformation(
             librariesFullPath.idup,
-            isRoot
+            isRoot,
+            false,
+            sourceLibrarySources.idup
         );
     }
 }
@@ -1502,6 +1507,9 @@ class ProjectNode
                         target.requirements.cfg = target.requirements.cfg.mergeLibPaths(other);
                     break;
                 case sourceLibrary:
+                    target.requirements.extra.sourceLibrarySources.exclusiveMerge(
+                        input.requirements.cfg.sourcePaths ~ input.requirements.cfg.sourceFiles
+                    );
                     target.requirements.cfg = target.requirements.cfg.mergeFrameworks(input.requirements.cfg);
                     target.requirements.cfg = target.requirements.cfg.mergeLibraries(input.requirements.cfg);
                     target.requirements.cfg = target.requirements.cfg.mergeLibPaths(input.requirements.cfg);

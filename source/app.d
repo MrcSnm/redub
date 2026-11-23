@@ -367,7 +367,7 @@ int testMain(string[] args, string[] runArgs)
     if(needsMain)
     {
         d.tree.requirements.cfg.dFlags ~= "-main";
-        if(!addTestRoot(d.tree.requirements.cfg))
+        if(!addTestRoot(d.tree))
             return 1;
     }
 
@@ -385,8 +385,9 @@ int testMain(string[] args, string[] runArgs)
  * only when its contents change, so an unchanged package stays up to date, and added to the
  * package's source files.
  */
-bool addTestRoot(ref BuildConfiguration cfg)
+bool addTestRoot(ProjectNode tree)
 {
+    ref BuildConfiguration cfg() { return tree.requirements.cfg; }
     import d_dependencies : parseSourceImportGraph, defaultImportScanContext;
     import std.algorithm : canFind, filter, map, sort;
     import std.array : array, join;
@@ -402,7 +403,21 @@ bool addTestRoot(ref BuildConfiguration cfg)
             ", so dub_test_root can't list it.");
         return false;
     }
-    string[] names = graph.modules.map!(m => m.modName).filter!(n => n != "dub_test_root").array;
+    ///A sourceLibrary dependency's sources are merged into the package's, but its modules
+    ///aren't the package's own, so they aren't listed, as dub doesn't list them.
+    string[] librarySources = tree.requirements.extra.sourceLibrarySources.map!(p => buildNormalizedPath(p)).array;
+    bool isLibraryModule(string modPath)
+    {
+        import std.algorithm : any;
+        import std.string : startsWith;
+        import std.path : dirSeparator;
+        string path = buildNormalizedPath(modPath);
+        return librarySources.any!(source => path == source || path.startsWith(source ~ dirSeparator));
+    }
+
+    string[] names = graph.modules
+        .filter!(m => m.modName != "dub_test_root" && !isLibraryModule(m.modPath))
+        .map!(m => m.modName).array;
     names.sort();
 
     string source = "module dub_test_root;\n\nimport std.meta : AliasSeq;\n\n";
