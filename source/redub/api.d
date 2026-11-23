@@ -470,47 +470,91 @@ i`{
     return returnCode;
 }
 
+/**
+ * Records in dub.selections.json, as dub does, the version of each dependency this build
+ * resolved that the file doesn't list yet. The file is the record of selections across every
+ * configuration, so existing entries are kept, packages this build didn't need included, the
+ * package being built is never listed, and the file is only written when something changes.
+ */
 void createSelectionsFile(ProjectNode tree)
 {
     import redub.misc.path;
-    import std.file;
-    import std.array:appender;
-    import std.string:replace;
-    import std.path;
+    import std.algorithm : sort;
+    import std.array : appender, join;
+    import std.file : exists, readText, write;
+    import std.path : relativePath;
+    import std.string : replace;
+    import hip.data.json;
+
     char[512] selectionsPathCache;
     char[] temp = selectionsPathCache;
+    string selectionsPath = normalizePath(temp, tree.requirements.cfg.workingDir, "dub.selections.json").idup;
 
-    string selectionsPath = normalizePath(temp, tree.requirements.cfg.workingDir, "dub.selections.json") ;
-    auto dubSelections = appender!string;
-    dubSelections~= "{\n\t\"fileVersion\": 1,\n\t\"versions\": {";
+    static string quoted(string s) { return "\"" ~ s.replace("\\", "\\\\").replace("\"", "\\\"") ~ "\""; }
 
-    bool isFirst = true;
-    bool[string] usedPackages;
+    ///Each entry's JSON text, by package name.
+    string[string] entries;
+    if(exists(selectionsPath))
+    {
+        try
+        {
+            JSONValue existing = parseJSON(readText(selectionsPath), true);
+            foreach(name, value; existing["versions"])
+            {
+                if(value.type == JSONType.string_)
+                    entries[name] = quoted(value.str);
+                else if(value.type == JSONType.object)
+                {
+                    string[] fields;
+                    foreach(field, fieldValue; value)
+                    {
+                        if(fieldValue.type != JSONType.string_)
+                            throw new Exception("entry "~name~" has a field that isn't a string");
+                        fields ~= quoted(field) ~ ": " ~ quoted(fieldValue.str);
+                    }
+                    fields.sort();
+                    entries[name] = "{" ~ join(fields, ", ") ~ "}";
+                }
+                else
+                    throw new Exception("entry "~name~" is neither a version nor an object");
+            }
+        }
+        catch(Exception e)
+        {
+            warn("dub.selections.json at ", selectionsPath, " wasn't updated, since it couldn't be read: ", e.msg);
+            return;
+        }
+    }
 
+    string rootName = tree.name;
+    getSubPackage(rootName);
+    ///An entry for the package itself, which earlier versions of redub wrote, is dropped.
+    bool changed = entries.remove(rootName);
     foreach(ProjectNode node; tree.getCollapsedForSelections)
     {
         if(node is tree)
             continue;
         string pkgName = node.name;
         getSubPackage(pkgName);
-        if(pkgName !in usedPackages)
-        {
-            if(!isFirst) dubSelections~=",";
-            isFirst = false;
-            auto req = node.requirements;
-            dubSelections~= "\n\t\t\""~pkgName~"\": ";
-            if(req.version_.length != 0)
-                dubSelections~= "\""~req.version_~"\"";
-            else
-                dubSelections~= " {\"path\": \""~replace(relativePath(req.cfg.workingDir, tree.requirements.cfg.workingDir), "\\", "\\\\")~"\"}";
-            usedPackages[pkgName] = true;
-        }
-
+        if(pkgName == rootName || pkgName in entries)
+            continue;
+        auto req = node.requirements;
+        entries[pkgName] = req.version_.length != 0
+            ? quoted(req.version_)
+            : "{\"path\": " ~ quoted(relativePath(req.cfg.workingDir, tree.requirements.cfg.workingDir).replace("\\", "/")) ~ "}";
+        changed = true;
     }
+    if(!changed || entries.length == 0)
+        return;
 
-    dubSelections~= "\n\t}\n}";
-
-    std.file.write(selectionsPath, dubSelections.data);
+    auto dubSelections = appender!string;
+    dubSelections ~= "{\n\t\"fileVersion\": 1,\n\t\"versions\": {";
+    string[] names = entries.keys;
+    names.sort();
+    foreach(i, name; names)
+        dubSelections ~= (i ? ",\n\t\t" : "\n\t\t") ~ quoted(name) ~ ": " ~ entries[name];
+    dubSelections ~= "\n\t}\n}\n";
+    write(selectionsPath, dubSelections.data);
 }
 
 bool isProjectUpToDate(ref ProjectDetails d)
