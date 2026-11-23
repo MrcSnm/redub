@@ -1129,7 +1129,7 @@ ProjectDetails resolveDependencies(
                 proj.subPackage,
                 proj.recipe,
                 target,
-                proj.preferUnittestConfiguration
+                preferUnittestConfiguration: proj.preferUnittestConfiguration
             );
         else
             res = redub.parsers.automatic.parseProject(
@@ -1140,7 +1140,7 @@ ProjectDetails resolveDependencies(
                 proj.recipe,
                 target,
                 proj.isDescribeOnly,
-                proj.preferUnittestConfiguration
+                preferUnittestConfiguration: proj.preferUnittestConfiguration
             );
     }
     

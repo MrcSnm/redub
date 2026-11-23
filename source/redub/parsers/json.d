@@ -430,7 +430,7 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
                         break;
                     }
                     ///As dub test does, the package under test uses its "unittest" configuration when none was requested.
-                    if(c.preferUnittestConfiguration && !c.subPackage.length && !c.subConfiguration.name && name.str == "unittest")
+                    if(c.preferUnittestConfiguration && !c.subConfiguration.name && name.str == "unittest")
                     {
                         preferredConfiguration = i.to!int;
                         break;

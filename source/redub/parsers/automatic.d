@@ -56,7 +56,7 @@ RootParseResult parseProject(
     }
 
     JSONValue projectJSON = getProjectJSON(projectFile, projectWorkingDir);
-    return parseProject(projectJSON, projectWorkingDir, cInfo, subConfiguration, subPackage, target, isDescribeOnly, null, preferUnittestConfiguration);
+    return parseProject(projectJSON, projectWorkingDir, cInfo, subConfiguration, subPackage, target, isDescribeOnly, preferUnittestConfiguration: preferUnittestConfiguration);
 }
 
 /**
