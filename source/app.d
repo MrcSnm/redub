@@ -348,7 +348,7 @@ int depsMain(string[] args)
 
 int testMain(string[] args, string[] runArgs)
 {
-    ProjectDetails d = resolveDependencies(args);
+    ProjectDetails d = resolveDependencies(args, preferUnittestConfiguration: true);
     if(d.error)
         return d.getReturnCode();
     import redub.parsers.build_type;

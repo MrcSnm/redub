@@ -10,13 +10,14 @@ public import redub.api;
  *   isDescribeOnly = Used to not run the preGenerate commands
  * Returns:
  */
-ProjectDetails resolveDependencies(string[] args, bool isDescribeOnly = false)
+ProjectDetails resolveDependencies(string[] args, bool isDescribeOnly = false, bool preferUnittestConfiguration = false)
 {
     import std.file;
     import redub.api;
     import redub.logging;
 
     ArgsDetails argsD = resolveArguments(args, isDescribeOnly);
+    argsD.proj.preferUnittestConfiguration = preferUnittestConfiguration;
 
 
     ProjectDetails ret =  redub.api.resolveDependencies(

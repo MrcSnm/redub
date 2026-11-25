@@ -123,6 +123,8 @@ struct ProjectToParse
     bool isSingle;
     ///Optional single argument. Used for not running preGenerate commands
     bool isDescribeOnly;
+    ///Set by `redub test`: the package's "unittest" configuration is used when none is requested, as dub test does
+    bool preferUnittestConfiguration;
 }
 
 struct ArgsDetails
@@ -1170,7 +1172,8 @@ ProjectDetails resolveDependencies(
                 BuildRequirements.Configuration(proj.configuration, false),
                 proj.subPackage,
                 proj.recipe,
-                target
+                target,
+                preferUnittestConfiguration: proj.preferUnittestConfiguration
             );
         else
             res = redub.parsers.automatic.parseProject(
@@ -1180,7 +1183,8 @@ ProjectDetails resolveDependencies(
                 proj.subPackage,
                 proj.recipe,
                 target,
-                proj.isDescribeOnly
+                proj.isDescribeOnly,
+                preferUnittestConfiguration: proj.preferUnittestConfiguration
             );
     }
     

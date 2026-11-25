@@ -181,6 +181,51 @@ D
     fi
 }
 
+test_test_prefers_unittest_configuration()
+{
+    local name="utcfg$SUFFIX"
+    local d="$WORK/utcfg"
+    local log="$WORK/utcfg.log"
+    local cfgs='"configurations":[{"name":"library","targetType":"library"},{"name":"unittest","versions":["UT_CFG"]},{"name":"other","versions":["OTHER_CFG"]}]'
+    local dep='"dependencies":{"'"$name"'dep":{"path":"'
+    local body='import std.stdio; unittest { version(UT_CFG) writeln("CFG_UNITTEST"); else version(OTHER_CFG) writeln("CFG_OTHER"); else writeln("CFG_DEFAULT"); }'
+    mkdir -p "$d/source" "$d/inl" "$d/pth/source" "$d/dep/source" "$d/plain/source"
+    printf '%s\n' '{"name":"'"$name"'",'"$dep"'dep"}},'"$cfgs"',"subPackages":[{"name":"inl","sourcePaths":["inl"],"importPaths":["inl"],'"$dep"'dep"}},'"$cfgs"'},"pth"]}' > "$d/dub.json"
+    printf '%s\n' '{"name":"pth",'"$dep"'../dep"}},'"$cfgs"'}' > "$d/pth/dub.json"
+    printf '%s\n' "module utroot; import utdep; $body" > "$d/source/utroot.d"
+    printf '%s\n' "module utinl; import utdep; $body" > "$d/inl/utinl.d"
+    printf '%s\n' "module utpth; import utdep; $body" > "$d/pth/source/utpth.d"
+    # A dependency keeps the configuration a build gives it: its "unittest" one doesn't compile.
+    printf '%s\n' '{"name":"'"$name"'dep","configurations":[{"name":"library","targetType":"library"},{"name":"unittest","versions":["DEP_UT"]}]}' > "$d/dep/dub.json"
+    printf '%s\n' 'module utdep; version(DEP_UT) static assert(0, "DEP_GOT_UNITTEST");' > "$d/dep/source/utdep.d"
+    printf '%s\n' '{"name":"'"$name"'plain","configurations":[{"name":"library","targetType":"library"},{"name":"other","versions":["OTHER_CFG"]}]}' > "$d/plain/dub.json"
+    printf '%s\n' "module utplain; $body" > "$d/plain/source/utplain.d"
+
+    local failures=""
+    expect()
+    {
+        local dir=$1 want=$2
+        shift 2
+        redub_in "$dir" 120 "$log" test "$@"
+        if ! grep -q "$want" "$log"; then
+            failures="$failures [test $*: wanted $want, got $(detail "$log")]"
+        fi
+    }
+    expect "$d" CFG_UNITTEST
+    expect "$d" CFG_UNITTEST :inl
+    expect "$d" CFG_UNITTEST :pth
+    expect "$d" CFG_OTHER -c other
+    expect "$d" CFG_OTHER :inl -c other
+    expect "$d" CFG_OTHER :pth -c other
+    expect "$d/plain" CFG_DEFAULT
+
+    if [ -z "$failures" ]; then
+        pass test_test_prefers_unittest_configuration
+    else
+        fail test_test_prefers_unittest_configuration "$failures"
+    fi
+}
+
 test_config_platform_crash()
 {
     local name="cfgtest$SUFFIX"
@@ -1689,6 +1734,7 @@ test_clean_old_cache
 test_failed_build_keeps_cache
 test_excluded_dependency_file_does_not_invalidate
 test_test_command_forwards_args
+test_test_prefers_unittest_configuration
 test_config_platform_crash
 test_copy_files_no_match
 test_unused_key_warning

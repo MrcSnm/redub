@@ -30,7 +30,8 @@ RootParseResult parseProject(
     BuildRequirements.Configuration subConfiguration,
     string subPackage, 
     string recipe,
-    string target
+    string target,
+    bool preferUnittestConfiguration = false
 )
 {
     import std.path;
@@ -62,7 +63,7 @@ RootParseResult parseProject(
                 import redub.parsers.adapter.json_cache;
                 parseData = parseJSONCached(recipe, singleInfo.recipe);
             }
-            res = redub.parsers.automatic.parseProject(parseData, projectWorkingDir, cInfo, subConfiguration, subPackage, target, false, singleInfo.defaultPackageName);
+            res = redub.parsers.automatic.parseProject(parseData, projectWorkingDir, cInfo, subConfiguration, subPackage, target, false, singleInfo.defaultPackageName, preferUnittestConfiguration: preferUnittestConfiguration);
             break;
         default: throw new Exception("Unsupported project type "~recipe~" at dir "~projectWorkingDir);
     }

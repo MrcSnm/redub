@@ -30,7 +30,8 @@ RootParseResult parseProject(
     string subPackage,
     string recipe,
     string target,
-    bool isDescribeOnly = false
+    bool isDescribeOnly = false,
+    bool preferUnittestConfiguration = false
 )
 {
     import redub.parsers.base;
@@ -55,7 +56,7 @@ RootParseResult parseProject(
     }
 
     JSONValue projectJSON = getProjectJSON(projectFile, projectWorkingDir);
-    return parseProject(projectJSON, projectWorkingDir, cInfo, subConfiguration, subPackage, target, isDescribeOnly);
+    return parseProject(projectJSON, projectWorkingDir, cInfo, subConfiguration, subPackage, target, isDescribeOnly, preferUnittestConfiguration: preferUnittestConfiguration);
 }
 
 /**
@@ -79,7 +80,8 @@ RootParseResult parseProject(
     string subPackage,
     string target,
     bool isDescribeOnly = false,
-    string defaultPackageName = null
+    string defaultPackageName = null,
+    bool preferUnittestConfiguration = false
 )
 {
     import redub.parsers.base;
@@ -88,6 +90,7 @@ RootParseResult parseProject(
     RootParseResult result;
 
     ParseConfig cfg = getParseConfig(projectWorkingDir, cInfo, defaultPackageName, null, subConfiguration, subPackage, null, isDescribeOnly);
+    cfg.preferUnittestConfiguration = preferUnittestConfiguration;
     TargetInfo targetInfo;
     CompilationInfo originalInfo = cInfo;
     if(target.length)
@@ -152,7 +155,8 @@ BuildRequirements parseProjectCommon(
     bool isRoot = false,
     bool isTarget = false,
     string version_ = null,
-    bool isDescribeOnly = false
+    bool isDescribeOnly = false,
+    bool preferUnittestConfiguration = false
 )
 {
     import redub.parsers.base;
@@ -179,6 +183,7 @@ BuildRequirements parseProjectCommon(
     BuildConfiguration pending;
     ParseConfig cfg = getParseConfig(projectWorkingDir, cInfo, null, version_, subConfiguration, subPackage, parentName, isDescribeOnly);
     cfg.extra.isTarget = isTarget;
+    cfg.preferUnittestConfiguration = preferUnittestConfiguration;
 
     JSONValue parseData = getProjectJSON(projectFile, projectWorkingDir);
 

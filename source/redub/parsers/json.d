@@ -429,6 +429,12 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
                         preferredConfiguration = i.to!int;
                         break;
                     }
+                    ///As dub test does, the package under test uses its "unittest" configuration when none was requested.
+                    if(c.preferUnittestConfiguration && !c.subConfiguration.name && name.str == "unittest")
+                    {
+                        preferredConfiguration = i.to!int;
+                        break;
+                    }
                     if(preferredConfiguration == -1)
                     {
                         if(name.str == "unittest")
@@ -599,7 +605,11 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
             {
                 const(JSONValue)* name = "name" in p;
                 if(name.str == cfg.subPackage)
-                    return parse(p, ParseConfig(cfg.workingDir, cfg.subConfiguration, null, cfg.version_, cfg.cInfo, null, ParseSubConfig(cfg.extra.requiredBy, buildRequirements.name, cfg.extra.isTarget), true, true), pending);
+                {
+                    ParseConfig subCfg = ParseConfig(cfg.workingDir, cfg.subConfiguration, null, cfg.version_, cfg.cInfo, null, ParseSubConfig(cfg.extra.requiredBy, buildRequirements.name, cfg.extra.isTarget), true, true);
+                    subCfg.preferUnittestConfiguration = cfg.preferUnittestConfiguration;
+                    return parse(p, subCfg, pending);
+                }
             }
             else ///Subpackage is on other file
             {
@@ -614,7 +624,8 @@ BuildRequirements parse(JSONValue json, ParseConfig cfg, out BuildConfiguration 
                 if(subPackageName == cfg.subPackage)
                 {
                     import redub.parsers.automatic;
-                    return parseProjectCommon(subPackagePath, cfg.cInfo, cfg.subConfiguration, null, null, buildRequirements.name, false, cfg.extra.isTarget, cfg.version_);
+                    return parseProjectCommon(subPackagePath, cfg.cInfo, cfg.subConfiguration, null, null, buildRequirements.name, false, cfg.extra.isTarget, cfg.version_,
+                        preferUnittestConfiguration: cfg.preferUnittestConfiguration);
                 }
             }
         }

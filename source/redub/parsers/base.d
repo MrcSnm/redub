@@ -26,6 +26,9 @@ struct ParseConfig
     ///When preGenerateRun is true, it will run the preGenerateRun
     bool preGenerateRun = true;
     bool isRoot = false;
+    ///Set by `redub test` for the package under test only, never its dependencies:
+    ///its "unittest" configuration is used when none is requested.
+    bool preferUnittestConfiguration = false;
 }
 
 /**
