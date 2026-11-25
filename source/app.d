@@ -365,13 +365,76 @@ int testMain(string[] args, string[] runArgs)
         d.tree.requirements.cfg.targetName~= "library";
 
     if(needsMain)
+    {
         d.tree.requirements.cfg.dFlags ~= "-main";
+        if(!addTestRoot(d.tree))
+            return 1;
+    }
 
     d = buildProject(d);
     if(d.error)
         return d.getReturnCode();
 
     return executeProgram(d, runArgs);
+}
+
+/**
+ * Writes `dub_test_root.d`, as dub test does: a module that statically imports every module
+ * of the package under test and lists them as `allModules`, which test runners such as silly
+ * use to find each unittest and its name. It's written under the package's `.dub` directory,
+ * only when its contents change, so an unchanged package stays up to date, and added to the
+ * package's source files.
+ */
+bool addTestRoot(ProjectNode tree)
+{
+    ref BuildConfiguration cfg() { return tree.requirements.cfg; }
+    import d_dependencies : parseSourceImportGraph, defaultImportScanContext;
+    import std.algorithm : canFind, filter, map, sort;
+    import std.array : array, join;
+    import std.file : exists, mkdirRecurse, readText, write;
+    import std.path : buildNormalizedPath;
+    import redub.logging;
+
+    auto graph = parseSourceImportGraph(cfg.sourcePaths, cfg.sourceFiles, cfg.excludeSourceFiles,
+        defaultImportScanContext());
+    if(graph.skippedFiles.length)
+    {
+        error("Couldn't tell the module of ", graph.skippedFiles.join(", "),
+            ", so dub_test_root can't list it.");
+        return false;
+    }
+    ///A sourceLibrary dependency's sources are merged into the package's, but its modules
+    ///aren't the package's own, so they aren't listed, as dub doesn't list them.
+    string[] librarySources = tree.requirements.extra.sourceLibrarySources.map!(p => buildNormalizedPath(p)).array;
+    bool isLibraryModule(string modPath)
+    {
+        import std.algorithm : any;
+        import std.string : startsWith;
+        import std.path : dirSeparator;
+        string path = buildNormalizedPath(modPath);
+        return librarySources.any!(source => path == source || path.startsWith(source ~ dirSeparator));
+    }
+
+    string[] names = graph.modules
+        .filter!(m => m.modName != "dub_test_root" && !isLibraryModule(m.modPath))
+        .map!(m => m.modName).array;
+    names.sort();
+
+    string source = "module dub_test_root;\n\nimport std.meta : AliasSeq;\n\n";
+    foreach(name; names)
+        source ~= "static import " ~ name ~ ";\n";
+    source ~= "\nalias allModules = AliasSeq!(" ~ names.join(", ") ~ ");\n";
+
+    string directory = buildNormalizedPath(cfg.workingDir, ".dub", "redub_test_root", cfg.targetName);
+    string path = buildNormalizedPath(directory, "dub_test_root.d");
+    if(!exists(path) || readText(path) != source)
+    {
+        mkdirRecurse(directory);
+        write(path, source);
+    }
+    if(!cfg.sourceFiles.canFind(path))
+        cfg.sourceFiles ~= path;
+    return true;
 }
 
 int initMain(string[] args)
