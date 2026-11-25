@@ -1074,10 +1074,14 @@ immutable(string[string]) getEnvForProject(const ProjectNode node, const string[
 private void saveBuiltPackages(Range)(Range builtPackages, string mainPackHash, CompilationInfo s, AdvCacheFormula* formulaCache, const(AdvCacheFormula)* existingSharedFormula)
 {
     import std.algorithm.iteration : filter;
-    saveFinishedBuilds(filter!((ProjectNode n) => !n.isRoot)(builtPackages), mainPackHash, s, formulaCache, existingSharedFormula);
+    ///Each successful package keeps its own per-package cache entry, but the
+    ///shared root formula is not written on failure: it is built from the live
+    ///scan, which includes the packages that failed, and would mark them as
+    ///already built on the next run.
+    saveFinishedBuilds(filter!((ProjectNode n) => !n.isRoot)(builtPackages), mainPackHash, s, formulaCache, existingSharedFormula, false);
 }
 
-private void saveFinishedBuilds(ProjNodeRange)(ProjNodeRange finishedProjects, string mainPackHash, CompilationInfo s, AdvCacheFormula* formulaCache, const(AdvCacheFormula)* existingSharedFormula)
+private void saveFinishedBuilds(ProjNodeRange)(ProjNodeRange finishedProjects, string mainPackHash, CompilationInfo s, AdvCacheFormula* formulaCache, const(AdvCacheFormula)* existingSharedFormula, bool writeRootCache = true)
 {
     import std.datetime.stopwatch;
     AdvCacheFormula cache;
@@ -1095,7 +1099,8 @@ private void saveFinishedBuilds(ProjNodeRange)(ProjNodeRange finishedProjects, s
     }
     auto formulaMs = formulaSw.peek.total!"msecs";
     StopWatch writeSw = StopWatch(AutoStart.yes);
-    updateCacheOnDisk(mainPackHash, &cache, existingSharedFormula);
+    if(writeRootCache)
+        updateCacheOnDisk(mainPackHash, &cache, existingSharedFormula);
     vvlog("Cache formulas: ", formulaMs, "ms; cache write: ", writeSw.peek.total!"msecs", "ms");
 
     ///TODO: Start comparing current build time with the last one

@@ -84,11 +84,19 @@ struct CompilationCache
         CacheRequirementEntry* targetCache = reqCache in c.requirements;
         bool loadedDepCache;
 
-        if (!targetCache && !req.extra.isRoot && exists(getCacheFilePath(reqCache)))
+        ///A package's own cache file is the authority for what its artifact was
+        ///built from. The root/shared formula is refreshed from the live scan on
+        ///every build, so reading it back here would make the "previous state"
+        ///equal to the current one and hide dependency source changes forever.
+        if (!req.extra.isRoot && exists(getCacheFilePath(reqCache)))
         {
-            c = getCache(reqCache);
-            targetCache = reqCache in c.requirements;
-            loadedDepCache = true;
+            CacheFileData* depCache = getCache(reqCache);
+            if (reqCache in depCache.requirements)
+            {
+                c = depCache;
+                targetCache = reqCache in c.requirements;
+                loadedDepCache = true;
+            }
         }
 
         bool fromGlobal = loadedDepCache || (!req.extra.isRoot && rootHash == reqCache);
@@ -105,11 +113,17 @@ struct CompilationCache
         if (!targetCache)
             return CompilationCache(reqCache, rootHash, AdvCacheFormula.init, AdvCacheFormula.init, sharedFormula, fromGlobal);
 
+        ///Use the dependency's own last-build snapshot as the "previous" side of
+        ///the diff instead of the shared formula that tracks the live scan.
+        AdvCacheFormula* previous = loadedDepCache && !c.fullFormula.isEmptyFormula
+            ? &c.fullFormula
+            : &sharedFormula;
+
         import redub.logging;
         try
             return CompilationCache(reqCache, rootHash,
-                formulaFromSimple(targetCache.compileFormula, sharedFormula),
-                formulaFromSimple(targetCache.copyFormula, sharedFormula),
+                formulaFromSimple(targetCache.compileFormula, *previous),
+                formulaFromSimple(targetCache.copyFormula, *previous),
                 sharedFormula,
                 fromGlobal);
         catch (Exception e)
