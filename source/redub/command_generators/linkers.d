@@ -200,7 +200,7 @@ string[] parseLinkConfigurationMSVC(const ThreadBuildData data, CompilationInfo 
         if(data.cfg.targetIcon)
         {
             import redub.misc.win_icon;
-            cmds~= getWindowsResourceName(data.cfg.targetIcon);
+            cmds~= getWindowsResourceName(data.cfg.targetIcon).escapePath;
         }
         cmds = mapAppend(cmds, libraries, (string l) => "-L"~stripLibraryExtension(l)~".lib");
 

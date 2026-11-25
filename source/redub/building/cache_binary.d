@@ -14,7 +14,7 @@ import std.array : Appender, appender;
 import std.exception : enforce;
 
 enum cacheBinaryMagic = "RDB1";
-enum cacheBinaryVersion = 2;
+enum cacheBinaryVersion = 3;
 enum cacheBinaryStringLengthPrefixed = 0;
 
 struct CacheSimpleFormula
@@ -189,6 +189,7 @@ ubyte[] encodeCacheFile(const ref CacheFileData cache)
             putString(sink, fileName);
             putU64(sink, file.timeModified);
             putHash(sink, file.contentHash);
+            putU64(sink, file.size);
         }
     }
 
@@ -198,6 +199,7 @@ ubyte[] encodeCacheFile(const ref CacheFileData cache)
         putString(sink, name);
         putU64(sink, file.timeModified);
         putHash(sink, file.contentHash);
+        putU64(sink, file.size);
     }
 
     putU32(sink, cast(uint) cache.requirements.length);
@@ -214,8 +216,9 @@ CacheFileData decodeCacheFile(ubyte[] data)
 {
     enforce(data.length >= 6, "Binary cache is too small.");
     enforce(cast(string) data[0 .. 4] == cacheBinaryMagic, "Invalid binary cache magic.");
-    enforce(data[4] == cacheBinaryVersion, "Unsupported binary cache version.");
+    enforce(data[4] >= 2 && data[4] <= cacheBinaryVersion, "Unsupported binary cache version.");
     enforce(data[5] == cacheBinaryStringLengthPrefixed, "Unsupported binary cache string encoding.");
+    bool hasSize = data[4] >= 3;
 
     size_t pos = 6;
     CacheFileData cache;
@@ -235,7 +238,8 @@ CacheFileData decodeCacheFile(ubyte[] data)
             string fileName = getString(data, pos);
             ulong timeModified = getU64(data, pos);
             ubyte[8] fileHash = getHash(data, pos);
-            files[fileName] = AdvFile(timeModified, fileHash);
+            ulong size = hasSize ? getU64(data, pos) : ulong.max;
+            files[fileName] = AdvFile(timeModified, fileHash, size);
         }
         cache.fullFormula.directories[name] = AdvDirectory(contentHash, files);
     }
@@ -247,7 +251,8 @@ CacheFileData decodeCacheFile(ubyte[] data)
         string name = getString(data, pos);
         ulong timeModified = getU64(data, pos);
         ubyte[8] fileHash = getHash(data, pos);
-        cache.fullFormula.files[name] = AdvFile(timeModified, fileHash);
+        ulong size = hasSize ? getU64(data, pos) : ulong.max;
+        cache.fullFormula.files[name] = AdvFile(timeModified, fileHash, size);
     }
 
     uint requirementCount = getU32(data, pos);
@@ -265,15 +270,8 @@ CacheFileData decodeCacheFile(ubyte[] data)
 
 void writeCacheFile(string path, const ref CacheFileData cache)
 {
-    import std.file : write, rename, remove;
-    import std.random : Random, unpredictableSeed, uniform;
-    import std.conv : to;
-
-    Random seed = Random(unpredictableSeed);
-    string temporaryPath = path ~ "." ~ uniform(0u, uint.max, seed).to!string ~ ".tmp";
-    write(temporaryPath, encodeCacheFile(cache));
-    scope(failure) remove(temporaryPath);
-    rename(temporaryPath, path);
+    import redub.misc.atomic_write : writeFileAtomic;
+    writeFileAtomic(path, encodeCacheFile(cache));
 }
 
 CacheFileData readCacheFile(string path)
@@ -289,11 +287,11 @@ unittest
     ubyte[8] hash2 = [9, 10, 11, 12, 13, 14, 15, 16];
 
     AdvFile[string] directoryFiles;
-    directoryFiles["a.d"] = AdvFile(1234, hash1);
+    directoryFiles["a.d"] = AdvFile(1234, hash1, 111);
     AdvDirectory[string] directories;
     directories["source"] = AdvDirectory(hash2, directoryFiles);
     AdvFile[string] files;
-    files["dub.json"] = AdvFile(5678, hash2);
+    files["dub.json"] = AdvFile(5678, hash2, 222);
     AdvCacheFormula fullFormula = AdvCacheFormula(hash1, directories, files);
 
     CacheFileData original;
@@ -307,6 +305,8 @@ unittest
     assert(decoded.fullFormula.contentHash == fullFormula.contentHash);
     assert(decoded.fullFormula.directories.length == 1);
     assert(decoded.fullFormula.files.length == 1);
+    assert(decoded.fullFormula.files["dub.json"].size == 222);
+    assert(decoded.fullFormula.directories["source"].files["a.d"].size == 111);
     assert(decoded.requirements.length == 1);
 
     AdvCacheFormula restored = formulaFromSimple(decoded.requirements["req"].compileFormula, decoded.fullFormula);

@@ -146,6 +146,8 @@ struct CompilationCache
     {
         if(requirementCache != hashFrom(req, s))
             return false;
+        if(!cacheArtifactsMatch(req, s))
+            return false;
         AdvCacheFormula otherFormula = getCompilationCacheFormula(req, rootHash, s, &sharedFormula, preprocessed);
         string[] sink = diffs;
         formula.diffStatus(otherFormula, sink, diffCount);
@@ -175,6 +177,33 @@ struct CompilationCache
         string[] sink = diffs;
         copyFormula.diffStatus(otherFormula, sink, diffCount);
         return diffCount != 0;
+    }
+
+    ///Returns: true when the artifacts still in the build cache match the size
+    ///recorded when they were built. The directory scan reuses hashes by time and
+    ///may report stale sizes, so a corrupted cached artifact could otherwise be
+    ///copied over a good output (or accepted as up-to-date).
+    private bool cacheArtifactsMatch(const BuildRequirements req, CompilationInfo s) const
+    {
+        if(!req.cfg.targetType.hasBuildableOutput)
+            return true;
+        import std.file : exists, getSize;
+        import std.path : buildNormalizedPath, baseName;
+        string cacheDir = getCacheOutputDir(rootHash, req, s);
+        const(AdvDirectory)* dir = cacheDir in formula.directories;
+        if(dir is null)
+            return true;
+        foreach(artifact; getExpectedArtifacts(req, s.targetOS, s.isa))
+        {
+            string name = baseName(artifact);
+            const(AdvFile)* recorded = name in dir.files;
+            if(recorded is null)
+                continue;
+            string cached = buildNormalizedPath(cacheDir, name);
+            if(!exists(cached) || getSize(cached) != recorded.size)
+                return false;
+        }
+        return true;
     }
 
     ///Returns: true when every delivered artifact matches its counterpart in the

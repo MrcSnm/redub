@@ -14,6 +14,8 @@ struct AdvFile
 	///This will be used to compare before content hash
 	ulong timeModified;
 	ubyte[8] contentHash;
+	///Check alongside the time so a size change is never hidden by an unchanged mtime.
+	ulong size = ulong.max;
 
 	AdvFile dup() const
 	{
@@ -26,11 +28,12 @@ struct AdvFile
 	void serialize(ref JSONValue output) const
 	{
 		import std.digest:toHexString;
-		output = JSONValue([JSONValue(timeModified), JSONValue(contentHash[].toHexString)]);
+		output = JSONValue([JSONValue(timeModified), JSONValue(contentHash[].toHexString), JSONValue(size)]);
 	}
 	/**
 	 * Specification:
-	 * [TIME_LONG, CONTENT_HASH]
+	 * [TIME_LONG, CONTENT_HASH, SIZE_LONG]
+	 * Older entries may have 2 members (no size); their size is unknown.
 	 * Params:
 	 *   input =
 	 * Returns:
@@ -38,8 +41,9 @@ struct AdvFile
 	static AdvFile deserialize(JSONValue input)
 	{
 		enforce(input.type == JSONType.array, "Input json for AdvFile deserialization is not an array.");
-		enforce(input.array.length == 2, "Input json for AdvFile deserialization is an array with size different from 2.");
-		return AdvFile(input.array[0].get!ulong, hashFromString(input.array[1].str));
+		enforce(input.array.length == 2 || input.array.length == 3, "Input json for AdvFile deserialization must have 2 or 3 members.");
+		ulong size = input.array.length == 3 ? input.array[2].get!ulong : ulong.max;
+		return AdvFile(input.array[0].get!ulong, hashFromString(input.array[1].str), size);
 	}
 }
 
@@ -365,12 +369,13 @@ struct AdvCacheFormula
 				if(e.isDir || e.isHidden || !filterDir.shouldInclude(e.name)) continue;
 				string fName = e.relativeName;
 				long time = e.timeModified;
+				ulong size = e.size;
 				if(existingDir)
 				{
 					const(AdvFile)* existingFile = fName in existingDir.files;
 					if(existingFile)
 					{
-						if(existingFile.timeModified == time)
+						if(existingFile.timeModified == time && existingFile.size == size)
 						{
 							advDir.files[names.add(fName)] = existingFile.dup;
 							joinedHash[0..8] = advDir.contentHash;
@@ -381,7 +386,7 @@ struct AdvCacheFormula
 					}
 				}
 				if(!hashContent(e.name, fileBuffer, hashedContent, contentHasher, isSimplified || filterDir.useSimplifiedHashing)) continue;
-				advDir.files[names.add(fName)] = AdvFile(time, hashedContent[0..8]);
+				advDir.files[names.add(fName)] = AdvFile(time, hashedContent[0..8], size);
 				joinedHash[0..8] = advDir.contentHash;
 				joinedHash[8..$] = hashedContent;
 				advDir.putContentHashInPlace(contentHasher(joinedHash, hashedContent)[0..8]);
@@ -410,11 +415,12 @@ struct AdvCacheFormula
 			version(Windows) if(file.length >= 248) ioFile = extendedPath(file);
 			DirEntry e = DirEntry(ioFile);
 			long time = e.timeLastModified.stdTime;
+			ulong size = e.size;
 
 			if(existing)
 			{
 				const(AdvFile)* existingFile = file in existing.files;
-				if(existingFile && existingFile.timeModified == time)
+				if(existingFile && existingFile.timeModified == time && existingFile.size == size)
 				{
 					ret.files[file] = existingFile.dup;
 					hashedContent = existingFile.contentHash;
@@ -425,7 +431,7 @@ struct AdvCacheFormula
 			}
 
 			if(!hashContent(file, fileBuffer, hashedContent, contentHasher, isSimplified || inferSimplifiedFile(e))) continue;
-			AdvFile f = AdvFile(time, hashedContent[0..8]);
+			AdvFile f = AdvFile(time, hashedContent[0..8], size);
 			ret.files[file] = f;
 			if(cacheHolder !is null)
 				cacheHolder.files[file] = f;
@@ -494,7 +500,8 @@ struct AdvCacheFormula
 			foreach(fileName, otherAdv; filesOther)
 			{
 				const(AdvFile)* advFile = fileName in files;
-				if(advFile is null ||  (otherAdv.timeModified != advFile.timeModified &&
+				if(advFile is null || otherAdv.size != advFile.size ||
+				(otherAdv.timeModified != advFile.timeModified &&
 				otherAdv.contentHash != advFile.contentHash))
 				{
 					if(diffCount < diffs.length)

@@ -23,6 +23,11 @@ string processIcon(string[] filenames, out string errors)
     import std.file;
     import std.conv:to;
 
+    ///The resource only depends on the icons, so reuse it until they change.
+    auto resName = getWindowsResourceName(filenames);
+    if(exists(resName))
+        return resName;
+
     static struct Ico {
         const(ubyte)[] icoBytes;
         ubyte imageWidth;
@@ -157,23 +162,43 @@ string processIcon(string[] filenames, out string errors)
     while(resBytes.length % 4)
         resBytes ~= 0; // pad to DWORD boundary
 
-    auto resName = getWindowsResourceName(filenames);
-    std.file.write(resName, resBytes);
+    ///Write atomically so an interrupted build never leaves a partial resource
+    ///that the reuse check above would accept.
+    import std.path : dirName;
+    import redub.misc.atomic_write : writeFileAtomic;
+    std.file.mkdirRecurse(dirName(resName));
+    writeFileAtomic(resName, resBytes);
     return resName;
 }
 
 
 string getWindowsResourceName(const string[] iconPaths)
 {
-    import std.array:join;
-    import std.path;
-    enum separator = ",";
-    if(iconPaths.length > 1)
+    import std.digest : toHexString;
+    import std.digest.crc : CRC32;
+    import std.file : DirEntry;
+    import std.path : absolutePath, buildNormalizedPath;
+    import redub.building.cache : getCacheFolder;
+
+    ///The resource is an intermediate consumed by the linker, so keep it in the
+    ///redub cache (persistent and managed by clean/version) instead of the
+    ///project. Its name covers the resolved icon paths and their metadata, so the
+    ///writer and the linker agree and an existing resource can be reused without
+    ///reading icon contents.
+    CRC32 crc;
+    foreach(iconPath; iconPaths)
     {
-        string ret = iconPaths[0];
-        for(int i = 1; i < iconPaths.length; i++)
-            ret~= separator~iconPaths[i].baseName;
-        return ret~".res";
+        string resolved = absolutePath(iconPath);
+        crc.put(cast(const ubyte[]) resolved);
+        try
+        {
+            DirEntry e = DirEntry(resolved);
+            ulong time = e.timeLastModified.stdTime;
+            ulong size = e.size;
+            crc.put((cast(const ubyte*) &time)[0..8]);
+            crc.put((cast(const ubyte*) &size)[0..8]);
+        }
+        catch(Exception) {}
     }
-    return join(iconPaths, separator)~".res";
+    return buildNormalizedPath(getCacheFolder(), "icons", "redub-icons-" ~ crc.finish()[].toHexString ~ ".res");
 }

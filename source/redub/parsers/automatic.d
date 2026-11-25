@@ -289,9 +289,10 @@ private void partiallyFinishBuildRequirements(ref BuildRequirements req, BuildCo
         req.cfg.outputDirectory = redub.misc.path.buildNormalizedPath(req.cfg.workingDir, req.cfg.outputDirectory);
 
     ///Libraries must not carry their entry point: another package may have a module with the same name.
-    bool excludeEntryPoint = req.cfg.targetType == TargetType.autodetect
-        ? !req.extra.isRoot
-        : req.cfg.targetType != TargetType.executable;
+    ///The root package is what is being built on purpose, so its own layout is respected.
+    bool excludeEntryPoint = !req.extra.isRoot
+        && (req.cfg.targetType == TargetType.autodetect
+            || req.cfg.targetType != TargetType.executable);
     // Android app shared libraries keep their entry point (android_main).
     if(req.cfg.arch.indexOf("android") != -1)
         excludeEntryPoint = false;

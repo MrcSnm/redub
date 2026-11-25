@@ -1779,8 +1779,67 @@ test_single_call_output_is_executable()
     fi
 }
 
+test_icon_resource_not_in_project()
+{
+    if [ "$WINDOWS" -eq 0 ]; then
+        skip icon_resource_not_in_project "requires a Windows host"
+        return
+    fi
+    if [ ! -f "$ROOT/logo16.png" ]; then
+        skip icon_resource_not_in_project "icon fixture missing"
+        return
+    fi
+    local name="icontest$SUFFIX"
+    local d="$WORK/icon"
+    local log="$WORK/icon.log"
+    mkdir -p "$d/source"
+    cp "$ROOT/logo16.png" "$d/icon.png"
+    printf '%s\n' '{"name":"'"$name"'","targetType":"executable","targetPath":"build","icon":["icon.png"]}' > "$d/dub.json"
+    printf '%s\n' 'void main(){}' > "$d/source/app.d"
+    if ! redub_in "$d" 120 "$log" build --force; then
+        fail icon_resource_not_in_project "build failed: $(detail "$log")"
+        return
+    fi
+    if [ -z "$(artifact "$d" "$name")" ]; then
+        fail icon_resource_not_in_project "artifact not found"
+        return
+    fi
+    local res
+    res="$(find "$d" -maxdepth 1 -name '*.res' -print -quit 2>/dev/null)"
+    if [ -n "$res" ]; then
+        fail icon_resource_not_in_project "resource written into the project: $res"
+    else
+        pass icon_resource_not_in_project
+    fi
+}
+
+test_root_library_keeps_app_d()
+{
+    if ! have_dmd; then
+        skip root_library_keeps_app_d "no D compiler found"
+        return
+    fi
+    local name="rootlib$SUFFIX"
+    local d="$WORK/rootlib"
+    local log="$WORK/rootlib.log"
+    mkdir -p "$d/source"
+    printf '%s\n' '{"name":"'"$name"'","targetType":"staticLibrary","targetPath":"build"}' > "$d/dub.json"
+    printf '%s\n' 'module app; int f(){ return 1; }' > "$d/source/app.d"
+    if ! redub_in "$d" 120 "$log" build --force; then
+        fail root_library_keeps_app_d "build failed: $(detail "$log")"
+        return
+    fi
+    if [ -n "$(find "$d/build" -maxdepth 1 \( -name "$name.lib" -o -name "lib$name.a" \) -print -quit 2>/dev/null)" ]; then
+        pass root_library_keeps_app_d
+    else
+        fail root_library_keeps_app_d "library artifact not found"
+    fi
+}
+
 test_cache_custom_source_paths
 test_single_call_output_is_executable
+test_icon_resource_not_in_project
+test_root_library_keeps_app_d
 test_shared_dependency_cache
 test_shared_dependency_cache_change
 test_shared_dependency_cache_version_flags

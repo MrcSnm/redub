@@ -2,7 +2,8 @@ module redub.building.build_timings;
 
 import redub.building.cache : getCacheFolder;
 import redub.logging : warn;
-import std.file : exists, mkdirRecurse, read, remove, rename, write;
+import redub.misc.atomic_write : writeFileAtomic;
+import std.file : exists, mkdirRecurse, read;
 import std.path : buildNormalizedPath, dirName;
 import std.algorithm : map, sort;
 import std.array : array;
@@ -138,11 +139,7 @@ private void save(string path, TimingRecord[] records)
         putU32(data, record.linkMs);
     }
     mkdirRecurse(dirName(path));
-    string temp = path ~ ".tmp";
-    write(temp, data);
-    version(Windows)
-        if(exists(path)) remove(path);
-    rename(temp, path);
+    writeFileAtomic(path, data);
 }
 
 private long median(uint[] values)

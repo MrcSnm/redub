@@ -463,10 +463,6 @@ string[] getExpectedArtifacts(const BuildRequirements req, OS targetOS, ISA isa)
     ///This library will enter on the cache formula
     if(targetOS.isWindows && req.cfg.targetType == TargetType.dynamicLibrary)
         ret ~= getOutputPath(req.cfg, TargetType.staticLibrary, targetOS, isa);
-    
-    string resName = getResourceName(req, targetOS);
-    if(resName.length)
-        ret~= resName;
     return ret;
 }
 
