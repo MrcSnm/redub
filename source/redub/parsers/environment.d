@@ -235,9 +235,9 @@ void setupEnvironmentVariablesForPackage(const ref BuildConfiguration cfg)
 }
 string parseStringWithEnvironment(string str)
 {
-    import std.exception;
     import std.string;
     import std.ascii:isAlphaNum;
+    import redub.api : RedubException;
     struct VarPos
     {
         size_t start, end;
@@ -259,7 +259,9 @@ string parseStringWithEnvironment(string str)
             else if(i + 1 < str.length && str[i+1] == '{')
             {
                 end = cast(int)indexOf(str, '}', i);
-                enforce(++end != 0, "Could not find matching brackets at "~str); //Advance the }
+                ++end; //Advance the }
+                if(end == 0)
+                    throw new RedubException("Could not find matching brackets at "~str);
                 envValue = getEnvVariable(str[i+2..end-1]);
             }
             else
@@ -494,12 +496,13 @@ version(AsLibrary) //Library version will use environment instead of redubEnv si
      */
     string getEnvVariable(string key)
     {
+        import redub.api : RedubException;
         uint tries = 0;
         enum maxTries = 254;
         while(key in environment)
         {
             if(++tries == maxTries)
-                throw new Exception("Too many expansions for the key "~key~" and value "~environment[key]);
+                throw new RedubException("Too many expansions for the key "~key~" and value "~environment[key]);
             string oldKey = key;
             key = environment[key];
 
@@ -514,7 +517,7 @@ version(AsLibrary) //Library version will use environment instead of redubEnv si
                     key = key[1..$-1];
 
                 if(key == oldKey)
-                    throw new Exception("Error: Variable expanded to itself: "~key);
+                    throw new RedubException("Error: Variable expanded to itself: "~key);
             }
         }
         return null;
@@ -542,6 +545,7 @@ else
     void unlockEnv(){envMutex.unlock();}
     string getEnvVariable(string key)
     {
+        import redub.api : RedubException;
         uint tries = 0;
         enum maxTries = 254;
 
@@ -549,7 +553,7 @@ else
         while(ret)
         {
             if(++tries == maxTries)
-                throw new Exception("Too many expansions for the key "~key~" and value "~environment[key]);
+                throw new RedubException("Too many expansions for the key "~key~" and value "~redubEnv[key]);
             string oldKey = key;
             key = *ret;
             if(key.length == 0)
@@ -562,7 +566,7 @@ else
                 if(key.length > 1 && key[0] == '{' && key[$-1] == '}')
                     key = key[1..$-1];
                 if (key == oldKey)
-                    throw new Exception("Error: Variable expanded to itself: " ~ key);
+                    throw new RedubException("Error: Variable expanded to itself: " ~ key);
             }
             ret = key in redubEnv;
         }

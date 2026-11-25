@@ -1400,6 +1400,64 @@ test_excluded_dependency_file_does_not_invalidate()
     fi
 }
 
+test_copy_failure_keeps_cache()
+{
+    if [ "$WINDOWS" -eq 1 ]; then
+        skip copy_failure_keeps_cache "needs POSIX directory permissions"
+        return
+    fi
+    local name="copyfail$SUFFIX"
+    local d="$WORK/copyfail"
+    local log="$WORK/copyfail.log"
+    mkdir -p "$d/source" "$d/out"
+    printf '%s\n' '{"name":"'"$name"'","targetPath":"out"}' > "$d/dub.json"
+    printf '%s\n' 'void main(){}' > "$d/source/app.d"
+
+    chmod a-w "$d/out"
+    if touch "$d/out/.probe" 2>/dev/null; then
+        rm -f "$d/out/.probe"
+        chmod u+w "$d/out"
+        skip copy_failure_keeps_cache "cannot make the output unwritable (running as root?)"
+        return
+    fi
+
+    # 1) The artifact cannot be delivered, so the build must fail.
+    if redub_in "$d" 120 "$log" build; then
+        chmod u+w "$d/out"
+        fail copy_failure_keeps_cache "build reported success despite an unwritable output ($(detail "$log"))"
+        return
+    fi
+    if [ -e "$d/out/$name" ] || [ -e "$d/out/$name.exe" ]; then
+        chmod u+w "$d/out"
+        fail copy_failure_keeps_cache "an artifact exists even though the output is unwritable"
+        return
+    fi
+
+    # 2) The compilation was cached, so a retry must not rebuild.
+    redub_in "$d" 120 "$log" build
+    if grep -qE "Built:|Built\+Linked:|Will Build:" "$log"; then
+        chmod u+w "$d/out"
+        fail copy_failure_keeps_cache "the failed copy discarded the compilation cache ($(detail "$log"))"
+        return
+    fi
+
+    # 3) Once the destination is writable, it is delivered from the cache.
+    chmod u+w "$d/out"
+    if ! redub_in "$d" 120 "$log" build; then
+        fail copy_failure_keeps_cache "build still failed after the output became writable ($(detail "$log"))"
+        return
+    fi
+    if grep -qE "Built:|Built\+Linked:" "$log"; then
+        fail copy_failure_keeps_cache "the artifact was rebuilt instead of copied from the cache ($(detail "$log"))"
+        return
+    fi
+    if [ ! -e "$d/out/$name" ] && [ ! -e "$d/out/$name.exe" ]; then
+        fail copy_failure_keeps_cache "the artifact was not delivered after the output became writable"
+        return
+    fi
+    pass copy_failure_keeps_cache
+}
+
 make_shared_cache_dep()
 {
     local base=$1
@@ -1732,6 +1790,7 @@ test_clean_all
 test_clean_orphan_tmp
 test_clean_old_cache
 test_failed_build_keeps_cache
+test_copy_failure_keeps_cache
 test_excluded_dependency_file_does_not_invalidate
 test_test_command_forwards_args
 test_test_prefers_unittest_configuration

@@ -238,10 +238,10 @@ private ExecutionResult compilePerSource(
                 outcome.command, data.isLeaf, cmdFile, data.env);
             outcome.pid = cast(shared)ex.pipe.pid;
             reportProcess(owner, id, outcome.pid, true);
+            scope(exit) reportProcess(owner, id, outcome.pid, false);
             auto one = waitProcessExec(ex);
             if(cmdFile)
                 remove(cmdFile);
-            reportProcess(owner, id, outcome.pid, false);
             outcome.status = one.status;
             outcome.output = one.output;
         }
@@ -357,7 +357,7 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
                     }
                     res.pid = cast(shared)ex.pipe.pid;
                     reportProcess(owner, id, res.pid, true);
-                    ret = cast(ExecutionResult)finishCompilerExec(cfg, compiler, inDir, dirName(outDir), ex);
+                    ret = cast(ExecutionResult)finishCompilerExec(cfg, compiler, inDir, dirName(outDir), ex, data.extra.isRoot);
                 }
             }
 
@@ -371,7 +371,20 @@ CompilationResult execCompilation(immutable ThreadBuildData data, shared Project
             }
 
             if(!ret.status && !data.cfg.syntaxOnly)
-                copyDir(inDir, dirName(outDir));
+            {
+                ///The root executable/dynamic library is delivered by link() or
+                ///finishCompilerExec; a copy-enough root is delivered by doLink.
+                ///Only non-root packages and static-library roots are copied here.
+                bool deliveredElsewhere = data.extra.isRoot
+                    && (data.cfg.targetType.isLinkedSeparately || pack.isCopyEnough);
+                if(!deliveredElsewhere)
+                {
+                    if(data.extra.isRoot)
+                        copyOutputBestEffort(inDir, dirName(outDir));
+                    else
+                        copyDir(inDir, dirName(outDir));
+                }
+            }
 
             if(!ret.status && singleCall)
             {
@@ -468,7 +481,10 @@ CompilationResult link(ProjectNode root, string rootHash, const ThreadBuildData 
         if(!makeFileExecutable(execPath))
             throw new Exception("Could not make the output file as executable "~execPath);
     }
-    copyDir(inDir, data.cfg.outputDirectory);
+    if(data.extra.isRoot)
+        copyOutputBestEffort(inDir, data.cfg.outputDirectory);
+    else
+        copyDir(inDir, data.cfg.outputDirectory);
 
     return ret;
 }
@@ -764,8 +780,6 @@ bool buildProjectFullyParallelized(ProjectDetails details, CompilationInfo s, co
         }
     }
 
-    //TODO: What happens if the root builds first and the dependency fails? It will skip everything and just try running the .exe
-    //TODO: What happens if a higher dependency finished first than a lower one? It may simply skip the lower since the parent has already finished.
     if(failedPackage)
     {
         killRunningProcesses();
@@ -1178,7 +1192,7 @@ private bool doLink(ProjectDetails details, CompilationInfo info, string mainPac
         import std.path;
         string inDir = getCacheOutputDir(mainPackHash, cast()root.requirements, info);
         string outDir = getConfigurationOutputPath(root.requirements.cfg, os);
-        copyDir(inDir, dirName(outDir));
+        copyOutputBestEffort(inDir, dirName(outDir));
     }
     else if(!isUpToDate && (linkedAlready || canBuildInSingleCall(root, info)))
     {
@@ -1199,6 +1213,18 @@ private bool doLink(ProjectDetails details, CompilationInfo info, string mainPac
         if(result.msecs > 5)
             redub.logging.info("Wrote cache in ", result.msecs, "ms");
 
+    }
+
+    ///The compilation cache above is kept even when the copy failed, so the next
+    ///run does not rebuild. But a build whose artifact is not in the output is
+    ///not a successful build.
+    if(root.requirements.cfg.targetType.hasBuildableOutput
+        && !outputMatchesCache(mainPackHash, root.requirements, info))
+    {
+        error("Build finished but the output files could not be written to ",
+            root.requirements.cfg.outputDirectory,
+            ". The build is cached; fix the destination and run again.");
+        return false;
     }
 
     return true;

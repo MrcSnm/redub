@@ -163,6 +163,12 @@ struct CompilationCache
      */
     bool needsNewCopy(const BuildRequirements req, CompilationInfo s, AdvCacheFormula* preprocessed, out string[MAX_DIRTY_FILES] diffs, out size_t diffCount) const
     {
+        ///The copy decision compares the delivered artifact against the one the
+        ///build produced in the cache. The recorded formula only diffs the output
+        ///against its own past, so a copy that failed (missing/inaccessible target,
+        ///or a size change) would stay invisible forever.
+        if(!artifactsMatchCache(req, s))
+            return true;
         if(copyFormula.isEmptyFormula)
             return false;
         AdvCacheFormula otherFormula = getCopyCacheFormula(rootHash, req, s, &sharedFormula, preprocessed);
@@ -170,6 +176,45 @@ struct CompilationCache
         copyFormula.diffStatus(otherFormula, sink, diffCount);
         return diffCount != 0;
     }
+
+    ///Returns: true when every delivered artifact matches its counterpart in the
+    ///build cache. Reuses requirementCache (validated == hashFrom by the caller)
+    ///so an up-to-date build does not recompute the requirement hash per package.
+    private bool artifactsMatchCache(const BuildRequirements req, CompilationInfo s) const
+    {
+        if(!req.cfg.targetType.hasBuildableOutput)
+            return true;
+        import std.path : buildNormalizedPath;
+        string cacheKey = req.extra.isRoot ? rootHash : requirementCache;
+        string cacheDir = buildNormalizedPath(getCacheFolder, cacheKey, requirementCache);
+        return outputMatchesCacheInDir(cacheDir, req, s);
+    }
+}
+
+///Returns: true when every delivered artifact matches the one produced in the
+///build cache (existence and size). Used after a build to decide the exit code:
+///a build whose artifact could not be written to the output is not successful.
+bool outputMatchesCache(string mainPackHash, const BuildRequirements req, CompilationInfo s)
+{
+    if(!req.cfg.targetType.hasBuildableOutput)
+        return true;
+    return outputMatchesCacheInDir(getCacheOutputDir(mainPackHash, req, s), req, s);
+}
+
+private bool outputMatchesCacheInDir(string cacheDir, const BuildRequirements req, CompilationInfo s)
+{
+    import std.file : exists, getSize;
+    import std.path : buildNormalizedPath, baseName;
+
+    foreach(artifact; getExpectedArtifacts(req, s.targetOS, s.isa))
+    {
+        string cached = buildNormalizedPath(cacheDir, baseName(artifact));
+        if(!exists(cached))
+            continue;
+        if(!exists(artifact) || getSize(artifact) != getSize(cached))
+            return false;
+    }
+    return true;
 }
 
 void mergeFormula(ref AdvCacheFormula target, const ref AdvCacheFormula source, bool overwrite = false)

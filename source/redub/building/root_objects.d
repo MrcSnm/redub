@@ -368,7 +368,7 @@ RootObjectResult buildRootObjects(ProjectNode root, CompilationInfo s, string ma
             }
         }
     }
-    copyDir(cacheDir, cfg.outputDirectory);
+    copyOutputBestEffort(cacheDir, cfg.outputDirectory);
     if(mainMarker.length)
         write(mainMarker, mainModule);
     result.msNeeded = sw.peek.total!"msecs";

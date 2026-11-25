@@ -53,7 +53,7 @@ ProcessExec2 execCompiler(const BuildConfiguration cfg, Compiler compiler, strin
 }
 
 
-auto finishCompilerExec(const BuildConfiguration cfg, Compiler compiler, string inputDir, string outDir, ProcessExec2 p)
+auto finishCompilerExec(const BuildConfiguration cfg, Compiler compiler, string inputDir, string outDir, ProcessExec2 p, bool bestEffortCopy = false)
 {
     import std.file;
     import redub.misc.hard_link;
@@ -75,7 +75,10 @@ auto finishCompilerExec(const BuildConfiguration cfg, Compiler compiler, string 
 
         vvlog("Copying ", inputDir, " to ", outDir, "...");
 
-        hardLinkDir(inputDir, outDir, true, true);
+        if(bestEffortCopy)
+            copyOutputBestEffort(inputDir, outDir);
+        else
+            hardLinkDir(inputDir, outDir, true, true);
         vvlog("Copy cache->output took ", sw.peek.total!"msecs", "ms");
     }
     return ret;
@@ -83,6 +86,23 @@ auto finishCompilerExec(const BuildConfiguration cfg, Compiler compiler, string 
 
 
 
+
+/**
+ * Copies built artifacts to the user-facing output directory without failing
+ * the build when the destination cannot be written (the target is the running
+ * executable or an inaccessible path). The artifact already lives in the cache,
+ * so the build stays up-to-date and is not repeated on the next run.
+ */
+void copyOutputBestEffort(string inputDir, string outputDir)
+{
+    import redub.command_generators.commons : copyDir;
+    import redub.logging : error;
+
+    try
+        copyDir(inputDir, outputDir);
+    catch(Exception e)
+        error("Could not copy the build output to ", outputDir, ": ", e.msg);
+}
 
 ProcessExec2 linkBase(const ThreadBuildData data, CompilationInfo session, string rootHash, out string compilationCommand, out string cmdFile)
 {
