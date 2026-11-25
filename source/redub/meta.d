@@ -29,7 +29,8 @@ void saveRedubMeta(JSONValue content)
     if(!("version" in content))
         content["version"] = JSONValue(RedubVersionOnly);
 
-    std.file.write(getRedubMetaFileName, content.toString);
+    import redub.misc.atomic_write : writeFileAtomic;
+    writeFileAtomic(getRedubMetaFileName, content.toString);
 }
 
 string getCachedString(ref JSONValue v, string prop, scope lazy string valueWhenNotFound)

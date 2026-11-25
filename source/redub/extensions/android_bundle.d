@@ -259,6 +259,7 @@ private int createDebugKeystore(string keystore)
 void createAndroidGlueProject(string projectRoot, bool opengl, string ndk = null)
 {
     import redub.misc.path : buildNormalizedPath;
+    import redub.misc.atomic_write : writeFileAtomic;
     import std.conv : text;
     import std.file : copy, exists, mkdirRecurse, write;
 
@@ -272,11 +273,11 @@ void createAndroidGlueProject(string projectRoot, bool opengl, string ndk = null
     if(!exists(sourceDir))
         mkdirRecurse(sourceDir);
     if(!exists(bridgePath))
-        write(bridgePath, opengl ? androidOpenGlBridgeSource : androidBridgeSource);
+        writeFileAtomic(bridgePath, opengl ? androidOpenGlBridgeSource : androidBridgeSource);
 
     string recipePath = buildNormalizedPath(glueDir, "dub.json");
     if(!exists(recipePath))
-        write(recipePath, i`{
+        writeFileAtomic(recipePath, i`{
     "name": "redub_android_glue",
     "language": "C",
     "targetType": "staticLibrary",
@@ -362,6 +363,7 @@ void generateAndroidBundle(string outputFolder, ref ProjectDetails d)
     import redub.misc.path : buildNormalizedPath;
     import std.datetime : Clock;
     import std.file : copy, exists, mkdirRecurse, read, remove, timeLastModified, write;
+    import redub.misc.atomic_write : writeFileAtomic;
     import std.path : baseName;
     import std.zip : ArchiveMember, CompressionMethod, ZipArchive;
     import std.string : indexOf;
@@ -430,7 +432,7 @@ void generateAndroidBundle(string outputFolder, ref ProjectDetails d)
             iconChanged = cast(string) read(iconPath) != redubAppIcon;
         catch(Exception) {}
     if(iconChanged)
-        write(iconPath, cast(const(ubyte)[]) redubAppIcon);
+        writeFileAtomic(iconPath, cast(const(ubyte)[]) redubAppIcon);
 
     string manifestText = androidManifest(androidPackageName(d.tree.name), d.tree.name,
         androidApi(arch), cfg.bundleConfig.permissions);
@@ -440,7 +442,7 @@ void generateAndroidBundle(string outputFolder, ref ProjectDetails d)
             manifestChanged = cast(string) read(manifest) != manifestText;
         catch(Exception) {}
     if(manifestChanged)
-        write(manifest, manifestText);
+        writeFileAtomic(manifest, manifestText);
 
     bool needPackage = !exists(unsignedApk)
         || timeLastModified(unsignedApk) < timeLastModified(manifest)
@@ -466,7 +468,7 @@ void generateAndroidBundle(string outputFolder, ref ProjectDetails d)
     member.compressionMethod = CompressionMethod.deflate;
     member.time = Clock.currTime();
     archive.addMember(member);
-    write(withLibApk, cast(ubyte[]) archive.build());
+    writeFileAtomic(withLibApk, cast(ubyte[]) archive.build());
 
     if(runTool([zipalign, "-f", "4", withLibApk, alignedApk], "zipalign") != 0)
         return;

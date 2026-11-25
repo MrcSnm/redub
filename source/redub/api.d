@@ -988,21 +988,25 @@ bool cleanProject(ProjectDetails d, bool showMessages, bool cleanAll = false, in
             string folder = getCacheFolder;
             if(std.file.exists(folder))
             {
-                auto cutoff = Clock.currTime - days(olderThanDays);
-                foreach(DirEntry e; std.file.dirEntries(folder, SpanMode.shallow))
-                {
-                    string fileName = baseName(e.name);
-                    if(fileName.endsWith(".tmp"))
-                    {
+                ///Atomic writes leave temp files next to their target, which can
+                ///now be in nested cache directories such as icons/.
+                foreach(DirEntry e; std.file.dirEntries(folder, SpanMode.depth))
+                    if(!e.isDir && baseName(e.name).endsWith(".tmp"))
                         removeFile(e.name, showMessages, "Removing orphan temp cache " ~ e.name);
-                        continue;
-                    }
-                    if(olderThanDays > 0 && fileName.endsWith(".bin") && e.timeLastModified < cutoff)
+
+                if(olderThanDays > 0)
+                {
+                    auto cutoff = Clock.currTime - days(olderThanDays);
+                    foreach(DirEntry e; std.file.dirEntries(folder, SpanMode.shallow))
                     {
-                        string key = fileName[0 .. $ - 4];
-                        string cacheDir = redub.misc.path.buildNormalizedPath(folder, key);
-                        removeFile(e.name, showMessages, "Removing old cache reference file " ~ e.name);
-                        removeFile(cacheDir, showMessages, "Removing old cache output dir " ~ cacheDir);
+                        string fileName = baseName(e.name);
+                        if(fileName.endsWith(".bin") && e.timeLastModified < cutoff)
+                        {
+                            string key = fileName[0 .. $ - 4];
+                            string cacheDir = redub.misc.path.buildNormalizedPath(folder, key);
+                            removeFile(e.name, showMessages, "Removing old cache reference file " ~ e.name);
+                            removeFile(cacheDir, showMessages, "Removing old cache output dir " ~ cacheDir);
+                        }
                     }
                 }
             }

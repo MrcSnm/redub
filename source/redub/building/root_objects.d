@@ -370,7 +370,10 @@ RootObjectResult buildRootObjects(ProjectNode root, CompilationInfo s, string ma
     }
     copyOutputBestEffort(cacheDir, cfg.outputDirectory);
     if(mainMarker.length)
-        write(mainMarker, mainModule);
+    {
+        import redub.misc.atomic_write : writeFileAtomic;
+        writeFileAtomic(mainMarker, mainModule);
+    }
     result.msNeeded = sw.peek.total!"msecs";
     if(cfg.buildStats)
         recordBuildTiming(mainPackHash,

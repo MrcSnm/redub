@@ -5,6 +5,17 @@ module redub.misc.win_icon;
 */
 string processIcon(string[] filenames, out string errors)
 {
+    try
+        return processIconImpl(filenames, errors);
+    catch(Exception e)
+    {
+        errors = "Could not process icon(s): " ~ e.msg;
+        return null;
+    }
+}
+
+private string processIconImpl(string[] filenames, out string errors)
+{
     // FIXME: error if target is not windows prolly here instead of in the compiler
     // https://devblogs.microsoft.com/oldnewthing/20120720-00/?p=7083
     // gotta create a Windows resource file. this means:

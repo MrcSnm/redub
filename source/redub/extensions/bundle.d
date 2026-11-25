@@ -1,5 +1,6 @@
 module redub.extensions.bundle;
 import redub.api;
+import redub.misc.atomic_write : writeFileAtomic;
 enum defaultIconNameNoExt = "redub_program";
 enum defaultIconName = "redub_program.png";
 enum programIcon = import(defaultIconName);
@@ -37,7 +38,7 @@ void generateMacOSBundle(string outputFolder, ref ProjectDetails d)
     mkdirRecurse(macOS);
     mkdirRecurse(resources);
 
-    std.file.write(buildNormalizedPath(baseDir, "Info.plist"), getInfoPlist(d));
+    writeFileAtomic(buildNormalizedPath(baseDir, "Info.plist"), getInfoPlist(d));
     if(d.tree.requirements.cfg.targetIcon.length)
     {
         import redub.misc.apple_icon;
@@ -46,7 +47,7 @@ void generateMacOSBundle(string outputFolder, ref ProjectDetails d)
         ubyte[] data = getAppleICNSData(d.tree.requirements.cfg.targetIcon, error);
         if(!data.length)
             throw new RedubException(error);
-        std.file.write(iconPath, data);
+        writeFileAtomic(iconPath, data);
     }
     d.bundleGenerated = true;
 }
@@ -90,8 +91,8 @@ void generateAppImageBundle(string outputFolder, ref ProjectDetails d)
 
 
 
-    std.file.write(dotDesktopFile, getDotDesktopContent(d));
-    std.file.write(appRunFile, 
+    writeFileAtomic(dotDesktopFile, getDotDesktopContent(d));
+    writeFileAtomic(appRunFile,
 `#!/bin/sh
 HERE="$(dirname "$(readlink -f "$0")")"
 cd "$HERE"
@@ -102,7 +103,7 @@ exec "./usr/bin/`~projectName~`" "$@"`);
     if(d.tree.requirements.cfg.targetIcon.length)
         copy(d.tree.requirements.cfg.targetIcon[0], buildNormalizedPath(folder, d.tree.requirements.cfg.targetIcon[0].baseName));
     else
-        std.file.write(buildNormalizedPath(folder, defaultIconName), programIcon);
+        writeFileAtomic(buildNormalizedPath(folder, defaultIconName), programIcon);
 
 
     string[string] env;

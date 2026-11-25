@@ -1035,6 +1035,7 @@ private bool copyFiles(ProjectNode root)
     {
         import std.file : exists, mkdirRecurse, read, write;
         import std.path : baseName;
+        import redub.misc.atomic_write : writeFileAtomic;
         bool providedByRecipe;
         foreach(f; cfg.filesToCopy)
             if(baseName(f) == "env.js")
@@ -1050,17 +1051,17 @@ private bool copyFiles(ProjectNode root)
             {
                 if(exists(outEnv))
                 {
-                    write(srcEnv, read(outEnv));
+                    writeFileAtomic(srcEnv, read(outEnv));
                     info("\tKept ", outEnv, " in the project as ", srcEnv);
                 }
                 else
                 {
-                    write(srcEnv, defaultEnvJs);
+                    writeFileAtomic(srcEnv, defaultEnvJs);
                     info("\tCreated ", srcEnv, " with the JS import template");
                 }
             }
             mkdirRecurse(outputDir);
-            write(outEnv, read(srcEnv));
+            writeFileAtomic(outEnv, read(srcEnv));
         }
     }
     return true;
