@@ -267,7 +267,8 @@ struct AdvCacheFormula
 	 *	 isSimplified = Hashes using file name + size + last modified time
 	 * Returns: If it could hash the file or not
 	 */
-	private static bool hashContent(string url, ref ubyte[] buffer, ref ubyte[8] outputHash, ubyte[] function(ubyte[], ref ubyte[8] output) contentHasher, bool isSimplified)
+	private static bool hashContent(string url, ref ubyte[] buffer, ref ubyte[8] outputHash, ubyte[] function(ubyte[], ref ubyte[8] output) contentHasher, bool isSimplified,
+		long timeModified, ulong size)
 	{
 		import std.file;
 		import std.array;
@@ -289,14 +290,12 @@ struct AdvCacheFormula
 			}
 			else
 			{
-				DirEntry e = DirEntry(ioUrl);
-				long timeMod = e.timeLastModified.stdTime;
-				ulong size = e.size;
-
+				// Reuse the time/size the directory walk already read instead of
+				// stat'ing the file again.
 				contentHasher(
 					joinFlattened(
 						cast(ubyte[])url,
-						(cast(ubyte*)&timeMod)[0..8],
+						(cast(ubyte*)&timeModified)[0..8],
 						(cast(ubyte*)&size)[0..8],
 					),
 					outputHash
@@ -305,6 +304,51 @@ struct AdvCacheFormula
 		}
 		catch(Exception e) return false;
 		return true;
+	}
+
+	/**
+	 * Reads a file's last modification time and size in a single stat.
+	 * Returns false when the path is missing or is a directory.
+	 */
+	private static bool statFile(string path, out long timeModified, out ulong size)
+	{
+		version(Windows)
+		{
+			import core.sys.windows.winbase : GetFileAttributesExW,
+				GET_FILEEX_INFO_LEVELS, WIN32_FILE_ATTRIBUTE_DATA;
+			import core.sys.windows.winnt : FILE_ATTRIBUTE_DIRECTORY;
+			import std.datetime.systime : FILETIMEToSysTime;
+			import std.internal.cstring : tempCStringW;
+
+			string ioPath = path;
+			if(path.length >= 248) ioPath = extendedPath(path);
+			WIN32_FILE_ATTRIBUTE_DATA data;
+			if(!GetFileAttributesExW(ioPath.tempCStringW(),
+				GET_FILEEX_INFO_LEVELS.GetFileExInfoStandard, &data))
+				return false;
+			if((data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0)
+				return false;
+			size = (cast(ulong) data.nFileSizeHigh << 32) | data.nFileSizeLow;
+			timeModified = FILETIMEToSysTime(&data.ftLastWriteTime).stdTime;
+			return true;
+		}
+		else version(Posix)
+		{
+			import core.sys.posix.sys.stat : posixStat = stat, stat_t, S_IFMT, S_IFDIR;
+			import std.file : timeLastModified;
+			import std.internal.cstring : tempCString;
+
+			stat_t st;
+			if(posixStat(path.tempCString(), &st) != 0)
+				return false;
+			if((st.st_mode & S_IFMT) == S_IFDIR)
+				return false;
+			size = cast(ulong) st.st_size;
+			timeModified = st.timeLastModified.stdTime;
+			return true;
+		}
+		else
+			return false;
 	}
 
 	/**
@@ -385,7 +429,7 @@ struct AdvCacheFormula
 						}
 					}
 				}
-				if(!hashContent(e.name, fileBuffer, hashedContent, contentHasher, isSimplified || filterDir.useSimplifiedHashing)) continue;
+				if(!hashContent(e.name, fileBuffer, hashedContent, contentHasher, isSimplified || filterDir.useSimplifiedHashing, time, size)) continue;
 				advDir.files[names.add(fName)] = AdvFile(time, hashedContent[0..8], size);
 				joinedHash[0..8] = advDir.contentHash;
 				joinedHash[8..$] = hashedContent;
@@ -408,14 +452,9 @@ struct AdvCacheFormula
 					continue;
 				}
 			}
-			///May throw if it is a directory.
-			scope(failure) continue;
-
-			string ioFile = file;
-			version(Windows) if(file.length >= 248) ioFile = extendedPath(file);
-			DirEntry e = DirEntry(ioFile);
-			long time = e.timeLastModified.stdTime;
-			ulong size = e.size;
+			long time;
+			ulong size;
+			if(!statFile(file, time, size)) continue;
 
 			if(existing)
 			{
@@ -430,7 +469,7 @@ struct AdvCacheFormula
 				}
 			}
 
-			if(!hashContent(file, fileBuffer, hashedContent, contentHasher, isSimplified || inferSimplifiedFile(e))) continue;
+			if(!hashContent(file, fileBuffer, hashedContent, contentHasher, isSimplified || inferSimplifiedFile(size), time, size)) continue;
 			AdvFile f = AdvFile(time, hashedContent[0..8], size);
 			ret.files[file] = f;
 			if(cacheHolder !is null)
@@ -588,9 +627,9 @@ ubyte[] fromHexString2(string hexStr)
 	return ret;
 }
 
-bool inferSimplifiedFile(DirEntry e)
+bool inferSimplifiedFile(ulong size)
 {
-	return e.size > 2_048_000;
+	return size > 2_048_000;
 }
 
 T[] joinFlattened(T)(scope const T[][] args...)

@@ -187,7 +187,6 @@ struct CompilationCache
     {
         if(!req.cfg.targetType.hasBuildableOutput)
             return true;
-        import std.file : exists, getSize;
         import std.path : buildNormalizedPath, baseName;
         string cacheDir = getCacheOutputDir(rootHash, req, s);
         const(AdvDirectory)* dir = cacheDir in formula.directories;
@@ -200,7 +199,8 @@ struct CompilationCache
             if(recorded is null)
                 continue;
             string cached = buildNormalizedPath(cacheDir, name);
-            if(!exists(cached) || getSize(cached) != recorded.size)
+            ulong cachedSize;
+            if(!fileSize(cached, cachedSize) || cachedSize != recorded.size)
                 return false;
         }
         return true;
@@ -230,17 +230,31 @@ bool outputMatchesCache(string mainPackHash, const BuildRequirements req, Compil
     return outputMatchesCacheInDir(getCacheOutputDir(mainPackHash, req, s), req, s);
 }
 
+///Returns: false when the path can't be stat'ed (missing, etc.).
+private bool fileSize(string path, out ulong size)
+{
+    import std.file : getSize;
+    try
+    {
+        size = getSize(path);
+        return true;
+    }
+    catch(Exception)
+        return false;
+}
+
 private bool outputMatchesCacheInDir(string cacheDir, const BuildRequirements req, CompilationInfo s)
 {
-    import std.file : exists, getSize;
     import std.path : buildNormalizedPath, baseName;
 
     foreach(artifact; getExpectedArtifacts(req, s.targetOS, s.isa))
     {
         string cached = buildNormalizedPath(cacheDir, baseName(artifact));
-        if(!exists(cached))
+        ulong cachedSize;
+        if(!fileSize(cached, cachedSize))
             continue;
-        if(!exists(artifact) || getSize(artifact) != getSize(cached))
+        ulong artifactSize;
+        if(!fileSize(artifact, artifactSize) || artifactSize != cachedSize)
             return false;
     }
     return true;

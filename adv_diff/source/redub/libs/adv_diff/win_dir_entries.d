@@ -300,7 +300,9 @@ else version(Posix)
                 ? e.name[rootPrefixLength .. $]
                 : e.name;
             entry.isDir = e.isDir;
-            entry.isSymlink = e.isSymlink;
+            // shortcut: short-circuit the lstat on the followSymlink path; the iterator
+            // already stat'ed this entry and no consumer reads isSymlink on Posix.
+            entry.isSymlink = !followSymlink && e.isSymlink;
             entry.size = e.size;
             entry.timeModified = e.timeLastModified.stdTime;
             entry.attributes = 0;
