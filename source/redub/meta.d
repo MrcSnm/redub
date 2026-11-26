@@ -17,6 +17,9 @@ private string getRedubMetaFileName()
 }
 
 
+private JSONValue cachedMeta;
+private bool metaLoaded;
+
 void saveRedubMeta(JSONValue content)
 {
     import redub.buildapi;
@@ -26,11 +29,14 @@ void saveRedubMeta(JSONValue content)
     if(!std.file.exists(dir))
         mkdirRecurse(dir);
 
-    if(!("version" in content))
-        content["version"] = JSONValue(RedubVersionOnly);
+    ///Always stamp the running version: a meta written by another build must
+    ///not keep an old version tag, otherwise the next run ignores it.
+    content["version"] = JSONValue(RedubVersionOnly);
 
     import redub.misc.atomic_write : writeFileAtomic;
     writeFileAtomic(getRedubMetaFileName, content.toString);
+    cachedMeta = content;
+    metaLoaded = true;
 }
 
 string getCachedString(ref JSONValue v, string prop, scope lazy string valueWhenNotFound)
@@ -52,25 +58,26 @@ JSONValue getRedubMeta()
 {
     import std.file;
     import redub.buildapi;
-    static JSONValue meta;
-    string metaFile = getRedubMetaFileName;
-    if(meta == JSONValue.init)
+    if(!metaLoaded)
     {
+        metaLoaded = true;
+        string metaFile = getRedubMetaFileName;
         if(exists(metaFile))
         {
-            meta = parseJSON(cast(string)std.file.read(getRedubMetaFileName), true);
-            if(meta == JSONValue.IncompleteStream || meta.hasErrorOccurred)
-                return JSONValue.emptyObject;
-            JSONValue* ver = "version" in meta;
-            if(ver == null || ver.str != RedubVersionOnly)
-                return JSONValue.emptyObject;
+            cachedMeta = parseJSON(cast(string)std.file.read(metaFile), true);
+            if(cachedMeta == JSONValue.IncompleteStream || cachedMeta.hasErrorOccurred)
+                cachedMeta = JSONValue.emptyObject;
+            else
+            {
+                JSONValue* ver = "version" in cachedMeta;
+                if(ver == null || ver.str != RedubVersionOnly)
+                    cachedMeta = JSONValue.emptyObject;
+            }
         }
         else
-        {
-            return JSONValue.emptyObject;
-        }
+            cachedMeta = JSONValue.emptyObject;
     }
-    return meta;
+    return cachedMeta;
 }
 
 string getExistingRedubVersion()
