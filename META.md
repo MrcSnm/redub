@@ -45,7 +45,7 @@ Here are described the modules which do most of the work if someone wants to con
 - No need to handle edge cases in the beginning. They may become even separate modules.
 
 ### A week project
-- This project had a small start. I gave one week for doing it, but since it was very succesful on its
+- This project had a small start. I gave one week for doing it, but since it was very successful on its
 achievements, I decided to extend a little the deadline for achieving support.
 Right now, it has been tested with
 
